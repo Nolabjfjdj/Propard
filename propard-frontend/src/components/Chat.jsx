@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import socket from '../socket';
 
-export default function Chat({ friend, token, userId }) {
+export default function Chat({ friend, token, userId, hideFriendIps }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const bottomRef = useRef(null);
@@ -45,7 +45,9 @@ export default function Chat({ friend, token, userId }) {
         <div style={styles.headerAvatar}>{friend.username[0].toUpperCase()}</div>
         <div>
           <p style={styles.headerName}>{friend.username}</p>
-          <p style={styles.headerIp}>{friend.ipAlias}</p>
+          <p style={styles.headerIp}>
+            {hideFriendIps ? '███.███.███.███' : friend.ipAlias}
+          </p>
         </div>
         <div style={{ ...styles.onlineDot, background: friend.isOnline ? 'var(--success)' : 'var(--text-muted)', marginLeft: 'auto' }} />
       </div>
