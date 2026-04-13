@@ -5,9 +5,13 @@ import socket from '../socket';
 export default function Chat({ friend, token, userId, hideFriendIps, isMobile }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
+  const [spamWarning, setSpamWarning] = useState(false);
   const bottomRef = useRef(null);
   const lastMessageTime = useRef(0);
+  const messageCount = useRef(0);
+  const messageCountTimer = useRef(null);
   const SPAM_DELAY = 1000;
+  const SPAM_LIMIT = 15;
 
   const normalize = (id) => id?.toString();
   const myId = normalize(userId);
@@ -41,9 +45,24 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
 
   const sendMessage = () => {
     if (!input.trim()) return;
+
     const now = Date.now();
     if (now - lastMessageTime.current < SPAM_DELAY) return;
     lastMessageTime.current = now;
+
+    // Compteur anti-spam
+    messageCount.current += 1;
+    clearTimeout(messageCountTimer.current);
+    messageCountTimer.current = setTimeout(() => {
+      messageCount.current = 0;
+    }, 10000);
+
+    if (messageCount.current > SPAM_LIMIT) {
+      setSpamWarning(true);
+      setTimeout(() => setSpamWarning(false), 3000);
+      return;
+    }
+
     socket.emit('sendMessage', { receiverId: friend._id, content: input.trim() });
     setInput('');
   };
@@ -51,25 +70,23 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
   return (
     <div style={styles.container}>
 
-      {/* Header — caché sur mobile car pseudo déjà affiché en haut */}
-      {!isMobile && (
-        <div style={styles.header}>
-          <div style={styles.headerAvatar}>
-            {friend.username[0].toUpperCase()}
-          </div>
-          <div>
-            <p style={styles.headerName}>{friend.username}</p>
-            <p style={styles.headerIp}>
-              {hideFriendIps ? '███.███.███.███' : friend.ipAlias}
-            </p>
-          </div>
-          <div style={{
-            ...styles.onlineDot,
-            background: friend.isOnline ? 'var(--success)' : 'var(--text-muted)',
-            marginLeft: 'auto'
-          }} />
+      {/* Header — toujours affiché, sur mobile comme sur PC */}
+      <div style={styles.header}>
+        <div style={styles.headerAvatar}>
+          {friend.username[0].toUpperCase()}
         </div>
-      )}
+        <div>
+          <p style={styles.headerName}>{friend.username}</p>
+          <p style={styles.headerIp}>
+            {hideFriendIps ? '███.███.███.███' : friend.ipAlias}
+          </p>
+        </div>
+        <div style={{
+          ...styles.onlineDot,
+          background: friend.isOnline ? 'var(--success)' : 'var(--text-muted)',
+          marginLeft: 'auto'
+        }} />
+      </div>
 
       {/* Messages */}
       <div style={styles.messages}>
@@ -89,6 +106,13 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
         })}
         <div ref={bottomRef} />
       </div>
+
+      {/* Avertissement spam */}
+      {spamWarning && (
+        <div style={styles.spamAlert}>
+          ⚠️ Envoie moins vite !
+        </div>
+      )}
 
       {/* Input */}
       <div style={styles.inputBar}>
@@ -116,6 +140,7 @@ const styles = {
   bubble: { maxWidth: '65%', padding: '10px 14px', borderRadius: '12px' },
   text: { color: '#fff', fontSize: '14px', lineHeight: '1.4' },
   msgTime: { fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginTop: '4px', textAlign: 'right' },
+  spamAlert: { textAlign: 'center', padding: '8px', color: 'var(--danger)', fontSize: '13px', fontWeight: '600', background: 'rgba(240, 91, 91, 0.1)', borderTop: '1px solid var(--danger)' },
   inputBar: { display: 'flex', padding: '16px', gap: '8px', borderTop: '1px solid var(--border)', background: 'var(--bg-secondary)', flexShrink: 0 },
   input: { flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: '14px' },
   btn: { padding: '10px 14px', background: 'var(--accent)', color: '#fff', borderRadius: '8px', fontSize: '16px' }
