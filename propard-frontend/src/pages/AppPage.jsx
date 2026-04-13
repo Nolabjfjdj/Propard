@@ -45,6 +45,9 @@ export default function AppPage() {
       <div style={{
         ...styles.sidebar,
         position: isMobile ? 'fixed' : 'relative',
+        top: isMobile ? 0 : 'auto',
+        left: isMobile ? 0 : 'auto',
+        bottom: isMobile ? 0 : 'auto',
         transform: isMobile
           ? (showSidebar ? 'translateX(0)' : 'translateX(-100%)')
           : 'translateX(0)'
@@ -101,7 +104,7 @@ export default function AppPage() {
       </div>
 
       {/* Zone principale */}
-      <div style={{ ...styles.main, marginLeft: isMobile ? 0 : '280px' }}>
+      <div style={styles.main}>
 
         {/* Header mobile uniquement */}
         {isMobile && (
@@ -142,8 +145,8 @@ const styles = {
   layout: { display: 'flex', height: '100vh', background: 'var(--bg-primary)', overflow: 'hidden' },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 99 },
   sidebar: {
-    top: 0, left: 0, bottom: 0,
     width: '280px',
+    flexShrink: 0,
     zIndex: 100,
     display: 'flex',
     flexDirection: 'column',
@@ -152,8 +155,7 @@ const styles = {
     overflowY: 'auto',
     background: 'var(--bg-secondary)',
     borderRight: '1px solid var(--border)',
-    transition: 'transform 0.25s ease',
-    flexShrink: 0
+    transition: 'transform 0.25s ease'
   },
   sidebarHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   appName: { fontFamily: 'var(--font-mono)', fontSize: '20px', fontWeight: '700' },
@@ -164,7 +166,7 @@ const styles = {
   copyBtn: { background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600' },
   addBtn: { background: 'var(--accent)', color: '#fff', borderRadius: '8px', padding: '10px', fontSize: '14px', fontWeight: '600' },
   logoutBtn: { background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '8px', padding: '8px', fontSize: '13px', marginTop: 'auto' },
-  main: { flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, width: '100%' },
+  main: { flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' },
   mobileHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' },
   hamburger: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', fontSize: '18px' },
   mobileTitle: { fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' },
