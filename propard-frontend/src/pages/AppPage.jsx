@@ -24,6 +24,7 @@ export default function AppPage() {
 
   const [isMobile, setIsMobile] = useState(false);
 
+  // responsive
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
@@ -31,9 +32,13 @@ export default function AppPage() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
+  // socket
   useEffect(() => {
+    if (!token) return;
+
     socket.connect();
     socket.emit('authenticate', token);
+
     return () => socket.disconnect();
   }, [token]);
 
@@ -45,6 +50,7 @@ export default function AppPage() {
   return (
     <div style={styles.layout}>
 
+      {/* overlay mobile */}
       {isMobile && showSidebar && (
         <div style={styles.overlay} onClick={() => setShowSidebar(false)} />
       )}
@@ -81,6 +87,26 @@ export default function AppPage() {
           <p style={styles.ipValue}>
             {hideIp ? '███.███.███.███' : user?.ipAlias}
           </p>
+
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+            <button
+              style={styles.copyBtn}
+              onClick={() => navigator.clipboard.writeText(user?.ipAlias)}
+            >
+              📋 Copier
+            </button>
+
+            <button
+              style={styles.copyBtn}
+              onClick={() => {
+                const next = !hideIp;
+                setHideIp(next);
+                localStorage.setItem('propard_hideIp', next);
+              }}
+            >
+              {hideIp ? '👁️ Afficher' : '🙈 Masquer'}
+            </button>
+          </div>
         </div>
 
         <button style={styles.addBtn} onClick={() => setShowAddFriend(true)}>
@@ -108,7 +134,10 @@ export default function AppPage() {
 
         {isMobile && (
           <div style={styles.mobileHeader}>
-            <button style={styles.hamburger} onClick={() => setShowSidebar(true)}>
+            <button
+              style={styles.hamburger}
+              onClick={() => setShowSidebar(true)}
+            >
               ☰
             </button>
 
@@ -124,13 +153,17 @@ export default function AppPage() {
           <Chat
             friend={selectedFriend}
             token={token}
-            userId={user?._id}
+            userId={user?._id}   // 🔥 FIX IMPORTANT
             hideFriendIps={hideFriendIps}
           />
         ) : (
           <div style={styles.empty}>
             <p style={{ fontSize: 48 }}>💬</p>
-            <p>Choisis un ami</p>
+            <p>
+              {isMobile
+                ? 'Appuie sur ☰ pour voir tes amis'
+                : 'Choisis un ami à gauche'}
+            </p>
           </div>
         )}
       </div>
@@ -142,7 +175,7 @@ export default function AppPage() {
   );
 }
 
-/* ===================== STYLES ===================== */
+/* ================= STYLES ================= */
 
 const styles = {
   layout: {
@@ -202,10 +235,7 @@ const styles = {
     textAlign: 'center'
   },
 
-  ipLabel: {
-    fontSize: 11,
-    color: 'var(--text-muted)'
-  },
+  ipLabel: { fontSize: 11, color: 'var(--text-muted)' },
 
   ipValue: {
     fontSize: 16,
@@ -213,21 +243,29 @@ const styles = {
     fontFamily: 'monospace'
   },
 
+  copyBtn: {
+    background: 'var(--accent-glow)',
+    color: 'var(--accent)',
+    border: '1px solid var(--accent)',
+    borderRadius: 6,
+    padding: '5px 12px'
+  },
+
   addBtn: {
+    background: 'var(--accent)',
+    color: '#fff',
     padding: 10,
     borderRadius: 8,
-    background: 'var(--accent)',
-    color: 'white',
     fontWeight: 600
   },
 
   logoutBtn: {
     marginTop: 'auto',
-    padding: 8,
-    borderRadius: 8,
     border: '1px solid red',
     color: 'red',
-    background: 'transparent'
+    background: 'transparent',
+    padding: 8,
+    borderRadius: 8
   },
 
   main: (isMobile) => ({
@@ -243,8 +281,8 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     padding: 12,
-    borderBottom: '1px solid var(--border)',
-    background: 'var(--bg-secondary)'
+    background: 'var(--bg-secondary)',
+    borderBottom: '1px solid var(--border)'
   },
 
   hamburger: {
@@ -255,8 +293,8 @@ const styles = {
   },
 
   mobileTitle: {
-    fontWeight: 700,
-    fontFamily: 'monospace'
+    fontFamily: 'monospace',
+    fontWeight: 700
   },
 
   empty: {
