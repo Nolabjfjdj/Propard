@@ -11,6 +11,7 @@ export default function AppPage() {
   const { theme, toggleTheme } = useTheme();
   const [selectedFriend, setSelectedFriend] = useState(null);
   const [showAddFriend, setShowAddFriend] = useState(false);
+  const [hideIp, setHideIp] = useState(false);
 
   useEffect(() => {
     socket.connect();
@@ -28,10 +29,17 @@ export default function AppPage() {
 
         <div style={styles.ipCard}>
           <p style={styles.ipLabel}>Ton adresse</p>
-          <p style={styles.ipValue}>{user?.ipAlias}</p>
-          <button style={styles.copyBtn} onClick={() => navigator.clipboard.writeText(user?.ipAlias)}>
-            📋 Copier
-          </button>
+          <p style={styles.ipValue}>
+            {hideIp ? '███.███.███.███' : user?.ipAlias}
+          </p>
+          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+            <button style={styles.copyBtn} onClick={() => navigator.clipboard.writeText(user?.ipAlias)}>
+              📋 Copier
+            </button>
+            <button style={styles.copyBtn} onClick={() => setHideIp(!hideIp)}>
+              {hideIp ? '👁️ Afficher' : '🙈 Masquer'}
+            </button>
+          </div>
         </div>
 
         <button style={styles.addBtn} onClick={() => setShowAddFriend(true)}>+ Ajouter un ami</button>
