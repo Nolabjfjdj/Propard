@@ -12,6 +12,7 @@ export default function AppPage() {
   const [selectedFriend, setSelectedFriend] = useState(null);
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [hideIp, setHideIp] = useState(false);
+  const [hideFriendIps, setHideFriendIps] = useState(false);
 
   useEffect(() => {
     socket.connect();
@@ -44,14 +45,20 @@ export default function AppPage() {
 
         <button style={styles.addBtn} onClick={() => setShowAddFriend(true)}>+ Ajouter un ami</button>
 
-        <FriendList token={token} selectedFriend={selectedFriend} onSelectFriend={setSelectedFriend} />
+        <FriendList
+          token={token}
+          selectedFriend={selectedFriend}
+          onSelectFriend={setSelectedFriend}
+          hideFriendIps={hideFriendIps}
+          setHideFriendIps={setHideFriendIps}
+        />
 
         <button style={styles.logoutBtn} onClick={logout}>Déconnexion</button>
       </div>
 
       <div style={styles.main}>
         {selectedFriend ? (
-          <Chat friend={selectedFriend} token={token} userId={user?.id} />
+          <Chat friend={selectedFriend} token={token} userId={user?.id} hideFriendIps={hideFriendIps} />
         ) : (
           <div style={styles.empty}>
             <p style={{ fontSize: '48px' }}>💬</p>
