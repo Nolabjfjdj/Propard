@@ -36,12 +36,10 @@ export default function AppPage() {
   return (
     <div style={styles.layout}>
 
-      {/* Overlay mobile */}
       {isMobile && showSidebar && (
         <div style={styles.overlay} onClick={() => setShowSidebar(false)} />
       )}
 
-      {/* Sidebar */}
       <div style={{
         ...styles.sidebar,
         position: isMobile ? 'fixed' : 'relative',
@@ -103,16 +101,21 @@ export default function AppPage() {
         <button style={styles.logoutBtn} onClick={logout}>Déconnexion</button>
       </div>
 
-      {/* Zone principale */}
       <div style={styles.main}>
 
-        {/* Header mobile uniquement */}
-        {isMobile && (
+        {/* Header mobile — affiché seulement quand PAS dans une conversation */}
+        {isMobile && !selectedFriend && (
           <div style={styles.mobileHeader}>
             <button style={styles.hamburger} onClick={() => setShowSidebar(true)}>☰</button>
-            <span style={styles.mobileTitle}>
-              {selectedFriend ? selectedFriend.username : 'Propard'}
-            </span>
+            <span style={styles.mobileTitle}>Propard</span>
+            <div style={{ width: '36px' }} />
+          </div>
+        )}
+
+        {/* Bouton retour sur mobile quand dans une conversation */}
+        {isMobile && selectedFriend && (
+          <div style={styles.mobileHeader}>
+            <button style={styles.hamburger} onClick={() => setSelectedFriend(null)}>←</button>
             <div style={{ width: '36px' }} />
           </div>
         )}
@@ -123,6 +126,7 @@ export default function AppPage() {
             token={token}
             userId={user?.id}
             hideFriendIps={hideFriendIps}
+            isMobile={isMobile}
           />
         ) : (
           <div style={styles.empty}>
@@ -144,19 +148,7 @@ export default function AppPage() {
 const styles = {
   layout: { display: 'flex', height: '100vh', background: 'var(--bg-primary)', overflow: 'hidden' },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 99 },
-  sidebar: {
-    width: '280px',
-    flexShrink: 0,
-    zIndex: 100,
-    display: 'flex',
-    flexDirection: 'column',
-    padding: '16px',
-    gap: '12px',
-    overflowY: 'auto',
-    background: 'var(--bg-secondary)',
-    borderRight: '1px solid var(--border)',
-    transition: 'transform 0.25s ease'
-  },
+  sidebar: { width: '280px', flexShrink: 0, zIndex: 100, display: 'flex', flexDirection: 'column', padding: '16px', gap: '12px', overflowY: 'auto', background: 'var(--bg-secondary)', borderRight: '1px solid var(--border)', transition: 'transform 0.25s ease' },
   sidebarHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   appName: { fontFamily: 'var(--font-mono)', fontSize: '20px', fontWeight: '700' },
   iconBtn: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', fontSize: '16px' },
