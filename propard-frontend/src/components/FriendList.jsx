@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import socket from '../socket';
 
-export default function FriendList({ token, selectedFriend, onSelectFriend }) {
+export default function FriendList({ token, selectedFriend, onSelectFriend, hideFriendIps, setHideFriendIps }) {
   const [friends, setFriends] = useState([]);
   const [requests, setRequests] = useState([]);
   const [unread, setUnread] = useState({});
-  const [hideFriendIps, setHideFriendIps] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -24,7 +23,6 @@ export default function FriendList({ token, selectedFriend, onSelectFriend }) {
     return () => clearInterval(interval);
   }, [token]);
 
-  // Écoute les nouveaux messages pour le badge
   useEffect(() => {
     const handleNew = (msg) => {
       const senderId = msg.sender._id || msg.sender;
