@@ -11,8 +11,8 @@ export default function AppPage() {
   const { theme, toggleTheme } = useTheme();
   const [selectedFriend, setSelectedFriend] = useState(null);
   const [showAddFriend, setShowAddFriend] = useState(false);
-  const [hideIp, setHideIp] = useState(false);
-  const [hideFriendIps, setHideFriendIps] = useState(false);
+  const [hideIp, setHideIp] = useState(() => localStorage.getItem('propard_hideIp') === 'true');
+  const [hideFriendIps, setHideFriendIps] = useState(() => localStorage.getItem('propard_hideFriendIps') === 'true');
 
   useEffect(() => {
     socket.connect();
