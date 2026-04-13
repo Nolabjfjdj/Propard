@@ -2,10 +2,12 @@ import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import socket from '../socket';
 
-export default function Chat({ friend, token, userId, hideFriendIps }) {
+export default function Chat({ friend, token, userId, hideFriendIps, isMobile }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const bottomRef = useRef(null);
+  const lastMessageTime = useRef(0);
+  const SPAM_DELAY = 1000;
 
   const normalize = (id) => id?.toString();
   const myId = normalize(userId);
@@ -39,6 +41,9 @@ export default function Chat({ friend, token, userId, hideFriendIps }) {
 
   const sendMessage = () => {
     if (!input.trim()) return;
+    const now = Date.now();
+    if (now - lastMessageTime.current < SPAM_DELAY) return;
+    lastMessageTime.current = now;
     socket.emit('sendMessage', { receiverId: friend._id, content: input.trim() });
     setInput('');
   };
@@ -46,23 +51,25 @@ export default function Chat({ friend, token, userId, hideFriendIps }) {
   return (
     <div style={styles.container}>
 
-      {/* Header avec pseudo et IP */}
-      <div style={styles.header}>
-        <div style={styles.headerAvatar}>
-          {friend.username[0].toUpperCase()}
+      {/* Header — caché sur mobile car pseudo déjà affiché en haut */}
+      {!isMobile && (
+        <div style={styles.header}>
+          <div style={styles.headerAvatar}>
+            {friend.username[0].toUpperCase()}
+          </div>
+          <div>
+            <p style={styles.headerName}>{friend.username}</p>
+            <p style={styles.headerIp}>
+              {hideFriendIps ? '███.███.███.███' : friend.ipAlias}
+            </p>
+          </div>
+          <div style={{
+            ...styles.onlineDot,
+            background: friend.isOnline ? 'var(--success)' : 'var(--text-muted)',
+            marginLeft: 'auto'
+          }} />
         </div>
-        <div>
-          <p style={styles.headerName}>{friend.username}</p>
-          <p style={styles.headerIp}>
-            {hideFriendIps ? '███.███.███.███' : friend.ipAlias}
-          </p>
-        </div>
-        <div style={{
-          ...styles.onlineDot,
-          background: friend.isOnline ? 'var(--success)' : 'var(--text-muted)',
-          marginLeft: 'auto'
-        }} />
-      </div>
+      )}
 
       {/* Messages */}
       <div style={styles.messages}>
