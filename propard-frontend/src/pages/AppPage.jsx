@@ -120,7 +120,7 @@ export default function AppPage() {
       </div>
 
       {/* Main */}
-      <div style={styles.main}>
+      <div style={styles.main(isMobile)}>
 
         {/* Mobile header */}
         {isMobile && (
@@ -268,13 +268,14 @@ const styles = {
     marginTop: 'auto'
   },
 
-  main: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    minWidth: 0,
-    marginLeft: '280px'
-  },
+  main: (isMobile) => ({
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  minWidth: 0,
+  marginLeft: isMobile ? '0' : '280px',
+  width: '100%'
+  }),
 
   mobileHeader: {
     display: 'flex',
