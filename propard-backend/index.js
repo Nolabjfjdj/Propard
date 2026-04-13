@@ -4,7 +4,6 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-
 require('dotenv').config();
 
 const app = express();
@@ -12,10 +11,7 @@ const server = http.createServer(app);
 
 // ─── SOCKET.IO ─────────────────────────────
 const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
+  cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
 // ─── MIDDLEWARES ───────────────────────────
@@ -31,22 +27,12 @@ mongoose.connect(process.env.MONGO_URI)
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/friends', require('./routes/friends'));
 
-// 🔥 UPTIME ROBOT FIX
-app.get('/', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    message: 'API online 🚀'
-  });
-});
+app.get('/', (req, res) => res.status(200).json({ status: 'ok', message: 'API online 🚀' }));
+app.get('/health', (req, res) => res.status(200).send('OK'));
 
-// 🔥 OPTION RECOMMANDÉE
-app.get('/health', (req, res) => {
-  res.status(200).send('OK');
-});
-
-// ─── SOCKET LOGIC ─────────────────────────
+// ─── SOCKET LOGIC ──────────────────────────
 const connectedUsers = new Map();
-
+const lastMessageTimes = new Map(); // anti-spam : userId -> timestamp
 const Message = require('./models/Message');
 const User = require('./models/User');
 
@@ -57,14 +43,10 @@ io.on('connection', (socket) => {
   socket.on('authenticate', async (token) => {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
       socket.userId = decoded.id;
       connectedUsers.set(decoded.id, socket.id);
-
       await User.findByIdAndUpdate(decoded.id, { isOnline: true });
-
       socket.emit('authenticated', true);
-
     } catch (err) {
       socket.emit('authenticated', false);
     }
@@ -74,8 +56,15 @@ io.on('connection', (socket) => {
   socket.on('sendMessage', async ({ receiverId, content }) => {
     try {
       if (!socket.userId) return;
-
       if (!content || !content.trim()) return;
+
+      // ─── Anti-spam : 1 message par seconde max ───
+      const now = Date.now();
+      const last = lastMessageTimes.get(socket.userId) || 0;
+      if (now - last < 1000) {
+        return socket.emit('spamWarning', { message: 'Envoie pas si vite !' });
+      }
+      lastMessageTimes.set(socket.userId, now);
 
       const message = await Message.create({
         sender: socket.userId,
@@ -83,28 +72,21 @@ io.on('connection', (socket) => {
         content: content.trim()
       });
 
-      const sender = await User.findById(socket.userId)
-        .select('username ipAlias');
+      const sender = await User.findById(socket.userId).select('username ipAlias');
 
       const messageData = {
         _id: message._id.toString(),
-
-        // IMPORTANT: toujours string pour éviter bug front
         sender: socket.userId,
-
         senderInfo: sender,
-
         receiver: receiverId,
         content: message.content,
         createdAt: message.createdAt
       };
 
       const receiverSocket = connectedUsers.get(receiverId);
-
       if (receiverSocket) {
         io.to(receiverSocket).emit('newMessage', messageData);
       }
-
       socket.emit('messageSent', messageData);
 
     } catch (err) {
@@ -116,6 +98,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', async () => {
     if (socket.userId) {
       connectedUsers.delete(socket.userId);
+      lastMessageTimes.delete(socket.userId);
       await User.findByIdAndUpdate(socket.userId, { isOnline: false });
     }
   });
@@ -123,7 +106,6 @@ io.on('connection', (socket) => {
 
 // ─── START SERVER ──────────────────────────
 const PORT = process.env.PORT || 3000;
-
 server.listen(PORT, () => {
   console.log(`🚀 Serveur lancé sur le port ${PORT}`);
 });
