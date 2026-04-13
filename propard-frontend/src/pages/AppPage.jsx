@@ -9,24 +9,15 @@ import AddFriend from '../components/AddFriend';
 export default function AppPage() {
   const { user, token, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-
   const [selectedFriend, setSelectedFriend] = useState(null);
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
-
-  const [hideIp, setHideIp] = useState(() =>
-    localStorage.getItem('propard_hideIp') === 'true'
-  );
-
-  const [hideFriendIps, setHideFriendIps] = useState(() =>
-    localStorage.getItem('propard_hideFriendIps') === 'true'
-  );
-
-  const [isMobile, setIsMobile] = useState(false);
+  const [hideIp, setHideIp] = useState(() => localStorage.getItem('propard_hideIp') === 'true');
+  const [hideFriendIps, setHideFriendIps] = useState(() => localStorage.getItem('propard_hideFriendIps') === 'true');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
-    check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
@@ -45,31 +36,29 @@ export default function AppPage() {
   return (
     <div style={styles.layout}>
 
+      {/* Overlay mobile */}
       {isMobile && showSidebar && (
         <div style={styles.overlay} onClick={() => setShowSidebar(false)} />
       )}
 
+      {/* Sidebar */}
       <div style={{
         ...styles.sidebar,
+        position: isMobile ? 'fixed' : 'relative',
         transform: isMobile
           ? (showSidebar ? 'translateX(0)' : 'translateX(-100%)')
           : 'translateX(0)'
       }}>
-
         <div style={styles.sidebarHeader}>
           <span style={styles.appName}>
             Propard<span style={{ color: 'var(--accent)' }}>.</span>
           </span>
-
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: '6px' }}>
             <button onClick={toggleTheme} style={styles.iconBtn}>
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>
-
             {isMobile && (
-              <button onClick={() => setShowSidebar(false)} style={styles.iconBtn}>
-                ✕
-              </button>
+              <button onClick={() => setShowSidebar(false)} style={styles.iconBtn}>✕</button>
             )}
           </div>
         </div>
@@ -79,6 +68,18 @@ export default function AppPage() {
           <p style={styles.ipValue}>
             {hideIp ? '███.███.███.███' : user?.ipAlias}
           </p>
+          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+            <button style={styles.copyBtn} onClick={() => navigator.clipboard.writeText(user?.ipAlias)}>
+              📋 Copier
+            </button>
+            <button style={styles.copyBtn} onClick={() => {
+              const next = !hideIp;
+              setHideIp(next);
+              localStorage.setItem('propard_hideIp', next);
+            }}>
+              {hideIp ? '👁️ Afficher' : '🙈 Masquer'}
+            </button>
+          </div>
         </div>
 
         <button style={styles.addBtn} onClick={() => setShowAddFriend(true)}>
@@ -96,24 +97,20 @@ export default function AppPage() {
           }}
         />
 
-        <button style={styles.logoutBtn} onClick={logout}>
-          Déconnexion
-        </button>
+        <button style={styles.logoutBtn} onClick={logout}>Déconnexion</button>
       </div>
 
-      <div style={styles.main(isMobile)}>
+      {/* Zone principale */}
+      <div style={{ ...styles.main, marginLeft: isMobile ? 0 : '280px' }}>
 
+        {/* Header mobile uniquement */}
         {isMobile && (
           <div style={styles.mobileHeader}>
-            <button style={styles.hamburger} onClick={() => setShowSidebar(true)}>
-              ☰
-            </button>
-
+            <button style={styles.hamburger} onClick={() => setShowSidebar(true)}>☰</button>
             <span style={styles.mobileTitle}>
               {selectedFriend ? selectedFriend.username : 'Propard'}
             </span>
-
-            <div style={{ width: 36 }} />
+            <div style={{ width: '36px' }} />
           </div>
         )}
 
@@ -121,13 +118,15 @@ export default function AppPage() {
           <Chat
             friend={selectedFriend}
             token={token}
-            userId={user?._id}   {/* ⚠️ IMPORTANT FIX ICI */}
+            userId={user?.id}
             hideFriendIps={hideFriendIps}
           />
         ) : (
           <div style={styles.empty}>
-            <p style={{ fontSize: 48 }}>💬</p>
-            <p>Choisis un ami</p>
+            <p style={{ fontSize: '48px' }}>💬</p>
+            <p style={styles.emptyText}>
+              {isMobile ? 'Appuie sur ☰ pour voir tes amis' : 'Sélectionne un ami pour chatter'}
+            </p>
           </div>
         )}
       </div>
@@ -139,22 +138,36 @@ export default function AppPage() {
   );
 }
 
-/* styles inchangés */
 const styles = {
   layout: { display: 'flex', height: '100vh', background: 'var(--bg-primary)', overflow: 'hidden' },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 99 },
-  sidebar: { position: 'fixed', top: 0, left: 0, bottom: 0, width: 280, zIndex: 100, display: 'flex', flexDirection: 'column', padding: 16, gap: 12, overflowY: 'auto', background: 'var(--bg-secondary)', borderRight: '1px solid var(--border)', transition: 'transform 0.25s ease' },
-  sidebarHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  appName: { fontSize: 20, fontWeight: 700, fontFamily: 'monospace' },
-  iconBtn: { padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-tertiary)' },
-  ipCard: { padding: 14, borderRadius: 10, background: 'var(--bg-tertiary)', textAlign: 'center' },
-  ipLabel: { fontSize: 11, color: 'var(--text-muted)' },
-  ipValue: { fontSize: 16, color: 'var(--accent)', fontFamily: 'monospace' },
-  addBtn: { padding: 10, borderRadius: 8, background: 'var(--accent)', color: 'white', fontWeight: 600 },
-  logoutBtn: { marginTop: 'auto', padding: 8, borderRadius: 8, border: '1px solid red', color: 'red', background: 'transparent' },
-  main: (isMobile) => ({ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, marginLeft: isMobile ? 0 : 280, width: '100%' }),
-  mobileHeader: { display: 'flex', justifyContent: 'space-between', padding: 12, borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)' },
-  hamburger: { padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-tertiary)' },
-  mobileTitle: { fontWeight: 700, fontFamily: 'monospace' },
-  empty: { flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: 10 }
+  sidebar: {
+    top: 0, left: 0, bottom: 0,
+    width: '280px',
+    zIndex: 100,
+    display: 'flex',
+    flexDirection: 'column',
+    padding: '16px',
+    gap: '12px',
+    overflowY: 'auto',
+    background: 'var(--bg-secondary)',
+    borderRight: '1px solid var(--border)',
+    transition: 'transform 0.25s ease',
+    flexShrink: 0
+  },
+  sidebarHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  appName: { fontFamily: 'var(--font-mono)', fontSize: '20px', fontWeight: '700' },
+  iconBtn: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', fontSize: '16px' },
+  ipCard: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px', textAlign: 'center' },
+  ipLabel: { fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' },
+  ipValue: { fontFamily: 'var(--font-mono)', fontSize: '17px', fontWeight: '700', color: 'var(--accent)', marginBottom: '10px' },
+  copyBtn: { background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600' },
+  addBtn: { background: 'var(--accent)', color: '#fff', borderRadius: '8px', padding: '10px', fontSize: '14px', fontWeight: '600' },
+  logoutBtn: { background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '8px', padding: '8px', fontSize: '13px', marginTop: 'auto' },
+  main: { flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, width: '100%' },
+  mobileHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' },
+  hamburger: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', fontSize: '18px' },
+  mobileTitle: { fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' },
+  empty: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' },
+  emptyText: { color: 'var(--text-secondary)', fontSize: '15px' }
 };
