@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema({
     unique: true,
     trim: true,
     minlength: 3,
-    maxlength: 20
+    maxlength: 16
   },
 
   // Le mot de passe (sera chiffré)
