@@ -7,26 +7,21 @@ export default function Chat({ friend, token, userId, hideFriendIps }) {
   const [input, setInput] = useState('');
   const bottomRef = useRef(null);
 
-  const normalize = (id) => id?.toString?.() || id;
+  const normalize = (id) => id?.toString();
 
   const myId = normalize(userId);
-  const friendId = normalize(friend._id);
 
   useEffect(() => {
     const fetchMessages = async () => {
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_URL}/api/friends/messages/${friend._id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setMessages(res.data);
-      } catch (err) {
-        console.error(err);
-      }
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/friends/messages/${friend._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setMessages(res.data);
     };
 
     fetchMessages();
-  }, [friend._id, token]);
+  }, [friend._id]);
 
   useEffect(() => {
     const handleNew = (msg) => {
@@ -50,8 +45,8 @@ export default function Chat({ friend, token, userId, hideFriendIps }) {
     if (!input.trim()) return;
 
     socket.emit('sendMessage', {
-      receiverId: friendId,
-      content: input.trim()
+      receiverId: friend._id,
+      content: input.trim(),
     });
 
     setInput('');
@@ -60,42 +55,28 @@ export default function Chat({ friend, token, userId, hideFriendIps }) {
   return (
     <div style={styles.container}>
 
-      <div style={styles.header}>
-        <div style={styles.avatar}>
-          {friend.username[0].toUpperCase()}
-        </div>
-
-        <div>
-          <div style={styles.name}>{friend.username}</div>
-          <div style={styles.ip}>
-            {hideFriendIps ? '███.███.███.███' : friend.ipAlias}
-          </div>
-        </div>
-      </div>
-
       <div style={styles.messages}>
         {messages.map((msg, i) => {
-          const senderId = normalize(msg.sender?._id || msg.sender);
+          const senderId =
+            msg.sender?._id?.toString?.() || msg.sender?.toString?.();
 
           const isMe = senderId === myId;
 
           return (
             <div
-              key={msg._id || i}
+              key={i}
               style={{
                 display: 'flex',
-                justifyContent: isMe ? 'flex-end' : 'flex-start'
+                justifyContent: isMe ? 'flex-end' : 'flex-start',
               }}
             >
               <div
                 style={{
                   ...styles.bubble,
-                  background: isMe
-                    ? 'var(--accent)'
-                    : 'var(--bg-tertiary)'
+                  background: isMe ? 'var(--accent)' : 'var(--bg-tertiary)',
                 }}
               >
-                <div style={styles.text}>{msg.content}</div>
+                <p style={styles.text}>{msg.content}</p>
               </div>
             </div>
           );
@@ -106,61 +87,20 @@ export default function Chat({ friend, token, userId, hideFriendIps }) {
 
       <div style={styles.inputBar}>
         <input
-          style={styles.input}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-          placeholder="Message..."
+          style={styles.input}
         />
 
-        <button style={styles.send} onClick={sendMessage}>
-          ➤
-        </button>
+        <button onClick={sendMessage} style={styles.btn}>➤</button>
       </div>
     </div>
   );
 }
 
-/* ========== STYLES ========== */
-
 const styles = {
-  container: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100vh'
-  },
-
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    padding: 16,
-    borderBottom: '1px solid var(--border)',
-    background: 'var(--bg-secondary)'
-  },
-
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: '50%',
-    background: 'var(--accent-glow)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    fontWeight: 700
-  },
-
-  name: {
-    fontWeight: 600,
-    color: 'var(--text-primary)'
-  },
-
-  ip: {
-    fontSize: 11,
-    color: 'var(--text-muted)',
-    fontFamily: 'monospace'
-  },
+  container: { flex: 1, display: 'flex', flexDirection: 'column', height: '100vh' },
 
   messages: {
     flex: 1,
@@ -168,26 +108,24 @@ const styles = {
     padding: 20,
     display: 'flex',
     flexDirection: 'column',
-    gap: 8
+    gap: 8,
   },
 
   bubble: {
     maxWidth: '65%',
     padding: '10px 14px',
-    borderRadius: 12
+    borderRadius: 12,
   },
 
   text: {
-    fontSize: 14,
-    color: '#fff'
+    color: '#fff',
   },
 
   inputBar: {
     display: 'flex',
-    gap: 8,
     padding: 16,
+    gap: 8,
     borderTop: '1px solid var(--border)',
-    background: 'var(--bg-secondary)'
   },
 
   input: {
@@ -195,14 +133,12 @@ const styles = {
     padding: 12,
     borderRadius: 8,
     border: '1px solid var(--border)',
-    background: 'var(--bg-tertiary)',
-    color: 'var(--text-primary)'
   },
 
-  send: {
-    padding: '12px 16px',
-    borderRadius: 8,
+  btn: {
+    padding: '10px 14px',
     background: 'var(--accent)',
-    color: '#fff'
-  }
+    color: '#fff',
+    borderRadius: 8,
+  },
 };
