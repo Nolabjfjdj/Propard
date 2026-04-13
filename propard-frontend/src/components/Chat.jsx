@@ -7,7 +7,6 @@ export default function Chat({ friend, token, userId, hideFriendIps }) {
   const [input, setInput] = useState('');
   const bottomRef = useRef(null);
 
-  // normalisation ID (IMPORTANT)
   const normalize = (id) => id?.toString?.() || id;
 
   const myId = normalize(userId);
@@ -52,7 +51,7 @@ export default function Chat({ friend, token, userId, hideFriendIps }) {
 
     socket.emit('sendMessage', {
       receiverId: friendId,
-      content: input.trim(),
+      content: input.trim()
     });
 
     setInput('');
@@ -60,16 +59,17 @@ export default function Chat({ friend, token, userId, hideFriendIps }) {
 
   return (
     <div style={styles.container}>
+
       <div style={styles.header}>
-        <div style={styles.headerAvatar}>
+        <div style={styles.avatar}>
           {friend.username[0].toUpperCase()}
         </div>
 
         <div>
-          <p style={styles.headerName}>{friend.username}</p>
-          <p style={styles.headerIp}>
+          <div style={styles.name}>{friend.username}</div>
+          <div style={styles.ip}>
             {hideFriendIps ? '███.███.███.███' : friend.ipAlias}
-          </p>
+          </div>
         </div>
       </div>
 
@@ -84,7 +84,7 @@ export default function Chat({ friend, token, userId, hideFriendIps }) {
               key={msg._id || i}
               style={{
                 display: 'flex',
-                justifyContent: isMe ? 'flex-end' : 'flex-start',
+                justifyContent: isMe ? 'flex-end' : 'flex-start'
               }}
             >
               <div
@@ -92,16 +92,10 @@ export default function Chat({ friend, token, userId, hideFriendIps }) {
                   ...styles.bubble,
                   background: isMe
                     ? 'var(--accent)'
-                    : 'var(--bg-tertiary)',
+                    : 'var(--bg-tertiary)'
                 }}
               >
-                <p style={styles.msgContent}>{msg.content}</p>
-                <p style={styles.msgTime}>
-                  {new Date(msg.createdAt).toLocaleTimeString('fr-FR', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </p>
+                <div style={styles.text}>{msg.content}</div>
               </div>
             </div>
           );
@@ -113,13 +107,13 @@ export default function Chat({ friend, token, userId, hideFriendIps }) {
       <div style={styles.inputBar}>
         <input
           style={styles.input}
-          placeholder={`Message à ${friend.username}...`}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+          placeholder="Message..."
         />
 
-        <button style={styles.sendBtn} onClick={sendMessage}>
+        <button style={styles.send} onClick={sendMessage}>
           ➤
         </button>
       </div>
@@ -127,100 +121,88 @@ export default function Chat({ friend, token, userId, hideFriendIps }) {
   );
 }
 
+/* ========== STYLES ========== */
+
 const styles = {
   container: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    height: '100vh',
+    height: '100vh'
   },
 
   header: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    padding: '16px 20px',
-    background: 'var(--bg-secondary)',
+    gap: 12,
+    padding: 16,
     borderBottom: '1px solid var(--border)',
+    background: 'var(--bg-secondary)'
   },
 
-  headerAvatar: {
-    width: '40px',
-    height: '40px',
+  avatar: {
+    width: 40,
+    height: 40,
     borderRadius: '50%',
     background: 'var(--accent-glow)',
-    border: '1px solid var(--accent)',
     display: 'flex',
-    alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '16px',
-    fontWeight: '700',
-    color: 'var(--accent)',
+    alignItems: 'center',
+    fontWeight: 700
   },
 
-  headerName: {
-    fontSize: '15px',
-    fontWeight: '600',
-    color: 'var(--text-primary)',
+  name: {
+    fontWeight: 600,
+    color: 'var(--text-primary)'
   },
 
-  headerIp: {
-    fontSize: '11px',
+  ip: {
+    fontSize: 11,
     color: 'var(--text-muted)',
-    fontFamily: 'var(--font-mono)',
+    fontFamily: 'monospace'
   },
 
   messages: {
     flex: 1,
     overflowY: 'auto',
-    padding: '20px',
+    padding: 20,
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    gap: 8
   },
 
   bubble: {
     maxWidth: '65%',
-    borderRadius: '12px',
     padding: '10px 14px',
+    borderRadius: 12
   },
 
-  msgContent: {
-    fontSize: '14px',
-    color: '#fff',
-    lineHeight: '1.4',
-  },
-
-  msgTime: {
-    fontSize: '10px',
-    color: 'rgba(255,255,255,0.6)',
-    marginTop: '4px',
-    textAlign: 'right',
+  text: {
+    fontSize: 14,
+    color: '#fff'
   },
 
   inputBar: {
     display: 'flex',
-    gap: '8px',
-    padding: '16px 20px',
-    background: 'var(--bg-secondary)',
+    gap: 8,
+    padding: 16,
     borderTop: '1px solid var(--border)',
+    background: 'var(--bg-secondary)'
   },
 
   input: {
     flex: 1,
-    background: 'var(--bg-tertiary)',
+    padding: 12,
+    borderRadius: 8,
     border: '1px solid var(--border)',
-    borderRadius: '8px',
-    padding: '12px 16px',
-    color: 'var(--text-primary)',
-    fontSize: '14px',
+    background: 'var(--bg-tertiary)',
+    color: 'var(--text-primary)'
   },
 
-  sendBtn: {
-    background: 'var(--accent)',
-    color: '#fff',
-    borderRadius: '8px',
+  send: {
     padding: '12px 16px',
-    fontSize: '16px',
-  },
+    borderRadius: 8,
+    background: 'var(--accent)',
+    color: '#fff'
+  }
 };
