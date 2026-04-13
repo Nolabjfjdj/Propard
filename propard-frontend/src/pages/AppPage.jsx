@@ -14,19 +14,23 @@ export default function AppPage() {
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
 
-  const [hideIp, setHideIp] = useState(() => localStorage.getItem('propard_hideIp') === 'true');
-  const [hideFriendIps, setHideFriendIps] = useState(() => localStorage.getItem('propard_hideFriendIps') === 'true');
+  const [hideIp, setHideIp] = useState(() =>
+    localStorage.getItem('propard_hideIp') === 'true'
+  );
 
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [hideFriendIps, setHideFriendIps] = useState(() =>
+    localStorage.getItem('propard_hideFriendIps') === 'true'
+  );
 
-  // Responsive listener
+  const [isMobile, setIsMobile] = useState(false);
+
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Socket auth
   useEffect(() => {
     socket.connect();
     socket.emit('authenticate', token);
@@ -41,24 +45,25 @@ export default function AppPage() {
   return (
     <div style={styles.layout}>
 
-      {/* Overlay mobile */}
       {isMobile && showSidebar && (
         <div style={styles.overlay} onClick={() => setShowSidebar(false)} />
       )}
 
-      {/* Sidebar */}
-      <div style={{
-        ...styles.sidebar,
-        transform: isMobile
-          ? (showSidebar ? 'translateX(0)' : 'translateX(-100%)')
-          : 'translateX(0)'
-      }}>
+      {/* SIDEBAR */}
+      <div
+        style={{
+          ...styles.sidebar,
+          transform: isMobile
+            ? (showSidebar ? 'translateX(0)' : 'translateX(-100%)')
+            : 'translateX(0)'
+        }}
+      >
         <div style={styles.sidebarHeader}>
           <span style={styles.appName}>
             Propard<span style={{ color: 'var(--accent)' }}>.</span>
           </span>
 
-          <div style={{ display: 'flex', gap: '6px' }}>
+          <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={toggleTheme} style={styles.iconBtn}>
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>
@@ -71,32 +76,11 @@ export default function AppPage() {
           </div>
         </div>
 
-        {/* IP */}
         <div style={styles.ipCard}>
           <p style={styles.ipLabel}>Ton adresse</p>
           <p style={styles.ipValue}>
             {hideIp ? '███.███.███.███' : user?.ipAlias}
           </p>
-
-          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-            <button
-              style={styles.copyBtn}
-              onClick={() => navigator.clipboard.writeText(user?.ipAlias)}
-            >
-              📋 Copier
-            </button>
-
-            <button
-              style={styles.copyBtn}
-              onClick={() => {
-                const next = !hideIp;
-                setHideIp(next);
-                localStorage.setItem('propard_hideIp', next);
-              }}
-            >
-              {hideIp ? '👁️ Afficher' : '🙈 Masquer'}
-            </button>
-          </div>
         </div>
 
         <button style={styles.addBtn} onClick={() => setShowAddFriend(true)}>
@@ -119,10 +103,9 @@ export default function AppPage() {
         </button>
       </div>
 
-      {/* Main */}
+      {/* MAIN */}
       <div style={styles.main(isMobile)}>
 
-        {/* Mobile header */}
         {isMobile && (
           <div style={styles.mobileHeader}>
             <button style={styles.hamburger} onClick={() => setShowSidebar(true)}>
@@ -133,7 +116,7 @@ export default function AppPage() {
               {selectedFriend ? selectedFriend.username : 'Propard'}
             </span>
 
-            <div style={{ width: '36px' }} />
+            <div style={{ width: 36 }} />
           </div>
         )}
 
@@ -141,17 +124,13 @@ export default function AppPage() {
           <Chat
             friend={selectedFriend}
             token={token}
-            userId={user?.id}
+            userId={user?._id}
             hideFriendIps={hideFriendIps}
           />
         ) : (
           <div style={styles.empty}>
-            <p style={{ fontSize: '48px' }}>💬</p>
-            <p style={styles.emptyText}>
-              {isMobile
-                ? 'Appuie sur ☰ pour voir tes amis'
-                : 'Choisis un ami à gauche'}
-            </p>
+            <p style={{ fontSize: 48 }}>💬</p>
+            <p>Choisis un ami</p>
           </div>
         )}
       </div>
@@ -162,6 +141,8 @@ export default function AppPage() {
     </div>
   );
 }
+
+/* ===================== STYLES ===================== */
 
 const styles = {
   layout: {
@@ -183,135 +164,107 @@ const styles = {
     top: 0,
     left: 0,
     bottom: 0,
+    width: 280,
     zIndex: 100,
-    width: '280px',
-    background: 'var(--bg-secondary)',
-    borderRight: '1px solid var(--border)',
     display: 'flex',
     flexDirection: 'column',
-    padding: '16px',
-    gap: '12px',
+    padding: 16,
+    gap: 12,
     overflowY: 'auto',
+    background: 'var(--bg-secondary)',
+    borderRight: '1px solid var(--border)',
     transition: 'transform 0.25s ease'
   },
 
   sidebarHeader: {
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    alignItems: 'center'
   },
 
   appName: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: '20px',
-    fontWeight: '700'
+    fontSize: 20,
+    fontWeight: 700,
+    fontFamily: 'monospace'
   },
 
   iconBtn: {
-    background: 'var(--bg-tertiary)',
-    border: '1px solid var(--border)',
-    borderRadius: '8px',
     padding: '6px 10px',
-    fontSize: '16px'
+    borderRadius: 8,
+    border: '1px solid var(--border)',
+    background: 'var(--bg-tertiary)'
   },
 
   ipCard: {
+    padding: 14,
+    borderRadius: 10,
     background: 'var(--bg-tertiary)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius)',
-    padding: '14px',
     textAlign: 'center'
   },
 
   ipLabel: {
-    fontSize: '11px',
-    color: 'var(--text-muted)',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-    marginBottom: '6px'
+    fontSize: 11,
+    color: 'var(--text-muted)'
   },
 
   ipValue: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: '17px',
-    fontWeight: '700',
+    fontSize: 16,
     color: 'var(--accent)',
-    marginBottom: '10px'
-  },
-
-  copyBtn: {
-    background: 'var(--accent-glow)',
-    color: 'var(--accent)',
-    border: '1px solid var(--accent)',
-    borderRadius: '6px',
-    padding: '5px 12px',
-    fontSize: '12px',
-    fontWeight: '600'
+    fontFamily: 'monospace'
   },
 
   addBtn: {
+    padding: 10,
+    borderRadius: 8,
     background: 'var(--accent)',
-    color: '#fff',
-    borderRadius: '8px',
-    padding: '10px',
-    fontSize: '14px',
-    fontWeight: '600'
+    color: 'white',
+    fontWeight: 600
   },
 
   logoutBtn: {
-    background: 'transparent',
-    color: 'var(--danger)',
-    border: '1px solid var(--danger)',
-    borderRadius: '8px',
-    padding: '8px',
-    fontSize: '13px',
-    marginTop: 'auto'
+    marginTop: 'auto',
+    padding: 8,
+    borderRadius: 8,
+    border: '1px solid red',
+    color: 'red',
+    background: 'transparent'
   },
 
   main: (isMobile) => ({
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  minWidth: 0,
-  marginLeft: isMobile ? '0' : '280px',
-  width: '100%'
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: 0,
+    marginLeft: isMobile ? 0 : 280,
+    width: '100%'
   }),
 
   mobileHeader: {
     display: 'flex',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '12px 16px',
-    background: 'var(--bg-secondary)',
-    borderBottom: '1px solid var(--border)'
+    padding: 12,
+    borderBottom: '1px solid var(--border)',
+    background: 'var(--bg-secondary)'
   },
 
   hamburger: {
-    background: 'var(--bg-tertiary)',
-    border: '1px solid var(--border)',
-    borderRadius: '8px',
     padding: '6px 10px',
-    fontSize: '18px'
+    borderRadius: 8,
+    border: '1px solid var(--border)',
+    background: 'var(--bg-tertiary)'
   },
 
   mobileTitle: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: '16px',
-    fontWeight: '700',
-    color: 'var(--text-primary)'
+    fontWeight: 700,
+    fontFamily: 'monospace'
   },
 
   empty: {
     flex: 1,
     display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
     justifyContent: 'center',
-    gap: '12px'
-  },
-
-  emptyText: {
-    color: 'var(--text-secondary)',
-    fontSize: '15px'
+    alignItems: 'center',
+    flexDirection: 'column',
+    gap: 10
   }
 };
