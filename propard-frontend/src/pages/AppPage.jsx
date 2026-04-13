@@ -37,7 +37,11 @@ export default function AppPage() {
             <button style={styles.copyBtn} onClick={() => navigator.clipboard.writeText(user?.ipAlias)}>
               📋 Copier
             </button>
-            <button style={styles.copyBtn} onClick={() => setHideIp(!hideIp)}>
+            <button style={styles.copyBtn} onClick={() => {
+              const next = !hideIp;
+              setHideIp(next);
+              localStorage.setItem('propard_hideIp', next);
+            }}>
               {hideIp ? '👁️ Afficher' : '🙈 Masquer'}
             </button>
           </div>
@@ -50,7 +54,10 @@ export default function AppPage() {
           selectedFriend={selectedFriend}
           onSelectFriend={setSelectedFriend}
           hideFriendIps={hideFriendIps}
-          setHideFriendIps={setHideFriendIps}
+          setHideFriendIps={(val) => {
+            setHideFriendIps(val);
+            localStorage.setItem('propard_hideFriendIps', val);
+          }}
         />
 
         <button style={styles.logoutBtn} onClick={logout}>Déconnexion</button>
