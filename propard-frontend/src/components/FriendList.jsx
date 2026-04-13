@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import socket from '../socket';
 
 export default function FriendList({ token, selectedFriend, onSelectFriend }) {
   const [friends, setFriends] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [unread, setUnread] = useState({});
+  const [hideFriendIps, setHideFriendIps] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -21,12 +24,30 @@ export default function FriendList({ token, selectedFriend, onSelectFriend }) {
     return () => clearInterval(interval);
   }, [token]);
 
+  // Écoute les nouveaux messages pour le badge
+  useEffect(() => {
+    const handleNew = (msg) => {
+      const senderId = msg.sender._id || msg.sender;
+      setUnread(prev => ({
+        ...prev,
+        [senderId]: (prev[senderId] || 0) + 1
+      }));
+    };
+    socket.on('newMessage', handleNew);
+    return () => socket.off('newMessage', handleNew);
+  }, []);
+
   const acceptRequest = async (fromUserId) => {
     try {
       await axios.post(`${import.meta.env.VITE_API_URL}/api/friends/accept`,
         { fromUserId }, { headers: { Authorization: `Bearer ${token}` } });
       fetchData();
     } catch (err) { console.error(err); }
+  };
+
+  const handleSelect = (friend) => {
+    setUnread(prev => ({ ...prev, [friend._id]: 0 }));
+    onSelectFriend(friend);
   };
 
   return (
@@ -43,18 +64,34 @@ export default function FriendList({ token, selectedFriend, onSelectFriend }) {
         </div>
       )}
 
-      <p style={styles.sectionTitle}>Amis — {friends.length}</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <p style={styles.sectionTitle}>Amis — {friends.length}</p>
+        <button style={styles.hideIpBtn} onClick={() => setHideFriendIps(!hideFriendIps)}>
+          {hideFriendIps ? '👁️' : '🙈'}
+        </button>
+      </div>
+
       {friends.length === 0 && <p style={styles.empty}>Ajoute ton premier ami !</p>}
+
       {friends.map(friend => (
         <div key={friend.userId?._id}
           style={{ ...styles.friendItem, background: selectedFriend?._id === friend.userId?._id ? 'var(--bg-hover)' : 'transparent' }}
-          onClick={() => onSelectFriend(friend.userId)}>
+          onClick={() => handleSelect(friend.userId)}>
           <div style={styles.avatar}>{(friend.nickname || friend.userId?.username || '?')[0].toUpperCase()}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={styles.friendName}>{friend.nickname || friend.userId?.username}</p>
-            <p style={styles.friendIp}>{friend.userId?.ipAlias}</p>
+            <p style={styles.friendIp}>
+              {hideFriendIps ? '███.███.███.███' : friend.userId?.ipAlias}
+            </p>
           </div>
-          <div style={{ ...styles.dot, background: friend.userId?.isOnline ? 'var(--success)' : 'var(--text-muted)' }} />
+          {unread[friend.userId?._id] > 0 ? (
+            <div style={styles.badge}>
+              <span style={styles.badgeIcon}>💬</span>
+              <span style={styles.badgeCount}>{unread[friend.userId?._id]}</span>
+            </div>
+          ) : (
+            <div style={{ ...styles.dot, background: friend.userId?.isOnline ? 'var(--success)' : 'var(--text-muted)' }} />
+          )}
         </div>
       ))}
     </div>
@@ -71,5 +108,9 @@ const styles = {
   friendName: { fontSize: '14px', fontWeight: '500', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   friendIp: { fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' },
   dot: { width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0 },
+  badge: { display: 'flex', alignItems: 'center', gap: '3px', background: '#1a3a1a', border: '1px solid var(--success)', borderRadius: '12px', padding: '2px 7px', flexShrink: 0 },
+  badgeIcon: { fontSize: '11px' },
+  badgeCount: { fontSize: '11px', fontWeight: '700', color: 'var(--success)' },
+  hideIpBtn: { background: 'transparent', border: 'none', fontSize: '14px', cursor: 'pointer', padding: '2px 4px', marginBottom: '6px' },
   empty: { fontSize: '13px', color: 'var(--text-muted)', padding: '4px' }
 };
