@@ -193,7 +193,7 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
 
       {/* Messages */}
       <div style={styles.messages}>
-        {messages.map((msg, i) => {
+        {messages.filter(msg => !msg.deleted).map((msg, i) => {
           const senderId = msg.sender?._id?.toString?.() || msg.sender?.toString?.();
           const isMe = senderId === myId;
 
@@ -206,10 +206,7 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
                 onTouchEnd={handleTouchEnd}
                 onTouchMove={handleTouchMove}
               >
-                {/* Message supprimé */}
-                {msg.deleted ? (
-                  <p style={styles.deletedText}>🗑️ Message supprimé</p>
-                ) : editingId === msg._id ? (
+                {editingId === msg._id ? (
                   /* Mode édition */
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <input
