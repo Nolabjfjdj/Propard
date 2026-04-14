@@ -13,6 +13,7 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
   const lastMessageTime = useRef(0);
   const messageCount = useRef(0);
   const messageCountTimer = useRef(null);
+  const longPressTimer = useRef(null); // Timer pour l'appui long mobile
   const SPAM_DELAY = 1000;
   const SPAM_LIMIT = 15;
 
@@ -48,7 +49,11 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
   useEffect(() => {
     const close = () => setContextMenu(null);
     window.addEventListener('click', close);
-    return () => window.removeEventListener('click', close);
+    window.addEventListener('touchstart', close);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('touchstart', close);
+    };
   }, []);
 
   const sendMessage = () => {
@@ -105,11 +110,70 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
     } catch (err) { console.error(err); }
   };
 
+  // ─── Calcule la position du menu pour qu'il reste dans l'écran ────────────
+  const getMenuPosition = (x, y, isTouch = false) => {
+    const menuWidth = 160;
+    const menuHeight = 90;
+    const margin = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    let left, top;
+
+    if (isTouch) {
+      // Sur mobile : centré horizontalement autour du point de toucher
+      left = x - menuWidth / 2;
+      top = y - menuHeight - 16; // Au-dessus du doigt
+    } else {
+      // Sur PC : à gauche du curseur
+      left = x - menuWidth - margin;
+      top = y;
+    }
+
+    // Empêche de sortir à gauche
+    if (left < margin) left = margin;
+    // Empêche de sortir à droite
+    if (left + menuWidth > vw - margin) left = vw - menuWidth - margin;
+    // Empêche de sortir en haut
+    if (top < margin) top = margin;
+    // Empêche de sortir en bas
+    if (top + menuHeight > vh - margin) top = vh - menuHeight - margin;
+
+    return { left, top };
+  };
+
+  // ─── Clic droit PC ────────────────────────────────────────────────────────
   const handleRightClick = (e, msg) => {
     const senderId = msg.sender?._id?.toString?.() || msg.sender?.toString?.();
     if (senderId !== myId || msg.deleted) return;
     e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, msg });
+    const pos = getMenuPosition(e.clientX, e.clientY, false);
+    setContextMenu({ ...pos, msg });
+  };
+
+  // ─── Appui long mobile ────────────────────────────────────────────────────
+  const handleTouchStart = (e, msg) => {
+    const senderId = msg.sender?._id?.toString?.() || msg.sender?.toString?.();
+    if (senderId !== myId || msg.deleted) return;
+
+    const touch = e.touches[0];
+    const touchX = touch.clientX;
+    const touchY = touch.clientY;
+
+    longPressTimer.current = setTimeout(() => {
+      e.preventDefault();
+      const pos = getMenuPosition(touchX, touchY, true);
+      setContextMenu({ ...pos, msg });
+    }, 500); // 500ms = appui long
+  };
+
+  const handleTouchEnd = () => {
+    clearTimeout(longPressTimer.current);
+  };
+
+  const handleTouchMove = () => {
+    // Annule si le doigt bouge (scroll)
+    clearTimeout(longPressTimer.current);
   };
 
   return (
@@ -138,6 +202,9 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
               <div
                 style={{ ...styles.bubble, background: isMe ? 'var(--accent)' : 'var(--bg-tertiary)' }}
                 onContextMenu={(e) => handleRightClick(e, msg)}
+                onTouchStart={(e) => handleTouchStart(e, msg)}
+                onTouchEnd={handleTouchEnd}
+                onTouchMove={handleTouchMove}
               >
                 {/* Message supprimé */}
                 {msg.deleted ? (
@@ -179,10 +246,13 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
         <div ref={bottomRef} />
       </div>
 
-      {/* Menu contextuel clic droit */}
+      {/* Menu contextuel */}
       {contextMenu && (
-        <div style={{ ...styles.contextMenu, top: contextMenu.y, left: contextMenu.x }}
-          onClick={e => e.stopPropagation()}>
+        <div
+          style={{ ...styles.contextMenu, top: contextMenu.top, left: contextMenu.left }}
+          onClick={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}
+        >
           <button style={styles.contextItem} onClick={() => { startEdit(contextMenu.msg); }}>
             ✏️ Modifier
           </button>
@@ -221,7 +291,7 @@ const styles = {
   headerIp: { fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' },
   onlineDot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
   messages: { flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px' },
-  bubble: { maxWidth: '65%', padding: '10px 14px', borderRadius: '12px', cursor: 'context-menu' },
+  bubble: { maxWidth: '65%', padding: '10px 14px', borderRadius: '12px', cursor: 'context-menu', userSelect: 'none', WebkitUserSelect: 'none' },
   text: { color: '#fff', fontSize: '14px', lineHeight: '1.4' },
   deletedText: { color: 'rgba(255,255,255,0.4)', fontSize: '13px', fontStyle: 'italic' },
   editedLabel: { fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' },
@@ -229,8 +299,8 @@ const styles = {
   editInput: { background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '14px', width: '100%' },
   editBtn: { background: 'var(--success)', color: '#fff', borderRadius: '6px', padding: '3px 8px', fontSize: '13px' },
   cancelBtn: { background: 'rgba(255,255,255,0.2)', color: '#fff', borderRadius: '6px', padding: '3px 8px', fontSize: '13px' },
-  contextMenu: { position: 'fixed', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '4px', zIndex: 200, boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', minWidth: '140px' },
-  contextItem: { background: 'transparent', color: 'var(--text-primary)', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', textAlign: 'left', cursor: 'pointer' },
+  contextMenu: { position: 'fixed', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '4px', zIndex: 200, boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', minWidth: '150px' },
+  contextItem: { background: 'transparent', color: 'var(--text-primary)', padding: '10px 14px', borderRadius: '6px', fontSize: '14px', textAlign: 'left', cursor: 'pointer' },
   spamAlert: { textAlign: 'center', padding: '8px', color: 'var(--danger)', fontSize: '13px', fontWeight: '600', background: 'rgba(240, 91, 91, 0.1)', borderTop: '1px solid var(--danger)' },
   inputBar: { display: 'flex', padding: '16px', gap: '8px', borderTop: '1px solid var(--border)', background: 'var(--bg-secondary)', flexShrink: 0 },
   input: { flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: '14px' },
