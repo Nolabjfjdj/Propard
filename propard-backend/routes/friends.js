@@ -13,18 +13,15 @@ router.post('/add', async (req, res) => {
   try {
     const { ipAlias } = req.body;
 
-    // Cherche l'utilisateur par son IP alias
     const targetUser = await User.findOne({ ipAlias });
     if (!targetUser) {
       return res.status(404).json({ error: 'Aucun utilisateur trouvé avec cette adresse' });
     }
 
-    // On ne peut pas s'ajouter soi-même
     if (targetUser._id.toString() === req.user.id) {
       return res.status(400).json({ error: 'Impossible de s\'ajouter soi-même' });
     }
 
-    // Vérifie si déjà amis
     const currentUser = await User.findById(req.user.id);
     const alreadyFriends = currentUser.friends.some(
       f => f.userId.toString() === targetUser._id.toString()
@@ -33,7 +30,6 @@ router.post('/add', async (req, res) => {
       return res.status(400).json({ error: 'Vous êtes déjà amis' });
     }
 
-    // Vérifie si demande déjà envoyée
     const alreadyRequested = targetUser.friendRequests.some(
       r => r.from.toString() === req.user.id
     );
@@ -41,7 +37,6 @@ router.post('/add', async (req, res) => {
       return res.status(400).json({ error: 'Demande déjà envoyée' });
     }
 
-    // Ajoute la demande d'ami
     targetUser.friendRequests.push({ from: req.user.id });
     await targetUser.save();
 
@@ -66,7 +61,6 @@ router.post('/accept', async (req, res) => {
       return res.status(404).json({ error: 'Utilisateur introuvable' });
     }
 
-    // Vérifie que la demande existe
     const requestIndex = currentUser.friendRequests.findIndex(
       r => r.from.toString() === fromUserId
     );
@@ -74,10 +68,8 @@ router.post('/accept', async (req, res) => {
       return res.status(400).json({ error: 'Demande introuvable' });
     }
 
-    // Supprime la demande
     currentUser.friendRequests.splice(requestIndex, 1);
 
-    // Ajoute mutuellement en amis
     currentUser.friends.push({ userId: fromUserId, nickname: null });
     fromUser.friends.push({ userId: req.user.id, nickname: null });
 
@@ -125,18 +117,72 @@ router.get('/messages/:friendId', async (req, res) => {
     const { friendId } = req.params;
     const myId = req.user.id;
 
-    // Récupère les messages entre les deux utilisateurs
     const messages = await Message.find({
       $or: [
         { sender: myId, receiver: friendId },
         { sender: friendId, receiver: myId }
       ]
     })
-    .sort({ createdAt: 1 }) // Du plus ancien au plus récent
+    .sort({ createdAt: 1 })
     .limit(50)
     .populate('sender', 'username ipAlias');
 
     res.json(messages);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ─── ROUTE : Supprimer un message ────────────────────────────────────────────
+// DELETE /api/friends/messages/:messageId
+router.delete('/messages/:messageId', async (req, res) => {
+  try {
+    const message = await Message.findById(req.params.messageId);
+    if (!message) return res.status(404).json({ error: 'Message introuvable' });
+
+    if (message.sender.toString() !== req.user.id) {
+      return res.status(403).json({ error: 'Non autorisé' });
+    }
+
+    message.deleted = true;
+    message.content = null;
+    await message.save();
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ─── ROUTE : Modifier un message ─────────────────────────────────────────────
+// PATCH /api/friends/messages/:messageId
+router.patch('/messages/:messageId', async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Contenu requis' });
+    }
+
+    const message = await Message.findById(req.params.messageId);
+    if (!message) return res.status(404).json({ error: 'Message introuvable' });
+
+    if (message.sender.toString() !== req.user.id) {
+      return res.status(403).json({ error: 'Non autorisé' });
+    }
+
+    if (!message.edited) {
+      message.originalContent = message.content;
+    }
+
+    message.content = content.trim();
+    message.edited = true;
+    await message.save();
+
+    res.json({ success: true, message });
 
   } catch (err) {
     console.error(err);
