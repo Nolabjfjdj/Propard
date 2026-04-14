@@ -121,7 +121,8 @@ router.get('/messages/:friendId', async (req, res) => {
       $or: [
         { sender: myId, receiver: friendId },
         { sender: friendId, receiver: myId }
-      ]
+      ],
+      deleted: { $ne: true } // ← N'envoie pas les messages supprimés
     })
     .sort({ createdAt: 1 })
     .limit(50)
