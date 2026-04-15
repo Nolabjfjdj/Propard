@@ -28,7 +28,7 @@ export default function ContactPage() {
           <div style={styles.form}>
             <label style={styles.label}>Ton pseudo</label>
             <div style={styles.lockedInput}>
-              🔒 {name}
+              {name}
             </div>
             <label style={styles.label}>Ton message</label>
             <textarea
