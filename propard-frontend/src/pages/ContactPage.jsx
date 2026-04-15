@@ -1,12 +1,15 @@
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 export default function ContactPage() {
-  const [name, setName] = useState('');
+  const { user } = useAuth();
   const [message, setMessage] = useState('');
   const [sent, setSent] = useState(false);
 
+  const name = user?.username || 'Anonyme';
+
   const handleSend = () => {
-    if (!name.trim() || !message.trim()) return;
+    if (!message.trim()) return;
     window.location.href = `mailto:propard@outlook.fr?subject=Contact Propard - ${encodeURIComponent(name)}&body=${encodeURIComponent(message)}`;
     setSent(true);
   };
@@ -15,23 +18,18 @@ export default function ContactPage() {
     <div style={styles.page}>
       <div style={styles.card}>
         <a href="/help" style={styles.back}>← Retour à l'aide</a>
-
         <h1 style={styles.title}>Nous contacter</h1>
         <p style={styles.subtitle}>On te répondra à <strong>propard@outlook.fr</strong></p>
-
         {sent ? (
           <div style={styles.success}>
             ✅ Ton client mail s'est ouvert ! Envoie le mail pour nous contacter.
           </div>
         ) : (
           <div style={styles.form}>
-            <label style={styles.label}>Ton nom / pseudo</label>
-            <input
-              style={styles.input}
-              placeholder="Ex: BananeVR"
-              value={name}
-              onChange={e => setName(e.target.value)}
-            />
+            <label style={styles.label}>Ton pseudo</label>
+            <div style={styles.lockedInput}>
+              🔒 {name}
+            </div>
             <label style={styles.label}>Ton message</label>
             <textarea
               style={styles.textarea}
@@ -58,7 +56,7 @@ const styles = {
   subtitle: { fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '32px' },
   form: { display: 'flex', flexDirection: 'column', gap: '12px' },
   label: { fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' },
-  input: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 16px', color: 'var(--text-primary)', fontSize: '14px' },
+  lockedInput: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 16px', color: 'var(--text-muted)', fontSize: '14px', fontWeight: '600' },
   textarea: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 16px', color: 'var(--text-primary)', fontSize: '14px', resize: 'vertical', fontFamily: 'var(--font-body)' },
   btn: { background: 'var(--accent)', color: '#fff', borderRadius: '8px', padding: '13px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', border: 'none' },
   success: { background: 'rgba(91, 240, 122, 0.1)', border: '1px solid var(--success)', borderRadius: '8px', padding: '16px', color: 'var(--success)', fontSize: '14px' }
