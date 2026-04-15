@@ -26,7 +26,7 @@ export default function HelpPage() {
           <h2 style={styles.sectionTitle}>📬 Nous contacter</h2>
           <p style={styles.text}>Tu as un problème ou une suggestion ? Contacte-nous !</p>
           <a href="/help/contact" style={styles.contactBtn}>Envoyer un message</a>
-          <a href="https://github.com/ton-repo/propard" target="_blank" rel="noreferrer" style={styles.sourceLink}>
+          <a href="https://github.com/Nolabjfjdj/Propard" target="_blank" rel="noreferrer" style={styles.sourceLink}>
             &lt;/&gt; Code source
           </a>
         </div>
