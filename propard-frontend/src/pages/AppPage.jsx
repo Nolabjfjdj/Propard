@@ -51,9 +51,12 @@ export default function AppPage() {
           : 'translateX(0)'
       }}>
         <div style={styles.sidebarHeader}>
-          <span style={styles.appName}>
-            Propard<span style={{ color: 'var(--accent)' }}>.</span>
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <a href="/help" style={styles.helpLink}>help</a>
+            <span style={styles.appName}>
+              Propard<span style={{ color: 'var(--accent)' }}>.</span>
+            </span>
+          </div>
           <div style={{ display: 'flex', gap: '6px' }}>
             <button onClick={toggleTheme} style={styles.iconBtn}>
               {theme === 'dark' ? '☀️' : '🌙'}
@@ -151,6 +154,7 @@ const styles = {
   sidebar: { width: '280px', flexShrink: 0, zIndex: 100, display: 'flex', flexDirection: 'column', padding: '16px', gap: '12px', overflowY: 'auto', background: 'var(--bg-secondary)', borderRight: '1px solid var(--border)', transition: 'transform 0.25s ease' },
   sidebarHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   appName: { fontFamily: 'var(--font-mono)', fontSize: '20px', fontWeight: '700' },
+  helpLink: { fontSize: '11px', color: 'var(--text-muted)', textDecoration: 'none', marginBottom: '2px' },
   iconBtn: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', fontSize: '16px' },
   ipCard: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px', textAlign: 'center' },
   ipLabel: { fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' },
