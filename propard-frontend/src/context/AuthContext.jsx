@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
 
 const AuthContext = createContext(null);
 
@@ -10,13 +11,27 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const savedToken = localStorage.getItem('propard_token');
     const savedUser = localStorage.getItem('propard_user');
-
     if (savedToken && savedUser) {
       setToken(savedToken);
       setUser(JSON.parse(savedUser));
     }
-
     setLoading(false);
+  }, []);
+
+  // Intercepteur axios — déconnecte automatiquement si token invalide
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      res => res,
+      err => {
+        if (err.response?.status === 401) {
+          localStorage.removeItem('propard_token');
+          localStorage.removeItem('propard_user');
+          window.location.href = '/';
+        }
+        return Promise.reject(err);
+      }
+    );
+    return () => axios.interceptors.response.eject(interceptor);
   }, []);
 
   const login = (userData, userToken) => {
@@ -24,10 +39,8 @@ export function AuthProvider({ children }) {
       ...userData,
       id: userData.id || userData._id
     };
-
     setUser(normalized);
     setToken(userToken);
-
     localStorage.setItem('propard_token', userToken);
     localStorage.setItem('propard_user', JSON.stringify(normalized));
   };
