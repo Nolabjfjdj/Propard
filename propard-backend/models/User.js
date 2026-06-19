@@ -28,7 +28,7 @@ const userSchema = new mongoose.Schema({
   friends: [
     {
       userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-      nickname: { type: String, default: null } // surnom optionnel
+      username: { type: String, default: null } // surnom optionnel
     }
   ],
 
