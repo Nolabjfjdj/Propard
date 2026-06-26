@@ -7,10 +7,25 @@ const authMiddleware = require('../middleware/auth');
 
 // ─── Pseudos interdits ───────────────────────────────────────────────────────
 const PSEUDOS_INTERDITS = [
-  'owner', 'admin', 'administrator', 'moderator', 'mod',
-  'staff', 'support', 'propard', 'system', 'bot', 'official',
-  'root', 'superuser', 'null', 'undefined', 'banned', 'deleted',
-  'anonymous', 'anon', 'guest', 'server', 'service', 'help'
+  // Administration
+  'owner', 'admin', 'administrator', 'superadmin', 'sysadmin',
+  'moderator', 'mod', 'comod', 'staff', 'team', 'crew',
+  'support', 'helpdesk', 'official',
+  'propard', 'propardbot', 'propardteam', 'propardstaff',
+  'propardadmin', 'propardsupport', 'propardofficial',
+  'everyone',
+  'nigger', 'nigga', 'faggot', 'retard', 'whore', 'bitch',
+  'salope', 'pute', 'connard', 'connasse', 'batard', 'batarde',
+  'enculé', 'encule', 'fdp', 'ntm', 'tg', 'pd',
+  'discord', 'telegram', 'whatsapp', 'snapchat', 'instagram',
+  'facebook', 'twitter', 'tiktok', 'youtube', 'google',
+  'microsoft', 'apple', 'amazon', 'netflix', 'spotify',
+  'twitch', 'reddit', 'github', 'anthropic', 'openai',
+  'chatgpt', 'claude',
+  'malware', 'virus',
+  'phishing', 'scam',
+  'billing', 'privacy',
+  'terms', 'rules', 'guidelines', 'policy',
 ];
 
 // ─── Génération IP alias ─────────────────────────────────────────────────────
@@ -41,9 +56,30 @@ router.post('/register', async (req, res) => {
     if (username.length < 3 || username.length > 16) {
       return res.status(400).json({ error: 'Username entre 3 et 16 caractères' });
     }
+
+    // Vérifie les pseudos interdits (égalité exacte)
     if (PSEUDOS_INTERDITS.includes(username.toLowerCase())) {
       return res.status(400).json({ error: 'Ce username n\'est pas autorisé' });
     }
+
+    // Vérifie si le pseudo contient un mot interdit
+    const containsForbidden = PSEUDOS_INTERDITS.some(word =>
+      username.toLowerCase().includes(word)
+    );
+    if (containsForbidden) {
+      return res.status(400).json({ error: 'Ce username contient un mot non autorisé' });
+    }
+
+    // Vérifie les caractères autorisés
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+      return res.status(400).json({ error: 'Username : lettres, chiffres, _ et - uniquement' });
+    }
+
+    // Vérifie qu'il y a au moins une lettre
+    if (!/[a-zA-Z]/.test(username)) {
+      return res.status(400).json({ error: 'Username doit contenir au moins une lettre' });
+    }
+
     if (password.length < 6) {
       return res.status(400).json({ error: 'Mot de passe minimum 6 caractères' });
     }
@@ -95,7 +131,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { id: user._id, username: user.username },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '30d' }
     );
 
     res.json({
