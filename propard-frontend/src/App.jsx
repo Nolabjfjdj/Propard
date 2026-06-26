@@ -15,6 +15,14 @@ export default function App() {
   );
 
   if (path === '/help') return <HelpPage />;
-  if (path === '/help/contact') return <ContactPage />;
+
+  if (path === '/help/contact') {
+    if (!user) {
+      window.location.href = '/';
+      return null;
+    }
+    return <ContactPage />;
+  }
+
   return user ? <AppPage /> : <AuthPage />;
 }
