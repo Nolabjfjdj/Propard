@@ -4,11 +4,9 @@ const User = require('../models/User');
 const Message = require('../models/Message');
 const authMiddleware = require('../middleware/auth');
 
-// Toutes ces routes nécessitent d'être connecté
 router.use(authMiddleware);
 
 // ─── ROUTE : Envoyer une demande d'ami ───────────────────────────────────────
-// POST /api/friends/add
 router.post('/add', async (req, res) => {
   try {
     const { ipAlias } = req.body;
@@ -49,7 +47,6 @@ router.post('/add', async (req, res) => {
 });
 
 // ─── ROUTE : Accepter une demande d'ami ──────────────────────────────────────
-// POST /api/friends/accept
 router.post('/accept', async (req, res) => {
   try {
     const { fromUserId } = req.body;
@@ -58,7 +55,12 @@ router.post('/accept', async (req, res) => {
     const fromUser = await User.findById(fromUserId);
 
     if (!fromUser) {
-      return res.status(404).json({ error: 'Utilisateur introuvable' });
+      // L'utilisateur a été supprimé, on retire la demande
+      currentUser.friendRequests = currentUser.friendRequests.filter(
+        r => r.from.toString() !== fromUserId
+      );
+      await currentUser.save();
+      return res.status(404).json({ error: 'Cet utilisateur n\'existe plus' });
     }
 
     const requestIndex = currentUser.friendRequests.findIndex(
@@ -69,7 +71,6 @@ router.post('/accept', async (req, res) => {
     }
 
     currentUser.friendRequests.splice(requestIndex, 1);
-
     currentUser.friends.push({ userId: fromUserId, nickname: null });
     fromUser.friends.push({ userId: req.user.id, nickname: null });
 
@@ -84,14 +85,37 @@ router.post('/accept', async (req, res) => {
   }
 });
 
+// ─── ROUTE : Refuser une demande d'ami ───────────────────────────────────────
+router.post('/decline', async (req, res) => {
+  try {
+    const { fromUserId } = req.body;
+
+    const currentUser = await User.findById(req.user.id);
+    const requestIndex = currentUser.friendRequests.findIndex(
+      r => r.from.toString() === fromUserId
+    );
+
+    if (requestIndex === -1) {
+      return res.status(400).json({ error: 'Demande introuvable' });
+    }
+
+    currentUser.friendRequests.splice(requestIndex, 1);
+    await currentUser.save();
+
+    res.json({ message: 'Demande refusée' });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // ─── ROUTE : Donner un surnom à un ami ───────────────────────────────────────
-// PATCH /api/friends/nickname
 router.patch('/nickname', async (req, res) => {
   try {
     const { friendId, nickname } = req.body;
 
     const currentUser = await User.findById(req.user.id);
-
     const friend = currentUser.friends.find(
       f => f.userId.toString() === friendId
     );
@@ -111,7 +135,6 @@ router.patch('/nickname', async (req, res) => {
 });
 
 // ─── ROUTE : Récupérer l'historique des messages ─────────────────────────────
-// GET /api/friends/messages/:friendId
 router.get('/messages/:friendId', async (req, res) => {
   try {
     const { friendId } = req.params;
@@ -122,7 +145,7 @@ router.get('/messages/:friendId', async (req, res) => {
         { sender: myId, receiver: friendId },
         { sender: friendId, receiver: myId }
       ],
-      deleted: { $ne: true } // ← N'envoie pas les messages supprimés
+      deleted: { $ne: true }
     })
     .sort({ createdAt: 1 })
     .limit(50)
@@ -137,7 +160,6 @@ router.get('/messages/:friendId', async (req, res) => {
 });
 
 // ─── ROUTE : Supprimer un message ────────────────────────────────────────────
-// DELETE /api/friends/messages/:messageId
 router.delete('/messages/:messageId', async (req, res) => {
   try {
     const message = await Message.findById(req.params.messageId);
@@ -160,7 +182,6 @@ router.delete('/messages/:messageId', async (req, res) => {
 });
 
 // ─── ROUTE : Modifier un message ─────────────────────────────────────────────
-// PATCH /api/friends/messages/:messageId
 router.patch('/messages/:messageId', async (req, res) => {
   try {
     const { content } = req.body;
