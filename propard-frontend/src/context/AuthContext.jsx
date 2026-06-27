@@ -4,59 +4,71 @@ import axios from 'axios';
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
+ const [user, setUser] = useState(null);
+ const [token, setToken] = useState(null);
+ const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const savedToken = localStorage.getItem('propard_token');
-    const savedUser = localStorage.getItem('propard_user');
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
-  }, []);
+ useEffect(() => {
+   const savedToken = localStorage.getItem('propard_token');
+   const savedUser = localStorage.getItem('propard_user');
 
-  // Intercepteur axios — déconnecte automatiquement si token invalide
-  useEffect(() => {
-    const interceptor = axios.interceptors.response.use(
-      res => res,
-      err => {
-        if (err.response?.status === 401) {
-          localStorage.removeItem('propard_token');
-          localStorage.removeItem('propard_user');
-          window.location.href = '/';
-        }
-        return Promise.reject(err);
-      }
-    );
-    return () => axios.interceptors.response.eject(interceptor);
-  }, []);
+   if (savedToken && savedUser) {
+     // Vérifie que le compte existe toujours au démarrage
+     axios.get(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+       headers: { Authorization: `Bearer ${savedToken}` }
+     }).then(() => {
+       setToken(savedToken);
+       setUser(JSON.parse(savedUser));
+     }).catch(() => {
+       localStorage.removeItem('propard_token');
+       localStorage.removeItem('propard_user');
+     }).finally(() => {
+       setLoading(false);
+     });
+   } else {
+     setLoading(false);
+   }
+ }, []);
 
-  const login = (userData, userToken) => {
-    const normalized = {
-      ...userData,
-      id: userData.id || userData._id
-    };
-    setUser(normalized);
-    setToken(userToken);
-    localStorage.setItem('propard_token', userToken);
-    localStorage.setItem('propard_user', JSON.stringify(normalized));
-  };
+ // Intercepteur axios — déconnecte automatiquement si token invalide
+ useEffect(() => {
+   const interceptor = axios.interceptors.response.use(
+     res => res,
+     err => {
+       if (err.response?.status === 401) {
+         localStorage.removeItem('propard_token');
+         localStorage.removeItem('propard_user');
+         window.location.href = '/';
+       }
+       return Promise.reject(err);
+     }
+   );
+   return () => axios.interceptors.response.eject(interceptor);
+ }, []);
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('propard_token');
-    localStorage.removeItem('propard_user');
-  };
+ const login = (userData, userToken) => {
+   const normalized = {
+     ...userData,
+     id: userData.id || userData._id
+   };
+   setUser(normalized);
+   setToken(userToken);
+   localStorage.setItem('propard_token', userToken);
+   localStorage.setItem('propard_user', JSON.stringify(normalized));
+ };
 
-  return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
+ const logout = () => {
+   setUser(null);
+   setToken(null);
+   localStorage.removeItem('propard_token');
+   localStorage.removeItem('propard_user');
+ };
+
+ return (
+   <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+     {children}
+   </AuthContext.Provider>
+ );
 }
 
 export const useAuth = () => useContext(AuthContext);
