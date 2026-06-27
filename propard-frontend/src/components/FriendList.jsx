@@ -45,6 +45,7 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
 
   const handleSelect = (friend) => {
     setUnread(prev => ({ ...prev, [friend._id]: 0 }));
+    window.history.pushState({}, '', `/chat/${friend._id}`);
     onSelectFriend(friend);
   };
 
