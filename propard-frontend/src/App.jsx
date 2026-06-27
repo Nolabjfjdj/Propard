@@ -17,11 +17,14 @@ export default function App() {
   if (path === '/help') return <HelpPage />;
 
   if (path === '/help/contact') {
-    if (!user) {
-      window.location.href = '/';
-      return null;
-    }
+    if (!user) { window.location.href = '/'; return null; }
     return <ContactPage />;
+  }
+
+  if (path.startsWith('/chat/')) {
+    if (!user) { window.location.href = '/'; return null; }
+    const friendId = path.split('/chat/')[1];
+    return <AppPage initialFriendId={friendId} />;
   }
 
   return user ? <AppPage /> : <AuthPage />;
