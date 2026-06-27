@@ -3,6 +3,7 @@ import AuthPage from './pages/AuthPage';
 import AppPage from './pages/AppPage';
 import HelpPage from './pages/HelpPage';
 import ContactPage from './pages/ContactPage';
+import AdminPage from './pages/AdminPage';
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -26,6 +27,8 @@ export default function App() {
     const friendId = path.split('/chat/')[1];
     return <AppPage initialFriendId={friendId} />;
   }
+
+  if (path === '/admin-propard-secret') return <AdminPage />;
 
   return user ? <AppPage /> : <AuthPage />;
 }
