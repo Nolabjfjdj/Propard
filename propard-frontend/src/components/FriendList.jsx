@@ -5,6 +5,7 @@ import socket from '../socket';
 export default function FriendList({ token, selectedFriend, onSelectFriend, hideFriendIps, setHideFriendIps }) {
   const [friends, setFriends] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [requestUsers, setRequestUsers] = useState({});
   const [unread, setUnread] = useState({});
 
   const fetchData = async () => {
@@ -12,8 +13,30 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
       const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setFriends(res.data.friends || []);
-      setRequests(res.data.friendRequests || []);
+      const friendsList = res.data.friends || [];
+      const requestsList = res.data.friendRequests || [];
+
+      setFriends(friendsList);
+
+      // Filtre les demandes dont l'utilisateur existe encore
+      const validRequests = [];
+      const usersMap = {};
+
+      for (const req of requestsList) {
+        try {
+          const userRes = await axios.get(
+            `${import.meta.env.VITE_API_URL}/api/auth/user/${req.from}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          usersMap[req.from] = userRes.data;
+          validRequests.push(req);
+        } catch {
+          // Utilisateur supprimé, on ignore
+        }
+      }
+
+      setRequests(validRequests);
+      setRequestUsers(usersMap);
     } catch (err) { console.error(err); }
   };
 
@@ -43,6 +66,14 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
     } catch (err) { console.error(err); }
   };
 
+  const declineRequest = async (fromUserId) => {
+    try {
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/friends/decline`,
+        { fromUserId }, { headers: { Authorization: `Bearer ${token}` } });
+      fetchData();
+    } catch (err) { console.error(err); }
+  };
+
   const handleSelect = (friend) => {
     setUnread(prev => ({ ...prev, [friend._id]: 0 }));
     window.history.pushState({}, '', `/chat/${friend._id}`);
@@ -56,8 +87,18 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
           <p style={styles.sectionTitle}>Demandes ({requests.length})</p>
           {requests.map(req => (
             <div key={req.from} style={styles.requestItem}>
-              <span style={{ fontSize: '13px', color: 'var(--text-primary)' }}>Nouveau</span>
-              <button style={styles.acceptBtn} onClick={() => acceptRequest(req.from)}>✓</button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={styles.requestName}>
+                  {requestUsers[req.from]?.username || '...'}
+                </p>
+                <p style={styles.requestIp}>
+                  {requestUsers[req.from]?.ipAlias || ''}
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button style={styles.acceptBtn} onClick={() => acceptRequest(req.from)}>✓</button>
+                <button style={styles.declineBtn} onClick={() => declineRequest(req.from)}>✕</button>
+              </div>
             </div>
           ))}
         </div>
@@ -100,8 +141,11 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
 const styles = {
   container: { display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 },
   sectionTitle: { fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px', padding: '0 4px' },
-  requestItem: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '4px' },
+  requestItem: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '4px', gap: '8px' },
+  requestName: { fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' },
+  requestIp: { fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' },
   acceptBtn: { background: 'var(--success)', color: '#fff', borderRadius: '6px', padding: '3px 8px', fontSize: '14px' },
+  declineBtn: { background: 'var(--danger)', color: '#fff', borderRadius: '6px', padding: '3px 8px', fontSize: '14px' },
   friendItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', borderRadius: '8px', cursor: 'pointer', transition: 'background 0.15s' },
   avatar: { width: '36px', height: '36px', borderRadius: '50%', background: 'var(--accent-glow)', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700', color: 'var(--accent)', flexShrink: 0 },
   friendName: { fontSize: '14px', fontWeight: '500', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
