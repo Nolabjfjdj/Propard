@@ -18,7 +18,6 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
 
       setFriends(friendsList);
 
-      // Filtre les demandes dont l'utilisateur existe encore
       const validRequests = [];
       const usersMap = {};
 
@@ -87,14 +86,9 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
           <p style={styles.sectionTitle}>Demandes ({requests.length})</p>
           {requests.map(req => (
             <div key={req.from} style={styles.requestItem}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={styles.requestName}>
-                  {requestUsers[req.from]?.username || '...'}
-                </p>
-                <p style={styles.requestIp}>
-                  {requestUsers[req.from]?.ipAlias || ''}
-                </p>
-              </div>
+              <p style={styles.requestName}>
+                {requestUsers[req.from]?.username || '...'}
+              </p>
               <div style={{ display: 'flex', gap: '4px' }}>
                 <button style={styles.acceptBtn} onClick={() => acceptRequest(req.from)}>✓</button>
                 <button style={styles.declineBtn} onClick={() => declineRequest(req.from)}>✕</button>
@@ -113,27 +107,31 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
 
       {friends.length === 0 && <p style={styles.empty}>Ajoute ton premier ami !</p>}
 
-      {friends.map(friend => (
-        <div key={friend.userId?._id}
-          style={{ ...styles.friendItem, background: selectedFriend?._id === friend.userId?._id ? 'var(--bg-hover)' : 'transparent' }}
-          onClick={() => handleSelect(friend.userId)}>
-          <div style={styles.avatar}>{(friend.nickname || friend.userId?.username || '?')[0].toUpperCase()}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={styles.friendName}>{friend.nickname || friend.userId?.username}</p>
-            <p style={styles.friendIp}>
-              {hideFriendIps ? '███.███.███.███' : friend.userId?.ipAlias}
-            </p>
-          </div>
-          {unread[friend.userId?._id] > 0 ? (
-            <div style={styles.badge}>
-              <span style={styles.badgeIcon}>💬</span>
-              <span style={styles.badgeCount}>{unread[friend.userId?._id]}</span>
+      {friends
+        .filter(friend => friend.userId)
+        .map(friend => (
+          <div key={friend.userId?._id}
+            style={{ ...styles.friendItem, background: selectedFriend?._id === friend.userId?._id ? 'var(--bg-hover)' : 'transparent' }}
+            onClick={() => handleSelect(friend.userId)}>
+            <div style={styles.avatar}>
+              {(friend.userId?.username || '?')[0].toUpperCase()}
             </div>
-          ) : (
-            <div style={{ ...styles.dot, background: friend.userId?.isOnline ? 'var(--success)' : 'var(--text-muted)' }} />
-          )}
-        </div>
-      ))}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={styles.friendName}>{friend.userId?.username}</p>
+              <p style={styles.friendIp}>
+                {hideFriendIps ? '███.███.███.███' : friend.userId?.ipAlias}
+              </p>
+            </div>
+            {unread[friend.userId?._id] > 0 ? (
+              <div style={styles.badge}>
+                <span style={styles.badgeIcon}>💬</span>
+                <span style={styles.badgeCount}>{unread[friend.userId?._id]}</span>
+              </div>
+            ) : (
+              <div style={{ ...styles.dot, background: friend.userId?.isOnline ? 'var(--success)' : 'var(--text-muted)' }} />
+            )}
+          </div>
+        ))}
     </div>
   );
 }
@@ -142,8 +140,7 @@ const styles = {
   container: { display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 },
   sectionTitle: { fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px', padding: '0 4px' },
   requestItem: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '4px', gap: '8px' },
-  requestName: { fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' },
-  requestIp: { fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' },
+  requestName: { fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   acceptBtn: { background: 'var(--success)', color: '#fff', borderRadius: '6px', padding: '3px 8px', fontSize: '14px' },
   declineBtn: { background: 'var(--danger)', color: '#fff', borderRadius: '6px', padding: '3px 8px', fontSize: '14px' },
   friendItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', borderRadius: '8px', cursor: 'pointer', transition: 'background 0.15s' },
