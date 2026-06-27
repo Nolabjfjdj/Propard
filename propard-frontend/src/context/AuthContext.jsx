@@ -13,18 +13,25 @@ export function AuthProvider({ children }) {
    const savedUser = localStorage.getItem('propard_user');
 
    if (savedToken && savedUser) {
-     // Vérifie que le compte existe toujours au démarrage
-     axios.get(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
-       headers: { Authorization: `Bearer ${savedToken}` }
-     }).then(() => {
+     const verify = () =>
+       axios.get(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+         headers: { Authorization: `Bearer ${savedToken}` }
+       }).catch(() => {
+         localStorage.removeItem('propard_token');
+         localStorage.removeItem('propard_user');
+         window.location.href = '/';
+       });
+
+     // Vérification au démarrage
+     verify().finally(() => {
        setToken(savedToken);
        setUser(JSON.parse(savedUser));
-     }).catch(() => {
-       localStorage.removeItem('propard_token');
-       localStorage.removeItem('propard_user');
-     }).finally(() => {
        setLoading(false);
      });
+
+     // Vérification toutes les 30 secondes
+     const interval = setInterval(verify, 30000);
+     return () => clearInterval(interval);
    } else {
      setLoading(false);
    }
