@@ -26,20 +26,20 @@ mongoose.connect(process.env.MONGO_URI)
 // ─── ROUTES API ────────────────────────────
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/friends', require('./routes/friends'));
+app.use('/api/admin', require('./routes/admin'));
 
 app.get('/', (req, res) => res.status(200).json({ status: 'ok', message: 'API online 🚀' }));
 app.get('/health', (req, res) => res.status(200).send('OK'));
 
 // ─── SOCKET LOGIC ──────────────────────────
 const connectedUsers = new Map();
-const lastMessageTimes = new Map(); // anti-spam : userId -> timestamp
+const lastMessageTimes = new Map();
 const Message = require('./models/Message');
 const User = require('./models/User');
 
 io.on('connection', (socket) => {
   console.log(`🔌 Socket connecté: ${socket.id}`);
 
-  // AUTH SOCKET
   socket.on('authenticate', async (token) => {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -52,13 +52,11 @@ io.on('connection', (socket) => {
     }
   });
 
-  // SEND MESSAGE
   socket.on('sendMessage', async ({ receiverId, content }) => {
     try {
       if (!socket.userId) return;
       if (!content || !content.trim()) return;
 
-      // ─── Anti-spam : 1 message par seconde max ───
       const now = Date.now();
       const last = lastMessageTimes.get(socket.userId) || 0;
       if (now - last < 1000) {
@@ -94,7 +92,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // DISCONNECT
   socket.on('disconnect', async () => {
     if (socket.userId) {
       connectedUsers.delete(socket.userId);
