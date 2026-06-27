@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import socket from '../socket';
@@ -6,7 +7,7 @@ import FriendList from '../components/FriendList';
 import Chat from '../components/Chat';
 import AddFriend from '../components/AddFriend';
 
-export default function AppPage() {
+export default function AppPage({ initialFriendId }) {
   const { user, token, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [selectedFriend, setSelectedFriend] = useState(null);
@@ -15,6 +16,7 @@ export default function AppPage() {
   const [hideIp, setHideIp] = useState(() => localStorage.getItem('propard_hideIp') === 'true');
   const [hideFriendIps, setHideFriendIps] = useState(() => localStorage.getItem('propard_hideFriendIps') === 'true');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [friendNotFound, setFriendNotFound] = useState(false);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -28,9 +30,36 @@ export default function AppPage() {
     return () => socket.disconnect();
   }, [token]);
 
+  // Charge l'ami depuis l'URL /chat/:friendId
+  useEffect(() => {
+    if (!initialFriendId || !token) return;
+    const loadInitialFriend = async () => {
+      try {
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const friends = res.data.friends || [];
+        const match = friends.find(f => f.userId?._id === initialFriendId);
+        if (match) {
+          setSelectedFriend(match.userId);
+        } else {
+          setFriendNotFound(true);
+        }
+      } catch (err) { console.error(err); }
+    };
+    loadInitialFriend();
+  }, [initialFriendId, token]);
+
   const handleSelectFriend = (friend) => {
     setSelectedFriend(friend);
+    window.history.pushState({}, '', `/chat/${friend._id}`);
     if (isMobile) setShowSidebar(false);
+  };
+
+  const handleBack = () => {
+    setSelectedFriend(null);
+    setFriendNotFound(false);
+    window.history.pushState({}, '', '/');
   };
 
   return (
@@ -106,8 +135,7 @@ export default function AppPage() {
 
       <div style={styles.main}>
 
-        {/* Header mobile — affiché seulement quand PAS dans une conversation */}
-        {isMobile && !selectedFriend && (
+        {isMobile && !selectedFriend && !friendNotFound && (
           <div style={styles.mobileHeader}>
             <button style={styles.hamburger} onClick={() => setShowSidebar(true)}>☰</button>
             <span style={styles.mobileTitle}>Propard</span>
@@ -115,10 +143,9 @@ export default function AppPage() {
           </div>
         )}
 
-        {/* Bouton retour sur mobile quand dans une conversation */}
-        {isMobile && selectedFriend && (
+        {isMobile && (selectedFriend || friendNotFound) && (
           <div style={styles.mobileHeader}>
-            <button style={styles.hamburger} onClick={() => setSelectedFriend(null)}>←</button>
+            <button style={styles.hamburger} onClick={handleBack}>←</button>
             <div style={{ width: '36px' }} />
           </div>
         )}
@@ -131,6 +158,14 @@ export default function AppPage() {
             hideFriendIps={hideFriendIps}
             isMobile={isMobile}
           />
+        ) : friendNotFound ? (
+          <div style={styles.empty}>
+            <p style={{ fontSize: '48px' }}>🚫</p>
+            <p style={styles.emptyText}>Tu n'as pas cet ami</p>
+            <button style={styles.backBtn} onClick={handleBack}>
+              Retour
+            </button>
+          </div>
         ) : (
           <div style={styles.empty}>
             <p style={{ fontSize: '48px' }}>💬</p>
@@ -167,5 +202,6 @@ const styles = {
   hamburger: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', fontSize: '18px' },
   mobileTitle: { fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' },
   empty: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' },
-  emptyText: { color: 'var(--text-secondary)', fontSize: '15px' }
+  emptyText: { color: 'var(--text-secondary)', fontSize: '15px' },
+  backBtn: { background: 'var(--accent)', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', border: 'none', cursor: 'pointer', marginTop: '8px' }
 };
