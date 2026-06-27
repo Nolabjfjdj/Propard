@@ -170,7 +170,6 @@ router.delete('/messages/:messageId', async (req, res) => {
     }
 
     message.deleted = true;
-    message.content = null;
     await message.save();
 
     res.json({ success: true });
