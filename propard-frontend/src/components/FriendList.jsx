@@ -8,6 +8,15 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
   const [requestUsers, setRequestUsers] = useState({});
   const [unread, setUnread] = useState({});
 
+  const fetchUnread = async () => {
+    try {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/friends/unread`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUnread(prev => ({ ...prev, ...res.data }));
+    } catch (err) { console.error(err); }
+  };
+
   const fetchData = async () => {
     try {
       const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
@@ -41,21 +50,28 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+    fetchUnread();
+    const interval = setInterval(() => {
+      fetchData();
+      fetchUnread();
+    }, 5000);
     return () => clearInterval(interval);
   }, [token]);
 
   useEffect(() => {
     const handleNew = (msg) => {
       const senderId = msg.sender._id || msg.sender;
-      setUnread(prev => ({
-        ...prev,
-        [senderId]: (prev[senderId] || 0) + 1
-      }));
+      // N'incrémente que si c'est pas l'ami actuellement ouvert
+      if (selectedFriend?._id !== senderId) {
+        setUnread(prev => ({
+          ...prev,
+          [senderId]: (prev[senderId] || 0) + 1
+        }));
+      }
     };
     socket.on('newMessage', handleNew);
     return () => socket.off('newMessage', handleNew);
-  }, []);
+  }, [selectedFriend]);
 
   const acceptRequest = async (fromUserId) => {
     try {
@@ -73,8 +89,19 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
     } catch (err) { console.error(err); }
   };
 
-  const handleSelect = (friend) => {
+  const handleSelect = async (friend) => {
+    // Remet le compteur à 0
     setUnread(prev => ({ ...prev, [friend._id]: 0 }));
+
+    // Marque les messages comme lus en base de données
+    try {
+      await axios.patch(
+        `${import.meta.env.VITE_API_URL}/api/friends/messages/read/${friend._id}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (err) { console.error(err); }
+
     window.history.pushState({}, '', `/chat/${friend._id}`);
     onSelectFriend(friend);
   };
