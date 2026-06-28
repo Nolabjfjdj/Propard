@@ -5,9 +5,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 
-// ─── Pseudos interdits ───────────────────────────────────────────────────────
 const PSEUDOS_INTERDITS = [
-  // Administration
   'owner', 'admin', 'administrator', 'superadmin', 'sysadmin',
   'moderator', 'mod', 'comod', 'staff', 'team', 'crew',
   'support', 'helpdesk', 'official',
@@ -28,7 +26,6 @@ const PSEUDOS_INTERDITS = [
   'terms', 'rules', 'guidelines', 'policy',
 ];
 
-// ─── Génération IP alias ─────────────────────────────────────────────────────
 function generateIpAlias() {
   const part = () => Math.floor(Math.random() * 254) + 1;
   return `${part()}.${part()}.${part()}.${part()}`;
