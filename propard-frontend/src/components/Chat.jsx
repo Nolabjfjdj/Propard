@@ -7,20 +7,13 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [spamWarning, setSpamWarning] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [editContent, setEditContent] = useState('');
-  const [contextMenu, setContextMenu] = useState(null);
   const [inCall, setInCall] = useState(false);
-
-  // 🔥 FIX CALL
-  const [incomingOffer, setIncomingOffer] = useState(null);
-  const [caller, setCaller] = useState(null);
 
   const bottomRef = useRef(null);
   const lastMessageTime = useRef(0);
   const messageCount = useRef(0);
   const messageCountTimer = useRef(null);
-  const longPressTimer = useRef(null);
+
   const SPAM_DELAY = 1000;
   const SPAM_LIMIT = 15;
 
@@ -41,11 +34,13 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
         { headers: { Authorization: `Bearer ${token}` } }
       ).catch(() => {});
     };
+
     fetchMessages();
   }, [friend._id]);
 
   useEffect(() => {
     const handleNew = (msg) => setMessages((prev) => [...prev, msg]);
+
     socket.on('newMessage', handleNew);
     socket.on('messageSent', handleNew);
 
@@ -55,40 +50,15 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
     };
   }, []);
 
-  // 🔥 CALL FIX
-  useEffect(() => {
-    const handleIncomingCall = ({ callerId, offer }) => {
-      setCaller({ _id: callerId });
-      setIncomingOffer(offer);
-      setInCall(true);
-    };
-
-    socket.on('incomingCall', handleIncomingCall);
-
-    return () => {
-      socket.off('incomingCall', handleIncomingCall);
-    };
-  }, []);
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  useEffect(() => {
-    const close = () => setContextMenu(null);
-    window.addEventListener('click', close);
-    window.addEventListener('touchstart', close);
-    return () => {
-      window.removeEventListener('click', close);
-      window.removeEventListener('touchstart', close);
-    };
-  }, []);
-
   const sendMessage = () => {
     if (!input.trim()) return;
+
     const now = Date.now();
     if (now - lastMessageTime.current < SPAM_DELAY) return;
-
     lastMessageTime.current = now;
 
     messageCount.current += 1;
@@ -111,34 +81,55 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
     setInput('');
   };
 
+  const isMe = (msg) => {
+    const senderId = msg.sender?._id?.toString?.() || msg.sender?.toString?.();
+    return senderId === myId;
+  };
+
   return (
     <div style={styles.container}>
 
       {/* HEADER */}
       <div style={styles.header}>
-        <div style={styles.headerAvatar}>
+        <div style={styles.avatar}>
           {friend.username[0].toUpperCase()}
         </div>
 
-        <div>
-          <p style={styles.headerName}>{friend.username}</p>
-          <p style={styles.headerIp}>
+        <div style={{ flex: 1 }}>
+          <p style={styles.name}>{friend.username}</p>
+          <p style={styles.ip}>
             {hideFriendIps ? '███.███.███.███' : friend.ipAlias}
           </p>
         </div>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
-          <button style={styles.callBtn} onClick={() => setInCall(true)}>
-            📞
-          </button>
-        </div>
+        <button style={styles.callBtn} onClick={() => setInCall(true)}>
+          📞
+        </button>
       </div>
 
       {/* MESSAGES */}
       <div style={styles.messages}>
         {messages.map((msg, i) => (
-          <div key={i}>{msg.content}</div>
+          <div
+            key={i}
+            style={{
+              display: 'flex',
+              justifyContent: isMe(msg) ? 'flex-end' : 'flex-start'
+            }}
+          >
+            <div
+              style={{
+                ...styles.bubble,
+                background: isMe(msg)
+                  ? 'linear-gradient(135deg, #6d5efc, #3dd6d0)'
+                  : 'rgba(255,255,255,0.08)'
+              }}
+            >
+              {msg.content}
+            </div>
+          </div>
         ))}
+
         <div ref={bottomRef} />
       </div>
 
@@ -151,20 +142,26 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
           placeholder={`Message à ${friend.username}...`}
           style={styles.input}
         />
-        <button onClick={sendMessage} style={styles.btn}>➤</button>
+
+        <button onClick={sendMessage} style={styles.sendBtn}>
+          ➤
+        </button>
       </div>
+
+      {/* SPAM WARNING */}
+      {spamWarning && (
+        <div style={styles.warning}>
+          ⚠️ Envoie moins vite
+        </div>
+      )}
 
       {/* CALL */}
       {inCall && (
         <VoiceCall
-          friend={caller || friend}
+          friend={friend}
           userId={userId}
-          onClose={() => {
-            setInCall(false);
-            setIncomingOffer(null);
-            setCaller(null);
-          }}
-          incomingOffer={incomingOffer}
+          onClose={() => setInCall(false)}
+          incomingOffer={null}
         />
       )}
     </div>
@@ -172,14 +169,105 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
 }
 
 const styles = {
-  container: { flex: 1, display: 'flex', flexDirection: 'column', height: '100vh' },
-  header: { display: 'flex', alignItems: 'center', padding: 16 },
-  headerAvatar: { width: 40, height: 40, borderRadius: '50%' },
-  headerName: { fontWeight: 'bold' },
-  headerIp: { fontSize: 12 },
-  callBtn: { padding: 6, fontSize: 18 },
-  messages: { flex: 1, overflowY: 'auto', padding: 16 },
-  inputBar: { display: 'flex', padding: 16 },
-  input: { flex: 1, padding: 10 },
-  btn: { padding: 10 }
+  container: {
+    height: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    background: 'linear-gradient(180deg, #0b0f17, #0f1624)',
+    color: '#fff',
+    fontFamily: 'system-ui'
+  },
+
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    background: 'rgba(255,255,255,0.03)',
+    borderBottom: '1px solid rgba(255,255,255,0.08)'
+  },
+
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #6d5efc, #3dd6d0)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 'bold'
+  },
+
+  name: {
+    margin: 0,
+    fontWeight: 700
+  },
+
+  ip: {
+    margin: 0,
+    fontSize: 11,
+    opacity: 0.6
+  },
+
+  callBtn: {
+    background: 'rgba(255,255,255,0.08)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 10,
+    padding: '8px 10px',
+    color: '#fff',
+    cursor: 'pointer'
+  },
+
+  messages: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: 16,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8
+  },
+
+  bubble: {
+    maxWidth: '70%',
+    padding: '10px 14px',
+    borderRadius: 14,
+    fontSize: 14,
+    lineHeight: 1.4,
+    color: '#fff'
+  },
+
+  inputBar: {
+    display: 'flex',
+    gap: 10,
+    padding: 12,
+    background: 'rgba(255,255,255,0.03)',
+    borderTop: '1px solid rgba(255,255,255,0.08)'
+  },
+
+  input: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'rgba(255,255,255,0.06)',
+    color: '#fff',
+    outline: 'none'
+  },
+
+  sendBtn: {
+    padding: '12px 14px',
+    borderRadius: 12,
+    border: 'none',
+    background: 'linear-gradient(135deg, #6d5efc, #3dd6d0)',
+    color: '#fff',
+    cursor: 'pointer'
+  },
+
+  warning: {
+    textAlign: 'center',
+    padding: 8,
+    color: '#ff4d4d',
+    fontWeight: 600,
+    background: 'rgba(255,0,0,0.08)'
+  }
 };
