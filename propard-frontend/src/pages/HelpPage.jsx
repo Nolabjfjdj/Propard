@@ -19,7 +19,7 @@ export default function HelpPage() {
         </div>
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>✏️ Modifier / Supprimer un message</h2>
-          <p style={styles.text}>Fais un clic droit sur un de tes messages pour le modifier ou le supprimer.</p>
+          <p style={styles.text}>Fais un clic droit (reste appuyer sur mobile) sur un de tes messages pour le modifier ou le supprimer.</p>
         </div>
         <div style={styles.divider} />
         <div style={styles.section}>
