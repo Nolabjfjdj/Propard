@@ -6,6 +6,7 @@ import socket from '../socket';
 import FriendList from '../components/FriendList';
 import Chat from '../components/Chat';
 import AddFriend from '../components/AddFriend';
+import VoiceCall from '../components/VoiceCall';
 
 export default function AppPage({ initialFriendId }) {
   const { user, token, logout } = useAuth();
@@ -17,6 +18,7 @@ export default function AppPage({ initialFriendId }) {
   const [hideFriendIps, setHideFriendIps] = useState(() => localStorage.getItem('propard_hideFriendIps') === 'true');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [friendNotFound, setFriendNotFound] = useState(false);
+  const [incomingCall, setIncomingCall] = useState(null);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -49,6 +51,20 @@ export default function AppPage({ initialFriendId }) {
     };
     loadInitialFriend();
   }, [initialFriendId, token]);
+
+  // Écoute les appels entrants
+  useEffect(() => {
+    socket.on('incomingCall', async ({ callerId, offer }) => {
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_URL}/api/auth/user/${callerId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setIncomingCall({ friend: { ...res.data, _id: callerId }, offer });
+      } catch (err) { console.error(err); }
+    });
+    return () => socket.off('incomingCall');
+  }, [token]);
 
   const handleSelectFriend = (friend) => {
     setSelectedFriend(friend);
@@ -162,9 +178,7 @@ export default function AppPage({ initialFriendId }) {
           <div style={styles.empty}>
             <p style={{ fontSize: '48px' }}>🚫</p>
             <p style={styles.emptyText}>Tu n'as pas cet ami</p>
-            <button style={styles.backBtn} onClick={handleBack}>
-              Retour
-            </button>
+            <button style={styles.backBtn} onClick={handleBack}>Retour</button>
           </div>
         ) : (
           <div style={styles.empty}>
@@ -178,6 +192,16 @@ export default function AppPage({ initialFriendId }) {
 
       {showAddFriend && (
         <AddFriend token={token} onClose={() => setShowAddFriend(false)} />
+      )}
+
+      {/* Appel entrant */}
+      {incomingCall && (
+        <VoiceCall
+          friend={incomingCall.friend}
+          userId={user?.id}
+          onClose={() => setIncomingCall(null)}
+          incomingOffer={incomingCall.offer}
+        />
       )}
     </div>
   );
