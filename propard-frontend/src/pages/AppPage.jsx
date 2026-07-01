@@ -32,7 +32,6 @@ export default function AppPage({ initialFriendId }) {
     return () => socket.disconnect();
   }, [token]);
 
-  // Charge l'ami depuis l'URL /chat/:friendId
   useEffect(() => {
     if (!initialFriendId || !token) return;
     const loadInitialFriend = async () => {
@@ -52,7 +51,6 @@ export default function AppPage({ initialFriendId }) {
     loadInitialFriend();
   }, [initialFriendId, token]);
 
-  // Écoute les appels entrants
   useEffect(() => {
     socket.on('incomingCall', async ({ callerId, offer }) => {
       try {
@@ -102,7 +100,15 @@ export default function AppPage({ initialFriendId }) {
               Propard<span style={{ color: 'var(--accent)' }}>.</span>
             </span>
           </div>
-          <div style={{ display: 'flex', gap: '6px' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <a
+              href="https://discord.gg/hsMdJQz6EY"
+              target="_blank"
+              rel="noreferrer"
+              style={styles.discordLink}
+            >
+              Discord
+            </a>
             <button onClick={toggleTheme} style={styles.iconBtn}>
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>
@@ -194,7 +200,6 @@ export default function AppPage({ initialFriendId }) {
         <AddFriend token={token} onClose={() => setShowAddFriend(false)} />
       )}
 
-      {/* Appel entrant */}
       {incomingCall && (
         <VoiceCall
           friend={incomingCall.friend}
@@ -214,6 +219,7 @@ const styles = {
   sidebarHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   appName: { fontFamily: 'var(--font-mono)', fontSize: '20px', fontWeight: '700' },
   helpLink: { fontSize: '11px', color: 'var(--text-muted)', textDecoration: 'none', marginBottom: '2px' },
+  discordLink: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center' },
   iconBtn: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', fontSize: '16px' },
   ipCard: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px', textAlign: 'center' },
   ipLabel: { fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' },
