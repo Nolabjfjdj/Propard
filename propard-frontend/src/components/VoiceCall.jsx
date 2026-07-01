@@ -1,11 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import socket from '../socket';
 
-const ICE_SERVERS = {
+const STUN_ONLY_FALLBACK = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' }
   ]
+};
+
+const getIceServers = async () => {
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/turn-credentials`);
+    if (!res.ok) throw new Error('turn-credentials fetch failed');
+    const iceServers = await res.json();
+    return { iceServers };
+  } catch (err) {
+    console.error('Impossible de récupérer les identifiants TURN, repli sur STUN seul', err);
+    return STUN_ONLY_FALLBACK;
+  }
 };
 
 export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
@@ -52,7 +64,8 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
 
-      const peer = new RTCPeerConnection(ICE_SERVERS);
+      const iceServers = await getIceServers();
+      const peer = new RTCPeerConnection(iceServers);
       peerRef.current = peer;
 
       stream.getTracks().forEach(track => peer.addTrack(track, stream));
@@ -67,6 +80,12 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
         const audio = new Audio();
         audio.srcObject = e.streams[0];
         audio.play();
+      };
+
+      peer.oniceconnectionstatechange = () => {
+        if (peer.iceConnectionState === 'failed' || peer.iceConnectionState === 'disconnected') {
+          setStatus('failed');
+        }
       };
 
       const offer = await peer.createOffer();
@@ -87,7 +106,8 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
 
-      const peer = new RTCPeerConnection(ICE_SERVERS);
+      const iceServers = await getIceServers();
+      const peer = new RTCPeerConnection(iceServers);
       peerRef.current = peer;
 
       stream.getTracks().forEach(track => peer.addTrack(track, stream));
@@ -102,6 +122,12 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
         const audio = new Audio();
         audio.srcObject = e.streams[0];
         audio.play();
+      };
+
+      peer.oniceconnectionstatechange = () => {
+        if (peer.iceConnectionState === 'failed' || peer.iceConnectionState === 'disconnected') {
+          setStatus('failed');
+        }
       };
 
       await peer.setRemoteDescription(new RTCSessionDescription(incomingOffer));
