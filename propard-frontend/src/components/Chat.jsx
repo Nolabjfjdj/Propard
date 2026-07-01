@@ -43,10 +43,15 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
 
   useEffect(() => {
     const handleNew = (msg) => setMessages((prev) => [...prev, msg]);
+    const myFriendId = normalize(friend._id);
     const handleIncomingCall = ({ callerId, offer }) => {
-      setCaller({ _id: callerId });
-      setIncomingOffer(offer);
-      setInCall(true);
+      setInCall(prevInCall => {
+        if (prevInCall) return prevInCall; // un appel est déjà en cours, on ignore le doublon
+        const known = callerId?.toString() === myFriendId ? friend : { _id: callerId, username: 'Inconnu' };
+        setCaller(known);
+        setIncomingOffer(offer);
+        return true;
+      });
     };
     socket.on('newMessage', handleNew);
     socket.on('messageSent', handleNew);
@@ -56,7 +61,7 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
       socket.off('messageSent', handleNew);
       socket.off('incomingCall', handleIncomingCall);
     };
-  }, []);
+  }, [friend._id]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -314,4 +319,3 @@ const styles = {
   input: { flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: '14px' },
   btn: { padding: '10px 14px', background: 'var(--accent)', color: '#fff', borderRadius: '8px', fontSize: '16px' }
 };
- 
