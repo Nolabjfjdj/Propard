@@ -169,10 +169,10 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
       <div style={styles.card}>
         {/* Avatar */}
         <div style={styles.avatar}>
-          {friend.username[0].toUpperCase()}
+          {friend?.username ? friend.username[0].toUpperCase() : '?'}
         </div>
 
-        <p style={styles.name}>{friend.username}</p>
+        <p style={styles.name}>{friend?.username || 'Appel inconnu'}</p>
 
         {/* Statut */}
         <p style={styles.status}>
