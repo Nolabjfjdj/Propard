@@ -27,6 +27,7 @@ mongoose.connect(process.env.MONGO_URI)
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/friends', require('./routes/friends'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api', require('./routes/turn'));
 
 app.get('/', (req, res) => res.status(200).json({ status: 'ok', message: 'API online 🚀' }));
 app.get('/health', (req, res) => res.status(200).send('OK'));
