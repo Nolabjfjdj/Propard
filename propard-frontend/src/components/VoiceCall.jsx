@@ -65,7 +65,7 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
       localStreamRef.current = stream;
 
       const iceServers = await getIceServers();
-      const peer = new RTCPeerConnection(iceServers);
+      const peer = new RTCPeerConnection({ ...iceServers, iceTransportPolicy: 'relay' });
       peerRef.current = peer;
 
       stream.getTracks().forEach(track => peer.addTrack(track, stream));
@@ -107,7 +107,7 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
       localStreamRef.current = stream;
 
       const iceServers = await getIceServers();
-      const peer = new RTCPeerConnection(iceServers);
+      const peer = new RTCPeerConnection({ ...iceServers, iceTransportPolicy: 'relay' });
       peerRef.current = peer;
 
       stream.getTracks().forEach(track => peer.addTrack(track, stream));
