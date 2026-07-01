@@ -15,6 +15,7 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
   const timerRef = useRef(null);
+  const hasInitiatedRef = useRef(false);
 
   // Démarre le timer quand l'appel est connecté
   const startTimer = () => {
@@ -123,7 +124,10 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
 
   // ─── Écoute les événements Socket.io ────────────────────────────────────
   useEffect(() => {
-    if (!incomingOffer) startCall();
+    if (!incomingOffer && !hasInitiatedRef.current) {
+      hasInitiatedRef.current = true;
+      startCall();
+    }
 
     socket.on('callAnswered', async ({ answer }) => {
       await peerRef.current?.setRemoteDescription(new RTCSessionDescription(answer));
