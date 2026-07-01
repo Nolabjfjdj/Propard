@@ -92,6 +92,41 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ─── SIGNALING WEBRTC ──────────────────────────────────────────────────
+
+  socket.on('callUser', ({ receiverId, offer }) => {
+    const receiverSocket = connectedUsers.get(receiverId);
+    if (receiverSocket) {
+      io.to(receiverSocket).emit('incomingCall', {
+        callerId: socket.userId,
+        offer
+      });
+    } else {
+      socket.emit('callFailed', { message: 'Utilisateur non connecté' });
+    }
+  });
+
+  socket.on('answerCall', ({ callerId, answer }) => {
+    const callerSocket = connectedUsers.get(callerId);
+    if (callerSocket) {
+      io.to(callerSocket).emit('callAnswered', { answer });
+    }
+  });
+
+  socket.on('iceCandidate', ({ receiverId, candidate }) => {
+    const receiverSocket = connectedUsers.get(receiverId);
+    if (receiverSocket) {
+      io.to(receiverSocket).emit('iceCandidate', { candidate });
+    }
+  });
+
+  socket.on('endCall', ({ receiverId }) => {
+    const receiverSocket = connectedUsers.get(receiverId);
+    if (receiverSocket) {
+      io.to(receiverSocket).emit('callEnded');
+    }
+  });
+
   socket.on('disconnect', async () => {
     if (socket.userId) {
       connectedUsers.delete(socket.userId);
