@@ -27,13 +27,13 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
   useEffect(() => {
     const fetchMessages = async () => {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_URL}/api/friends/messages/${friend._id}`,
+        `/api/friends/messages/${friend._id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setMessages(res.data);
 
       await axios.patch(
-        `${import.meta.env.VITE_API_URL}/api/friends/messages/read/${friend._id}`,
+        `/api/friends/messages/read/${friend._id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       ).catch(() => {});
@@ -44,7 +44,6 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
   useEffect(() => {
     const handleNew = (msg) => setMessages((prev) => [...prev, msg]);
 
-    // Suppression temps réel
     const handleDeleted = ({ messageId }) => {
       setMessages(prev => prev.filter(m => m._id !== messageId));
     };
@@ -108,13 +107,12 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
   };
 
   const deleteMessage = async (msgId) => {
-    // Retire immédiatement de l'écran de l'expéditeur
     setMessages(prev => prev.filter(m => m._id !== msgId));
     setContextMenu(null);
 
     try {
       await axios.delete(
-        `${import.meta.env.VITE_API_URL}/api/friends/messages/${msgId}`,
+        `/api/friends/messages/${msgId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
     } catch (err) { console.error(err); }
@@ -130,7 +128,7 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
     if (!editContent.trim()) return;
     try {
       await axios.patch(
-        `${import.meta.env.VITE_API_URL}/api/friends/messages/${msgId}`,
+        `/api/friends/messages/${msgId}`,
         { content: editContent.trim() },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -195,8 +193,6 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
 
   return (
     <div style={styles.container}>
-
-      {/* Header */}
       <div style={styles.header}>
         <div style={styles.headerAvatar}>{friend.username[0].toUpperCase()}</div>
         <div>
@@ -211,7 +207,6 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
         </div>
       </div>
 
-      {/* Messages */}
       <div style={styles.messages}>
         {messages.filter(msg => !msg.deleted).map((msg, i) => {
           const senderId = msg.sender?._id?.toString?.() || msg.sender?.toString?.();
@@ -260,7 +255,6 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
         <div ref={bottomRef} />
       </div>
 
-      {/* Menu contextuel */}
       {contextMenu && (
         <div
           style={{ ...styles.contextMenu, top: contextMenu.top, left: contextMenu.left }}
@@ -277,12 +271,10 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
         </div>
       )}
 
-      {/* Avertissement spam */}
       {spamWarning && (
         <div style={styles.spamAlert}>⚠️ Envoie moins vite !</div>
       )}
 
-      {/* Input */}
       <div style={styles.inputBar}>
         <input
           value={input}
@@ -294,7 +286,6 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
         <button onClick={sendMessage} style={styles.btn}>➤</button>
       </div>
 
-      {/* Appel vocal */}
       {inCall && (
         <VoiceCall
           friend={caller || friend}
