@@ -36,7 +36,7 @@ export default function AppPage({ initialFriendId }) {
     if (!initialFriendId || !token) return;
     const loadInitialFriend = async () => {
       try {
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+        const res = await axios.get('/api/auth/me', {
           headers: { Authorization: `Bearer ${token}` }
         });
         const friends = res.data.friends || [];
@@ -55,7 +55,7 @@ export default function AppPage({ initialFriendId }) {
     socket.on('incomingCall', async ({ callerId, offer }) => {
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_API_URL}/api/auth/user/${callerId}`,
+          `/api/auth/user/${callerId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setIncomingCall({ friend: { ...res.data, _id: callerId }, offer });
