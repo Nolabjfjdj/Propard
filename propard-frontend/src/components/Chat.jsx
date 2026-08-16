@@ -43,22 +43,32 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
 
   useEffect(() => {
     const handleNew = (msg) => setMessages((prev) => [...prev, msg]);
+
+    // Suppression temps réel
+    const handleDeleted = ({ messageId }) => {
+      setMessages(prev => prev.filter(m => m._id !== messageId));
+    };
+
     const myFriendId = normalize(friend._id);
     const handleIncomingCall = ({ callerId, offer }) => {
       setInCall(prevInCall => {
-        if (prevInCall) return prevInCall; // un appel est déjà en cours, on ignore le doublon
+        if (prevInCall) return prevInCall;
         const known = callerId?.toString() === myFriendId ? friend : { _id: callerId, username: 'Inconnu' };
         setCaller(known);
         setIncomingOffer(offer);
         return true;
       });
     };
+
     socket.on('newMessage', handleNew);
     socket.on('messageSent', handleNew);
+    socket.on('messageDeleted', handleDeleted);
     socket.on('incomingCall', handleIncomingCall);
+
     return () => {
       socket.off('newMessage', handleNew);
       socket.off('messageSent', handleNew);
+      socket.off('messageDeleted', handleDeleted);
       socket.off('incomingCall', handleIncomingCall);
     };
   }, [friend._id]);
@@ -98,14 +108,15 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
   };
 
   const deleteMessage = async (msgId) => {
+    // Retire immédiatement de l'écran de l'expéditeur
+    setMessages(prev => prev.filter(m => m._id !== msgId));
+    setContextMenu(null);
+
     try {
       await axios.delete(
         `${import.meta.env.VITE_API_URL}/api/friends/messages/${msgId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setMessages(prev => prev.map(m =>
-        m._id === msgId ? { ...m, deleted: true, content: null } : m
-      ));
     } catch (err) { console.error(err); }
   };
 
@@ -260,7 +271,7 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
             ✏️ Modifier
           </button>
           <button style={{ ...styles.contextItem, color: 'var(--danger)' }}
-            onClick={() => { deleteMessage(contextMenu.msg._id); setContextMenu(null); }}>
+            onClick={() => deleteMessage(contextMenu.msg._id)}>
             🗑️ Supprimer
           </button>
         </div>
