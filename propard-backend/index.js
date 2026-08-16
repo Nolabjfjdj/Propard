@@ -141,12 +141,12 @@ io.on('connection', (socket) => {
 // ─── SERVIR LE FRONTEND REACT (BUILD) ──────────────────────────
 app.use(express.static(path.join(__dirname, 'dist')));
 
-app.get('/*', (req, res) => {
+app.get(/^(?!\/api).*/, (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 // ─── START SERVER ──────────────────────────
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Serveur lancé sur le port ${PORT}`);
 });
