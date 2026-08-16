@@ -10,7 +10,7 @@ export default function AddFriend({ token, onClose }) {
     if (!ipAlias.trim()) return;
     setError(''); setStatus('');
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/friends/add`,
+      await axios.post('/api/friends/add',
         { ipAlias: ipAlias.trim() }, { headers: { Authorization: `Bearer ${token}` } });
       setStatus('Demande envoyée !');
       setIpAlias('');
