@@ -14,7 +14,7 @@ export default function AdminPage() {
     setError(''); setResult('');
     setLoading(true);
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/admin/reset-password`, {
+      const res = await axios.post('/api/admin/reset-password', {
         adminKey, username, newPassword
       });
       setResult(res.data.message);
