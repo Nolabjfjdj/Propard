@@ -19,7 +19,7 @@ export default function AuthPage() {
    setLoading(true);
    try {
      const route = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
-     const res = await axios.post(`${import.meta.env.VITE_API_URL}${route}`, { username, password });
+     const res = await axios.post(route, { username, password });
      login(res.data.user, res.data.token);
    } catch (err) {
      setError(err.response?.data?.error || 'Erreur serveur');
