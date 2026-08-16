@@ -10,7 +10,7 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
 
   const fetchUnread = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/friends/unread`, {
+      const res = await axios.get('/api/friends/unread', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUnread(prev => ({ ...prev, ...res.data }));
@@ -19,7 +19,7 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
 
   const fetchData = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+      const res = await axios.get('/api/auth/me', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const friendsList = res.data.friends || [];
@@ -33,7 +33,7 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
       for (const req of requestsList) {
         try {
           const userRes = await axios.get(
-            `${import.meta.env.VITE_API_URL}/api/auth/user/${req.from}`,
+            `/api/auth/user/${req.from}`,
             { headers: { Authorization: `Bearer ${token}` } }
           );
           usersMap[req.from] = userRes.data;
@@ -61,7 +61,6 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
   useEffect(() => {
     const handleNew = (msg) => {
       const senderId = msg.sender._id || msg.sender;
-      // N'incrémente que si c'est pas l'ami actuellement ouvert
       if (selectedFriend?._id !== senderId) {
         setUnread(prev => ({
           ...prev,
@@ -75,7 +74,7 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
 
   const acceptRequest = async (fromUserId) => {
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/friends/accept`,
+      await axios.post('/api/friends/accept',
         { fromUserId }, { headers: { Authorization: `Bearer ${token}` } });
       fetchData();
     } catch (err) { console.error(err); }
@@ -83,20 +82,18 @@ export default function FriendList({ token, selectedFriend, onSelectFriend, hide
 
   const declineRequest = async (fromUserId) => {
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/friends/decline`,
+      await axios.post('/api/friends/decline',
         { fromUserId }, { headers: { Authorization: `Bearer ${token}` } });
       fetchData();
     } catch (err) { console.error(err); }
   };
 
   const handleSelect = async (friend) => {
-    // Remet le compteur à 0
     setUnread(prev => ({ ...prev, [friend._id]: 0 }));
 
-    // Marque les messages comme lus en base de données
     try {
       await axios.patch(
-        `${import.meta.env.VITE_API_URL}/api/friends/messages/read/${friend._id}`,
+        `/api/friends/messages/read/${friend._id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
