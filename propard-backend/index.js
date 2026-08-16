@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -34,7 +35,6 @@ app.use('/api/friends', require('./routes/friends'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api', require('./routes/turn'));
 
-app.get('/', (req, res) => res.status(200).json({ status: 'ok', message: 'API online 🚀' }));
 app.get('/health', (req, res) => res.status(200).send('OK'));
 
 // ─── SOCKET LOGIC ──────────────────────────
@@ -136,6 +136,13 @@ io.on('connection', (socket) => {
       await User.findByIdAndUpdate(socket.userId, { isOnline: false });
     }
   });
+});
+
+// ─── SERVIR LE FRONTEND REACT (BUILD) ──────────────────────────
+app.use(express.static(path.join(__dirname, 'dist')));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 // ─── START SERVER ──────────────────────────
