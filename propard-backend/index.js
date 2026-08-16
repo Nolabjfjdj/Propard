@@ -23,6 +23,11 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB connecté'))
   .catch(err => console.error('❌ MongoDB error:', err));
 
+// ─── Shared state (accessible depuis les routes) ────────────────────────────
+const connectedUsers = new Map();
+app.set('io', io);
+app.set('connectedUsers', connectedUsers);
+
 // ─── ROUTES API ────────────────────────────
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/friends', require('./routes/friends'));
@@ -33,7 +38,6 @@ app.get('/', (req, res) => res.status(200).json({ status: 'ok', message: 'API on
 app.get('/health', (req, res) => res.status(200).send('OK'));
 
 // ─── SOCKET LOGIC ──────────────────────────
-const connectedUsers = new Map();
 const lastMessageTimes = new Map();
 const Message = require('./models/Message');
 const User = require('./models/User');
@@ -98,10 +102,7 @@ io.on('connection', (socket) => {
   socket.on('callUser', ({ receiverId, offer }) => {
     const receiverSocket = connectedUsers.get(receiverId);
     if (receiverSocket) {
-      io.to(receiverSocket).emit('incomingCall', {
-        callerId: socket.userId,
-        offer
-      });
+      io.to(receiverSocket).emit('incomingCall', { callerId: socket.userId, offer });
     } else {
       socket.emit('callFailed', { message: 'Utilisateur non connecté' });
     }
