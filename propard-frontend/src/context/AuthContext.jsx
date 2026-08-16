@@ -14,7 +14,7 @@ export function AuthProvider({ children }) {
 
    if (savedToken && savedUser) {
      const verify = () =>
-       axios.get(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+       axios.get('/api/auth/me', {
          headers: { Authorization: `Bearer ${savedToken}` }
        }).catch(() => {
          localStorage.removeItem('propard_token');
