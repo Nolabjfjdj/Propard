@@ -2,7 +2,7 @@ export default function TermsPage() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <a href="/" style={styles.back}>← Retour</a>
+        <a href="/help" style={styles.back}>← Retour</a>
         <h1 style={styles.title}>Conditions Générales d'Utilisation</h1>
         <p style={styles.date}>En vigueur depuis le 12 avril 2026</p>
 
