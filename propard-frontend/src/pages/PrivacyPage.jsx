@@ -2,7 +2,7 @@ export default function PrivacyPage() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <a href="/" style={styles.back}>← Retour</a>
+        <a href="/help" style={styles.back}>← Retour</a>
         <h1 style={styles.title}>Politique de Confidentialité</h1>
         <p style={styles.date}>En vigueur depuis le 12 avril 2026</p>
 
@@ -19,7 +19,7 @@ export default function PrivacyPage() {
           <p style={styles.text}>Lors de la création d'un compte, Propard collecte et stocke :</p>
           <ul style={styles.list}>
             <li>Un nom d'utilisateur (pseudo) choisi librement</li>
-            <li>Un mot de passe chiffré (hashé via bcrypt — nous ne pouvons pas le lire)</li>
+            <li>Un mot de passe chiffré (hashé via bcrypt, nous ne pouvons pas le lire)</li>
             <li>Une adresse IP alias générée aléatoirement (ce n'est pas votre vraie adresse IP)</li>
             <li>La date de création du compte</li>
             <li>Le statut en ligne / hors ligne en temps réel</li>
