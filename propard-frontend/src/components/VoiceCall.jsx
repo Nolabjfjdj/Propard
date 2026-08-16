@@ -10,7 +10,7 @@ const STUN_ONLY_FALLBACK = {
 
 const getIceServers = async () => {
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/turn-credentials`);
+    const res = await fetch('/api/turn-credentials');
     if (!res.ok) throw new Error('turn-credentials fetch failed');
     const iceServers = await res.json();
     return { iceServers };
@@ -29,7 +29,6 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
   const timerRef = useRef(null);
   const hasInitiatedRef = useRef(false);
 
-  // Démarre le timer quand l'appel est connecté
   const startTimer = () => {
     timerRef.current = setInterval(() => {
       setDuration(prev => prev + 1);
@@ -58,7 +57,6 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
     onClose();
   };
 
-  // ─── Initier un appel ────────────────────────────────────────────────────
   const startCall = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -100,7 +98,6 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
     }
   };
 
-  // ─── Accepter un appel entrant ───────────────────────────────────────────
   const answerCall = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -148,7 +145,6 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
     onClose();
   };
 
-  // ─── Écoute les événements Socket.io ────────────────────────────────────
   useEffect(() => {
     if (!incomingOffer && !hasInitiatedRef.current) {
       hasInitiatedRef.current = true;
@@ -197,14 +193,12 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
   return (
     <div style={styles.overlay}>
       <div style={styles.card}>
-        {/* Avatar */}
         <div style={styles.avatar}>
           {friend?.username ? friend.username[0].toUpperCase() : '?'}
         </div>
 
         <p style={styles.name}>{friend?.username || 'Appel inconnu'}</p>
 
-        {/* Statut */}
         <p style={styles.status}>
           {status === 'calling' && '📞 Appel en cours...'}
           {status === 'incoming' && '📲 Appel entrant'}
@@ -213,7 +207,6 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
           {status === 'error' && '❌ Micro inaccessible'}
         </p>
 
-        {/* Boutons */}
         <div style={styles.buttons}>
           {status === 'incoming' ? (
             <>
