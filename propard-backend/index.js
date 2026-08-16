@@ -141,6 +141,11 @@ io.on('connection', (socket) => {
 // ─── SERVIR LE FRONTEND REACT (BUILD) ──────────────────────────
 app.use(express.static(path.join(__dirname, 'dist')));
 
+app.get('/sitemap.xml', (req, res) => {
+  res.type('application/xml');
+  res.sendFile(path.join(__dirname, 'dist', 'sitemap.xml'));
+});
+
 app.get(/^(?!\/api).*/, (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
