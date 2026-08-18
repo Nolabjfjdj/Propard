@@ -24,6 +24,13 @@ const userSchema = new mongoose.Schema({
     unique: true
   },
 
+  // Clé publique ECDH (JWK, format JSON) pour le chiffrement de bout en
+  // bout des messages.
+  publicKey: {
+    type: String,
+    default: null
+  },
+
   // Liste des amis
   friends: [
     {
