@@ -19,6 +19,10 @@ const messageSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  encrypted: {
+    type: Boolean,
+    default: true
+  },
   edited: {
     type: Boolean,
     default: false
