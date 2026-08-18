@@ -6,12 +6,13 @@ export async function generateKeyPair() {
     true,
     ['deriveKey']
   );
-  const publicKeyJwk = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
-  const privateKeyJwk = await crypto.subtle.exportKey('jwk', keyPair.privateKey);
-  return { publicKeyJwk, privateKeyJwk };
+  return {
+    publicKeyJwk: await crypto.subtle.exportKey('jwk', keyPair.publicKey),
+    privateKeyJwk: await crypto.subtle.exportKey('jwk', keyPair.privateKey)
+  };
 }
 
-const privKeyStorageKey = (userId) => `propard_privkey_${userId}`;
+const privKeyStorageKey = userId => `propard_privkey_${userId}`;
 
 export function storePrivateKey(userId, privateKeyJwk) {
   localStorage.setItem(privKeyStorageKey(userId), JSON.stringify(privateKeyJwk));
@@ -20,7 +21,8 @@ export function storePrivateKey(userId, privateKeyJwk) {
 export function getStoredPrivateKeyJwk(userId) {
   if (!userId) return null;
   const raw = localStorage.getItem(privKeyStorageKey(userId));
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
 }
 
 export function hasStoredPrivateKey(userId) {
@@ -28,15 +30,11 @@ export function hasStoredPrivateKey(userId) {
 }
 
 async function importPrivateKey(jwk) {
-  return crypto.subtle.importKey(
-    'jwk', jwk, { name: 'ECDH', namedCurve: CURVE }, true, ['deriveKey']
-  );
+  return crypto.subtle.importKey('jwk', jwk, { name: 'ECDH', namedCurve: CURVE }, true, ['deriveKey']);
 }
 
 async function importPublicKey(jwk) {
-  return crypto.subtle.importKey(
-    'jwk', jwk, { name: 'ECDH', namedCurve: CURVE }, true, []
-  );
+  return crypto.subtle.importKey('jwk', jwk, { name: 'ECDH', namedCurve: CURVE }, true, []);
 }
 
 export async function deriveSharedKey(myPrivateKeyJwk, friendPublicKeyJwk) {
@@ -52,7 +50,13 @@ export async function deriveSharedKey(myPrivateKeyJwk, friendPublicKeyJwk) {
 }
 
 function bufToBase64(buf) {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+  let binary = '';
+  const bytes = new Uint8Array(buf);
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
 }
 
 function base64ToBuf(b64) {
@@ -62,14 +66,8 @@ function base64ToBuf(b64) {
 export async function encryptMessage(sharedKey, plaintext) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(plaintext);
-  const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv }, sharedKey, encoded
-  );
-  return JSON.stringify({
-    v: 1,
-    iv: bufToBase64(iv),
-    ct: bufToBase64(ciphertext)
-  });
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, sharedKey, encoded);
+  return JSON.stringify({ v: 1, iv: bufToBase64(iv), ct: bufToBase64(ciphertext) });
 }
 
 export async function decryptMessage(sharedKey, payload) {
@@ -78,9 +76,7 @@ export async function decryptMessage(sharedKey, payload) {
     if (!parsed || parsed.v !== 1 || !parsed.iv || !parsed.ct) return null;
     const iv = base64ToBuf(parsed.iv);
     const ciphertext = base64ToBuf(parsed.ct);
-    const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv }, sharedKey, ciphertext
-    );
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, sharedKey, ciphertext);
     return new TextDecoder().decode(decrypted);
   } catch {
     return null;
