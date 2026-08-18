@@ -24,8 +24,6 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
   const normalize = (id) => id?.toString();
   const myId = normalize(userId);
 
-  // Si friend n'est pas encore prêt (switch de conversation en cours), on ne rend rien
-  // plutôt que de planter tout l'arbre React (source de l'écran gris).
   if (!friend || !friend._id) {
     return <div style={styles.container} />;
   }
@@ -38,7 +36,7 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
       setLoadError(null);
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_API_URL}/api/friends/messages/${friend._id}`,
+          `/api/friends/messages/${friend._id}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (!cancelled) {
@@ -46,7 +44,7 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
         }
 
         await axios.patch(
-          `${import.meta.env.VITE_API_URL}/api/friends/messages/read/${friend._id}`,
+          `/api/friends/messages/read/${friend._id}`,
           {},
           { headers: { Authorization: `Bearer ${token}` } }
         ).catch(() => {});
@@ -120,7 +118,7 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
 
     try {
       await axios.delete(
-        `${import.meta.env.VITE_API_URL}/api/friends/messages/${msgId}`,
+        `/api/friends/messages/${msgId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
     } catch (err) { console.error(err); }
@@ -136,7 +134,7 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
     if (!editContent.trim()) return;
     try {
       await axios.patch(
-        `${import.meta.env.VITE_API_URL}/api/friends/messages/${msgId}`,
+        `/api/friends/messages/${msgId}`,
         { content: editContent.trim() },
         { headers: { Authorization: `Bearer ${token}` } }
       );
