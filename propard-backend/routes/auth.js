@@ -92,7 +92,7 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       message: 'Compte créé avec succès',
       token,
-      user: { id: user._id, username: user.username, ipAlias: user.ipAlias }
+      user: { id: user._id, username: user.username, ipAlias: user.ipAlias, publicKey: user.publicKey }
     });
 
   } catch (err) {
@@ -125,7 +125,7 @@ router.post('/login', async (req, res) => {
     res.json({
       message: 'Connexion réussie',
       token,
-      user: { id: user._id, username: user.username, ipAlias: user.ipAlias }
+      user: { id: user._id, username: user.username, ipAlias: user.ipAlias, publicKey: user.publicKey }
     });
 
   } catch (err) {
@@ -139,7 +139,7 @@ router.get('/me', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id)
       .select('-password')
-      .populate('friends.userId', 'username ipAlias isOnline');
+      .populate('friends.userId', 'username ipAlias isOnline publicKey');
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -149,10 +149,41 @@ router.get('/me', authMiddleware, async (req, res) => {
 // ─── ROUTE : Récupérer un utilisateur par ID ─────────────────────────────────
 router.get('/user/:id', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('username ipAlias');
+    const user = await User.findById(req.params.id).select('username ipAlias publicKey');
     if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
     res.json(user);
   } catch (err) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ─── ROUTE : Enregistrer / mettre à jour sa clé publique de chiffrement ──────
+// Appelée automatiquement par le client (AuthContext) juste après connexion
+// ou inscription, dès qu'une paire de clés locale a été générée. Ne stocke
+// jamais de clé privée : seule la clé publique transite ici.
+router.patch('/publickey', authMiddleware, async (req, res) => {
+  try {
+    const { publicKey } = req.body;
+
+    if (!publicKey || typeof publicKey !== 'string') {
+      return res.status(400).json({ error: 'Clé publique requise' });
+    }
+    if (publicKey.length > 2000) {
+      return res.status(400).json({ error: 'Clé publique invalide' });
+    }
+    // Vérifie que c'est bien du JSON (format JWK), sans en imposer la forme
+    // exacte ici — la validation cryptographique se fait côté client.
+    try {
+      JSON.parse(publicKey);
+    } catch {
+      return res.status(400).json({ error: 'Clé publique mal formée' });
+    }
+
+    await User.findByIdAndUpdate(req.user.id, { publicKey });
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
