@@ -27,9 +27,22 @@ export default function AppPage({ initialFriendId }) {
   }, []);
 
   useEffect(() => {
+    const authenticate = () => socket.emit('authenticate', token);
+
+    // Réauthentifie à chaque (re)connexion, pas juste au montage.
+    // Sans ça, une coupure réseau (fréquent en 4G) fait reconnecter le
+    // socket avec un nouvel id côté serveur, mais l'utilisateur reste
+    // introuvable dans connectedUsers tant qu'on n'a pas renvoyé
+    // 'authenticate' — ce qui casse silencieusement endCall, iceCandidate,
+    // callUser, etc. envoyés vers lui après coup.
+    socket.on('connect', authenticate);
     socket.connect();
-    socket.emit('authenticate', token);
-    return () => socket.disconnect();
+    if (socket.connected) authenticate();
+
+    return () => {
+      socket.off('connect', authenticate);
+      socket.disconnect();
+    };
   }, [token]);
 
   useEffect(() => {
