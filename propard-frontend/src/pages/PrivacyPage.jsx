@@ -43,12 +43,17 @@ export default function PrivacyPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>4. Messages privés</h2>
-          <p style={styles.text}>
-            Les messages échangés entre utilisateurs sont stockés dans notre base de données pour permettre l'affichage de l'historique. Nous ne lisons jamais le contenu de vos messages privés. Les messages supprimés sont définitivement effacés de notre base de données.
-          </p>
-        </div>
-
+  <h2 style={styles.sectionTitle}>4. Messages privés</h2>
+  <p style={styles.text}>
+    Les messages échangés entre utilisateurs sont chiffrés de bout en bout (E2EE) avant d'être envoyés à nos serveurs. Le contenu des messages est donc stocké sous forme chiffrée dans notre base de données et nous ne pouvons pas lire leur contenu.
+  </p>
+  <p style={styles.text}>
+    La clé privée nécessaire au déchiffrement est conservée uniquement sur l'appareil de l'utilisateur et n'est jamais envoyée à nos serveurs. En conséquence, nous ne pouvons pas déchiffrer ou récupérer le contenu de vos messages à votre place. Si cette clé privée est perdue, les messages chiffrés associés peuvent devenir définitivement illisibles.
+  </p>
+  <p style={styles.text}>
+    Les messages supprimés sont définitivement effacés de notre base de données.
+  </p>
+</div>
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>5. Hébergement</h2>
           <p style={styles.text}>
