@@ -11,8 +11,6 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
   const [editContent, setEditContent] = useState('');
   const [contextMenu, setContextMenu] = useState(null);
   const [inCall, setInCall] = useState(false);
-  const [incomingOffer, setIncomingOffer] = useState(null);
-  const [caller, setCaller] = useState(null);
   const bottomRef = useRef(null);
   const lastMessageTime = useRef(0);
   const messageCount = useRef(0);
@@ -27,13 +25,13 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
   useEffect(() => {
     const fetchMessages = async () => {
       const res = await axios.get(
-        `/api/friends/messages/${friend._id}`,
+        `${import.meta.env.VITE_API_URL}/api/friends/messages/${friend._id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setMessages(res.data);
 
       await axios.patch(
-        `/api/friends/messages/read/${friend._id}`,
+        `${import.meta.env.VITE_API_URL}/api/friends/messages/read/${friend._id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       ).catch(() => {});
@@ -48,27 +46,14 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
       setMessages(prev => prev.filter(m => m._id !== messageId));
     };
 
-    const myFriendId = normalize(friend._id);
-    const handleIncomingCall = ({ callerId, offer }) => {
-      setInCall(prevInCall => {
-        if (prevInCall) return prevInCall;
-        const known = callerId?.toString() === myFriendId ? friend : { _id: callerId, username: 'Inconnu' };
-        setCaller(known);
-        setIncomingOffer(offer);
-        return true;
-      });
-    };
-
     socket.on('newMessage', handleNew);
     socket.on('messageSent', handleNew);
     socket.on('messageDeleted', handleDeleted);
-    socket.on('incomingCall', handleIncomingCall);
 
     return () => {
       socket.off('newMessage', handleNew);
       socket.off('messageSent', handleNew);
       socket.off('messageDeleted', handleDeleted);
-      socket.off('incomingCall', handleIncomingCall);
     };
   }, [friend._id]);
 
@@ -112,7 +97,7 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
 
     try {
       await axios.delete(
-        `/api/friends/messages/${msgId}`,
+        `${import.meta.env.VITE_API_URL}/api/friends/messages/${msgId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
     } catch (err) { console.error(err); }
@@ -128,7 +113,7 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
     if (!editContent.trim()) return;
     try {
       await axios.patch(
-        `/api/friends/messages/${msgId}`,
+        `${import.meta.env.VITE_API_URL}/api/friends/messages/${msgId}`,
         { content: editContent.trim() },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -184,12 +169,6 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
 
   const handleTouchEnd = () => clearTimeout(longPressTimer.current);
   const handleTouchMove = () => clearTimeout(longPressTimer.current);
-
-  const closeCall = () => {
-    setInCall(false);
-    setIncomingOffer(null);
-    setCaller(null);
-  };
 
   return (
     <div style={styles.container}>
@@ -286,12 +265,13 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
         <button onClick={sendMessage} style={styles.btn}>➤</button>
       </div>
 
+      {/* Appel sortant uniquement — les appels entrants sont gérés dans AppPage */}
       {inCall && (
         <VoiceCall
-          friend={caller || friend}
+          friend={friend}
           userId={userId}
-          onClose={closeCall}
-          incomingOffer={incomingOffer}
+          onClose={() => setInCall(false)}
+          incomingOffer={null}
         />
       )}
     </div>
