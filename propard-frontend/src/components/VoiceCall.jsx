@@ -2,10 +2,22 @@ import { useEffect, useRef, useState } from 'react';
 import socket from '../socket';
 
 const getIceServers = async () => {
+  const endpoint = '/api/turn-credentials';
+
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/turn-credentials`);
-    if (!res.ok) throw new Error('turn-credentials fetch failed');
-    const data = await res.json();
+    const res = await fetch(endpoint);
+    const contentType = res.headers.get('content-type') || '';
+    const raw = await res.text();
+
+    if (!res.ok) {
+      throw new Error(`turn-credentials fetch failed (status ${res.status}): ${raw.slice(0, 200)}`);
+    }
+
+    if (!contentType.includes('application/json')) {
+      throw new Error(`Réponse non-JSON reçue depuis ${endpoint} (content-type: ${contentType}). Début du corps: ${raw.slice(0, 200)}`);
+    }
+
+    const data = JSON.parse(raw);
     // Metered retourne directement un tableau d'iceServers
     const iceServers = Array.isArray(data) ? data : (data.iceServers || data);
     return {
@@ -16,7 +28,7 @@ const getIceServers = async () => {
       ]
     };
   } catch (err) {
-    console.error('Repli sur STUN seul:', err);
+    console.error(`Repli sur STUN seul (endpoint appelé: ${endpoint}):`, err);
     return {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -66,6 +78,7 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
 
   const createPeer = async () => {
     const config = await getIceServers();
+    console.log('ICE config utilisée:', config);
     const peer = new RTCPeerConnection(config);
 
     peer.onicecandidate = (e) => {
