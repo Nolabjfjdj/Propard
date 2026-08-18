@@ -1,7 +1,23 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { generateKeyPair, storePrivateKey, hasStoredPrivateKey } from '../utils/crypto';
 
 const AuthContext = createContext(null);
+
+const ensureEncryptionKeys = async (userId, authToken) => {
+  if (!userId || hasStoredPrivateKey(userId)) return;
+  try {
+    const { publicKeyJwk, privateKeyJwk } = await generateKeyPair();
+    storePrivateKey(userId, privateKeyJwk);
+    await axios.patch(
+      '/api/auth/publickey',
+      { publicKey: JSON.stringify(publicKeyJwk) },
+      { headers: { Authorization: `Bearer ${authToken}` } }
+    );
+  } catch (err) {
+    console.error('Erreur génération clés de chiffrement:', err);
+  }
+};
 
 export function AuthProvider({ children }) {
  const [user, setUser] = useState(null);
@@ -27,6 +43,8 @@ export function AuthProvider({ children }) {
        setToken(savedToken);
        setUser(JSON.parse(savedUser));
        setLoading(false);
+       const parsed = JSON.parse(savedUser);
+       ensureEncryptionKeys(parsed.id, savedToken);
      });
 
      // Vérification toutes les 30 secondes
@@ -62,6 +80,7 @@ export function AuthProvider({ children }) {
    setToken(userToken);
    localStorage.setItem('propard_token', userToken);
    localStorage.setItem('propard_user', JSON.stringify(normalized));
+   ensureEncryptionKeys(normalized.id, userToken);
  };
 
  const logout = () => {
