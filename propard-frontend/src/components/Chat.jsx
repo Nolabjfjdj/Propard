@@ -5,6 +5,8 @@ import VoiceCall from './VoiceCall';
 
 export default function Chat({ friend, token, userId, hideFriendIps, isMobile }) {
   const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [input, setInput] = useState('');
   const [spamWarning, setSpamWarning] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -22,21 +24,42 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
   const normalize = (id) => id?.toString();
   const myId = normalize(userId);
 
-  useEffect(() => {
-    const fetchMessages = async () => {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_URL}/api/friends/messages/${friend._id}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setMessages(res.data);
+  // Si friend n'est pas encore prêt (switch de conversation en cours), on ne rend rien
+  // plutôt que de planter tout l'arbre React (source de l'écran gris).
+  if (!friend || !friend._id) {
+    return <div style={styles.container} />;
+  }
 
-      await axios.patch(
-        `${import.meta.env.VITE_API_URL}/api/friends/messages/read/${friend._id}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      ).catch(() => {});
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchMessages = async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_URL}/api/friends/messages/${friend._id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!cancelled) {
+          setMessages(Array.isArray(res.data) ? res.data : []);
+        }
+
+        await axios.patch(
+          `${import.meta.env.VITE_API_URL}/api/friends/messages/read/${friend._id}`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        ).catch(() => {});
+      } catch (err) {
+        console.error('fetchMessages error:', err);
+        if (!cancelled) setLoadError('Impossible de charger les messages.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
+
     fetchMessages();
+    return () => { cancelled = true; };
   }, [friend._id]);
 
   useEffect(() => {
@@ -105,7 +128,7 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
 
   const startEdit = (msg) => {
     setEditingId(msg._id);
-    setEditContent(msg.content);
+    setEditContent(typeof msg.content === 'string' ? msg.content : '');
     setContextMenu(null);
   };
 
@@ -173,9 +196,11 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <div style={styles.headerAvatar}>{friend.username[0].toUpperCase()}</div>
+        <div style={styles.headerAvatar}>
+          {friend.username ? friend.username[0].toUpperCase() : '?'}
+        </div>
         <div>
-          <p style={styles.headerName}>{friend.username}</p>
+          <p style={styles.headerName}>{friend.username || 'Ami'}</p>
           <p style={styles.headerIp}>
             {hideFriendIps ? '███.███.███.███' : friend.ipAlias}
           </p>
@@ -187,11 +212,18 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
       </div>
 
       <div style={styles.messages}>
-        {messages.filter(msg => !msg.deleted).map((msg, i) => {
+        {loading && (
+          <p style={styles.infoText}>Chargement des messages...</p>
+        )}
+        {!loading && loadError && (
+          <p style={{ ...styles.infoText, color: 'var(--danger)' }}>{loadError}</p>
+        )}
+        {!loading && !loadError && messages.filter(msg => !msg.deleted).map((msg, i) => {
           const senderId = msg.sender?._id?.toString?.() || msg.sender?.toString?.();
           const isMe = senderId === myId;
+          const content = typeof msg.content === 'string' ? msg.content : '';
           return (
-            <div key={i} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+            <div key={msg._id || i} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
               <div
                 style={{ ...styles.bubble, background: isMe ? 'var(--accent)' : 'var(--bg-tertiary)' }}
                 onContextMenu={(e) => handleRightClick(e, msg)}
@@ -218,11 +250,11 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
                   </div>
                 ) : (
                   <>
-                    <p style={styles.text}>{msg.content}</p>
+                    <p style={styles.text}>{content}</p>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '4px' }}>
                       {msg.edited && <p style={styles.editedLabel}>modifié</p>}
                       <p style={styles.msgTime}>
-                        {new Date(msg.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                        {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}
                       </p>
                     </div>
                   </>
@@ -259,7 +291,7 @@ export default function Chat({ friend, token, userId, hideFriendIps, isMobile })
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-          placeholder={`Message à ${friend.username}...`}
+          placeholder={`Message à ${friend.username || ''}...`}
           style={styles.input}
         />
         <button onClick={sendMessage} style={styles.btn}>➤</button>
@@ -287,6 +319,7 @@ const styles = {
   onlineDot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
   callBtn: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', fontSize: '16px', cursor: 'pointer' },
   messages: { flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px' },
+  infoText: { textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', padding: '20px 0' },
   bubble: { maxWidth: '65%', padding: '10px 14px', borderRadius: '12px', cursor: 'context-menu', userSelect: 'none', WebkitUserSelect: 'none' },
   text: { color: '#fff', fontSize: '14px', lineHeight: '1.4' },
   editedLabel: { fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' },
