@@ -1,22 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
 import socket from '../socket';
 
-const STUN_ONLY_FALLBACK = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' }
-  ]
-};
-
 const getIceServers = async () => {
   try {
-    const res = await fetch('/api/turn-credentials');
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/turn-credentials`);
     if (!res.ok) throw new Error('turn-credentials fetch failed');
-    const iceServers = await res.json();
-    return { iceServers };
+    const data = await res.json();
+    // Metered retourne directement un tableau d'iceServers
+    const iceServers = Array.isArray(data) ? data : (data.iceServers || data);
+    return {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        ...iceServers
+      ]
+    };
   } catch (err) {
-    console.error('Impossible de récupérer les identifiants TURN, repli sur STUN seul', err);
-    return STUN_ONLY_FALLBACK;
+    console.error('Repli sur STUN seul:', err);
+    return {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    };
   }
 };
 
@@ -26,8 +32,10 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
   const [muted, setMuted] = useState(false);
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
+  const remoteAudioRef = useRef(null);
   const timerRef = useRef(null);
   const hasInitiatedRef = useRef(false);
+  const pendingCandidates = useRef([]);
 
   const startTimer = () => {
     timerRef.current = setInterval(() => {
@@ -45,16 +53,57 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
     clearInterval(timerRef.current);
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(t => t.stop());
+      localStreamRef.current = null;
     }
     if (peerRef.current) {
       peerRef.current.close();
+      peerRef.current = null;
+    }
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = null;
     }
   };
 
-  const hangUp = () => {
-    socket.emit('endCall', { receiverId: friend._id });
-    cleanup();
-    onClose();
+  const createPeer = async () => {
+    const config = await getIceServers();
+    const peer = new RTCPeerConnection(config);
+
+    peer.onicecandidate = (e) => {
+      if (e.candidate) {
+        socket.emit('iceCandidate', { receiverId: friend._id, candidate: e.candidate });
+      }
+    };
+
+    peer.ontrack = (e) => {
+      if (!remoteAudioRef.current) {
+        remoteAudioRef.current = new Audio();
+        remoteAudioRef.current.autoplay = true;
+      }
+      remoteAudioRef.current.srcObject = e.streams[0];
+      remoteAudioRef.current.play().catch(console.error);
+    };
+
+    peer.oniceconnectionstatechange = () => {
+      console.log('ICE state:', peer.iceConnectionState);
+      if (peer.iceConnectionState === 'connected' || peer.iceConnectionState === 'completed') {
+        setStatus('connected');
+        startTimer();
+      }
+      if (peer.iceConnectionState === 'failed') {
+        setStatus('failed');
+      }
+    };
+
+    return peer;
+  };
+
+  const addPendingCandidates = async (peer) => {
+    for (const candidate of pendingCandidates.current) {
+      try {
+        await peer.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) { console.error('candidate error:', err); }
+    }
+    pendingCandidates.current = [];
   };
 
   const startCall = async () => {
@@ -62,38 +111,18 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
 
-      const iceServers = await getIceServers();
-      const peer = new RTCPeerConnection({ ...iceServers, iceTransportPolicy: 'relay' });
+      const peer = await createPeer();
       peerRef.current = peer;
 
       stream.getTracks().forEach(track => peer.addTrack(track, stream));
-
-      peer.onicecandidate = (e) => {
-        if (e.candidate) {
-          socket.emit('iceCandidate', { receiverId: friend._id, candidate: e.candidate });
-        }
-      };
-
-      peer.ontrack = (e) => {
-        const audio = new Audio();
-        audio.srcObject = e.streams[0];
-        audio.play();
-      };
-
-      peer.oniceconnectionstatechange = () => {
-        if (peer.iceConnectionState === 'failed' || peer.iceConnectionState === 'disconnected') {
-          setStatus('failed');
-        }
-      };
 
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
 
       socket.emit('callUser', { receiverId: friend._id, offer });
-      setStatus('calling');
 
     } catch (err) {
-      console.error(err);
+      console.error('startCall error:', err);
       setStatus('error');
     }
   };
@@ -103,46 +132,46 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
 
-      const iceServers = await getIceServers();
-      const peer = new RTCPeerConnection(iceServers);
+      const peer = await createPeer();
       peerRef.current = peer;
 
       stream.getTracks().forEach(track => peer.addTrack(track, stream));
 
-      peer.onicecandidate = (e) => {
-        if (e.candidate) {
-          socket.emit('iceCandidate', { receiverId: friend._id, candidate: e.candidate });
-        }
-      };
-
-      peer.ontrack = (e) => {
-        const audio = new Audio();
-        audio.srcObject = e.streams[0];
-        audio.play();
-      };
-
-      peer.oniceconnectionstatechange = () => {
-        if (peer.iceConnectionState === 'failed' || peer.iceConnectionState === 'disconnected') {
-          setStatus('failed');
-        }
-      };
-
       await peer.setRemoteDescription(new RTCSessionDescription(incomingOffer));
+
+      // Ajoute les candidates reçus avant la remote description
+      await addPendingCandidates(peer);
+
       const answer = await peer.createAnswer();
       await peer.setLocalDescription(answer);
 
       socket.emit('answerCall', { callerId: friend._id, answer });
-      setStatus('connected');
-      startTimer();
 
     } catch (err) {
-      console.error(err);
+      console.error('answerCall error:', err);
+      setStatus('error');
     }
   };
 
   const declineCall = () => {
     socket.emit('endCall', { receiverId: friend._id });
+    cleanup();
     onClose();
+  };
+
+  const hangUp = () => {
+    socket.emit('endCall', { receiverId: friend._id });
+    cleanup();
+    onClose();
+  };
+
+  const toggleMute = () => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getAudioTracks().forEach(t => {
+        t.enabled = !t.enabled;
+      });
+      setMuted(prev => !prev);
+    }
   };
 
   useEffect(() => {
@@ -151,44 +180,49 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
       startCall();
     }
 
-    socket.on('callAnswered', async ({ answer }) => {
-      await peerRef.current?.setRemoteDescription(new RTCSessionDescription(answer));
-      setStatus('connected');
-      startTimer();
-    });
-
-    socket.on('iceCandidate', async ({ candidate }) => {
+    const handleCallAnswered = async ({ answer }) => {
+      if (!peerRef.current) return;
       try {
-        await peerRef.current?.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (err) { console.error(err); }
-    });
+        await peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+        await addPendingCandidates(peerRef.current);
+      } catch (err) { console.error('callAnswered error:', err); }
+    };
 
-    socket.on('callEnded', () => {
+    const handleIceCandidate = async ({ candidate }) => {
+      if (!candidate) return;
+      if (peerRef.current && peerRef.current.remoteDescription) {
+        try {
+          await peerRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) { console.error('iceCandidate error:', err); }
+      } else {
+        // Remote description pas encore set, on met en attente
+        pendingCandidates.current.push(candidate);
+      }
+    };
+
+    const handleCallEnded = () => {
       cleanup();
       onClose();
-    });
+    };
 
-    socket.on('callFailed', () => {
+    const handleCallFailed = () => {
       setStatus('failed');
       cleanup();
-    });
+    };
+
+    socket.on('callAnswered', handleCallAnswered);
+    socket.on('iceCandidate', handleIceCandidate);
+    socket.on('callEnded', handleCallEnded);
+    socket.on('callFailed', handleCallFailed);
 
     return () => {
-      socket.off('callAnswered');
-      socket.off('iceCandidate');
-      socket.off('callEnded');
-      socket.off('callFailed');
+      socket.off('callAnswered', handleCallAnswered);
+      socket.off('iceCandidate', handleIceCandidate);
+      socket.off('callEnded', handleCallEnded);
+      socket.off('callFailed', handleCallFailed);
+      cleanup();
     };
   }, []);
-
-  const toggleMute = () => {
-    if (localStreamRef.current) {
-      localStreamRef.current.getAudioTracks().forEach(t => {
-        t.enabled = !t.enabled;
-      });
-      setMuted(!muted);
-    }
-  };
 
   return (
     <div style={styles.overlay}>
