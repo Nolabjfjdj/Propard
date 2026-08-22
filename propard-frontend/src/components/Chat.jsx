@@ -28,6 +28,12 @@ export default function Chat({
   const [friendPublicKey, setFriendPublicKey] = useState(null);
   const [sharedKey, setSharedKey] = useState(null);
 
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState('');
+  const [reportSuccess, setReportSuccess] = useState(false);
+
   const bottomRef = useRef(null);
   const lastMessageTime = useRef(0);
   const messageCount = useRef(0);
@@ -572,6 +578,67 @@ export default function Chat({
     }
   };
 
+  const openReport = msg => {
+    setReportTarget(msg);
+    setReportReason('');
+    setReportError('');
+    setReportSuccess(false);
+    setContextMenu(null);
+  };
+
+  const closeReport = () => {
+    setReportTarget(null);
+    setReportReason('');
+    setReportError('');
+    setReportSuccess(false);
+  };
+
+  // Le client déchiffre déjà le message pour l'afficher — c'est ce texte
+  // en clair qui est envoyé, une seule fois, uniquement pour ce
+  // signalement précis. Le serveur ne peut techniquement pas déchiffrer
+  // lui-même un message E2E.
+  const submitReport = async () => {
+    if (!reportTarget || reportTarget.decryptionError) return;
+
+    const senderId = (
+      reportTarget.sender?._id ||
+      reportTarget.sender
+    )?.toString();
+
+    setReportLoading(true);
+    setReportError('');
+
+    try {
+      await axios.post(
+        '/api/reports',
+        {
+          messageId: reportTarget._id,
+          reportedUserId: senderId,
+          content: reportTarget.content,
+          reason: reportReason.trim() || undefined
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      setReportSuccess(true);
+
+      setTimeout(() => {
+        closeReport();
+      }, 1800);
+    } catch (err) {
+      setReportError(
+        err.response?.data?.error ||
+        'Erreur lors de l’envoi du signalement.'
+      );
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   const getMenuPosition = (
     x,
     y,
@@ -619,15 +686,7 @@ export default function Chat({
     e,
     msg
   ) => {
-    const senderId = (
-      msg.sender?._id ||
-      msg.sender
-    )?.toString();
-
-    if (
-      senderId !== myId ||
-      msg.deleted
-    ) {
+    if (msg.deleted) {
       return;
     }
 
@@ -646,15 +705,7 @@ export default function Chat({
     e,
     msg
   ) => {
-    const senderId = (
-      msg.sender?._id ||
-      msg.sender
-    )?.toString();
-
-    if (
-      senderId !== myId ||
-      msg.deleted
-    ) {
+    if (msg.deleted) {
       return;
     }
 
@@ -1042,46 +1093,49 @@ export default function Chat({
         <div ref={bottomRef} />
       </div>
 
-      {contextMenu && (
-        <div
-          style={{
-            ...styles.contextMenu,
-            top: contextMenu.top,
-            left: contextMenu.left
-          }}
-          onClick={e =>
-            e.stopPropagation()
-          }
-          onTouchStart={e =>
-            e.stopPropagation()
-          }
-        >
-          <button
-            style={styles.contextItem}
-            onClick={() =>
-              startEdit(
-                contextMenu.msg
-              )
-            }
-          >
-            ✏️ Modifier
-          </button>
+      {contextMenu && (() => {
+        const senderId = (
+          contextMenu.msg.sender?._id ||
+          contextMenu.msg.sender
+        )?.toString();
+        const isMe = senderId === myId;
 
-          <button
+        return (
+          <div
             style={{
-              ...styles.contextItem,
-              color: 'var(--danger)'
+              ...styles.contextMenu,
+              top: contextMenu.top,
+              left: contextMenu.left
             }}
-            onClick={() =>
-              deleteMessage(
-                contextMenu.msg._id
-              )
-            }
+            onClick={e => e.stopPropagation()}
+            onTouchStart={e => e.stopPropagation()}
           >
-            🗑️ Supprimer
-          </button>
-        </div>
-      )}
+            {isMe ? (
+              <>
+                <button
+                  style={styles.contextItem}
+                  onClick={() => startEdit(contextMenu.msg)}
+                >
+                  ✏️ Modifier
+                </button>
+                <button
+                  style={{ ...styles.contextItem, color: 'var(--danger)' }}
+                  onClick={() => deleteMessage(contextMenu.msg._id)}
+                >
+                  🗑️ Supprimer
+                </button>
+              </>
+            ) : (
+              <button
+                style={{ ...styles.contextItem, color: 'var(--danger)' }}
+                onClick={() => openReport(contextMenu.msg)}
+              >
+                🚩 Signaler
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {spamWarning && (
         <div style={styles.spamAlert}>
@@ -1112,6 +1166,57 @@ export default function Chat({
           ➤
         </button>
       </div>
+
+      {reportTarget && (
+        <div style={styles.modalOverlay} onClick={closeReport}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <h2 style={styles.modalTitle}>🚩 Signaler ce message</h2>
+            <p style={styles.modalDesc}>
+              Ce message — uniquement celui-ci, en clair — sera envoyé à l'équipe Propard pour modération. Le reste de ta conversation reste privé.
+            </p>
+
+            <p style={styles.reportedContent}>
+              {reportTarget.decryptionError
+                ? '🔒 Message impossible à déchiffrer'
+                : reportTarget.content}
+            </p>
+
+            <textarea
+              style={styles.reportTextarea}
+              placeholder="Motif (optionnel)"
+              value={reportReason}
+              onChange={e => setReportReason(e.target.value)}
+              rows={3}
+              disabled={reportLoading || reportSuccess}
+            />
+
+            {reportError && (
+              <p style={styles.modalError}>{reportError}</p>
+            )}
+
+            {reportSuccess ? (
+              <p style={styles.reportSuccess}>✓ Signalement envoyé, merci.</p>
+            ) : (
+              <>
+                <button
+                  style={styles.modalBtnDanger}
+                  onClick={submitReport}
+                  disabled={reportLoading || reportTarget.decryptionError}
+                >
+                  {reportLoading ? '...' : 'Envoyer le signalement'}
+                </button>
+                <button
+                  style={styles.modalBtnCancel}
+                  onClick={closeReport}
+                  disabled={reportLoading}
+                >
+                  Annuler
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {inCall && (
         <VoiceCall
@@ -1347,5 +1452,98 @@ const styles = {
     color: '#fff',
     borderRadius: '8px',
     fontSize: '16px'
+  },
+
+  modalOverlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.7)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 300,
+    padding: '16px'
+  },
+
+  modal: {
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    padding: '28px',
+    width: '100%',
+    maxWidth: '420px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px'
+  },
+
+  modalTitle: {
+    fontSize: '18px',
+    fontWeight: '700',
+    color: 'var(--text-primary)'
+  },
+
+  modalDesc: {
+    fontSize: '13px',
+    color: 'var(--text-secondary)',
+    lineHeight: '1.5'
+  },
+
+  reportedContent: {
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: '8px',
+    padding: '10px',
+    fontSize: '13px',
+    color: 'var(--text-primary)',
+    whiteSpace: 'pre-wrap',
+    overflowWrap: 'anywhere',
+    maxHeight: '120px',
+    overflowY: 'auto'
+  },
+
+  reportTextarea: {
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: '8px',
+    padding: '10px',
+    color: 'var(--text-primary)',
+    fontSize: '13px',
+    resize: 'vertical',
+    fontFamily: 'inherit'
+  },
+
+  reportSuccess: {
+    color: 'var(--success)',
+    fontSize: '13px',
+    textAlign: 'center',
+    fontWeight: '600'
+  },
+
+  modalBtnDanger: {
+    background: 'var(--danger)',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    padding: '10px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer'
+  },
+
+  modalBtnCancel: {
+    background: 'transparent',
+    color: 'var(--text-muted)',
+    border: '1px solid var(--border)',
+    borderRadius: '8px',
+    padding: '8px',
+    fontSize: '13px',
+    cursor: 'pointer'
+  },
+
+  modalError: {
+    color: 'var(--danger)',
+    fontSize: '13px',
+    textAlign: 'center'
   }
 };
