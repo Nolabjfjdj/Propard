@@ -299,7 +299,7 @@ export default function AppPage({ initialFriendId }) {
                 onClick={() => setConfirmAction('anonymize')}
                 disabled={deleteLoading}
               >
-                🙈 Anonymiser mon compte
+                Anonymiser mon compte
               </button>
             </div>
 
@@ -315,7 +315,7 @@ export default function AppPage({ initialFriendId }) {
                 onClick={() => setConfirmAction('delete')}
                 disabled={deleteLoading}
               >
-                💀 Tout supprimer définitivement
+                Tout supprimer définitivement
               </button>
             </div>
 
