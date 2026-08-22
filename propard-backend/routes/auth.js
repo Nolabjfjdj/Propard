@@ -8,6 +8,8 @@ const authMiddleware = require('../middleware/auth');
 
 const PSEUDOS_INTERDITS = ['owner','admin','administrator','superadmin','sysadmin','moderator','mod','comod','staff','team','crew','support','helpdesk','official','propard','propardbot','propardteam','propardstaff','propardadmin','propardsupport','propardofficial','everyone','nigger','nigga','faggot','retard','whore','bitch','salope','pute','connard','connasse','batard','batarde','enculé','encule','fdp','ntm','tg','pd','discord','telegram','whatsapp','snapchat','instagram','facebook','twitter','tiktok','youtube','google','microsoft','apple','amazon','netflix','spotify','twitch','reddit','github','anthropic','openai','chatgpt','claude','malware','virus','phishing','scam','billing','privacy','terms','rules','guidelines','policy'];
 
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
 function generateIpAlias() {
   const part = () => Math.floor(Math.random() * 254) + 1;
   return `${part()}.${part()}.${part()}.${part()}`;
@@ -32,29 +34,78 @@ router.post('/register', async (req, res) => {
     if (!/^[a-zA-Z0-9_-]+$/.test(username)) return res.status(400).json({ error: 'Username : lettres, chiffres, _ et - uniquement' });
     if (!/[a-zA-Z]/.test(username)) return res.status(400).json({ error: 'Username doit contenir au moins une lettre' });
     if (password.length < 6) return res.status(400).json({ error: 'Mot de passe minimum 6 caractères' });
-    const existing = await User.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
+
+    // Vérifie aussi contre les pseudos "réels" de comptes en anonymisation
+    // en cours, pour éviter tout conflit pendant leur fenêtre de 30 jours.
+    const existing = await User.findOne({
+      $or: [
+        { username: { $regex: new RegExp(`^${username}$`, 'i') } },
+        { realUsername: { $regex: new RegExp(`^${username}$`, 'i') } }
+      ]
+    });
     if (existing) return res.status(400).json({ error: 'Ce username est déjà pris' });
+
     const user = new User({ username, password: await bcrypt.hash(password, 10), ipAlias: await generateUniqueIpAlias() });
     await user.save();
     const token = jwt.sign({ id: user._id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '30d' });
-    res.status(201).json({ message: 'Compte créé avec succès', token, user: { id: user._id, username: user.username, ipAlias: user.ipAlias, publicKey: user.publicKey } });
+    res.status(201).json({
+      message: 'Compte créé avec succès',
+      token,
+      user: { id: user._id, username: user.username, ipAlias: user.ipAlias, publicKey: user.publicKey, pendingDeletion: false, deletionExpiresAt: null }
+    });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Erreur serveur' }); }
 });
 
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    const user = await User.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
-    if (!user || !(await bcrypt.compare(password, user.password))) return res.status(400).json({ error: 'Username ou mot de passe incorrect' });
+
+    // Un compte anonymisé garde son vrai pseudo dans `realUsername` — on
+    // permet donc de se reconnecter avec l'un OU l'autre.
+    const user = await User.findOne({
+      $or: [
+        { username: { $regex: new RegExp(`^${username}$`, 'i') } },
+        { realUsername: { $regex: new RegExp(`^${username}$`, 'i') } }
+      ]
+    });
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(400).json({ error: 'Username ou mot de passe incorrect' });
+    }
+
     const token = jwt.sign({ id: user._id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '30d' });
-    res.json({ message: 'Connexion réussie', token, user: { id: user._id, username: user.username, ipAlias: user.ipAlias, publicKey: user.publicKey } });
+    const deletionExpiresAt = user.pendingDeletionAt
+      ? new Date(user.pendingDeletionAt.getTime() + THIRTY_DAYS_MS)
+      : null;
+
+    res.json({
+      message: 'Connexion réussie',
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        ipAlias: user.ipAlias,
+        publicKey: user.publicKey,
+        pendingDeletion: !!user.pendingDeletionAt,
+        deletionExpiresAt
+      }
+    });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Erreur serveur' }); }
 });
 
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password').populate('friends.userId', 'username ipAlias isOnline publicKey');
-    res.json(user);
+    const user = await User.findById(req.user.id)
+      .select('-password -realUsername')
+      .populate('friends.userId', 'username ipAlias isOnline publicKey');
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+
+    const userObj = user.toObject();
+    userObj.pendingDeletion = !!user.pendingDeletionAt;
+    userObj.deletionExpiresAt = user.pendingDeletionAt
+      ? new Date(user.pendingDeletionAt.getTime() + THIRTY_DAYS_MS)
+      : null;
+
+    res.json(userObj);
   } catch (e) { res.status(500).json({ error: 'Erreur serveur' }); }
 });
 
@@ -79,55 +130,79 @@ router.patch('/publickey', authMiddleware, async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'Erreur serveur' }); }
 });
 
-// ─── ROUTE : Anonymisation du compte (Option A) ───────────────────────────────
-// Supprime les données identifiantes (pseudo, mot de passe, IP alias) mais
-// garde les messages ET les amitiés intactes, sous le pseudo
-// "supprimé_xxxxxx". Important : on conserve `publicKey` et on ne touche
-// PAS au tableau `friends` (ni au sien, ni à celui des autres) — sinon le
-// secret de chiffrement partagé (ECDH) ne peut plus jamais être recalculé
-// et tous les anciens messages échangés avec ce compte deviennent
-// définitivement illisibles pour l'ami restant.
+// ─── ROUTE : Anonymisation du compte (Option A, réversible 30 jours) ─────────
+// Masque immédiatement le pseudo (affiché "supprimé_xxxxxx" partout) mais
+// garde le pseudo réel + mot de passe intacts pendant 30 jours, pour
+// permettre à l'utilisateur de se reconnecter et annuler en cas d'erreur.
+// publicKey et friends restent inchangés dans tous les cas : les messages
+// échangés doivent rester déchiffrables par l'ami, que la suppression soit
+// annulée ou finalisée plus tard.
 router.delete('/anonymize', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'Compte introuvable' });
 
-    await User.findByIdAndUpdate(userId, {
-      username: `supprimé_${userId.toString().slice(-6)}`,
-      password: await bcrypt.hash(Math.random().toString(36), 10),
-      ipAlias: await generateUniqueIpAlias(),
-      isOnline: false
-      // publicKey, friends, friendRequests volontairement inchangés
-    });
+    if (!user.pendingDeletionAt) {
+      user.realUsername = user.username;
+      user.username = `supprimé_${userId.toString().slice(-6)}`;
+      user.pendingDeletionAt = new Date();
+      user.isOnline = false;
+      await user.save();
+    }
 
-    // On retire seulement les demandes d'ami EN ATTENTE envoyées par ce
-    // compte (propre à faire, sans conséquence sur le chiffrement). Les
-    // amitiés déjà établies, elles, restent intactes des deux côtés.
+    // Retire seulement les demandes d'ami EN ATTENTE envoyées par ce
+    // compte. Les amitiés déjà établies restent intactes des deux côtés.
     await User.updateMany(
       { 'friendRequests.from': userId },
       { $pull: { friendRequests: { from: userId } } }
     );
 
-    res.json({ success: true, message: 'Compte anonymisé' });
+    res.json({
+      success: true,
+      message: 'Compte anonymisé. Reconnecte-toi avec ton pseudo et mot de passe habituels dans les 30 jours pour annuler.'
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-// ─── ROUTE : Suppression totale du compte (Option B) ─────────────────────────
-// Supprime tout : compte, amis, messages. Ici c'est voulu : plus personne
-// ne doit pouvoir relire ces messages, donc on les efface plutôt que de
-// les laisser orphelins et indéchiffrables.
+// ─── ROUTE : Annuler une anonymisation en cours ──────────────────────────────
+router.post('/cancel-deletion', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'Compte introuvable' });
+    if (!user.pendingDeletionAt) {
+      return res.status(400).json({ error: 'Aucune suppression en cours pour ce compte' });
+    }
+
+    const expiresAt = new Date(user.pendingDeletionAt.getTime() + THIRTY_DAYS_MS);
+    if (Date.now() > expiresAt.getTime()) {
+      return res.status(400).json({ error: 'Le délai de 30 jours est dépassé, restauration impossible' });
+    }
+
+    user.username = user.realUsername;
+    user.realUsername = null;
+    user.pendingDeletionAt = null;
+    await user.save();
+
+    res.json({ success: true, message: 'Compte restauré avec succès', username: user.username });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ─── ROUTE : Suppression totale du compte (Option B, immédiate et irréversible) ──
 router.delete('/delete', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Supprime tous les messages envoyés ou reçus
     await Message.deleteMany({
       $or: [{ sender: userId }, { receiver: userId }]
     });
 
-    // Retire des listes d'amis et demandes de tout le monde
     await User.updateMany(
       { 'friends.userId': userId },
       { $pull: { friends: { userId } } }
@@ -137,7 +212,6 @@ router.delete('/delete', authMiddleware, async (req, res) => {
       { $pull: { friendRequests: { from: userId } } }
     );
 
-    // Supprime le compte
     await User.findByIdAndDelete(userId);
 
     res.json({ success: true, message: 'Compte et données supprimés définitivement' });
@@ -146,5 +220,34 @@ router.delete('/delete', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
+
+// ─── Finalisation automatique après 30 jours ──────────────────────────────────
+// Passé le délai, l'anonymisation devient irréversible : mot de passe et
+// IP alias sont écrasés définitivement (login impossible même avec le vrai
+// pseudo). publicKey et friends restent intacts pour ne jamais casser le
+// déchiffrement des messages côté amis.
+async function finalizeExpiredDeletions() {
+  try {
+    const cutoff = new Date(Date.now() - THIRTY_DAYS_MS);
+    const expired = await User.find({ pendingDeletionAt: { $ne: null, $lte: cutoff } });
+
+    for (const user of expired) {
+      user.password = await bcrypt.hash(Math.random().toString(36) + Date.now(), 10);
+      user.ipAlias = await generateUniqueIpAlias();
+      user.realUsername = null;
+      user.pendingDeletionAt = null;
+      await user.save();
+    }
+
+    if (expired.length) {
+      console.log(`🧹 ${expired.length} compte(s) définitivement anonymisé(s) après 30 jours`);
+    }
+  } catch (err) {
+    console.error('Erreur finalizeExpiredDeletions:', err);
+  }
+}
+
+setInterval(finalizeExpiredDeletions, 6 * 60 * 60 * 1000);
+finalizeExpiredDeletions();
 
 module.exports = router;
