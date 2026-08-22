@@ -20,8 +20,11 @@ export default function AppPage({ initialFriendId }) {
   const [friendNotFound, setFriendNotFound] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null); // null | 'anonymize' | 'delete'
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelError, setCancelError] = useState('');
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -84,6 +87,12 @@ export default function AppPage({ initialFriendId }) {
     window.history.pushState({}, '', '/');
   };
 
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setConfirmAction(null);
+    setDeleteError('');
+  };
+
   const handleAnonymize = async () => {
     setDeleteLoading(true);
     setDeleteError('');
@@ -109,6 +118,22 @@ export default function AppPage({ initialFriendId }) {
     } catch (e) {
       setDeleteError(e.response?.data?.error || 'Erreur serveur');
       setDeleteLoading(false);
+    }
+  };
+
+  const handleCancelDeletion = async () => {
+    setCancelLoading(true);
+    setCancelError('');
+    try {
+      await axios.post('/api/auth/cancel-deletion', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // Le plus simple et le plus fiable pour resynchroniser tout l'état
+      // (user, friends, etc.) après une restauration de compte.
+      window.location.reload();
+    } catch (e) {
+      setCancelError(e.response?.data?.error || 'Erreur serveur');
+      setCancelLoading(false);
     }
   };
 
@@ -148,6 +173,21 @@ export default function AppPage({ initialFriendId }) {
             )}
           </div>
         </div>
+
+        {user?.pendingDeletion && (
+          <div style={styles.pendingBanner}>
+            <p style={styles.pendingBannerText}>
+              ⏳ Compte en cours de suppression
+              {user.deletionExpiresAt
+                ? ` — restaurable jusqu'au ${new Date(user.deletionExpiresAt).toLocaleDateString('fr-FR')}`
+                : ''}
+            </p>
+            <button style={styles.pendingBannerBtn} onClick={handleCancelDeletion} disabled={cancelLoading}>
+              {cancelLoading ? '...' : '↩️ Annuler la suppression'}
+            </button>
+            {cancelError && <p style={styles.pendingBannerError}>{cancelError}</p>}
+          </div>
+        )}
 
         <div style={styles.ipCard}>
           <p style={styles.ipLabel}>Ton adresse</p>
@@ -242,50 +282,78 @@ export default function AppPage({ initialFriendId }) {
         />
       )}
 
-      {/* Modal suppression de compte */}
-      {showDeleteModal && (
-        <div style={styles.modalOverlay} onClick={() => { setShowDeleteModal(false); setDeleteError(''); }}>
+      {/* Modal suppression de compte — étape 1 : choix de l'option */}
+      {showDeleteModal && !confirmAction && (
+        <div style={styles.modalOverlay} onClick={closeDeleteModal}>
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
             <h2 style={styles.modalTitle}>Supprimer mon compte</h2>
             <p style={styles.modalText}>Choisis une option :</p>
 
             <div style={styles.modalOption}>
-              <h3 style={styles.modalOptionTitle}>Option A — Anonymisation</h3>
+              <h3 style={styles.modalOptionTitle}>Option A — Anonymisation (réversible 30 jours)</h3>
               <p style={styles.modalOptionDesc}>
-                Tes données personnelles sont effacées (pseudo, mot de passe, adresse IP) mais tes messages restent visibles sous le nom <strong>"Utilisateur supprimé"</strong>. Tu seras déconnecté.
+                Ton pseudo est masqué immédiatement (affiché <strong>"Utilisateur supprimé"</strong>) mais tes messages et tes amitiés restent intacts. Tu peux te reconnecter avec ton pseudo et mot de passe actuels pendant <strong>30 jours</strong> pour tout annuler. Passé ce délai, c'est définitif.
               </p>
               <button
                 style={styles.modalBtnWarn}
-                onClick={handleAnonymize}
+                onClick={() => setConfirmAction('anonymize')}
                 disabled={deleteLoading}
               >
-                {deleteLoading ? '...' : '🙈 Anonymiser mon compte'}
+                🙈 Anonymiser mon compte
               </button>
             </div>
 
             <div style={styles.modalDivider} />
 
             <div style={styles.modalOption}>
-              <h3 style={styles.modalOptionTitle}>Option B — Suppression totale</h3>
+              <h3 style={styles.modalOptionTitle}>Option B — Suppression totale (immédiate)</h3>
               <p style={styles.modalOptionDesc}>
-                Ton compte <strong>et tous tes messages</strong> sont définitivement supprimés. Cette action est irréversible. Tu seras déconnecté.
+                Ton compte <strong>et tous tes messages</strong> sont définitivement supprimés tout de suite. Cette action est irréversible, aucun délai de grâce.
               </p>
               <button
                 style={styles.modalBtnDanger}
-                onClick={handleDeleteTotal}
+                onClick={() => setConfirmAction('delete')}
                 disabled={deleteLoading}
               >
-                {deleteLoading ? '...' : '💀 Tout supprimer définitivement'}
+                💀 Tout supprimer définitivement
               </button>
             </div>
+
+            <button style={styles.modalBtnCancel} onClick={closeDeleteModal}>
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal suppression de compte — étape 2 : confirmation explicite */}
+      {showDeleteModal && confirmAction && (
+        <div style={styles.modalOverlay} onClick={() => { setConfirmAction(null); setDeleteError(''); }}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <h2 style={styles.modalTitle}>
+              {confirmAction === 'anonymize' ? 'Confirmer l\'anonymisation ?' : 'Confirmer la suppression définitive ?'}
+            </h2>
+            <p style={styles.modalOptionDesc}>
+              {confirmAction === 'anonymize'
+                ? "Ton pseudo sera masqué tout de suite pour tout le monde. Tu pourras te reconnecter avec ton pseudo et mot de passe actuels pendant 30 jours pour annuler."
+                : "Cette action supprime immédiatement et irréversiblement ton compte et tous tes messages. Aucun moyen de revenir en arrière."}
+            </p>
 
             {deleteError && <p style={styles.modalError}>{deleteError}</p>}
 
             <button
-              style={styles.modalBtnCancel}
-              onClick={() => { setShowDeleteModal(false); setDeleteError(''); }}
+              style={confirmAction === 'anonymize' ? styles.modalBtnWarn : styles.modalBtnDanger}
+              onClick={confirmAction === 'anonymize' ? handleAnonymize : handleDeleteTotal}
+              disabled={deleteLoading}
             >
-              Annuler
+              {deleteLoading ? '...' : 'Oui, je confirme'}
+            </button>
+            <button
+              style={styles.modalBtnCancel}
+              onClick={() => { setConfirmAction(null); setDeleteError(''); }}
+              disabled={deleteLoading}
+            >
+              Retour
             </button>
           </div>
         </div>
@@ -303,6 +371,10 @@ const styles = {
   helpLink: { fontSize: '11px', color: 'var(--text-muted)', textDecoration: 'none', marginBottom: '2px' },
   discordLink: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center' },
   iconBtn: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', fontSize: '16px' },
+  pendingBanner: { background: 'rgba(240, 180, 60, 0.12)', border: '1px solid var(--accent)', borderRadius: 'var(--radius)', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' },
+  pendingBannerText: { fontSize: '12px', color: 'var(--text-primary)', lineHeight: '1.4' },
+  pendingBannerBtn: { background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
+  pendingBannerError: { color: 'var(--danger)', fontSize: '12px' },
   ipCard: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px', textAlign: 'center' },
   ipLabel: { fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' },
   ipValue: { fontFamily: 'var(--font-mono)', fontSize: '17px', fontWeight: '700', color: 'var(--accent)', marginBottom: '10px' },
