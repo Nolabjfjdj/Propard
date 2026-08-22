@@ -183,7 +183,7 @@ export default function AppPage({ initialFriendId }) {
                 : ''}
             </p>
             <button style={styles.pendingBannerBtn} onClick={handleCancelDeletion} disabled={cancelLoading}>
-              {cancelLoading ? '...' : '↩️ Annuler la suppression'}
+              {cancelLoading ? '...' : 'Annuler la suppression'}
             </button>
             {cancelError && <p style={styles.pendingBannerError}>{cancelError}</p>}
           </div>
@@ -225,7 +225,7 @@ export default function AppPage({ initialFriendId }) {
 
         <button style={styles.logoutBtn} onClick={logout}>Déconnexion</button>
         <button style={styles.deleteAccountBtn} onClick={() => setShowDeleteModal(true)}>
-          🗑️ Supprimer mon compte
+          Supprimer mon compte
         </button>
       </div>
 
