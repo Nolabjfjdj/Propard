@@ -19,6 +19,9 @@ export default function AppPage({ initialFriendId }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [friendNotFound, setFriendNotFound] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -28,17 +31,9 @@ export default function AppPage({ initialFriendId }) {
 
   useEffect(() => {
     const authenticate = () => socket.emit('authenticate', token);
-
-    // Réauthentifie à chaque (re)connexion, pas juste au montage.
-    // Sans ça, une coupure réseau (fréquent en 4G) fait reconnecter le
-    // socket avec un nouvel id côté serveur, mais l'utilisateur reste
-    // introuvable dans connectedUsers tant qu'on n'a pas renvoyé
-    // 'authenticate' — ce qui casse silencieusement endCall, iceCandidate,
-    // callUser, etc. envoyés vers lui après coup.
     socket.on('connect', authenticate);
     socket.connect();
     if (socket.connected) authenticate();
-
     return () => {
       socket.off('connect', authenticate);
       socket.disconnect();
@@ -89,6 +84,34 @@ export default function AppPage({ initialFriendId }) {
     window.history.pushState({}, '', '/');
   };
 
+  const handleAnonymize = async () => {
+    setDeleteLoading(true);
+    setDeleteError('');
+    try {
+      await axios.delete('/api/auth/anonymize', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      logout();
+    } catch (e) {
+      setDeleteError(e.response?.data?.error || 'Erreur serveur');
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleDeleteTotal = async () => {
+    setDeleteLoading(true);
+    setDeleteError('');
+    try {
+      await axios.delete('/api/auth/delete', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      logout();
+    } catch (e) {
+      setDeleteError(e.response?.data?.error || 'Erreur serveur');
+      setDeleteLoading(false);
+    }
+  };
+
   return (
     <div style={styles.layout}>
 
@@ -114,12 +137,7 @@ export default function AppPage({ initialFriendId }) {
             </span>
           </div>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <a
-              href="https://discord.gg/hsMdJQz6EY"
-              target="_blank"
-              rel="noreferrer"
-              style={styles.discordLink}
-            >
+            <a href="https://discord.gg/hsMdJQz6EY" target="_blank" rel="noreferrer" style={styles.discordLink}>
               Discord
             </a>
             <button onClick={toggleTheme} style={styles.iconBtn}>
@@ -166,10 +184,12 @@ export default function AppPage({ initialFriendId }) {
         />
 
         <button style={styles.logoutBtn} onClick={logout}>Déconnexion</button>
+        <button style={styles.deleteAccountBtn} onClick={() => setShowDeleteModal(true)}>
+          🗑️ Supprimer mon compte
+        </button>
       </div>
 
       <div style={styles.main}>
-
         {isMobile && !selectedFriend && !friendNotFound && (
           <div style={styles.mobileHeader}>
             <button style={styles.hamburger} onClick={() => setShowSidebar(true)}>☰</button>
@@ -221,6 +241,55 @@ export default function AppPage({ initialFriendId }) {
           incomingOffer={incomingCall.offer}
         />
       )}
+
+      {/* Modal suppression de compte */}
+      {showDeleteModal && (
+        <div style={styles.modalOverlay} onClick={() => { setShowDeleteModal(false); setDeleteError(''); }}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <h2 style={styles.modalTitle}>Supprimer mon compte</h2>
+            <p style={styles.modalText}>Choisis une option :</p>
+
+            <div style={styles.modalOption}>
+              <h3 style={styles.modalOptionTitle}>Option A — Anonymisation</h3>
+              <p style={styles.modalOptionDesc}>
+                Tes données personnelles sont effacées (pseudo, mot de passe, adresse IP) mais tes messages restent visibles sous le nom <strong>"Utilisateur supprimé"</strong>. Tu seras déconnecté.
+              </p>
+              <button
+                style={styles.modalBtnWarn}
+                onClick={handleAnonymize}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? '...' : '🙈 Anonymiser mon compte'}
+              </button>
+            </div>
+
+            <div style={styles.modalDivider} />
+
+            <div style={styles.modalOption}>
+              <h3 style={styles.modalOptionTitle}>Option B — Suppression totale</h3>
+              <p style={styles.modalOptionDesc}>
+                Ton compte <strong>et tous tes messages</strong> sont définitivement supprimés. Cette action est irréversible. Tu seras déconnecté.
+              </p>
+              <button
+                style={styles.modalBtnDanger}
+                onClick={handleDeleteTotal}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? '...' : '💀 Tout supprimer définitivement'}
+              </button>
+            </div>
+
+            {deleteError && <p style={styles.modalError}>{deleteError}</p>}
+
+            <button
+              style={styles.modalBtnCancel}
+              onClick={() => { setShowDeleteModal(false); setDeleteError(''); }}
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -239,12 +308,25 @@ const styles = {
   ipValue: { fontFamily: 'var(--font-mono)', fontSize: '17px', fontWeight: '700', color: 'var(--accent)', marginBottom: '10px' },
   copyBtn: { background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: '600' },
   addBtn: { background: 'var(--accent)', color: '#fff', borderRadius: '8px', padding: '10px', fontSize: '14px', fontWeight: '600' },
-  logoutBtn: { background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '8px', padding: '8px', fontSize: '13px', marginTop: 'auto' },
+  logoutBtn: { background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '8px', padding: '8px', fontSize: '13px' },
+  deleteAccountBtn: { background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px', fontSize: '12px', marginTop: 'auto', cursor: 'pointer' },
   main: { flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' },
   mobileHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' },
   hamburger: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 10px', fontSize: '18px' },
   mobileTitle: { fontFamily: 'var(--font-mono)', fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' },
   empty: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' },
   emptyText: { color: 'var(--text-secondary)', fontSize: '15px' },
-  backBtn: { background: 'var(--accent)', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', border: 'none', cursor: 'pointer', marginTop: '8px' }
+  backBtn: { background: 'var(--accent)', color: '#fff', borderRadius: '8px', padding: '10px 20px', fontSize: '14px', fontWeight: '600', border: 'none', cursor: 'pointer', marginTop: '8px' },
+  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '16px' },
+  modal: { background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '32px', width: '100%', maxWidth: '440px', display: 'flex', flexDirection: 'column', gap: '16px' },
+  modalTitle: { fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' },
+  modalText: { fontSize: '14px', color: 'var(--text-secondary)' },
+  modalOption: { display: 'flex', flexDirection: 'column', gap: '8px' },
+  modalOptionTitle: { fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)' },
+  modalOptionDesc: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' },
+  modalDivider: { height: '1px', background: 'var(--border)' },
+  modalBtnWarn: { background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
+  modalBtnDanger: { background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
+  modalBtnCancel: { background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' },
+  modalError: { color: 'var(--danger)', fontSize: '13px', textAlign: 'center' }
 };
