@@ -69,7 +69,7 @@ router.post('/login', async (req, res) => {
       ]
     });
     if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(400).json({ error: 'Username ou mot de passe incorrect' });
+      return res.status(400).json({ error: 'Pseudo ou mot de passe incorrect' });
     }
 
     const token = jwt.sign({ id: user._id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '30d' });
