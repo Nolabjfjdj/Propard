@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import socket from '../socket';
 import VoiceCall from './VoiceCall';
@@ -87,7 +87,7 @@ export default function Chat({
         }
       } catch (err) {
         console.error(
-          "Impossible de récupérer la clé publique de l'ami:",
+          'Impossible de récupérer la clé publique de l’ami:',
           err
         );
 
@@ -220,8 +220,6 @@ export default function Chat({
           setMessages(decrypted);
         }
 
-        // La conversation vient d'être ouverte :
-        // tous les messages reçus sont lus.
         await axios.patch(
           `/api/friends/messages/read/${friend._id}`,
           {},
@@ -253,12 +251,6 @@ export default function Chat({
     };
   }, [friend._id, token, sharedKey]);
 
-  /*
-   * Réception des nouveaux messages.
-   *
-   * Si le message reçu vient de l'ami actuellement affiché,
-   * on le marque immédiatement comme lu côté serveur.
-   */
   useEffect(() => {
     const handleNewMessage = async msg => {
       const senderId = (
@@ -319,12 +311,6 @@ export default function Chat({
           : [...prev, decryptedMessage]
       );
 
-      /*
-       * IMPORTANT :
-       * Si le message vient de l'ami et qu'on est actuellement
-       * dans sa conversation, il est immédiatement considéré
-       * comme lu.
-       */
       if (
         senderId === friendId &&
         receiverId === myId
@@ -699,6 +685,59 @@ export default function Chat({
     );
   };
 
+  const formatDateSeparator = date => {
+    const d = new Date(date);
+    const today = new Date();
+    const yesterday = new Date();
+
+    yesterday.setDate(
+      yesterday.getDate() - 1
+    );
+
+    if (
+      d.toDateString() ===
+      today.toDateString()
+    ) {
+      return "Aujourd'hui";
+    }
+
+    if (
+      d.toDateString() ===
+      yesterday.toDateString()
+    ) {
+      return 'Hier';
+    }
+
+    return d.toLocaleDateString(
+      'fr-FR',
+      {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      }
+    );
+  };
+
+  const shouldShowDateSeparator = (
+    messages,
+    index
+  ) => {
+    if (index === 0) return true;
+
+    const curr = new Date(
+      messages[index].createdAt
+    );
+
+    const prev = new Date(
+      messages[index - 1].createdAt
+    );
+
+    return (
+      curr.toDateString() !==
+      prev.toDateString()
+    );
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -771,7 +810,7 @@ export default function Chat({
           !loadError &&
           messages
             .filter(msg => !msg.deleted)
-            .map((msg, i) => {
+            .map((msg, i, arr) => {
               const senderId = (
                 msg.sender?._id ||
                 msg.sender
@@ -788,177 +827,215 @@ export default function Chat({
                   ? msg.content
                   : '';
 
+              const showSeparator =
+                msg.createdAt &&
+                shouldShowDateSeparator(
+                  arr,
+                  i
+                );
+
               return (
-                <div
-                  key={
-                    msg._id || i
-                  }
-                  style={{
-                    display: 'flex',
-                    justifyContent:
-                      isMe
-                        ? 'flex-end'
-                        : 'flex-start'
-                  }}
+                <React.Fragment
+                  key={msg._id || i}
                 >
+                  {showSeparator && (
+                    <div
+                      style={
+                        styles.dateSeparator
+                      }
+                    >
+                      <div
+                        style={
+                          styles.dateLine
+                        }
+                      />
+
+                      <span
+                        style={
+                          styles.dateText
+                        }
+                      >
+                        {formatDateSeparator(
+                          msg.createdAt
+                        )}
+                      </span>
+
+                      <div
+                        style={
+                          styles.dateLine
+                        }
+                      />
+                    </div>
+                  )}
+
                   <div
                     style={{
-                      ...styles.bubble,
-                      background: isMe
-                        ? 'var(--accent)'
-                        : 'var(--bg-tertiary)'
+                      display: 'flex',
+                      justifyContent:
+                        isMe
+                          ? 'flex-end'
+                          : 'flex-start'
                     }}
-                    onContextMenu={e =>
-                      handleRightClick(
-                        e,
-                        msg
-                      )
-                    }
-                    onTouchStart={e =>
-                      handleTouchStart(
-                        e,
-                        msg
-                      )
-                    }
-                    onTouchEnd={
-                      handleTouchEnd
-                    }
-                    onTouchMove={
-                      handleTouchMove
-                    }
                   >
-                    {editingId ===
-                    msg._id ? (
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexDirection:
-                            'column',
-                          gap: 6
-                        }}
-                      >
-                        <input
-                          style={
-                            styles.editInput
-                          }
-                          value={
-                            editContent
-                          }
-                          onChange={e =>
-                            setEditContent(
-                              e.target.value
-                            )
-                          }
-                          onKeyDown={e => {
-                            if (
-                              e.key ===
-                              'Enter'
-                            ) {
-                              saveEdit(
-                                msg._id
-                              );
-                            }
-
-                            if (
-                              e.key ===
-                              'Escape'
-                            ) {
-                              setEditingId(
-                                null
-                              );
-                            }
-                          }}
-                          autoFocus
-                        />
-
+                    <div
+                      style={{
+                        ...styles.bubble,
+                        background: isMe
+                          ? 'var(--accent)'
+                          : 'var(--bg-tertiary)'
+                      }}
+                      onContextMenu={e =>
+                        handleRightClick(
+                          e,
+                          msg
+                        )
+                      }
+                      onTouchStart={e =>
+                        handleTouchStart(
+                          e,
+                          msg
+                        )
+                      }
+                      onTouchEnd={
+                        handleTouchEnd
+                      }
+                      onTouchMove={
+                        handleTouchMove
+                      }
+                    >
+                      {editingId ===
+                      msg._id ? (
                         <div
                           style={{
                             display: 'flex',
-                            gap: 4,
-                            justifyContent:
-                              'flex-end'
+                            flexDirection:
+                              'column',
+                            gap: 6
                           }}
                         >
-                          <button
+                          <input
                             style={
-                              styles.editBtn
+                              styles.editInput
                             }
-                            onClick={() =>
-                              saveEdit(
-                                msg._id
+                            value={
+                              editContent
+                            }
+                            onChange={e =>
+                              setEditContent(
+                                e.target.value
                               )
                             }
-                          >
-                            ✓
-                          </button>
+                            onKeyDown={e => {
+                              if (
+                                e.key ===
+                                'Enter'
+                              ) {
+                                saveEdit(
+                                  msg._id
+                                );
+                              }
 
-                          <button
-                            style={
-                              styles.cancelBtn
-                            }
-                            onClick={() =>
-                              setEditingId(
-                                null
-                              )
-                            }
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <p
-                          style={
-                            styles.text
-                          }
-                        >
-                          {content}
-                        </p>
+                              if (
+                                e.key ===
+                                'Escape'
+                              ) {
+                                setEditingId(
+                                  null
+                                );
+                              }
+                            }}
+                            autoFocus
+                          />
 
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent:
-                              'flex-end',
-                            alignItems:
-                              'center',
-                            gap: 4
-                          }}
-                        >
-                          {msg.edited && (
-                            <p
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: 4,
+                              justifyContent:
+                                'flex-end'
+                            }}
+                          >
+                            <button
                               style={
-                                styles.editedLabel
+                                styles.editBtn
+                              }
+                              onClick={() =>
+                                saveEdit(
+                                  msg._id
+                                )
                               }
                             >
-                              modifié
-                            </p>
-                          )}
+                              ✓
+                            </button>
 
+                            <button
+                              style={
+                                styles.cancelBtn
+                              }
+                              onClick={() =>
+                                setEditingId(
+                                  null
+                                )
+                              }
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
                           <p
                             style={
-                              styles.msgTime
+                              styles.text
                             }
                           >
-                            {msg.createdAt
-                              ? new Date(
-                                  msg.createdAt
-                                ).toLocaleTimeString(
-                                  'fr-FR',
-                                  {
-                                    hour: '2-digit',
-                                    minute:
-                                      '2-digit'
-                                  }
-                                )
-                              : ''}
+                            {content}
                           </p>
-                        </div>
-                      </>
-                    )}
+
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent:
+                                'flex-end',
+                              alignItems:
+                                'center',
+                              gap: 4
+                            }}
+                          >
+                            {msg.edited && (
+                              <p
+                                style={
+                                  styles.editedLabel
+                                }
+                              >
+                                modifié
+                              </p>
+                            )}
+
+                            <p
+                              style={
+                                styles.msgTime
+                              }
+                            >
+                              {msg.createdAt
+                                ? new Date(
+                                    msg.createdAt
+                                  ).toLocaleTimeString(
+                                    'fr-FR',
+                                    {
+                                      hour: '2-digit',
+                                      minute:
+                                        '2-digit'
+                                    }
+                                  )
+                                : ''}
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
+                </React.Fragment>
               );
             })}
 
@@ -1120,6 +1197,26 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '8px'
+  },
+
+  dateSeparator: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    margin: '8px 0'
+  },
+
+  dateLine: {
+    flex: 1,
+    height: '1px',
+    background: 'var(--border)'
+  },
+
+  dateText: {
+    fontSize: '11px',
+    color: 'var(--text-muted)',
+    whiteSpace: 'nowrap',
+    padding: '0 4px'
   },
 
   infoText: {
