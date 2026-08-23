@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Message = require('../models/Message');
 const authMiddleware = require('../middleware/auth');
-const { sendReportEmail } = require('../utils/mailer');
+const { sendReportNotification } = require('../utils/discordReport');
 
 // Anti-spam basique : 1 signalement max toutes les 15 secondes par compte.
 // Pas de captcha ici, comme demandé — le cooldown suffit pour ce cas d'usage.
@@ -65,8 +65,8 @@ router.post('/', authMiddleware, async (req, res) => {
     ]);
 
     // Volontairement AUCUNE écriture en base ici — le contenu signalé
-    // n'existe nulle part côté serveur en dehors de cet email.
-    await sendReportEmail({
+    // n'existe nulle part côté serveur en dehors de ce message Discord.
+    await sendReportNotification({
       reporter,
       reportedUser,
       messageId,
