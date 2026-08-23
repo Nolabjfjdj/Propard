@@ -1172,7 +1172,7 @@ export default function Chat({
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
             <h2 style={styles.modalTitle}>🚩 Signaler ce message</h2>
             <p style={styles.modalDesc}>
-              Ce message — uniquement celui-ci, en clair — sera envoyé à l'équipe Propard pour modération. Le reste de ta conversation reste privé.
+              Ce message, uniquement celui-ci, en clair, sera envoyé à l'équipe Propard pour modération. Le reste de ta conversation reste privé.
             </p>
 
             <p style={styles.reportedContent}>
