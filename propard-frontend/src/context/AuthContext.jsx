@@ -1,21 +1,51 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
-import { generateKeyPair, storePrivateKey, hasStoredPrivateKey } from '../utils/crypto';
+import {
+  generateKeyPair,
+  storePrivateKey,
+  getStoredPrivateKeyJwk,
+  publicKeyFromPrivateJwk
+} from '../utils/crypto';
 
 const AuthContext = createContext(null);
 
 const ensureEncryptionKeys = async (userId, authToken) => {
   if (!userId || !authToken) return;
   try {
-    if (hasStoredPrivateKey(userId)) return;
+    const existingPriv = getStoredPrivateKeyJwk(userId);
+
+    if (existingPriv) {
+      // Une clé locale existe déjà : on renvoie systématiquement la clé
+      // publique correspondante au serveur (idempotent, sans régénérer
+      // de nouvelle paire). Ça corrige automatiquement les comptes dont
+      // un envoi précédent avait échoué silencieusement (ex: coupure
+      // réseau, backend indisponible) sans jamais casser le
+      // déchiffrement des messages déjà échangés.
+      const derivedPublicKeyJwk = publicKeyFromPrivateJwk(existingPriv);
+      await axios.patch('/api/auth/publickey', { publicKey: JSON.stringify(derivedPublicKeyJwk) }, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      return;
+    }
+
+    // Aucune clé locale : première fois sur cet appareil.
     const { publicKeyJwk, privateKeyJwk } = await generateKeyPair();
-    storePrivateKey(userId, privateKeyJwk);
+
     await axios.patch('/api/auth/publickey', { publicKey: JSON.stringify(publicKeyJwk) }, {
       headers: { Authorization: `Bearer ${authToken}` }
     });
+
+    // Important : on ne stocke la clé privée QU'APRÈS confirmation que le
+    // serveur a bien reçu la clé publique correspondante. Sinon, une
+    // panne réseau ponctuelle laisserait une clé locale à jamais
+    // désynchronisée du serveur, sans aucun moyen de le détecter aux
+    // connexions suivantes (c'était le bug : hasStoredPrivateKey()
+    // renvoyait true pour toujours, donc plus aucune tentative de
+    // renvoi n'avait lieu).
+    storePrivateKey(userId, privateKeyJwk);
     console.log('🔐 Clés E2EE générées avec succès');
   } catch (err) {
-    console.error('❌ Erreur génération clés de chiffrement:', err);
+    console.error('❌ Erreur génération/synchronisation des clés de chiffrement:', err);
   }
 };
 
