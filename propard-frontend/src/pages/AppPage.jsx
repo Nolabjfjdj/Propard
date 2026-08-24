@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -7,6 +7,11 @@ import FriendList from '../components/FriendList';
 import Chat from '../components/Chat';
 import AddFriend from '../components/AddFriend';
 import VoiceCall from '../components/VoiceCall';
+import {
+  deriveSharedKey,
+  encryptMessage,
+  getStoredPrivateKeyJwk
+} from '../utils/crypto';
 
 export default function AppPage({ initialFriendId }) {
   const { user, token, logout } = useAuth();
@@ -25,6 +30,14 @@ export default function AppPage({ initialFriendId }) {
   const [deleteError, setDeleteError] = useState('');
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelError, setCancelError] = useState('');
+
+  // --- Grab & Send ---
+  // grabRef contient toutes les données "chaudes" de la manipulation en
+  // cours (mise à jour à chaque frame, pas de re-render à chaque tick).
+  // grabVisual est le sous-ensemble qui doit déclencher un re-render pour
+  // afficher le fantôme et surligner la conversation survolée.
+  const grabRef = useRef(null);
+  const [grabVisual, setGrabVisual] = useState(null);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -137,6 +150,173 @@ export default function AppPage({ initialFriendId }) {
     }
   };
 
+  // ─── Grab & Send : logique de glisser-déposer ────────────────────────────
+
+  const handleGrabMoveImpl = (e) => {
+    const g = grabRef.current;
+    if (!g) return;
+
+    g.raw = { x: e.clientX, y: e.clientY };
+
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const zone = el && el.closest ? el.closest('[data-friend-drop-zone]') : null;
+    const targetId = zone ? zone.getAttribute('data-friend-id') : null;
+
+    g.dragOverFriendId =
+      targetId && targetId !== g.sourceFriendId ? targetId : null;
+  };
+
+  const forwardGrabbedMessage = async (g, targetId) => {
+    try {
+      const res = await axios.get(`/api/auth/user/${targetId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const rawPublicKey = res.data?.publicKey;
+      if (!rawPublicKey) {
+        throw new Error('Clé publique du destinataire indisponible.');
+      }
+
+      const targetPublicKey =
+        typeof rawPublicKey === 'string'
+          ? JSON.parse(rawPublicKey)
+          : rawPublicKey;
+
+      const myPrivateKeyJwk = getStoredPrivateKeyJwk(user?.id);
+      if (!myPrivateKeyJwk) {
+        throw new Error('Clé privée locale introuvable.');
+      }
+
+      const sharedKey = await deriveSharedKey(myPrivateKeyJwk, targetPublicKey);
+      const encryptedContent = await encryptMessage(sharedKey, g.msg.content);
+
+      socket.emit('sendMessage', {
+        receiverId: targetId,
+        content: encryptedContent
+      });
+    } catch (err) {
+      console.error('Erreur transfert de message (Grab & Send):', err);
+    }
+  };
+
+  const handleGrabEndImpl = () => {
+    const g = grabRef.current;
+    if (!g) return;
+
+    window.removeEventListener('pointermove', g.moveHandler);
+    window.removeEventListener('pointerup', g.endHandler);
+    window.removeEventListener('pointercancel', g.endHandler);
+    cancelAnimationFrame(g.rafId);
+
+    const targetId = g.dragOverFriendId;
+
+    if (targetId) {
+      // Petite animation d'atterrissage/compression avant disparition.
+      setGrabVisual(v => v && { ...v, landing: true, dragOverFriendId: targetId });
+
+      forwardGrabbedMessage(g, targetId);
+
+      setTimeout(() => {
+        setGrabVisual(null);
+        grabRef.current = null;
+        if (g.forcedSidebarOpen) setShowSidebar(false);
+      }, 190);
+    } else {
+      // Relâché hors zone valide : retour en douceur à la position d'origine.
+      setGrabVisual(v => v && {
+        ...v,
+        x: g.originRect.left,
+        y: g.originRect.top,
+        rotation: 0,
+        returning: true,
+        dragOverFriendId: null
+      });
+
+      setTimeout(() => {
+        setGrabVisual(null);
+        grabRef.current = null;
+        if (g.forcedSidebarOpen) setShowSidebar(false);
+      }, 260);
+    }
+  };
+
+  const handleGrabStart = ({ msg, clientX, clientY, rect }, sourceFriendId) => {
+    if (grabRef.current) return; // un glisser est déjà en cours
+
+    const wasSidebarHidden = isMobile && !showSidebar;
+    if (wasSidebarHidden) setShowSidebar(true);
+
+    const moveHandler = (e) => handleGrabMoveImpl(e);
+    const endHandler = () => handleGrabEndImpl();
+
+    grabRef.current = {
+      msg,
+      sourceFriendId: sourceFriendId ? sourceFriendId.toString() : null,
+      originRect: rect,
+      raw: { x: clientX, y: clientY },
+      prevRaw: { x: clientX, y: clientY },
+      ghost: { x: rect.left, y: rect.top },
+      rotation: 0,
+      dragOverFriendId: null,
+      forcedSidebarOpen: wasSidebarHidden,
+      moveHandler,
+      endHandler,
+      rafId: null
+    };
+
+    setGrabVisual({
+      msgId: msg._id,
+      x: rect.left,
+      y: rect.top,
+      width: rect.width,
+      rotation: 0,
+      content: msg.content,
+      dragOverFriendId: null,
+      landing: false,
+      returning: false
+    });
+
+    window.addEventListener('pointermove', moveHandler);
+    window.addEventListener('pointerup', endHandler);
+    window.addEventListener('pointercancel', endHandler);
+
+    const loop = () => {
+      const g = grabRef.current;
+      if (!g) return;
+
+      // Le fantôme "rattrape" le doigt avec un léger retard (effet de
+      // manipulation physique), au lieu de coller parfaitement à la
+      // position brute — c'est ce qui donne la sensation de tenir
+      // réellement l'objet.
+      const FOLLOW = 0.28;
+      const targetX = g.raw.x - g.originRect.width / 2;
+      const targetY = g.raw.y - 24;
+
+      g.ghost.x += (targetX - g.ghost.x) * FOLLOW;
+      g.ghost.y += (targetY - g.ghost.y) * FOLLOW;
+
+      const vx = g.raw.x - g.prevRaw.x;
+      g.prevRaw = { x: g.raw.x, y: g.raw.y };
+
+      // Léger tangage lors des changements brusques de direction, qui
+      // s'atténue tout seul — subtil, borné à ±8°.
+      const targetRotation = Math.max(-8, Math.min(8, vx * 1.4));
+      g.rotation += (targetRotation - g.rotation) * 0.25;
+
+      setGrabVisual(v => v && {
+        ...v,
+        x: g.ghost.x,
+        y: g.ghost.y,
+        rotation: g.rotation,
+        dragOverFriendId: g.dragOverFriendId
+      });
+
+      g.rafId = requestAnimationFrame(loop);
+    };
+
+    grabRef.current.rafId = requestAnimationFrame(loop);
+  };
+
   return (
     <div style={styles.layout}>
 
@@ -221,6 +401,7 @@ export default function AppPage({ initialFriendId }) {
             setHideFriendIps(val);
             localStorage.setItem('propard_hideFriendIps', val);
           }}
+          dragOverFriendId={grabVisual?.dragOverFriendId || null}
         />
 
         <button style={styles.logoutBtn} onClick={logout}>Déconnexion</button>
@@ -252,6 +433,8 @@ export default function AppPage({ initialFriendId }) {
             userId={user?.id}
             hideFriendIps={hideFriendIps}
             isMobile={isMobile}
+            onGrabStart={(payload) => handleGrabStart(payload, selectedFriend?._id)}
+            grabbedMessageId={grabVisual?.msgId || null}
           />
         ) : friendNotFound ? (
           <div style={styles.empty}>
@@ -280,6 +463,39 @@ export default function AppPage({ initialFriendId }) {
           onClose={() => setIncomingCall(null)}
           incomingOffer={incomingCall.offer}
         />
+      )}
+
+      {/* Fantôme du message en cours de Grab & Send */}
+      {grabVisual && (
+        <div
+          style={{
+            position: 'fixed',
+            left: 0,
+            top: 0,
+            width: grabVisual.width,
+            maxWidth: '65%',
+            padding: '10px 14px',
+            borderRadius: '12px',
+            background: 'var(--accent)',
+            color: '#fff',
+            fontSize: '14px',
+            lineHeight: '1.4',
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'anywhere',
+            boxShadow: '0 14px 30px rgba(0,0,0,0.35)',
+            pointerEvents: 'none',
+            zIndex: 500,
+            opacity: grabVisual.landing ? 0 : 1,
+            transform: `translate(${grabVisual.x}px, ${grabVisual.y}px) rotate(${grabVisual.rotation}deg) scale(${grabVisual.landing ? 0.82 : 1.04})`,
+            transition: grabVisual.returning
+              ? 'transform 0.26s cubic-bezier(0.22, 1, 0.36, 1)'
+              : grabVisual.landing
+                ? 'transform 0.19s ease-out, opacity 0.19s ease-out'
+                : 'none'
+          }}
+        >
+          {grabVisual.content}
+        </div>
       )}
 
       {/* Modal suppression de compte — étape 1 : choix de l'option */}
