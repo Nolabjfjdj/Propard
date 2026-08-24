@@ -7,7 +7,8 @@ export default function FriendList({
   selectedFriend,
   onSelectFriend,
   hideFriendIps,
-  setHideFriendIps
+  setHideFriendIps,
+  dragOverFriendId
 }) {
   const [friends, setFriends] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -294,16 +295,28 @@ export default function FriendList({
         .map(friend => {
           const friendId = friend.userId?._id?.toString();
           const unreadCount = unread[friendId] || 0;
+          const isDropTarget =
+            !!dragOverFriendId &&
+            dragOverFriendId.toString() === friendId;
 
           return (
             <div
               key={friendId}
+              data-friend-drop-zone="true"
+              data-friend-id={friendId}
               style={{
                 ...styles.friendItem,
-                background:
-                  selectedFriend?._id?.toString() === friendId
+                background: isDropTarget
+                  ? 'var(--accent-glow)'
+                  : selectedFriend?._id?.toString() === friendId
                     ? 'var(--bg-hover)'
-                    : 'transparent'
+                    : 'transparent',
+                boxShadow: isDropTarget
+                  ? '0 0 0 2px var(--accent)'
+                  : 'none',
+                transform: isDropTarget
+                  ? 'scale(1.03)'
+                  : 'scale(1)'
               }}
               onClick={() =>
                 handleSelect(friend.userId)
@@ -330,7 +343,9 @@ export default function FriendList({
                 </p>
               </div>
 
-              {unreadCount > 0 ? (
+              {isDropTarget ? (
+                <div style={styles.dropHint}>📥</div>
+              ) : unreadCount > 0 ? (
                 <div style={styles.badge}>
                   <span style={styles.badgeIcon}>
                     💬
@@ -420,7 +435,7 @@ const styles = {
     padding: '8px',
     borderRadius: '8px',
     cursor: 'pointer',
-    transition: 'background 0.15s'
+    transition: 'background 0.15s, transform 0.15s, box-shadow 0.15s'
   },
 
   avatar: {
@@ -479,6 +494,11 @@ const styles = {
     fontSize: '11px',
     fontWeight: '700',
     color: 'var(--success)'
+  },
+
+  dropHint: {
+    fontSize: '16px',
+    flexShrink: 0
   },
 
   hideIpBtn: {
