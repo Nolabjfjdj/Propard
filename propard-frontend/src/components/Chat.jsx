@@ -767,6 +767,14 @@ export default function Chat({
       now - lastTapRef.current.time < DOUBLE_TAP_WINDOW_MS;
 
     if (wasDoubleTap) {
+      // Le 2e tap démarre le geste potentiel : on bloque le comportement
+      // natif du navigateur pour éviter sélection de texte (iOS) et scroll
+      // parasite (Android), sans empêcher le scroll normal du 1er tap.
+      e.preventDefault();
+      if (typeof window !== 'undefined' && window.getSelection) {
+        window.getSelection()?.removeAllRanges();
+      }
+
       lastTapRef.current = { id: null, time: 0 };
 
       const rect = e.currentTarget.getBoundingClientRect();
@@ -1045,9 +1053,10 @@ export default function Chat({
                       onPointerDown={e =>
                         handleBubblePointerDown(e, msg)
                       }
-                      onPointerMove={
-                        handleBubblePointerMoveGrabCheck
-                      }
+                      onPointerMove={e => {
+                        if (grabCandidateRef.current) e.preventDefault();
+                        handleBubblePointerMoveGrabCheck(e);
+                      }}
                       onPointerUp={
                         handleBubblePointerUpCancel
                       }
@@ -1439,6 +1448,7 @@ const styles = {
     cursor: 'context-menu',
     userSelect: 'none',
     WebkitUserSelect: 'none',
+    WebkitTouchCallout: 'none',
     touchAction: 'pan-y'
   },
 
