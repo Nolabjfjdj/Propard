@@ -14,7 +14,9 @@ export default function Chat({
   token,
   userId,
   hideFriendIps,
-  isMobile
+  isMobile,
+  onGrabStart,
+  grabbedMessageId
 }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +42,16 @@ export default function Chat({
   const messageCountTimer = useRef(null);
   const longPressTimer = useRef(null);
 
+  // --- Grab & Send : détection double-tap puis maintien du 2e tap ---
+  // Fonctionne identiquement en souris (PC) et tactile (mobile) grâce aux
+  // Pointer Events, qui unifient les deux sans code séparé.
+  const lastTapRef = useRef({ id: null, time: 0 });
+  const grabHoldTimerRef = useRef(null);
+  const grabCandidateRef = useRef(null);
+  const DOUBLE_TAP_WINDOW_MS = 300;
+  const HOLD_TO_GRAB_MS = 180;
+  const MOVE_CANCEL_PX = 12;
+
   const SPAM_DELAY = 1000;
   const SPAM_LIMIT = 15;
 
@@ -49,6 +61,7 @@ export default function Chat({
   useEffect(() => {
     return () => {
       clearTimeout(messageCountTimer.current);
+      clearTimeout(grabHoldTimerRef.current);
     };
   }, []);
 
@@ -736,6 +749,75 @@ export default function Chat({
     );
   };
 
+  // --- Grab & Send : handlers additifs, n'interfèrent pas avec le
+  // menu contextuel existant (clic droit / appui long classique) ---
+
+  const clearGrabHold = () => {
+    clearTimeout(grabHoldTimerRef.current);
+    grabHoldTimerRef.current = null;
+    grabCandidateRef.current = null;
+  };
+
+  const handleBubblePointerDown = (e, msg) => {
+    if (msg.deleted || msg.decryptionError) return;
+
+    const now = Date.now();
+    const wasDoubleTap =
+      lastTapRef.current.id === msg._id &&
+      now - lastTapRef.current.time < DOUBLE_TAP_WINDOW_MS;
+
+    if (wasDoubleTap) {
+      lastTapRef.current = { id: null, time: 0 };
+
+      const rect = e.currentTarget.getBoundingClientRect();
+
+      grabCandidateRef.current = {
+        msg,
+        startX: e.clientX,
+        startY: e.clientY,
+        rect
+      };
+
+      grabHoldTimerRef.current = setTimeout(() => {
+        const c = grabCandidateRef.current;
+        if (c) {
+          // On annule le menu contextuel (appui long) qui aurait pu être
+          // programmé par ce même 2e tap, pour éviter qu'il s'ouvre
+          // par-dessus le glisser.
+          clearTimeout(longPressTimer.current);
+
+          if (onGrabStart) {
+            onGrabStart({
+              msg: c.msg,
+              clientX: c.startX,
+              clientY: c.startY,
+              rect: c.rect
+            });
+          }
+        }
+        grabCandidateRef.current = null;
+      }, HOLD_TO_GRAB_MS);
+    } else {
+      lastTapRef.current = { id: msg._id, time: now };
+    }
+  };
+
+  const handleBubblePointerMoveGrabCheck = e => {
+    const c = grabCandidateRef.current;
+    if (!c) return;
+
+    const dx = e.clientX - c.startX;
+    const dy = e.clientY - c.startY;
+
+    if (Math.sqrt(dx * dx + dy * dy) > MOVE_CANCEL_PX) {
+      clearGrabHold();
+    }
+  };
+
+  const handleBubblePointerUpCancel = () => {
+    clearGrabHold();
+  };
+
   const formatDateSeparator = date => {
     const d = new Date(date);
     const today = new Date();
@@ -870,6 +952,12 @@ export default function Chat({
               const isMe =
                 senderId === myId;
 
+              const isBeingGrabbed =
+                grabbedMessageId &&
+                msg._id &&
+                grabbedMessageId.toString() ===
+                  msg._id.toString();
+
               const content =
                 msg.decryptionError
                   ? '🔒 Message impossible à déchiffrer'
@@ -933,7 +1021,8 @@ export default function Chat({
                         ...styles.bubble,
                         background: isMe
                           ? 'var(--accent)'
-                          : 'var(--bg-tertiary)'
+                          : 'var(--bg-tertiary)',
+                        opacity: isBeingGrabbed ? 0 : 1
                       }}
                       onContextMenu={e =>
                         handleRightClick(
@@ -952,6 +1041,18 @@ export default function Chat({
                       }
                       onTouchMove={
                         handleTouchMove
+                      }
+                      onPointerDown={e =>
+                        handleBubblePointerDown(e, msg)
+                      }
+                      onPointerMove={
+                        handleBubblePointerMoveGrabCheck
+                      }
+                      onPointerUp={
+                        handleBubblePointerUpCancel
+                      }
+                      onPointerCancel={
+                        handleBubblePointerUpCancel
                       }
                     >
                       {editingId ===
@@ -1337,7 +1438,8 @@ const styles = {
     borderRadius: '12px',
     cursor: 'context-menu',
     userSelect: 'none',
-    WebkitUserSelect: 'none'
+    WebkitUserSelect: 'none',
+    touchAction: 'pan-y'
   },
 
   text: {
