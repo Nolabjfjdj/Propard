@@ -246,7 +246,11 @@ export default function AppPage({ initialFriendId }) {
     const wasSidebarHidden = isMobile && !showSidebar;
     if (wasSidebarHidden) setShowSidebar(true);
 
-    const moveHandler = (e) => handleGrabMoveImpl(e);
+    const moveHandler = (e) => {
+      // Empêche le geste tactile natif (scroll Android) pendant le Grab.
+      e.preventDefault();
+      handleGrabMoveImpl(e);
+    };
     const endHandler = () => handleGrabEndImpl();
 
     grabRef.current = {
@@ -276,7 +280,7 @@ export default function AppPage({ initialFriendId }) {
       returning: false
     });
 
-    window.addEventListener('pointermove', moveHandler);
+    window.addEventListener('pointermove', moveHandler, { passive: false });
     window.addEventListener('pointerup', endHandler);
     window.addEventListener('pointercancel', endHandler);
 
