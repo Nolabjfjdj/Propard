@@ -761,6 +761,13 @@ export default function Chat({
   const handleBubblePointerDown = (e, msg) => {
     if (msg.deleted || msg.decryptionError) return;
 
+    // Empêche immédiatement la sélection de texte / le menu de callout
+    // natif que le navigateur tente de déclencher sur un double-tap
+    // (surtout iOS Safari), avant même que notre logique double-tap ne
+    // s'exécute. On préfère bloquer systématiquement plutôt qu'après
+    // coup, une fois la sélection déjà amorcée.
+    e.preventDefault();
+
     const now = Date.now();
     const wasDoubleTap =
       lastTapRef.current.id === msg._id &&
@@ -775,7 +782,8 @@ export default function Chat({
         msg,
         startX: e.clientX,
         startY: e.clientY,
-        rect
+        rect,
+        pointerId: e.pointerId
       };
 
       grabHoldTimerRef.current = setTimeout(() => {
@@ -791,7 +799,8 @@ export default function Chat({
               msg: c.msg,
               clientX: c.startX,
               clientY: c.startY,
-              rect: c.rect
+              rect: c.rect,
+              pointerId: c.pointerId
             });
           }
         }
@@ -1439,7 +1448,11 @@ const styles = {
     cursor: 'context-menu',
     userSelect: 'none',
     WebkitUserSelect: 'none',
-    touchAction: 'pan-y'
+    WebkitTouchCallout: 'none',
+    // 'none' plutôt que 'pan-y' : empêche le navigateur de démarrer un
+    // scroll natif dès qu'on touche une bulle, ce qui annulait le geste
+    // Grab & Send sur Android avant même le déclenchement du grab.
+    touchAction: 'none'
   },
 
   text: {
