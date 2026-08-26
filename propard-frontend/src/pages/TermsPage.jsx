@@ -66,7 +66,7 @@ export default function TermsPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>5. Messages privés et chiffrement</h2>
+          <h2 style={styles.sectionTitle}>5. Messages privés, chiffrement et signalements</h2>
 
           <p style={styles.text}>
             Les communications privées échangées sur Propard utilisent un système
@@ -92,15 +92,27 @@ export default function TermsPage() {
           </p>
 
           <p style={styles.text}>
-            Propard peut mettre en place des mécanismes permettant aux utilisateurs de
-            signaler certains contenus. Lorsqu'un mécanisme de signalement est disponible,
-            les modalités applicables seront précisées dans le service et, le cas échéant,
-            dans les présentes CGU.
+            Propard permet aux utilisateurs de signaler certains contenus qu'ils estiment
+            contraires aux présentes CGU ou à la réglementation applicable.
+          </p>
+
+          <p style={styles.text}>
+            Lorsqu'un utilisateur signale un message privé, les informations nécessaires
+            au traitement du signalement peuvent être transmises à Propard, notamment le
+            contenu du message signalé lorsque cela est nécessaire. Cette transmission
+            intervient à la suite de l'action volontaire de l'utilisateur qui effectue
+            le signalement.
+          </p>
+
+          <p style={styles.text}>
+            Le contenu transmis dans le cadre d'un signalement peut être examiné afin de
+            déterminer s'il constitue une violation des présentes CGU ou de la réglementation
+            applicable et afin de permettre à Propard de prendre les mesures appropriées.
           </p>
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>6. Contenus des utilisateurs et signalements</h2>
+          <h2 style={styles.sectionTitle}>6. Contenus des utilisateurs et mesures</h2>
 
           <p style={styles.text}>
             Les contenus transmis ou publiés par les utilisateurs demeurent sous la
@@ -112,6 +124,12 @@ export default function TermsPage() {
             contenu ou d'une utilisation contraire aux présentes CGU ou à la réglementation
             applicable, dans les limites de ses possibilités techniques et de ses obligations
             légales.
+          </p>
+
+          <p style={styles.text}>
+            Lorsqu'un contenu est signalé, Propard peut examiner les informations transmises
+            dans le cadre du signalement et prendre les mesures appropriées en fonction de
+            la situation.
           </p>
 
           <p style={styles.text}>
@@ -149,8 +167,8 @@ export default function TermsPage() {
 
           <p style={styles.text}>
             Propard est fourni sans garantie de disponibilité continue. Des interruptions
-            peuvent survenir notamment pour des raisons de maintenance, de sécurité ou
-            de contraintes techniques.
+            peuvent survenir notamment pour des raisons de maintenance, de sécurité ou de
+            contraintes techniques.
           </p>
 
           <p style={styles.text}>
