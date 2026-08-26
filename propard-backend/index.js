@@ -1,15 +1,308 @@
-const express=require('express');const http=require('http');const {Server}=require('socket.io');const mongoose=require('mongoose');const cors=require('cors');const jwt=require('jsonwebtoken');const path=require('path');require('dotenv').config();
-const app=express();const server=http.createServer(app);const io=new Server(server,{cors:{origin:'*',methods:['GET','POST']}});app.use(cors());app.use(express.json());mongoose.connect(process.env.MONGO_URI).then(()=>console.log('✅ MongoDB connecté')).catch(e=>console.error('❌ MongoDB error:',e));
-const connectedUsers=new Map();app.set('io',io);app.set('connectedUsers',connectedUsers);app.use('/api/auth',require('./routes/auth'));app.use('/api/friends',require('./routes/friends'));app.use('/api/admin',require('./routes/admin'));app.use('/api',require('./routes/turn'));app.use('/api/reports',require('./routes/reports'));app.get('/health',(req,res)=>res.status(200).send('OK'));
-const lastMessageTimes=new Map();const Message=require('./models/Message');const User=require('./models/User');
-async function areFriends(userId,friendId){const user=await User.findById(userId).select('friends');return !!user&&user.friends.some(f=>f.userId.toString()===friendId.toString());}
-io.on('connection',socket=>{console.log(`🔌 Socket connecté: ${socket.id}`);
- socket.on('authenticate',async token=>{try{const decoded=jwt.verify(token,process.env.JWT_SECRET);socket.userId=decoded.id;connectedUsers.set(decoded.id,socket.id);await User.findByIdAndUpdate(decoded.id,{isOnline:true});socket.emit('authenticated',true);}catch{socket.emit('authenticated',false);}});
- socket.on('sendMessage',async({receiverId,content})=>{try{if(!socket.userId)return;if(!content||typeof content!=='string'||!content.trim())return;if(!mongoose.isValidObjectId(receiverId)||!(await areFriends(socket.userId,receiverId)))return socket.emit('messageError',{message:'Destinataire invalide.'});let p;try{p=JSON.parse(content);}catch{return socket.emit('messageError',{message:'Message chiffré invalide.'});}if(!p||p.v!==1||typeof p.iv!=='string'||typeof p.ct!=='string')return socket.emit('messageError',{message:'Message chiffré invalide.'});const now=Date.now(),last=lastMessageTimes.get(socket.userId)||0;if(now-last<1000)return socket.emit('spamWarning',{message:'Envoie pas si vite !'});lastMessageTimes.set(socket.userId,now);const message=await Message.create({sender:socket.userId,receiver:receiverId,content:content.trim(),originalContent:null,encrypted:true});const sender=await User.findById(socket.userId).select('username ipAlias');const messageData={_id:message._id.toString(),sender:socket.userId,senderInfo:sender,receiver:receiverId,content:message.content,encrypted:true,createdAt:message.createdAt};const receiverSocket=connectedUsers.get(receiverId);if(receiverSocket)io.to(receiverSocket).emit('newMessage',messageData);socket.emit('messageSent',messageData);}catch(e){console.error('sendMessage error:',e);socket.emit('messageError',{message:'Impossible d’envoyer le message.'});}});
- socket.on('callUser',({receiverId,offer})=>{const s=connectedUsers.get(receiverId);if(s)io.to(s).emit('incomingCall',{callerId:socket.userId,offer});else socket.emit('callFailed',{message:'Utilisateur non connecté'});});
- socket.on('answerCall',({callerId,answer})=>{const s=connectedUsers.get(callerId);if(s)io.to(s).emit('callAnswered',{answer});});
- socket.on('iceCandidate',({receiverId,candidate})=>{const s=connectedUsers.get(receiverId);if(s)io.to(s).emit('iceCandidate',{candidate});});
- socket.on('endCall',({receiverId})=>{const s=connectedUsers.get(receiverId);if(s)io.to(s).emit('callEnded');});
- socket.on('disconnect',async()=>{if(socket.userId){if(connectedUsers.get(socket.userId)===socket.id)connectedUsers.delete(socket.userId);lastMessageTimes.delete(socket.userId);await User.findByIdAndUpdate(socket.userId,{isOnline:false});}});
+const express=require('express');
+const http=require('http');
+const {Server}=require('socket.io');
+const mongoose=require('mongoose');
+const cors=require('cors');
+const jwt=require('jsonwebtoken');
+const path=require('path');
+require('dotenv').config();
+
+const app=express();
+const server=http.createServer(app);
+
+const io=new Server(server,{
+  cors:{
+    origin:'*',
+    methods:['GET','POST']
+  }
 });
-app.use(express.static(path.join(__dirname,'dist')));app.get('/sitemap.xml',(req,res)=>{res.type('application/xml');res.sendFile(path.join(__dirname,'dist','sitemap.xml'));});app.get(/^(?!\/api).*/, (req,res)=>res.sendFile(path.join(__dirname,'dist','index.html')));const PORT=process.env.PORT||3000;server.listen(PORT,'0.0.0.0',()=>console.log(`🚀 Serveur lancé sur le port ${PORT}`));
+
+app.use(cors());
+app.use(express.json());
+
+mongoose.connect(process.env.MONGO_URI)
+  .then(()=>console.log('✅ MongoDB connecté'))
+  .catch(e=>console.error('❌ MongoDB error:',e));
+
+const connectedUsers=new Map();
+
+app.set('io',io);
+app.set('connectedUsers',connectedUsers);
+
+app.use('/api/auth',require('./routes/auth'));
+app.use('/api/friends',require('./routes/friends'));
+app.use('/api/admin',require('./routes/admin'));
+app.use('/api/announcements',require('./routes/announcements'));
+app.use('/api',require('./routes/turn'));
+app.use('/api/reports',require('./routes/reports'));
+
+app.get('/health',(req,res)=>res.status(200).send('OK'));
+
+const lastMessageTimes=new Map();
+
+const Message=require('./models/Message');
+const User=require('./models/User');
+
+async function areFriends(userId,friendId){
+  const user=await User.findById(userId).select('friends');
+  return !!user&&user.friends.some(
+    f=>f.userId.toString()===friendId.toString()
+  );
+}
+
+io.on('connection',socket=>{
+  console.log(`🔌 Socket connecté: ${socket.id}`);
+
+  socket.on('authenticate',async token=>{
+    try{
+      const decoded=jwt.verify(
+        token,
+        process.env.JWT_SECRET
+      );
+
+      socket.userId=decoded.id;
+
+      connectedUsers.set(
+        decoded.id,
+        socket.id
+      );
+
+      await User.findByIdAndUpdate(
+        decoded.id,
+        {isOnline:true}
+      );
+
+      socket.emit('authenticated',true);
+
+    }catch{
+      socket.emit('authenticated',false);
+    }
+  });
+
+  socket.on('sendMessage',async({receiverId,content})=>{
+    try{
+      if(!socket.userId)return;
+
+      if(
+        !content ||
+        typeof content!=='string' ||
+        !content.trim()
+      )return;
+
+      if(
+        !mongoose.isValidObjectId(receiverId) ||
+        !(await areFriends(socket.userId,receiverId))
+      ){
+        return socket.emit(
+          'messageError',
+          {message:'Destinataire invalide.'}
+        );
+      }
+
+      let p;
+
+      try{
+        p=JSON.parse(content);
+      }catch{
+        return socket.emit(
+          'messageError',
+          {message:'Message chiffré invalide.'}
+        );
+      }
+
+      if(
+        !p ||
+        p.v!==1 ||
+        typeof p.iv!=='string' ||
+        typeof p.ct!=='string'
+      ){
+        return socket.emit(
+          'messageError',
+          {message:'Message chiffré invalide.'}
+        );
+      }
+
+      const now=Date.now();
+      const last=lastMessageTimes.get(socket.userId)||0;
+
+      if(now-last<1000){
+        return socket.emit(
+          'spamWarning',
+          {message:'Envoie pas si vite !'}
+        );
+      }
+
+      lastMessageTimes.set(
+        socket.userId,
+        now
+      );
+
+      const message=await Message.create({
+        sender:socket.userId,
+        receiver:receiverId,
+        content:content.trim(),
+        originalContent:null,
+        encrypted:true
+      });
+
+      const sender=await User.findById(
+        socket.userId
+      ).select(
+        'username ipAlias'
+      );
+
+      const messageData={
+        _id:message._id.toString(),
+        sender:socket.userId,
+        senderInfo:sender,
+        receiver:receiverId,
+        content:message.content,
+        encrypted:true,
+        createdAt:message.createdAt
+      };
+
+      const receiverSocket=
+        connectedUsers.get(receiverId);
+
+      if(receiverSocket){
+        io.to(receiverSocket).emit(
+          'newMessage',
+          messageData
+        );
+      }
+
+      socket.emit(
+        'messageSent',
+        messageData
+      );
+
+    }catch(e){
+      console.error(
+        'sendMessage error:',
+        e
+      );
+
+      socket.emit(
+        'messageError',
+        {
+          message:'Impossible d’envoyer le message.'
+        }
+      );
+    }
+  });
+
+  socket.on('callUser',({receiverId,offer})=>{
+    const s=connectedUsers.get(receiverId);
+
+    if(s){
+      io.to(s).emit(
+        'incomingCall',
+        {
+          callerId:socket.userId,
+          offer
+        }
+      );
+    }else{
+      socket.emit(
+        'callFailed',
+        {
+          message:'Utilisateur non connecté'
+        }
+      );
+    }
+  });
+
+  socket.on('answerCall',({callerId,answer})=>{
+    const s=connectedUsers.get(callerId);
+
+    if(s){
+      io.to(s).emit(
+        'callAnswered',
+        {answer}
+      );
+    }
+  });
+
+  socket.on('iceCandidate',({receiverId,candidate})=>{
+    const s=connectedUsers.get(receiverId);
+
+    if(s){
+      io.to(s).emit(
+        'iceCandidate',
+        {candidate}
+      );
+    }
+  });
+
+  socket.on('endCall',({receiverId})=>{
+    const s=connectedUsers.get(receiverId);
+
+    if(s){
+      io.to(s).emit(
+        'callEnded'
+      );
+    }
+  });
+
+  socket.on('disconnect',async()=>{
+    if(socket.userId){
+
+      if(
+        connectedUsers.get(socket.userId)===socket.id
+      ){
+        connectedUsers.delete(
+          socket.userId
+        );
+      }
+
+      lastMessageTimes.delete(
+        socket.userId
+      );
+
+      await User.findByIdAndUpdate(
+        socket.userId,
+        {isOnline:false}
+      );
+    }
+  });
+});
+
+app.use(
+  express.static(
+    path.join(__dirname,'dist')
+  )
+);
+
+app.get('/sitemap.xml',(req,res)=>{
+  res.type('application/xml');
+
+  res.sendFile(
+    path.join(
+      __dirname,
+      'dist',
+      'sitemap.xml'
+    )
+  );
+});
+
+app.get(
+  /^(?!\/api).*/,
+  (req,res)=>
+    res.sendFile(
+      path.join(
+        __dirname,
+        'dist',
+        'index.html'
+      )
+    )
+);
+
+const PORT=process.env.PORT||3000;
+
+server.listen(
+  PORT,
+  '0.0.0.0',
+  ()=>console.log(
+    `🚀 Serveur lancé sur le port ${PORT}`
+  )
+);
