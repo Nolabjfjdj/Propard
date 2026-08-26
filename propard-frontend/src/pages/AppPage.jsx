@@ -152,9 +152,24 @@ export default function AppPage({ initialFriendId }) {
 
   // ─── Grab & Send : logique de glisser-déposer ────────────────────────────
 
+  // Empêche/relâche la sélection de texte sur toute la page pendant le
+  // glisser — sinon le geste tactile qui déplace le fantôme continue de
+  // sélectionner le texte qu'il survole ailleurs sur la page (bug iOS).
+  const lockPageSelection = (locked) => {
+    document.body.style.userSelect = locked ? 'none' : '';
+    document.body.style.webkitUserSelect = locked ? 'none' : '';
+  };
+
   const handleGrabMoveImpl = (e) => {
     const g = grabRef.current;
     if (!g) return;
+
+    // On ignore tout doigt/pointeur différent de celui qui a initié le
+    // grab — ça laisse un 2e doigt scroller librement la liste d'amis
+    // (ou n'importe quoi d'autre) pendant qu'on tient le message.
+    if (g.pointerId != null && e.pointerId !== g.pointerId) return;
+
+    e.preventDefault();
 
     g.raw = { x: e.clientX, y: e.clientY };
 
@@ -199,14 +214,19 @@ export default function AppPage({ initialFriendId }) {
     }
   };
 
-  const handleGrabEndImpl = () => {
+  const handleGrabEndImpl = (e) => {
     const g = grabRef.current;
     if (!g) return;
+
+    // Même filtre que pour le déplacement : seul le relâchement du doigt
+    // qui a initié le grab doit terminer le geste.
+    if (g.pointerId != null && e && e.pointerId !== g.pointerId) return;
 
     window.removeEventListener('pointermove', g.moveHandler);
     window.removeEventListener('pointerup', g.endHandler);
     window.removeEventListener('pointercancel', g.endHandler);
     cancelAnimationFrame(g.rafId);
+    lockPageSelection(false);
 
     const targetId = g.dragOverFriendId;
 
@@ -240,19 +260,22 @@ export default function AppPage({ initialFriendId }) {
     }
   };
 
-  const handleGrabStart = ({ msg, clientX, clientY, rect }, sourceFriendId) => {
+  const handleGrabStart = ({ msg, clientX, clientY, rect, pointerId }, sourceFriendId) => {
     if (grabRef.current) return; // un glisser est déjà en cours
 
     const wasSidebarHidden = isMobile && !showSidebar;
     if (wasSidebarHidden) setShowSidebar(true);
 
+    lockPageSelection(true);
+
     const moveHandler = (e) => handleGrabMoveImpl(e);
-    const endHandler = () => handleGrabEndImpl();
+    const endHandler = (e) => handleGrabEndImpl(e);
 
     grabRef.current = {
       msg,
       sourceFriendId: sourceFriendId ? sourceFriendId.toString() : null,
       originRect: rect,
+      pointerId: pointerId != null ? pointerId : null,
       raw: { x: clientX, y: clientY },
       prevRaw: { x: clientX, y: clientY },
       ghost: { x: rect.left, y: rect.top },
@@ -276,7 +299,7 @@ export default function AppPage({ initialFriendId }) {
       returning: false
     });
 
-    window.addEventListener('pointermove', moveHandler);
+    window.addEventListener('pointermove', moveHandler, { passive: false });
     window.addEventListener('pointerup', endHandler);
     window.addEventListener('pointercancel', endHandler);
 
@@ -484,6 +507,7 @@ export default function AppPage({ initialFriendId }) {
             overflowWrap: 'anywhere',
             boxShadow: '0 14px 30px rgba(0,0,0,0.35)',
             pointerEvents: 'none',
+            userSelect: 'none',
             zIndex: 500,
             opacity: grabVisual.landing ? 0 : 1,
             transform: `translate(${grabVisual.x}px, ${grabVisual.y}px) rotate(${grabVisual.rotation}deg) scale(${grabVisual.landing ? 0.82 : 1.04})`,
