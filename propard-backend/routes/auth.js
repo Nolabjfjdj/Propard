@@ -5,10 +5,29 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Message = require('../models/Message');
 const authMiddleware = require('../middleware/auth');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
 const PSEUDOS_INTERDITS = ['owner','admin','administrator','superadmin','sysadmin','moderator','mod','comod','staff','team','crew','support','helpdesk','official','propard','propardbot','propardteam','propardstaff','propardadmin','propardsupport','propardofficial','everyone','nigger','nigga','faggot','retard','whore','bitch','salope','pute','connard','connasse','batard','batarde','enculé','encule','fdp','ntm','tg','pd','discord','telegram','whatsapp','snapchat','instagram','facebook','twitter','tiktok','youtube','google','microsoft','apple','amazon','netflix','spotify','twitch','reddit','github','anthropic','openai','chatgpt','claude','malware','virus','phishing','scam','billing','privacy','terms','rules','guidelines','policy'];
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+// Login : limité par IP + pseudo tenté, pour freiner le brute-force ciblé
+// sans bloquer tout le monde si une seule IP contient plusieurs comptes
+// (réseau partagé, plusieurs comptes de test, etc.).
+const loginRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyFn: (req) => `${req.ip}:${(req.body?.username || '').toLowerCase()}`,
+  message: 'Trop de tentatives de connexion, réessaie dans quelques minutes.'
+});
+
+// Register : limité par IP pour empêcher la création massive de comptes.
+const registerRateLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 8,
+  keyFn: (req) => req.ip,
+  message: 'Trop de comptes créés depuis cette adresse, réessaie plus tard.'
+});
 
 function generateIpAlias() {
   const part = () => Math.floor(Math.random() * 254) + 1;
@@ -24,7 +43,7 @@ async function generateUniqueIpAlias() {
   return ip;
 }
 
-router.post('/register', async (req, res) => {
+router.post('/register', registerRateLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username et mot de passe requis' });
@@ -33,7 +52,11 @@ router.post('/register', async (req, res) => {
     if (PSEUDOS_INTERDITS.includes(lower) || PSEUDOS_INTERDITS.some(w => lower.includes(w))) return res.status(400).json({ error: 'Ce username n\'est pas autorisé' });
     if (!/^[a-zA-Z0-9_-]+$/.test(username)) return res.status(400).json({ error: 'Username : lettres, chiffres, _ et - uniquement' });
     if (!/[a-zA-Z]/.test(username)) return res.status(400).json({ error: 'Username doit contenir au moins une lettre' });
-    if (password.length < 6) return res.status(400).json({ error: 'Mot de passe minimum 6 caractères' });
+    // Relevé de 6 à 8 caractères minimum — n'affecte que les nouvelles
+    // inscriptions, les comptes existants avec un mot de passe plus
+    // court restent valides (bcrypt.compare ne dépend pas de la
+    // politique de longueur, seulement du hash déjà stocké).
+    if (password.length < 8) return res.status(400).json({ error: 'Mot de passe minimum 8 caractères' });
 
     // Vérifie aussi contre les pseudos "réels" de comptes en anonymisation
     // en cours, pour éviter tout conflit pendant leur fenêtre de 30 jours.
@@ -56,7 +79,7 @@ router.post('/register', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'Erreur serveur' }); }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginRateLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
 
