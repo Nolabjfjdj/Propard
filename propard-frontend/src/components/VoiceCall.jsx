@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import socket from '../socket';
 
-const getIceServers = async () => {
+const getIceServers = async (token) => {
   const endpoint = '/api/turn-credentials';
 
   try {
-    const res = await fetch(endpoint);
+    const res = await fetch(endpoint, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
     const contentType = res.headers.get('content-type') || '';
     const raw = await res.text();
 
@@ -38,7 +40,7 @@ const getIceServers = async () => {
   }
 };
 
-export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
+export default function VoiceCall({ friend, userId, token, onClose, incomingOffer }) {
   const [status, setStatus] = useState(incomingOffer ? 'incoming' : 'calling');
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
@@ -77,8 +79,7 @@ export default function VoiceCall({ friend, userId, onClose, incomingOffer }) {
   };
 
   const createPeer = async () => {
-    const config = await getIceServers();
-    console.log('ICE config utilisée:', config);
+    const config = await getIceServers(token);
     const peer = new RTCPeerConnection(config);
 
     peer.onicecandidate = (e) => {
