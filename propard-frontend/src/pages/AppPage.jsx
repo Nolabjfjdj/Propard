@@ -483,6 +483,7 @@ export default function AppPage({ initialFriendId }) {
         <VoiceCall
           friend={incomingCall.friend}
           userId={user?.id}
+          token={token}
           onClose={() => setIncomingCall(null)}
           incomingOffer={incomingCall.offer}
         />
