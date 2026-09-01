@@ -363,6 +363,40 @@ export default function Chat({
       );
     };
 
+    // Un message modifié par l'ami arrive ici toujours chiffré (le
+    // serveur ne voit et ne transmet jamais de texte en clair) — on le
+    // déchiffre avec la même clé partagée avant de mettre à jour l'état
+    // local, exactement comme pour un nouveau message.
+    const handleEdited = async ({ messageId, content }) => {
+      if (!messageId || !content) return;
+
+      if (!sharedKey) {
+        setMessages(prev =>
+          prev.map(m =>
+            m._id?.toString() === messageId?.toString()
+              ? { ...m, content: null, decryptionError: true, edited: true }
+              : m
+          )
+        );
+        return;
+      }
+
+      const plaintext = await decryptMessage(sharedKey, content);
+
+      setMessages(prev =>
+        prev.map(m =>
+          m._id?.toString() === messageId?.toString()
+            ? {
+                ...m,
+                content: plaintext !== null ? plaintext : null,
+                decryptionError: plaintext === null,
+                edited: true
+              }
+            : m
+        )
+      );
+    };
+
     socket.on(
       'newMessage',
       handleNewMessage
@@ -376,6 +410,11 @@ export default function Chat({
     socket.on(
       'messageDeleted',
       handleDeleted
+    );
+
+    socket.on(
+      'messageEdited',
+      handleEdited
     );
 
     return () => {
@@ -392,6 +431,11 @@ export default function Chat({
       socket.off(
         'messageDeleted',
         handleDeleted
+      );
+
+      socket.off(
+        'messageEdited',
+        handleEdited
       );
     };
   }, [
@@ -1332,6 +1376,7 @@ export default function Chat({
         <VoiceCall
           friend={friend}
           userId={userId}
+          token={token}
           onClose={() =>
             setInCall(false)
           }
