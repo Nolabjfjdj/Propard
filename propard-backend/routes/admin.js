@@ -5,6 +5,7 @@ const crypto = require('crypto');
 
 const User = require('../models/User');
 const Announcement = require('../models/Announcement');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
 /*
  * Vérification des clés secrètes.
@@ -40,6 +41,17 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Ces routes ne sont protégées que par une clé secrète (pas de JWT), donc
+// un rate limit strict par IP est important pour rendre le brute-force de
+// la clé impraticable — même une clé "très longue et aléatoire" mérite
+// cette défense en profondeur.
+const adminSensitiveLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  keyFn: (req) => req.ip,
+  message: 'Trop de tentatives, réessaie plus tard.'
+});
+
 
 /*
  * ============================================================
@@ -47,7 +59,7 @@ function escapeRegex(value) {
  * ============================================================
  */
 
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', adminSensitiveLimiter, async (req, res) => {
   try {
     const {
       adminKey,
@@ -73,9 +85,9 @@ router.post('/reset-password', async (req, res) => {
       });
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       return res.status(400).json({
-        error: 'Mot de passe minimum 6 caractères'
+        error: 'Mot de passe minimum 8 caractères'
       });
     }
 
@@ -120,7 +132,7 @@ router.post('/reset-password', async (req, res) => {
  * ============================================================
  */
 
-router.post('/announcement/create', async (req, res) => {
+router.post('/announcement/create', adminSensitiveLimiter, async (req, res) => {
   try {
     const {
       announcementKey,
@@ -224,7 +236,8 @@ router.post('/announcement/create', async (req, res) => {
  * RÉCUPÉRER L'ANNONCE ACTIVE
  * ============================================================
  *
- * Cette route est surtout destinée au panneau admin.
+ * Cette route est surtout destinée au panneau admin. Pas de clé secrète
+ * requise (lecture seule, non sensible) donc pas de rate limit strict ici.
  */
 
 router.get('/announcement', async (req, res) => {
@@ -266,7 +279,7 @@ router.get('/announcement', async (req, res) => {
  * ============================================================
  */
 
-router.post('/announcement/delete', async (req, res) => {
+router.post('/announcement/delete', adminSensitiveLimiter, async (req, res) => {
   try {
     const {
       announcementKey
