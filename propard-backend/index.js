@@ -10,24 +10,83 @@ require('dotenv').config();
 const app=express();
 const server=http.createServer(app);
 
+// Nécessaire pour que req.ip reflète la vraie IP du client derrière le
+// proxy de Render — sans ça, le rate limiting par IP verrait toujours la
+// même adresse interne et s'appliquerait globalement au lieu de par
+// utilisateur.
+app.set('trust proxy', 1);
+
 const io=new Server(server,{
   cors:{
-    origin:'*',
+    origin: process.env.FRONTEND_ORIGIN || '*',
     methods:['GET','POST']
   }
 });
 
-app.use(cors());
+app.use(cors({ origin: process.env.FRONTEND_ORIGIN || '*' }));
 app.use(express.json());
+
+// Headers de sécurité de base. style-src autorise 'unsafe-inline' car
+// toute l'interface actuelle utilise des styles React inline — les
+// retirer casserait le rendu. connect-src reste large (https/wss/turn/
+// stun) pour ne pas casser la connexion au fournisseur TURN dont le
+// domaine exact peut varier ; à resserrer plus tard si besoin.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; " +
+    "script-src 'self'; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data:; " +
+    "connect-src 'self' https: wss: turn: turns: stun:; " +
+    "frame-ancestors 'none'; " +
+    "base-uri 'self'; " +
+    "form-action 'self'"
+  );
+  next();
+});
 
 mongoose.connect(process.env.MONGO_URI)
   .then(()=>console.log('✅ MongoDB connecté'))
   .catch(e=>console.error('❌ MongoDB error:',e));
 
+// userId -> Set<socketId>. Permet plusieurs connexions simultanées
+// (plusieurs onglets, plusieurs appareils) sans se marquer offline tant
+// qu'il reste au moins un socket actif, et sans qu'une nouvelle connexion
+// n'écrase/perde les précédentes.
 const connectedUsers=new Map();
+
+function addConnection(userId, socketId) {
+  if (!connectedUsers.has(userId)) connectedUsers.set(userId, new Set());
+  connectedUsers.get(userId).add(socketId);
+}
+
+function removeConnection(userId, socketId) {
+  const set = connectedUsers.get(userId);
+  if (!set) return false;
+  set.delete(socketId);
+  if (set.size === 0) {
+    connectedUsers.delete(userId);
+    return true; // dernier socket de cet utilisateur : il devient offline
+  }
+  return false;
+}
+
+function emitToUser(ioInstance, userId, event, payload) {
+  const set = connectedUsers.get(userId);
+  if (!set || set.size === 0) return false;
+  for (const socketId of set) {
+    ioInstance.to(socketId).emit(event, payload);
+  }
+  return true;
+}
 
 app.set('io',io);
 app.set('connectedUsers',connectedUsers);
+app.set('emitToUser', emitToUser);
 
 app.use('/api/auth',require('./routes/auth'));
 app.use('/api/friends',require('./routes/friends'));
@@ -62,15 +121,18 @@ io.on('connection',socket=>{
 
       socket.userId=decoded.id;
 
-      connectedUsers.set(
-        decoded.id,
-        socket.id
-      );
+      const wasOffline = !connectedUsers.has(decoded.id);
+      addConnection(decoded.id, socket.id);
 
-      await User.findByIdAndUpdate(
-        decoded.id,
-        {isOnline:true}
-      );
+      // On ne réécrit isOnline que si c'est la première connexion de cet
+      // utilisateur — inutile de le refaire pour chaque onglet
+      // supplémentaire.
+      if (wasOffline) {
+        await User.findByIdAndUpdate(
+          decoded.id,
+          {isOnline:true}
+        );
+      }
 
       socket.emit('authenticated',true);
 
@@ -161,15 +223,7 @@ io.on('connection',socket=>{
         createdAt:message.createdAt
       };
 
-      const receiverSocket=
-        connectedUsers.get(receiverId);
-
-      if(receiverSocket){
-        io.to(receiverSocket).emit(
-          'newMessage',
-          messageData
-        );
-      }
+      emitToUser(io, receiverId, 'newMessage', messageData);
 
       socket.emit(
         'messageSent',
@@ -191,78 +245,72 @@ io.on('connection',socket=>{
     }
   });
 
-  socket.on('callUser',({receiverId,offer})=>{
-    const s=connectedUsers.get(receiverId);
+  // ─── Événements WebRTC : authentification + vérification d'amitié ───────
+  // Avant, ces événements faisaient confiance au receiverId/callerId
+  // fourni par le client sans vérifier ni qui il était, ni s'il avait le
+  // droit de contacter cette personne. On applique désormais les mêmes
+  // règles que pour les messages : utilisateur authentifié + amis avec
+  // la cible, en réutilisant areFriends() déjà utilisé pour la
+  // messagerie (pas de deuxième logique d'amitié).
 
-    if(s){
-      io.to(s).emit(
-        'incomingCall',
-        {
-          callerId:socket.userId,
-          offer
-        }
-      );
-    }else{
-      socket.emit(
-        'callFailed',
-        {
-          message:'Utilisateur non connecté'
-        }
-      );
+  socket.on('callUser',async ({receiverId,offer})=>{
+    if(!socket.userId) return;
+    if(!mongoose.isValidObjectId(receiverId)) return;
+    if(!(await areFriends(socket.userId, receiverId))){
+      return socket.emit('callFailed',{message:'Utilisateur non autorisé'});
+    }
+
+    const delivered = emitToUser(io, receiverId, 'incomingCall', {
+      callerId:socket.userId,
+      offer
+    });
+
+    if(!delivered){
+      socket.emit('callFailed',{message:'Utilisateur non connecté'});
     }
   });
 
-  socket.on('answerCall',({callerId,answer})=>{
-    const s=connectedUsers.get(callerId);
+  socket.on('answerCall',async ({callerId,answer})=>{
+    if(!socket.userId) return;
+    if(!mongoose.isValidObjectId(callerId)) return;
+    if(!(await areFriends(socket.userId, callerId))) return;
 
-    if(s){
-      io.to(s).emit(
-        'callAnswered',
-        {answer}
-      );
-    }
+    emitToUser(io, callerId, 'callAnswered', {answer});
   });
 
-  socket.on('iceCandidate',({receiverId,candidate})=>{
-    const s=connectedUsers.get(receiverId);
+  socket.on('iceCandidate',async ({receiverId,candidate})=>{
+    if(!socket.userId) return;
+    if(!mongoose.isValidObjectId(receiverId)) return;
+    if(!(await areFriends(socket.userId, receiverId))) return;
 
-    if(s){
-      io.to(s).emit(
-        'iceCandidate',
-        {candidate}
-      );
-    }
+    emitToUser(io, receiverId, 'iceCandidate', {candidate});
   });
 
-  socket.on('endCall',({receiverId})=>{
-    const s=connectedUsers.get(receiverId);
+  socket.on('endCall',async ({receiverId})=>{
+    if(!socket.userId) return;
+    if(!mongoose.isValidObjectId(receiverId)) return;
+    if(!(await areFriends(socket.userId, receiverId))) return;
 
-    if(s){
-      io.to(s).emit(
-        'callEnded'
-      );
-    }
+    emitToUser(io, receiverId, 'callEnded');
   });
 
   socket.on('disconnect',async()=>{
     if(socket.userId){
-
-      if(
-        connectedUsers.get(socket.userId)===socket.id
-      ){
-        connectedUsers.delete(
-          socket.userId
-        );
-      }
+      const becameOffline = removeConnection(socket.userId, socket.id);
 
       lastMessageTimes.delete(
         socket.userId
       );
 
-      await User.findByIdAndUpdate(
-        socket.userId,
-        {isOnline:false}
-      );
+      // Ne marque offline que si c'était le dernier socket actif de cet
+      // utilisateur — un 2e onglet/appareil encore connecté doit garder
+      // l'utilisateur en ligne.
+      if (becameOffline) {
+        await User.findByIdAndUpdate(
+          socket.userId,
+          {isOnline:false}
+        );
+      }
     }
   });
 });
