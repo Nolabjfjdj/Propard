@@ -85,11 +85,13 @@ export default function FriendList({
    *
    * Si le message vient de la conversation actuellement ouverte :
    * - aucun badge ne doit apparaître ;
+   * - aucun son ne doit être joué ;
    * - le compteur local est remis à 0 ;
    * - le serveur est immédiatement informé que les messages sont lus.
    *
    * Sinon :
-   * - on augmente le compteur de la personne qui vient d'envoyer le message.
+   * - on augmente le compteur de la personne qui vient d'envoyer le message ;
+   * - on joue le son de notification.
    */
   useEffect(() => {
     const handleNew = async (msg) => {
@@ -130,6 +132,16 @@ export default function FriendList({
       }
 
       // Message reçu dans une autre conversation.
+      // Le son ne doit jouer que pour les conversations non ouvertes.
+      try {
+        const audio = new Audio('/notification.wav');
+        audio.play().catch(() => {
+          // Le navigateur peut bloquer la lecture automatique.
+        });
+      } catch {
+        // Impossible de créer l'élément audio.
+      }
+
       setUnread(prev => ({
         ...prev,
         [senderId]: (prev[senderId] || 0) + 1
