@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import socket from '../socket';
 
@@ -15,6 +15,47 @@ export default function FriendList({
   const [requestUsers, setRequestUsers] = useState({});
   const [unread, setUnread] = useState({});
 
+  // Un seul élément audio est créé pour toute la durée de vie
+  // de FriendList, puis réutilisé pour toutes les notifications.
+  const notificationAudioRef = useRef(null);
+
+  useEffect(() => {
+    const audio = new Audio('/notification.wav');
+
+    // Demande au navigateur de précharger le fichier.
+    audio.preload = 'auto';
+
+    notificationAudioRef.current = audio;
+
+    return () => {
+      audio.pause();
+      audio.currentTime = 0;
+      notificationAudioRef.current = null;
+    };
+  }, []);
+
+  const playNotificationSound = () => {
+    const audio = notificationAudioRef.current;
+
+    if (!audio) return;
+
+    // On repart toujours du début du son.
+    audio.currentTime = 0;
+
+    const playPromise = audio.play();
+
+    if (playPromise !== undefined) {
+      playPromise.catch(err => {
+        // Safari/iOS peut refuser une lecture audio dans certains cas.
+        // On évite qu'une erreur de lecture casse le traitement du message.
+        console.warn(
+          'Lecture du son de notification impossible:',
+          err
+        );
+      });
+    }
+  };
+
   const fetchUnread = async () => {
     try {
       const res = await axios.get('/api/friends/unread', {
@@ -25,7 +66,10 @@ export default function FriendList({
       // Cela évite de conserver d'anciens compteurs localement.
       setUnread(res.data || {});
     } catch (err) {
-      console.error('Erreur récupération messages non lus:', err);
+      console.error(
+        'Erreur récupération messages non lus:',
+        err
+      );
     }
   };
 
@@ -64,7 +108,10 @@ export default function FriendList({
       setRequests(validRequests);
       setRequestUsers(usersMap);
     } catch (err) {
-      console.error('Erreur récupération données amis:', err);
+      console.error(
+        'Erreur récupération données amis:',
+        err
+      );
     }
   };
 
@@ -85,12 +132,12 @@ export default function FriendList({
    *
    * Si le message vient de la conversation actuellement ouverte :
    * - aucun badge ne doit apparaître ;
-   * - aucun son ne doit être joué ;
    * - le compteur local est remis à 0 ;
-   * - le serveur est immédiatement informé que les messages sont lus.
+   * - le serveur est immédiatement informé que les messages sont lus ;
+   * - aucun son n'est joué.
    *
    * Sinon :
-   * - on augmente le compteur de la personne qui vient d'envoyer le message ;
+   * - on augmente le compteur ;
    * - on joue le son de notification.
    */
   useEffect(() => {
@@ -102,7 +149,8 @@ export default function FriendList({
 
       if (!senderId) return;
 
-      const selectedId = selectedFriend?._id?.toString();
+      const selectedId =
+        selectedFriend?._id?.toString();
 
       // Message reçu dans la conversation actuellement ouverte.
       if (selectedId === senderId) {
@@ -132,20 +180,13 @@ export default function FriendList({
       }
 
       // Message reçu dans une autre conversation.
-      // Le son ne doit jouer que pour les conversations non ouvertes.
-      try {
-        const audio = new Audio('/notification.wav');
-        audio.play().catch(() => {
-          // Le navigateur peut bloquer la lecture automatique.
-        });
-      } catch {
-        // Impossible de créer l'élément audio.
-      }
-
       setUnread(prev => ({
         ...prev,
         [senderId]: (prev[senderId] || 0) + 1
       }));
+
+      // Notification sonore uniquement pour une autre conversation.
+      playNotificationSound();
     };
 
     socket.on('newMessage', handleNew);
@@ -169,7 +210,10 @@ export default function FriendList({
 
       fetchData();
     } catch (err) {
-      console.error('Erreur acceptation demande:', err);
+      console.error(
+        'Erreur acceptation demande:',
+        err
+      );
     }
   };
 
@@ -187,7 +231,10 @@ export default function FriendList({
 
       fetchData();
     } catch (err) {
-      console.error('Erreur refus demande:', err);
+      console.error(
+        'Erreur refus demande:',
+        err
+      );
     }
   };
 
@@ -305,8 +352,12 @@ export default function FriendList({
       {friends
         .filter(friend => friend.userId)
         .map(friend => {
-          const friendId = friend.userId?._id?.toString();
-          const unreadCount = unread[friendId] || 0;
+          const friendId =
+            friend.userId?._id?.toString();
+
+          const unreadCount =
+            unread[friendId] || 0;
+
           const isDropTarget =
             !!dragOverFriendId &&
             dragOverFriendId.toString() === friendId;
@@ -356,7 +407,9 @@ export default function FriendList({
               </div>
 
               {isDropTarget ? (
-                <div style={styles.dropHint}>📥</div>
+                <div style={styles.dropHint}>
+                  📥
+                </div>
               ) : unreadCount > 0 ? (
                 <div style={styles.badge}>
                   <span style={styles.badgeIcon}>
@@ -447,7 +500,8 @@ const styles = {
     padding: '8px',
     borderRadius: '8px',
     cursor: 'pointer',
-    transition: 'background 0.15s, transform 0.15s, box-shadow 0.15s'
+    transition:
+      'background 0.15s, transform 0.15s, box-shadow 0.15s'
   },
 
   avatar: {
