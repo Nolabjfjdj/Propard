@@ -8,21 +8,19 @@ export default function FriendList({
   onSelectFriend,
   hideFriendIps,
   setHideFriendIps,
-  dragOverFriendId
+  dragOverFriendId,
+  refreshKey
 }) {
   const [friends, setFriends] = useState([]);
   const [requests, setRequests] = useState([]);
   const [requestUsers, setRequestUsers] = useState({});
   const [unread, setUnread] = useState({});
 
-  // Un seul élément audio est créé pour toute la durée de vie
-  // de FriendList, puis réutilisé pour toutes les notifications.
   const notificationAudioRef = useRef(null);
 
   useEffect(() => {
     const audio = new Audio('/notification.wav');
 
-    // Demande au navigateur de précharger le fichier.
     audio.preload = 'auto';
 
     notificationAudioRef.current = audio;
@@ -39,15 +37,12 @@ export default function FriendList({
 
     if (!audio) return;
 
-    // On repart toujours du début du son.
     audio.currentTime = 0;
 
     const playPromise = audio.play();
 
     if (playPromise !== undefined) {
       playPromise.catch(err => {
-        // Safari/iOS peut refuser une lecture audio dans certains cas.
-        // On évite qu'une erreur de lecture casse le traitement du message.
         console.warn(
           'Lecture du son de notification impossible:',
           err
@@ -62,8 +57,6 @@ export default function FriendList({
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // On remplace complètement l'état par celui du serveur.
-      // Cela évite de conserver d'anciens compteurs localement.
       setUnread(res.data || {});
     } catch (err) {
       console.error(
@@ -101,7 +94,6 @@ export default function FriendList({
           usersMap[req.from] = userRes.data;
           validRequests.push(req);
         } catch {
-          // Utilisateur supprimé, on ignore la demande.
         }
       }
 
@@ -125,21 +117,8 @@ export default function FriendList({
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [token]);
+  }, [token, refreshKey]);
 
-  /*
-   * Gestion des nouveaux messages en temps réel.
-   *
-   * Si le message vient de la conversation actuellement ouverte :
-   * - aucun badge ne doit apparaître ;
-   * - le compteur local est remis à 0 ;
-   * - le serveur est immédiatement informé que les messages sont lus ;
-   * - aucun son n'est joué.
-   *
-   * Sinon :
-   * - on augmente le compteur ;
-   * - on joue le son de notification.
-   */
   useEffect(() => {
     const handleNew = async (msg) => {
       const senderId = (
@@ -152,7 +131,6 @@ export default function FriendList({
       const selectedId =
         selectedFriend?._id?.toString();
 
-      // Message reçu dans la conversation actuellement ouverte.
       if (selectedId === senderId) {
         setUnread(prev => ({
           ...prev,
@@ -179,13 +157,11 @@ export default function FriendList({
         return;
       }
 
-      // Message reçu dans une autre conversation.
       setUnread(prev => ({
         ...prev,
         [senderId]: (prev[senderId] || 0) + 1
       }));
 
-      // Notification sonore uniquement pour une autre conversation.
       playNotificationSound();
     };
 
@@ -243,14 +219,12 @@ export default function FriendList({
 
     if (!friendId) return;
 
-    // Suppression immédiate du badge dans l'interface.
     setUnread(prev => ({
       ...prev,
       [friendId]: 0
     }));
 
     try {
-      // Marque les messages comme lus côté serveur.
       await axios.patch(
         `/api/friends/messages/read/${friendId}`,
         {},
