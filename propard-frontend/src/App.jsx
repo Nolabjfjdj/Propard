@@ -182,4 +182,4 @@ const styles = {
     fontWeight: '600',
     textDecoration: 'none'
   }
-};"
+};
