@@ -699,7 +699,7 @@ Lorsqu'un problème est signalé, fournissez si possible :
 6. Les logs ou captures utiles.
 
 > [!WARNING]
-> Ne publiez jamais de mots de passe, tokens, clés API, clés privées ou données personnelles dans un rapport de bug.
+> Ne publiez jamais de mots de passe, tokens, clés API, clés privées ou données personnelles dans un rapport de bug. Sauf si c'est demandé.
 
 ---
 
