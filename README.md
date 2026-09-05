@@ -716,9 +716,9 @@ Lorsqu'un problème est signalé, fournissez si possible :
 Projet indépendant — **2026**
 
 Tous droits réservés.
+Dernière mise à jour du README : 26 Août 2026
 
 Voir [`LICENSE`](./LICENSE) pour les conditions complètes d'utilisation.
-Dernière mise à jour du README : 26 Août 2026
 ---
 
 > **Propard — Communication, simplicité et sécurité.**
