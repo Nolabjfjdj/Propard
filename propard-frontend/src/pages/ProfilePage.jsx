@@ -490,4 +490,4 @@ const styles = {
   modal: { background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '28px', width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '10px' },
   modalTitle: { fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)' },
   modalDesc: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }
-};"
+};
