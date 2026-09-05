@@ -10,7 +10,7 @@
 
 ## 📖 Présentation
 
-**Propard** est un projet indépendant visant à regrouper plusieurs fonctionnalités de communication dans une seule plateforme.
+**Propard** est un projet indépendant et français visant à regrouper plusieurs fonctionnalités de communication dans une seule plateforme.
 
 L'application est organisée autour de deux parties principales :
 
