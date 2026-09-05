@@ -60,6 +60,26 @@ export default function App() {
     );
   }
 
+  // ─── Page de profil utilisateur (/profile/:userId) ─────────────────────
+  // Même schéma que /chat/:friendId : la "vraie page" est gérée en interne
+  // par AppPage (sidebar + zone principale), pas par un composant séparé
+  // sans sidebar, pour rester cohérent avec le reste de l'appli.
+  if (path.startsWith('/profile/')) {
+    if (!user) {
+      window.location.href = '/';
+      return null;
+    }
+
+    const profileUserId = path.split('/profile/')[1];
+
+    return (
+      <>
+        <AppPage initialProfileUserId={profileUserId} />
+        <GlobalAnnouncement />
+      </>
+    );
+  }
+
   /*
    * L'administration ne reçoit pas les annonces utilisateur.
    */
@@ -162,4 +182,4 @@ const styles = {
     fontWeight: '600',
     textDecoration: 'none'
   }
-};
+};"
