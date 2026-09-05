@@ -1,6 +1,6 @@
 # Propard
 
-> **Propard** est une plateforme web de communication et d'interaction entre utilisateurs, développée avec **React**, **Node.js**, **Express**, **MongoDB** et **Socket.IO**.
+> **Propard** est une plateforme web de communication et d'interaction française entre utilisateurs, développée avec **React**, **Node.js**, **Express**, **MongoDB** et **Socket.IO**.
 
 [![Website](https://img.shields.io/badge/Website-propard.site-blue?style=flat-square)](https://propard.site)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-black?style=flat-square&logo=github)](https://github.com/Nolabjfjdj/Propard)
@@ -718,7 +718,7 @@ Projet indépendant — **2026**
 Tous droits réservés.
 
 Voir [`LICENSE`](./LICENSE) pour les conditions complètes d'utilisation.
-
+Dernière mise à jour du README : 26 Août 2026
 ---
 
 > **Propard — Communication, simplicité et sécurité.**
