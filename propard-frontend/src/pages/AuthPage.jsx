@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
-export default function AuthPage({ initialMode = 'login' }) {
-  const [mode, setMode] = useState(initialMode);
+export default function AuthPage({ mode }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -12,31 +11,18 @@ export default function AuthPage({ initialMode = 'login' }) {
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
   const { login } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  useEffect(() => {
-    setMode(initialMode);
-    setError('');
-    setShowPassword(false);
-    setAcceptTerms(false);
-    setAcceptPrivacy(false);
-  }, [initialMode]);
-
   const switchMode = (newMode) => {
-    setMode(newMode);
     setError('');
     setShowPassword(false);
     setAcceptTerms(false);
     setAcceptPrivacy(false);
 
-    window.history.pushState(
-      {},
-      '',
-      newMode === 'login' ? '/login' : '/register'
-    );
-
-    window.dispatchEvent(new PopStateEvent('popstate'));
+    window.location.href =
+      newMode === 'login' ? '/login' : '/register';
   };
 
   const handleSubmit = async () => {
@@ -66,8 +52,7 @@ export default function AuthPage({ initialMode = 'login' }) {
 
       login(res.data.user, res.data.token);
 
-      window.history.replaceState({}, '', '/');
-      window.dispatchEvent(new PopStateEvent('popstate'));
+      window.location.href = '/';
     } catch (err) {
       setError(
         err.response?.data?.error || 'Erreur serveur'
@@ -111,7 +96,9 @@ export default function AuthPage({ initialMode = 'login' }) {
             placeholder="Pseudo"
             value={username}
             onChange={e => setUsername(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+            onKeyDown={e =>
+              e.key === 'Enter' && handleSubmit()
+            }
           />
 
           <div style={{ position: 'relative' }}>
@@ -125,12 +112,16 @@ export default function AuthPage({ initialMode = 'login' }) {
               placeholder="Mot de passe"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              onKeyDown={e =>
+                e.key === 'Enter' && handleSubmit()
+              }
             />
 
             <button
               style={styles.eyeBtn}
-              onClick={() => setShowPassword(!showPassword)}
+              onClick={() =>
+                setShowPassword(!showPassword)
+              }
               type="button"
             >
               {showPassword ? '🙈' : '👁️'}
@@ -143,7 +134,9 @@ export default function AuthPage({ initialMode = 'login' }) {
                 <input
                   type="checkbox"
                   checked={acceptTerms}
-                  onChange={e => setAcceptTerms(e.target.checked)}
+                  onChange={e =>
+                    setAcceptTerms(e.target.checked)
+                  }
                   style={styles.checkbox}
                 />
 
@@ -164,7 +157,9 @@ export default function AuthPage({ initialMode = 'login' }) {
                 <input
                   type="checkbox"
                   checked={acceptPrivacy}
-                  onChange={e => setAcceptPrivacy(e.target.checked)}
+                  onChange={e =>
+                    setAcceptPrivacy(e.target.checked)
+                  }
                   style={styles.checkbox}
                 />
 
@@ -220,7 +215,9 @@ export default function AuthPage({ initialMode = 'login' }) {
             style={styles.switchLink}
             onClick={() =>
               switchMode(
-                mode === 'login' ? 'register' : 'login'
+                mode === 'login'
+                  ? 'register'
+                  : 'login'
               )
             }
           >
