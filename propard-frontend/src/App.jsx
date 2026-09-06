@@ -1,185 +1,219 @@
-import { useAuth } from './context/AuthContext';
-import AuthPage from './pages/AuthPage';
-import AppPage from './pages/AppPage';
-import HelpPage from './pages/HelpPage';
-import ContactPage from './pages/ContactPage';
-import AdminPage from './pages/AdminPage';
-import PrivacyPage from './pages/PrivacyPage';
-import TermsPage from './pages/TermsPage';
-import GlobalAnnouncement from './components/GlobalAnnouncement';
+import { useState, useEffect } from ‘react’;
+import { useAuth } from ‘./context/AuthContext’;
+import AuthPage from ‘./pages/AuthPage’;
+import AppPage from ‘./pages/AppPage’;
+import HelpPage from ‘./pages/HelpPage’;
+import ContactPage from ‘./pages/ContactPage’;
+import AdminPage from ‘./pages/AdminPage’;
+import PrivacyPage from ‘./pages/PrivacyPage’;
+import TermsPage from ‘./pages/TermsPage’;
+import GlobalAnnouncement from ‘./components/GlobalAnnouncement’;
 
 export default function App() {
-  const { user, loading } = useAuth();
-  const path = window.location.pathname;
+const { user, loading } = useAuth();
+const [path, setPath] = useState(window.location.pathname);
 
-  if (loading) return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: '100vh'
-    }}>
-      <p style={{
-        color: 'var(--text-secondary)',
-        fontFamily: 'var(--font-mono)'
-      }}>
-        Chargement...
-      </p>
-    </div>
-  );
+useEffect(() => {
+const handlePopState = () => {
+setPath(window.location.pathname);
+};
 
-  if (path === '/help') return <HelpPage />;
+window.addEventListener('popstate', handlePopState);
+return () => {
+  window.removeEventListener('popstate', handlePopState);
+};
 
-  if (path === '/help/contact') {
-    if (!user) {
-      window.location.href = '/';
-      return null;
-    }
+}, []);
 
-    return (
-      <>
-        <ContactPage />
-        <GlobalAnnouncement />
-      </>
-    );
-  }
+const navigate = (to) => {
+window.history.pushState({}, ‘’, to);
+setPath(to);
+};
 
-  if (path.startsWith('/chat/')) {
-    if (!user) {
-      window.location.href = '/';
-      return null;
-    }
+if (loading) return (
+<div style={{
+display: ‘flex’,
+alignItems: ‘center’,
+justifyContent: ‘center’,
+height: ‘100vh’
+}}>
+<p style={{
+color: ‘var(–text-secondary)’,
+fontFamily: ‘var(–font-mono)’
+}}>
+Chargement…
+);
 
-    const friendId = path.split('/chat/')[1];
+if (path === ‘/help’) return ;
 
-    return (
-      <>
-        <AppPage initialFriendId={friendId} />
-        <GlobalAnnouncement />
-      </>
-    );
-  }
+if (path === ‘/help/contact’) {
+if (!user) {
+navigate(’/login’);
+return null;
+}
 
-  // ─── Page de profil utilisateur (/profile/:userId) ─────────────────────
-  // Même schéma que /chat/:friendId : la "vraie page" est gérée en interne
-  // par AppPage (sidebar + zone principale), pas par un composant séparé
-  // sans sidebar, pour rester cohérent avec le reste de l'appli.
-  if (path.startsWith('/profile/')) {
-    if (!user) {
-      window.location.href = '/';
-      return null;
-    }
+return (
+  <>
+    <ContactPage />
+    <GlobalAnnouncement />
+  </>
+);
 
-    const profileUserId = path.split('/profile/')[1];
+}
 
-    return (
-      <>
-        <AppPage initialProfileUserId={profileUserId} />
-        <GlobalAnnouncement />
-      </>
-    );
-  }
+if (path.startsWith(’/chat/’)) {
+if (!user) {
+navigate(’/login’);
+return null;
+}
 
-  /*
-   * L'administration ne reçoit pas les annonces utilisateur.
-   */
-  if (path === '/admin-propard-secret') {
-    return <AdminPage />;
-  }
+const friendId = path.split('/chat/')[1];
+return (
+  <>
+    <AppPage initialFriendId={friendId} />
+    <GlobalAnnouncement />
+  </>
+);
 
-  if (path === '/privacy') {
-    return <PrivacyPage />;
-  }
+}
 
-  if (path === '/terms') {
-    return <TermsPage />;
-  }
+if (path.startsWith(’/profile/’)) {
+if (!user) {
+navigate(’/login’);
+return null;
+}
 
-  if (path === '/') {
-    if (user) {
-      return (
-        <>
-          <AppPage />
-          <GlobalAnnouncement />
-        </>
-      );
-    }
+const profileUserId = path.split('/profile/')[1];
+return (
+  <>
+    <AppPage initialProfileUserId={profileUserId} />
+    <GlobalAnnouncement />
+  </>
+);
 
-    return <AuthPage />;
-  }
+}
 
-  return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <p style={styles.code}>404</p>
+if (path === ‘/admin-propard-secret’) {
+return ;
+}
 
-        <p style={styles.title}>
-          Page introuvable
-        </p>
+if (path === ‘/privacy’) {
+return ;
+}
 
-        <p style={styles.sub}>
-          Cette page n'existe pas sur Propard.
-        </p>
+if (path === ‘/terms’) {
+return ;
+}
 
-        <a
-          href="/"
-          style={styles.btn}
-        >
-          ← Retour à l'accueil
-        </a>
-      </div>
-    </div>
-  );
+// ─── Connexion ─────────────────────────────────────────────
+if (path === ‘/login’) {
+if (user) {
+navigate(’/’);
+return null;
+}
+
+return <AuthPage initialMode="login" />;
+
+}
+
+// ─── Inscription ──────────────────────────────────────────
+if (path === ‘/register’) {
+if (user) {
+navigate(’/’);
+return null;
+}
+
+return <AuthPage initialMode="register" />;
+
+}
+
+// ─── Page principale ──────────────────────────────────────
+if (path === ‘/’) {
+if (user) {
+return (
+<>
+</>
+);
+}
+
+// Pas connecté → inscription
+navigate('/register');
+return null;
+
+}
+
+// ─── 404 ──────────────────────────────────────────────────
+return (
+404
+
+    <p style={styles.title}>
+      Page introuvable
+    </p>
+    <p style={styles.sub}>
+      Cette page n'existe pas sur Propard.
+    </p>
+    <button
+      onClick={() => navigate('/')}
+      style={styles.btn}
+    >
+      ← Retour à l'accueil
+    </button>
+  </div>
+</div>
+
+);
 }
 
 const styles = {
-  page: {
-    minHeight: '100vh',
-    background: 'var(--bg-primary)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
+page: {
+minHeight: ‘100vh’,
+background: ‘var(–bg-primary)’,
+display: ‘flex’,
+alignItems: ‘center’,
+justifyContent: ‘center’
+},
 
-  card: {
-    background: 'var(--bg-secondary)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius)',
-    padding: '48px 40px',
-    textAlign: 'center',
-    maxWidth: '400px',
-    width: '100%'
-  },
+card: {
+background: ‘var(–bg-secondary)’,
+border: ‘1px solid var(–border)’,
+borderRadius: ‘var(–radius)’,
+padding: ‘48px 40px’,
+textAlign: ‘center’,
+maxWidth: ‘400px’,
+width: ‘100%’
+},
 
-  code: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: '64px',
-    fontWeight: '700',
-    color: 'var(--accent)',
-    marginBottom: '8px'
-  },
+code: {
+fontFamily: ‘var(–font-mono)’,
+fontSize: ‘64px’,
+fontWeight: ‘700’,
+color: ‘var(–accent)’,
+marginBottom: ‘8px’
+},
 
-  title: {
-    fontSize: '20px',
-    fontWeight: '700',
-    color: 'var(--text-primary)',
-    marginBottom: '8px'
-  },
+title: {
+fontSize: ‘20px’,
+fontWeight: ‘700’,
+color: ‘var(–text-primary)’,
+marginBottom: ‘8px’
+},
 
-  sub: {
-    fontSize: '14px',
-    color: 'var(--text-secondary)',
-    marginBottom: '24px'
-  },
+sub: {
+fontSize: ‘14px’,
+color: ‘var(–text-secondary)’,
+marginBottom: ‘24px’
+},
 
-  btn: {
-    display: 'inline-block',
-    background: 'var(--accent)',
-    color: '#fff',
-    borderRadius: '8px',
-    padding: '10px 20px',
-    fontSize: '14px',
-    fontWeight: '600',
-    textDecoration: 'none'
-  }
+btn: {
+display: ‘inline-block’,
+background: ‘var(–accent)’,
+color: ‘#fff’,
+borderRadius: ‘8px’,
+padding: ‘10px 20px’,
+fontSize: ‘14px’,
+fontWeight: ‘600’,
+textDecoration: ‘none’,
+border: ‘none’,
+cursor: ‘pointer’
+}
 };
