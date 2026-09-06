@@ -251,13 +251,20 @@ export default function FriendList({
       );
     }
 
+    const friendship = friends.find(
+      f => f.userId?._id?.toString() === friendId
+    );
+
     window.history.pushState(
       {},
       '',
       `/chat/${friendId}`
     );
 
-    onSelectFriend(friend);
+    onSelectFriend({
+      ...friend,
+      nickname: friendship?.nickname || null
+    });
   };
 
   const handleOpenProfile = (e, friend) => {
