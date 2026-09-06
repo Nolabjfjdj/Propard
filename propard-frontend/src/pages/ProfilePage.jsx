@@ -292,7 +292,8 @@ export default function ProfilePage({
 
       onRelationshipChanged?.(
         'nicknameChanged',
-        userId
+        userId,
+        nickname
       );
     } catch (err) {
       setActionError(
@@ -678,7 +679,10 @@ export default function ProfilePage({
                   isOnline:
                     profile.isOnline,
                   publicKey:
-                    profile.publicKey
+                    profile.publicKey,
+                  nickname:
+                    profile.friendNickname ||
+                    null
                 })
               }
             >
