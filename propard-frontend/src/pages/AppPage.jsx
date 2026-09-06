@@ -14,47 +14,129 @@ import {
   getStoredPrivateKeyJwk
 } from '../utils/crypto';
 
-export default function AppPage({ initialFriendId, initialProfileUserId }) {
+export default function AppPage({
+  initialFriendId,
+  initialProfileUserId
+}) {
   const { user, token, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [selectedFriend, setSelectedFriend] = useState(null);
-  const [selectedProfile, setSelectedProfile] = useState(initialProfileUserId || null);
-  const [showAddFriend, setShowAddFriend] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(false);
-  const [hideIp, setHideIp] = useState(() => localStorage.getItem('propard_hideIp') === 'true');
-  const [hideFriendIps, setHideFriendIps] = useState(() => localStorage.getItem('propard_hideFriendIps') === 'true');
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [friendNotFound, setFriendNotFound] = useState(false);
-  const [incomingCall, setIncomingCall] = useState(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [confirmAction, setConfirmAction] = useState(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
-  const [cancelLoading, setCancelLoading] = useState(false);
-  const [cancelError, setCancelError] = useState('');
+
+  const [selectedFriend, setSelectedFriend] =
+    useState(null);
+
+  const [selectedProfile, setSelectedProfile] =
+    useState(
+      initialProfileUserId || null
+    );
+
+  const [friendListRefreshKey, setFriendListRefreshKey] =
+    useState(0);
+
+  const [showAddFriend, setShowAddFriend] =
+    useState(false);
+
+  const [showSidebar, setShowSidebar] =
+    useState(false);
+
+  const [hideIp, setHideIp] =
+    useState(
+      () =>
+        localStorage.getItem(
+          'propard_hideIp'
+        ) === 'true'
+    );
+
+  const [hideFriendIps, setHideFriendIps] =
+    useState(
+      () =>
+        localStorage.getItem(
+          'propard_hideFriendIps'
+        ) === 'true'
+    );
+
+  const [isMobile, setIsMobile] =
+    useState(
+      window.innerWidth < 768
+    );
+
+  const [friendNotFound, setFriendNotFound] =
+    useState(false);
+
+  const [incomingCall, setIncomingCall] =
+    useState(null);
+
+  const [showDeleteModal, setShowDeleteModal] =
+    useState(false);
+
+  const [confirmAction, setConfirmAction] =
+    useState(null);
+
+  const [deleteLoading, setDeleteLoading] =
+    useState(false);
+
+  const [deleteError, setDeleteError] =
+    useState('');
+
+  const [cancelLoading, setCancelLoading] =
+    useState(false);
+
+  const [cancelError, setCancelError] =
+    useState('');
 
   const grabRef = useRef(null);
-  const [grabVisual, setGrabVisual] = useState(null);
+  const [grabVisual, setGrabVisual] =
+    useState(null);
 
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
+    const check = () =>
+      setIsMobile(
+        window.innerWidth < 768
+      );
+
+    window.addEventListener(
+      'resize',
+      check
+    );
+
+    return () =>
+      window.removeEventListener(
+        'resize',
+        check
+      );
   }, []);
 
   useEffect(() => {
-    const authenticate = () => socket.emit('authenticate', token);
-    socket.on('connect', authenticate);
+    const authenticate = () =>
+      socket.emit(
+        'authenticate',
+        token
+      );
+
+    socket.on(
+      'connect',
+      authenticate
+    );
+
     socket.connect();
-    if (socket.connected) authenticate();
+
+    if (socket.connected) {
+      authenticate();
+    }
+
     return () => {
-      socket.off('connect', authenticate);
+      socket.off(
+        'connect',
+        authenticate
+      );
       socket.disconnect();
     };
   }, [token]);
 
   useEffect(() => {
-    setSelectedProfile(initialProfileUserId || null);
+    setSelectedProfile(
+      initialProfileUserId || null
+    );
+
     if (initialProfileUserId) {
       setSelectedFriend(null);
       setFriendNotFound(false);
@@ -64,357 +146,800 @@ export default function AppPage({ initialFriendId, initialProfileUserId }) {
   useEffect(() => {
     if (!initialFriendId || !token) return;
 
-    const loadInitialFriend = async () => {
-      try {
-        const res = await axios.get('/api/auth/me', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const friends = res.data.friends || [];
-        const match = friends.find(f => f.userId?._id === initialFriendId);
+    const loadInitialFriend =
+      async () => {
+        try {
+          const res =
+            await axios.get(
+              '/api/auth/me',
+              {
+                headers: {
+                  Authorization:
+                    `Bearer ${token}`
+                }
+              }
+            );
 
-        if (match) {
-          setSelectedFriend(match.userId);
-          setSelectedProfile(null);
-        } else {
-          setFriendNotFound(true);
+          const friends =
+            res.data.friends || [];
+
+          const match =
+            friends.find(
+              f =>
+                f.userId?._id ===
+                initialFriendId
+            );
+
+          if (match) {
+            setSelectedFriend(
+              match.userId
+            );
+            setSelectedProfile(null);
+          } else {
+            setFriendNotFound(true);
+          }
+        } catch (err) {
+          console.error(err);
         }
-      } catch (err) {
-        console.error(err);
-      }
-    };
+      };
 
     loadInitialFriend();
-  }, [initialFriendId, token]);
+  }, [
+    initialFriendId,
+    token
+  ]);
 
   useEffect(() => {
-    socket.on('incomingCall', async ({ callerId, offer }) => {
-      try {
-        const res = await axios.get(
-          `/api/auth/user/${callerId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setIncomingCall({ friend: { ...res.data, _id: callerId }, offer });
-      } catch (err) {
-        console.error(err);
-      }
-    });
+    socket.on(
+      'incomingCall',
+      async ({
+        callerId,
+        offer
+      }) => {
+        try {
+          const res =
+            await axios.get(
+              `/api/auth/user/${callerId}`,
+              {
+                headers: {
+                  Authorization:
+                    `Bearer ${token}`
+                }
+              }
+            );
 
-    return () => socket.off('incomingCall');
+          setIncomingCall({
+            friend: {
+              ...res.data,
+              _id: callerId
+            },
+            offer
+          });
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    );
+
+    return () =>
+      socket.off(
+        'incomingCall'
+      );
   }, [token]);
 
-  const handleSelectFriend = (friend) => {
+  const handleSelectFriend = (
+    friend
+  ) => {
     setSelectedFriend(friend);
     setSelectedProfile(null);
     setFriendNotFound(false);
-    window.history.pushState({}, '', `/chat/${friend._id}`);
-    if (isMobile) setShowSidebar(false);
+
+    window.history.pushState(
+      {},
+      '',
+      `/chat/${friend._id}`
+    );
+
+    if (isMobile) {
+      setShowSidebar(false);
+    }
   };
 
-  const handleOpenProfile = (userId) => {
-    setSelectedProfile(userId);
+  const handleOpenProfile = (
+    userId
+  ) => {
+    setSelectedProfile(
+      userId
+    );
+
     setSelectedFriend(null);
     setFriendNotFound(false);
-    window.history.pushState({}, '', `/profile/${userId}`);
-    if (isMobile) setShowSidebar(false);
+
+    window.history.pushState(
+      {},
+      '',
+      `/profile/${userId}`
+    );
+
+    if (isMobile) {
+      setShowSidebar(false);
+    }
   };
 
   const handleBack = () => {
     setSelectedFriend(null);
     setSelectedProfile(null);
     setFriendNotFound(false);
-    window.history.pushState({}, '', '/');
+
+    window.history.pushState(
+      {},
+      '',
+      '/'
+    );
   };
 
-  const handleProfileRelationshipChanged = async (action, userId) => {
-    if (action === 'removed' || action === 'blocked') {
-      if (selectedFriend?._id === userId) {
-        setSelectedFriend(null);
-      }
-    }
+  const handleProfileRelationshipChanged =
+    async (
+      action,
+      userId
+    ) => {
+      setFriendListRefreshKey(
+        key => key + 1
+      );
 
-    if (action === 'added' || action === 'accepted' || action === 'removed' || action === 'blocked') {
-      try {
-        const res = await axios.get('/api/auth/me', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
-        const friends = res.data.friends || [];
-        const current = friends.find(f => f.userId?._id === selectedFriend?._id);
-
-        if (current) {
-          setSelectedFriend(current.userId);
-        } else if (selectedFriend?._id === userId) {
+      if (
+        action === 'removed' ||
+        action === 'blocked'
+      ) {
+        if (
+          selectedFriend?._id ===
+          userId
+        ) {
           setSelectedFriend(null);
         }
-      } catch (err) {
-        console.error(err);
-      }
-    }
-  };
-
-  const closeDeleteModal = () => {
-    setShowDeleteModal(false);
-    setConfirmAction(null);
-    setDeleteError('');
-  };
-
-  const handleAnonymize = async () => {
-    setDeleteLoading(true);
-    setDeleteError('');
-
-    try {
-      await axios.delete('/api/auth/anonymize', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      logout();
-    } catch (e) {
-      setDeleteError(e.response?.data?.error || 'Erreur serveur');
-      setDeleteLoading(false);
-    }
-  };
-
-  const handleDeleteTotal = async () => {
-    setDeleteLoading(true);
-    setDeleteError('');
-
-    try {
-      await axios.delete('/api/auth/delete', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      logout();
-    } catch (e) {
-      setDeleteError(e.response?.data?.error || 'Erreur serveur');
-      setDeleteLoading(false);
-    }
-  };
-
-  const handleCancelDeletion = async () => {
-    setCancelLoading(true);
-    setCancelError('');
-
-    try {
-      await axios.post('/api/auth/cancel-deletion', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      window.location.reload();
-    } catch (e) {
-      setCancelError(e.response?.data?.error || 'Erreur serveur');
-      setCancelLoading(false);
-    }
-  };
-
-  const lockPageSelection = (locked) => {
-    document.body.style.userSelect = locked ? 'none' : '';
-    document.body.style.webkitUserSelect = locked ? 'none' : '';
-  };
-
-  const handleGrabMoveImpl = (e) => {
-    const g = grabRef.current;
-    if (!g) return;
-
-    if (g.pointerId != null && e.pointerId !== g.pointerId) return;
-
-    e.preventDefault();
-
-    g.raw = { x: e.clientX, y: e.clientY };
-
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const zone = el && el.closest ? el.closest('[data-friend-drop-zone]') : null;
-    const targetId = zone ? zone.getAttribute('data-friend-id') : null;
-
-    g.dragOverFriendId =
-      targetId && targetId !== g.sourceFriendId ? targetId : null;
-  };
-
-  const forwardGrabbedMessage = async (g, targetId) => {
-    try {
-      const res = await axios.get(`/api/auth/user/${targetId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      const rawPublicKey = res.data?.publicKey;
-      if (!rawPublicKey) {
-        throw new Error('Clé publique du destinataire indisponible.');
       }
 
-      const targetPublicKey =
-        typeof rawPublicKey === 'string'
-          ? JSON.parse(rawPublicKey)
-          : rawPublicKey;
+      if (
+        action === 'added' ||
+        action === 'accepted' ||
+        action === 'removed' ||
+        action === 'blocked' ||
+        action === 'unblocked' ||
+        action === 'nicknameChanged'
+      ) {
+        try {
+          const res =
+            await axios.get(
+              '/api/auth/me',
+              {
+                headers: {
+                  Authorization:
+                    `Bearer ${token}`
+                }
+              }
+            );
 
-      const myPrivateKeyJwk = getStoredPrivateKeyJwk(user?.id);
-      if (!myPrivateKeyJwk) {
-        throw new Error('Clé privée locale introuvable.');
+          const friends =
+            res.data.friends || [];
+
+          const current =
+            friends.find(
+              f =>
+                f.userId?._id ===
+                selectedFriend?._id
+            );
+
+          if (current) {
+            setSelectedFriend(
+              current.userId
+            );
+          } else if (
+            selectedFriend?._id ===
+            userId
+          ) {
+            setSelectedFriend(null);
+          }
+        } catch (err) {
+          console.error(err);
+        }
       }
-
-      const sharedKey = await deriveSharedKey(myPrivateKeyJwk, targetPublicKey);
-      const encryptedContent = await encryptMessage(sharedKey, g.msg.content);
-
-      socket.emit('sendMessage', {
-        receiverId: targetId,
-        content: encryptedContent
-      });
-    } catch (err) {
-      console.error('Erreur transfert de message (Grab & Send):', err);
-    }
-  };
-
-  const handleGrabEndImpl = (e) => {
-    const g = grabRef.current;
-    if (!g) return;
-
-    if (g.pointerId != null && e && e.pointerId !== g.pointerId) return;
-
-    window.removeEventListener('pointermove', g.moveHandler);
-    window.removeEventListener('pointerup', g.endHandler);
-    window.removeEventListener('pointercancel', g.endHandler);
-    cancelAnimationFrame(g.rafId);
-    lockPageSelection(false);
-
-    const targetId = g.dragOverFriendId;
-
-    if (targetId) {
-      setGrabVisual(v => v && { ...v, landing: true, dragOverFriendId: targetId });
-
-      forwardGrabbedMessage(g, targetId);
-
-      setTimeout(() => {
-        setGrabVisual(null);
-        grabRef.current = null;
-        if (g.forcedSidebarOpen) setShowSidebar(false);
-      }, 190);
-    } else {
-      setGrabVisual(v => v && {
-        ...v,
-        x: g.originRect.left,
-        y: g.originRect.top,
-        rotation: 0,
-        returning: true,
-        dragOverFriendId: null
-      });
-
-      setTimeout(() => {
-        setGrabVisual(null);
-        grabRef.current = null;
-        if (g.forcedSidebarOpen) setShowSidebar(false);
-      }, 260);
-    }
-  };
-
-  const handleGrabStart = ({ msg, clientX, clientY, rect, pointerId }, sourceFriendId) => {
-    if (grabRef.current) return;
-
-    const wasSidebarHidden = isMobile && !showSidebar;
-    if (wasSidebarHidden) setShowSidebar(true);
-
-    lockPageSelection(true);
-
-    const moveHandler = (e) => handleGrabMoveImpl(e);
-    const endHandler = (e) => handleGrabEndImpl(e);
-
-    grabRef.current = {
-      msg,
-      sourceFriendId: sourceFriendId ? sourceFriendId.toString() : null,
-      originRect: rect,
-      pointerId: pointerId != null ? pointerId : null,
-      raw: { x: clientX, y: clientY },
-      prevRaw: { x: clientX, y: clientY },
-      ghost: { x: rect.left, y: rect.top },
-      rotation: 0,
-      dragOverFriendId: null,
-      forcedSidebarOpen: wasSidebarHidden,
-      moveHandler,
-      endHandler,
-      rafId: null
     };
 
-    setGrabVisual({
-      msgId: msg._id,
-      x: rect.left,
-      y: rect.top,
-      width: rect.width,
-      rotation: 0,
-      content: msg.content,
-      dragOverFriendId: null,
-      landing: false,
-      returning: false
-    });
+  const closeDeleteModal =
+    () => {
+      setShowDeleteModal(false);
+      setConfirmAction(null);
+      setDeleteError('');
+    };
 
-    window.addEventListener('pointermove', moveHandler, { passive: false });
-    window.addEventListener('pointerup', endHandler);
-    window.addEventListener('pointercancel', endHandler);
+  const handleAnonymize =
+    async () => {
+      setDeleteLoading(true);
+      setDeleteError('');
 
-    const loop = () => {
+      try {
+        await axios.delete(
+          '/api/auth/anonymize',
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`
+            }
+          }
+        );
+
+        logout();
+      } catch (e) {
+        setDeleteError(
+          e.response?.data?.error ||
+          'Erreur serveur'
+        );
+
+        setDeleteLoading(false);
+      }
+    };
+
+  const handleDeleteTotal =
+    async () => {
+      setDeleteLoading(true);
+      setDeleteError('');
+
+      try {
+        await axios.delete(
+          '/api/auth/delete',
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`
+            }
+          }
+        );
+
+        logout();
+      } catch (e) {
+        setDeleteError(
+          e.response?.data?.error ||
+          'Erreur serveur'
+        );
+
+        setDeleteLoading(false);
+      }
+    };
+
+  const handleCancelDeletion =
+    async () => {
+      setCancelLoading(true);
+      setCancelError('');
+
+      try {
+        await axios.post(
+          '/api/auth/cancel-deletion',
+          {},
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`
+            }
+          }
+        );
+
+        window.location.reload();
+      } catch (e) {
+        setCancelError(
+          e.response?.data?.error ||
+          'Erreur serveur'
+        );
+
+        setCancelLoading(false);
+      }
+    };
+
+  const lockPageSelection =
+    locked => {
+      document.body.style.userSelect =
+        locked ? 'none' : '';
+
+      document.body.style.webkitUserSelect =
+        locked ? 'none' : '';
+    };
+
+  const handleGrabMoveImpl =
+    e => {
       const g = grabRef.current;
+
       if (!g) return;
 
-      const FOLLOW = 0.28;
-      const targetX = g.raw.x - g.originRect.width / 2;
-      const targetY = g.raw.y - 24;
+      if (
+        g.pointerId != null &&
+        e.pointerId !==
+          g.pointerId
+      ) {
+        return;
+      }
 
-      g.ghost.x += (targetX - g.ghost.x) * FOLLOW;
-      g.ghost.y += (targetY - g.ghost.y) * FOLLOW;
+      e.preventDefault();
 
-      const vx = g.raw.x - g.prevRaw.x;
-      g.prevRaw = { x: g.raw.x, y: g.raw.y };
+      g.raw = {
+        x: e.clientX,
+        y: e.clientY
+      };
 
-      const targetRotation = Math.max(-8, Math.min(8, vx * 1.4));
-      g.rotation += (targetRotation - g.rotation) * 0.25;
+      const el =
+        document.elementFromPoint(
+          e.clientX,
+          e.clientY
+        );
 
-      setGrabVisual(v => v && {
-        ...v,
-        x: g.ghost.x,
-        y: g.ghost.y,
-        rotation: g.rotation,
-        dragOverFriendId: g.dragOverFriendId
-      });
+      const zone =
+        el &&
+        el.closest
+          ? el.closest(
+              '[data-friend-drop-zone]'
+            )
+          : null;
 
-      g.rafId = requestAnimationFrame(loop);
+      const targetId =
+        zone
+          ? zone.getAttribute(
+              'data-friend-id'
+            )
+          : null;
+
+      g.dragOverFriendId =
+        targetId &&
+        targetId !==
+          g.sourceFriendId
+          ? targetId
+          : null;
     };
 
-    grabRef.current.rafId = requestAnimationFrame(loop);
-  };
+  const forwardGrabbedMessage =
+    async (
+      g,
+      targetId
+    ) => {
+      try {
+        const res =
+          await axios.get(
+            `/api/auth/user/${targetId}`,
+            {
+              headers: {
+                Authorization:
+                  `Bearer ${token}`
+              }
+            }
+          );
+
+        const rawPublicKey =
+          res.data?.publicKey;
+
+        if (!rawPublicKey) {
+          throw new Error(
+            'Clé publique du destinataire indisponible.'
+          );
+        }
+
+        const targetPublicKey =
+          typeof rawPublicKey ===
+          'string'
+            ? JSON.parse(
+                rawPublicKey
+              )
+            : rawPublicKey;
+
+        const myPrivateKeyJwk =
+          getStoredPrivateKeyJwk(
+            user?.id
+          );
+
+        if (!myPrivateKeyJwk) {
+          throw new Error(
+            'Clé privée locale introuvable.'
+          );
+        }
+
+        const sharedKey =
+          await deriveSharedKey(
+            myPrivateKeyJwk,
+            targetPublicKey
+          );
+
+        const encryptedContent =
+          await encryptMessage(
+            sharedKey,
+            g.msg.content
+          );
+
+        socket.emit(
+          'sendMessage',
+          {
+            receiverId:
+              targetId,
+            content:
+              encryptedContent
+          }
+        );
+      } catch (err) {
+        console.error(
+          'Erreur transfert de message (Grab & Send):',
+          err
+        );
+      }
+    };
+
+  const handleGrabEndImpl =
+    e => {
+      const g = grabRef.current;
+
+      if (!g) return;
+
+      if (
+        g.pointerId != null &&
+        e &&
+        e.pointerId !==
+          g.pointerId
+      ) {
+        return;
+      }
+
+      window.removeEventListener(
+        'pointermove',
+        g.moveHandler
+      );
+
+      window.removeEventListener(
+        'pointerup',
+        g.endHandler
+      );
+
+      window.removeEventListener(
+        'pointercancel',
+        g.endHandler
+      );
+
+      cancelAnimationFrame(
+        g.rafId
+      );
+
+      lockPageSelection(false);
+
+      const targetId =
+        g.dragOverFriendId;
+
+      if (targetId) {
+        setGrabVisual(
+          v =>
+            v && {
+              ...v,
+              landing: true,
+              dragOverFriendId:
+                targetId
+            }
+        );
+
+        forwardGrabbedMessage(
+          g,
+          targetId
+        );
+
+        setTimeout(() => {
+          setGrabVisual(null);
+          grabRef.current = null;
+
+          if (
+            g.forcedSidebarOpen
+          ) {
+            setShowSidebar(false);
+          }
+        }, 190);
+      } else {
+        setGrabVisual(
+          v =>
+            v && {
+              ...v,
+              x: g.originRect.left,
+              y: g.originRect.top,
+              rotation: 0,
+              returning: true,
+              dragOverFriendId:
+                null
+            }
+        );
+
+        setTimeout(() => {
+          setGrabVisual(null);
+          grabRef.current = null;
+
+          if (
+            g.forcedSidebarOpen
+          ) {
+            setShowSidebar(false);
+          }
+        }, 260);
+      }
+    };
+
+  const handleGrabStart =
+    ({
+      msg,
+      clientX,
+      clientY,
+      rect,
+      pointerId
+    }, sourceFriendId) => {
+      if (grabRef.current) return;
+
+      const wasSidebarHidden =
+        isMobile &&
+        !showSidebar;
+
+      if (wasSidebarHidden) {
+        setShowSidebar(true);
+      }
+
+      lockPageSelection(true);
+
+      const moveHandler =
+        e =>
+          handleGrabMoveImpl(e);
+
+      const endHandler =
+        e =>
+          handleGrabEndImpl(e);
+
+      grabRef.current = {
+        msg,
+        sourceFriendId:
+          sourceFriendId
+            ? sourceFriendId.toString()
+            : null,
+        originRect: rect,
+        pointerId:
+          pointerId != null
+            ? pointerId
+            : null,
+        raw: {
+          x: clientX,
+          y: clientY
+        },
+        prevRaw: {
+          x: clientX,
+          y: clientY
+        },
+        ghost: {
+          x: rect.left,
+          y: rect.top
+        },
+        rotation: 0,
+        dragOverFriendId:
+          null,
+        forcedSidebarOpen:
+          wasSidebarHidden,
+        moveHandler,
+        endHandler,
+        rafId: null
+      };
+
+      setGrabVisual({
+        msgId: msg._id,
+        x: rect.left,
+        y: rect.top,
+        width: rect.width,
+        rotation: 0,
+        content: msg.content,
+        dragOverFriendId: null,
+        landing: false,
+        returning: false
+      });
+
+      window.addEventListener(
+        'pointermove',
+        moveHandler,
+        {
+          passive: false
+        }
+      );
+
+      window.addEventListener(
+        'pointerup',
+        endHandler
+      );
+
+      window.addEventListener(
+        'pointercancel',
+        endHandler
+      );
+
+      const loop = () => {
+        const g =
+          grabRef.current;
+
+        if (!g) return;
+
+        const FOLLOW = 0.28;
+
+        const targetX =
+          g.raw.x -
+          g.originRect.width /
+            2;
+
+        const targetY =
+          g.raw.y - 24;
+
+        g.ghost.x +=
+          (targetX -
+            g.ghost.x) *
+          FOLLOW;
+
+        g.ghost.y +=
+          (targetY -
+            g.ghost.y) *
+          FOLLOW;
+
+        const vx =
+          g.raw.x -
+          g.prevRaw.x;
+
+        g.prevRaw = {
+          x: g.raw.x,
+          y: g.raw.y
+        };
+
+        const targetRotation =
+          Math.max(
+            -8,
+            Math.min(
+              8,
+              vx * 1.4
+            )
+          );
+
+        g.rotation +=
+          (targetRotation -
+            g.rotation) *
+          0.25;
+
+        setGrabVisual(
+          v =>
+            v && {
+              ...v,
+              x: g.ghost.x,
+              y: g.ghost.y,
+              rotation:
+                g.rotation,
+              dragOverFriendId:
+                g.dragOverFriendId
+            }
+        );
+
+        g.rafId =
+          requestAnimationFrame(
+            loop
+          );
+      };
+
+      grabRef.current.rafId =
+        requestAnimationFrame(
+          loop
+        );
+    };
 
   return (
     <div style={styles.layout}>
-      {isMobile && showSidebar && (
-        <div style={styles.overlay} onClick={() => setShowSidebar(false)} />
-      )}
+      {isMobile &&
+        showSidebar && (
+          <div
+            style={styles.overlay}
+            onClick={() =>
+              setShowSidebar(false)
+            }
+          />
+        )}
 
-      <div style={{
-        ...styles.sidebar,
-        position: isMobile ? 'fixed' : 'relative',
-        top: isMobile ? 0 : 'auto',
-        left: isMobile ? 0 : 'auto',
-        bottom: isMobile ? 0 : 'auto',
-        transform: isMobile
-          ? (showSidebar ? 'translateX(0)' : 'translateX(-100%)')
-          : 'translateX(0)'
-      }}>
-        <div style={styles.sidebarHeader}>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <a href="/help" style={styles.helpLink}>help</a>
-            <span style={styles.appName}>
-              Propard<span style={{ color: 'var(--accent)' }}>.</span>
+      <div
+        style={{
+          ...styles.sidebar,
+          position: isMobile
+            ? 'fixed'
+            : 'relative',
+          top: isMobile
+            ? 0
+            : 'auto',
+          left: isMobile
+            ? 0
+            : 'auto',
+          bottom: isMobile
+            ? 0
+            : 'auto',
+          transform: isMobile
+            ? showSidebar
+              ? 'translateX(0)'
+              : 'translateX(-100%)'
+            : 'translateX(0)'
+        }}
+      >
+        <div
+          style={
+            styles.sidebarHeader
+          }
+        >
+          <div
+            style={{
+              display: 'flex',
+              flexDirection:
+                'column'
+            }}
+          >
+            <a
+              href="/help"
+              style={
+                styles.helpLink
+              }
+            >
+              help
+            </a>
+
+            <span
+              style={
+                styles.appName
+              }
+            >
+              Propard
+              <span
+                style={{
+                  color:
+                    'var(--accent)'
+                }}
+              >
+                .
+              </span>
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: '6px',
+              alignItems:
+                'center'
+            }}
+          >
             <a
               href="https://discord.gg/hsMdJQz6EY"
               target="_blank"
               rel="noreferrer"
-              style={styles.discordLink}
+              style={
+                styles.discordLink
+              }
             >
               Discord
             </a>
 
-            <button onClick={toggleTheme} style={styles.iconBtn}>
-              {theme === 'dark' ? '☀️' : '🌙'}
+            <button
+              onClick={
+                toggleTheme
+              }
+              style={
+                styles.iconBtn
+              }
+            >
+              {theme ===
+              'dark'
+                ? '☀️'
+                : '🌙'}
             </button>
 
             {isMobile && (
-              <button onClick={() => setShowSidebar(false)} style={styles.iconBtn}>
+              <button
+                onClick={() =>
+                  setShowSidebar(
+                    false
+                  )
+                }
+                style={
+                  styles.iconBtn
+                }
+              >
                 ✕
               </button>
             )}
@@ -422,168 +947,418 @@ export default function AppPage({ initialFriendId, initialProfileUserId }) {
         </div>
 
         {user?.pendingDeletion && (
-          <div style={styles.pendingBanner}>
-            <p style={styles.pendingBannerText}>
-              ⏳ Compte en cours de suppression
+          <div
+            style={
+              styles.pendingBanner
+            }
+          >
+            <p
+              style={
+                styles.pendingBannerText
+              }
+            >
+              ⏳ Compte en cours de
+              suppression
               {user.deletionExpiresAt
-                ? ` — restaurable jusqu'au ${new Date(user.deletionExpiresAt).toLocaleDateString('fr-FR')}`
+                ? ` — restaurable jusqu'au ${new Date(
+                    user.deletionExpiresAt
+                  ).toLocaleDateString(
+                    'fr-FR'
+                  )}`
                 : ''}
             </p>
 
             <button
-              style={styles.pendingBannerBtn}
-              onClick={handleCancelDeletion}
-              disabled={cancelLoading}
+              style={
+                styles.pendingBannerBtn
+              }
+              onClick={
+                handleCancelDeletion
+              }
+              disabled={
+                cancelLoading
+              }
             >
-              {cancelLoading ? '...' : 'Annuler la suppression'}
+              {cancelLoading
+                ? '...'
+                : 'Annuler la suppression'}
             </button>
 
             {cancelError && (
-              <p style={styles.pendingBannerError}>{cancelError}</p>
+              <p
+                style={
+                  styles.pendingBannerError
+                }
+              >
+                {cancelError}
+              </p>
             )}
           </div>
         )}
 
-        <div style={styles.ipCard}>
-          <p style={styles.ipLabel}>Ton adresse</p>
-
-          <p style={styles.ipValue}>
-            {hideIp ? '███.███.███.███' : user?.ipAlias}
+        <div
+          style={styles.ipCard}
+        >
+          <p
+            style={styles.ipLabel}
+          >
+            Ton adresse
           </p>
 
-          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+          <p
+            style={styles.ipValue}
+          >
+            {hideIp
+              ? '███.███.███.███'
+              : user?.ipAlias}
+          </p>
+
+          <div
+            style={{
+              display: 'flex',
+              gap: '6px',
+              justifyContent:
+                'center'
+            }}
+          >
             <button
-              style={styles.copyBtn}
-              onClick={() => navigator.clipboard.writeText(user?.ipAlias)}
+              style={
+                styles.copyBtn
+              }
+              onClick={() =>
+                navigator.clipboard.writeText(
+                  user?.ipAlias
+                )
+              }
             >
               📋 Copier
             </button>
 
             <button
-              style={styles.copyBtn}
+              style={
+                styles.copyBtn
+              }
               onClick={() => {
-                const next = !hideIp;
-                setHideIp(next);
-                localStorage.setItem('propard_hideIp', next);
+                const next =
+                  !hideIp;
+
+                setHideIp(
+                  next
+                );
+
+                localStorage.setItem(
+                  'propard_hideIp',
+                  next
+                );
               }}
             >
-              {hideIp ? '👁️ Afficher' : '🙈 Masquer'}
+              {hideIp
+                ? '👁️ Afficher'
+                : '🙈 Masquer'}
             </button>
           </div>
         </div>
 
-        <button style={styles.addBtn} onClick={() => setShowAddFriend(true)}>
+        <button
+          style={styles.addBtn}
+          onClick={() =>
+            setShowAddFriend(true)
+          }
+        >
           + Ajouter un ami
         </button>
 
         <FriendList
           token={token}
-          selectedFriend={selectedFriend}
-          onSelectFriend={handleSelectFriend}
-          hideFriendIps={hideFriendIps}
-          setHideFriendIps={(val) => {
-            setHideFriendIps(val);
-            localStorage.setItem('propard_hideFriendIps', val);
-          }}
-          dragOverFriendId={grabVisual?.dragOverFriendId || null}
+          selectedFriend={
+            selectedFriend
+          }
+          onSelectFriend={
+            handleSelectFriend
+          }
+          onOpenProfile={
+            handleOpenProfile
+          }
+          hideFriendIps={
+            hideFriendIps
+          }
+          setHideFriendIps={
+            value => {
+              setHideFriendIps(
+                value
+              );
+
+              localStorage.setItem(
+                'propard_hideFriendIps',
+                value
+              );
+            }
+          }
+          dragOverFriendId={
+            grabVisual?.dragOverFriendId ||
+            null
+          }
+          refreshKey={
+            friendListRefreshKey
+          }
         />
 
         <button
-          style={styles.profileBtn}
-          onClick={() => handleOpenProfile(user?.id)}
+          style={
+            styles.profileBtn
+          }
+          onClick={() =>
+            handleOpenProfile(
+              user?.id
+            )
+          }
         >
-          <div style={styles.profileAvatar}>
+          <div
+            style={
+              styles.profileAvatar
+            }
+          >
             {user?.avatar ? (
-              <img src={user.avatar} alt="" style={styles.profileAvatarImg} />
+              <img
+                src={user.avatar}
+                alt=""
+                style={
+                  styles.profileAvatarImg
+                }
+              />
             ) : (
-              (user?.displayName || user?.username || '?')[0].toUpperCase()
+              (
+                user?.displayName ||
+                user?.username ||
+                '?'
+              )[0].toUpperCase()
             )}
           </div>
 
-          <div style={styles.profileInfo}>
-            <span style={styles.profileName}>
-              {user?.displayName || user?.username}
+          <div
+            style={
+              styles.profileInfo
+            }
+          >
+            <span
+              style={
+                styles.profileName
+              }
+            >
+              {user?.displayName ||
+                user?.username}
             </span>
-            <span style={styles.profileUsername}>
+
+            <span
+              style={
+                styles.profileUsername
+              }
+            >
               @{user?.username}
             </span>
           </div>
         </button>
 
-        <button style={styles.logoutBtn} onClick={logout}>
+        <button
+          style={
+            styles.logoutBtn
+          }
+          onClick={logout}
+        >
           Déconnexion
         </button>
 
         <button
-          style={styles.deleteAccountBtn}
-          onClick={() => setShowDeleteModal(true)}
+          style={
+            styles.deleteAccountBtn
+          }
+          onClick={() =>
+            setShowDeleteModal(
+              true
+            )
+          }
         >
           Supprimer mon compte
         </button>
       </div>
 
       <div style={styles.main}>
-        {isMobile && !selectedFriend && !selectedProfile && !friendNotFound && (
-          <div style={styles.mobileHeader}>
-            <button
-              style={styles.hamburger}
-              onClick={() => setShowSidebar(true)}
+        {isMobile &&
+          !selectedFriend &&
+          !selectedProfile &&
+          !friendNotFound && (
+            <div
+              style={
+                styles.mobileHeader
+              }
             >
-              ☰
-            </button>
+              <button
+                style={
+                  styles.hamburger
+                }
+                onClick={() =>
+                  setShowSidebar(
+                    true
+                  )
+                }
+              >
+                ☰
+              </button>
 
-            <span style={styles.mobileTitle}>Propard</span>
+              <span
+                style={
+                  styles.mobileTitle
+                }
+              >
+                Propard
+              </span>
 
-            <div style={{ width: '36px' }} />
-          </div>
-        )}
+              <div
+                style={{
+                  width: '36px'
+                }}
+              />
+            </div>
+          )}
 
-        {isMobile && (selectedFriend || selectedProfile || friendNotFound) && (
-          <div style={styles.mobileHeader}>
-            <button style={styles.hamburger} onClick={handleBack}>
-              ←
-            </button>
+        {isMobile &&
+          (selectedFriend ||
+            friendNotFound) && (
+            <div
+              style={
+                styles.mobileHeader
+              }
+            >
+              <button
+                style={
+                  styles.hamburger
+                }
+                onClick={
+                  handleBack
+                }
+              >
+                ←
+              </button>
 
-            <div style={{ width: '36px' }} />
-          </div>
-        )}
+              <div
+                style={{
+                  width: '36px'
+                }}
+              />
+            </div>
+          )}
 
         {selectedProfile ? (
           <ProfilePage
-            userId={selectedProfile}
-            isMobile={isMobile}
-            onBack={handleBack}
-            onOpenChat={(friend) => {
-              setSelectedProfile(null);
-              setSelectedFriend(friend);
-              window.history.pushState({}, '', `/chat/${friend._id}`);
+            userId={
+              selectedProfile
+            }
+            isMobile={
+              isMobile
+            }
+            onBack={
+              handleBack
+            }
+            onOpenChat={friend => {
+              setSelectedProfile(
+                null
+              );
+
+              setSelectedFriend(
+                friend
+              );
+
+              window.history.pushState(
+                {},
+                '',
+                `/chat/${friend._id}`
+              );
+
+              if (isMobile) {
+                setShowSidebar(
+                  false
+                );
+              }
             }}
-            onRelationshipChanged={handleProfileRelationshipChanged}
+            onRelationshipChanged={
+              handleProfileRelationshipChanged
+            }
           />
         ) : selectedFriend ? (
           <Chat
-            friend={selectedFriend}
+            friend={
+              selectedFriend
+            }
             token={token}
             userId={user?.id}
-            hideFriendIps={hideFriendIps}
-            isMobile={isMobile}
-            onGrabStart={(payload) =>
-              handleGrabStart(payload, selectedFriend?._id)
+            hideFriendIps={
+              hideFriendIps
             }
-            grabbedMessageId={grabVisual?.msgId || null}
+            isMobile={
+              isMobile
+            }
+            onGrabStart={payload =>
+              handleGrabStart(
+                payload,
+                selectedFriend?._id
+              )
+            }
+            grabbedMessageId={
+              grabVisual?.msgId ||
+              null
+            }
           />
         ) : friendNotFound ? (
-          <div style={styles.empty}>
-            <p style={{ fontSize: '48px' }}>🚫</p>
-            <p style={styles.emptyText}>Tu n'as pas cet ami</p>
-            <button style={styles.backBtn} onClick={handleBack}>
+          <div
+            style={styles.empty}
+          >
+            <p
+              style={{
+                fontSize:
+                  '48px'
+              }}
+            >
+              🚫
+            </p>
+
+            <p
+              style={
+                styles.emptyText
+              }
+            >
+              Tu n'as pas cet
+              ami
+            </p>
+
+            <button
+              style={
+                styles.backBtn
+              }
+              onClick={
+                handleBack
+              }
+            >
               Retour
             </button>
           </div>
         ) : (
-          <div style={styles.empty}>
-            <p style={{ fontSize: '48px' }}>💬</p>
-            <p style={styles.emptyText}>
+          <div
+            style={styles.empty}
+          >
+            <p
+              style={{
+                fontSize:
+                  '48px'
+              }}
+            >
+              💬
+            </p>
+
+            <p
+              style={
+                styles.emptyText
+              }
+            >
               {isMobile
                 ? 'Appuie sur ☰ pour voir tes amis'
                 : 'Sélectionne un ami pour chatter'}
@@ -595,17 +1370,29 @@ export default function AppPage({ initialFriendId, initialProfileUserId }) {
       {showAddFriend && (
         <AddFriend
           token={token}
-          onClose={() => setShowAddFriend(false)}
+          onClose={() =>
+            setShowAddFriend(
+              false
+            )
+          }
         />
       )}
 
       {incomingCall && (
         <VoiceCall
-          friend={incomingCall.friend}
+          friend={
+            incomingCall.friend
+          }
           userId={user?.id}
           token={token}
-          onClose={() => setIncomingCall(null)}
-          incomingOffer={incomingCall.offer}
+          onClose={() =>
+            setIncomingCall(
+              null
+            )
+          }
+          incomingOffer={
+            incomingCall.offer
+          }
         />
       )}
 
@@ -615,138 +1402,299 @@ export default function AppPage({ initialFriendId, initialProfileUserId }) {
             position: 'fixed',
             left: 0,
             top: 0,
-            width: grabVisual.width,
+            width:
+              grabVisual.width,
             maxWidth: '65%',
-            padding: '10px 14px',
-            borderRadius: '12px',
-            background: 'var(--accent)',
+            padding:
+              '10px 14px',
+            borderRadius:
+              '12px',
+            background:
+              'var(--accent)',
             color: '#fff',
             fontSize: '14px',
             lineHeight: '1.4',
-            whiteSpace: 'pre-wrap',
-            overflowWrap: 'anywhere',
-            boxShadow: '0 14px 30px rgba(0,0,0,0.35)',
-            pointerEvents: 'none',
-            userSelect: 'none',
+            whiteSpace:
+              'pre-wrap',
+            overflowWrap:
+              'anywhere',
+            boxShadow:
+              '0 14px 30px rgba(0,0,0,0.35)',
+            pointerEvents:
+              'none',
+            userSelect:
+              'none',
             zIndex: 500,
-            opacity: grabVisual.landing ? 0 : 1,
+            opacity:
+              grabVisual.landing
+                ? 0
+                : 1,
             transform: `translate(${grabVisual.x}px, ${grabVisual.y}px) rotate(${grabVisual.rotation}deg) scale(${grabVisual.landing ? 0.82 : 1.04})`,
-            transition: grabVisual.returning
-              ? 'transform 0.26s cubic-bezier(0.22, 1, 0.36, 1)'
-              : grabVisual.landing
-                ? 'transform 0.19s ease-out, opacity 0.19s ease-out'
-                : 'none'
+            transition:
+              grabVisual.returning
+                ? 'transform 0.26s cubic-bezier(0.22, 1, 0.36, 1)'
+                : grabVisual.landing
+                  ? 'transform 0.19s ease-out, opacity 0.19s ease-out'
+                  : 'none'
           }}
         >
           {grabVisual.content}
         </div>
       )}
 
-      {showDeleteModal && !confirmAction && (
-        <div style={styles.modalOverlay} onClick={closeDeleteModal}>
-          <div style={styles.modal} onClick={e => e.stopPropagation()}>
-            <h2 style={styles.modalTitle}>Supprimer mon compte</h2>
-            <p style={styles.modalText}>Choisis une option :</p>
-
-            <div style={styles.modalOption}>
-              <h3 style={styles.modalOptionTitle}>
-                Option A — Anonymisation (réversible 30 jours)
-              </h3>
-
-              <p style={styles.modalOptionDesc}>
-                Ton pseudo est masqué immédiatement (affiché <strong>"Utilisateur supprimé"</strong>) mais tes messages et tes amitiés restent intacts. Tu peux te reconnecter avec ton pseudo et mot de passe actuels pendant <strong>30 jours</strong> pour tout annuler. Passé ce délai, c'est définitif.
-              </p>
-
-              <button
-                style={styles.modalBtnWarn}
-                onClick={() => setConfirmAction('anonymize')}
-                disabled={deleteLoading}
-              >
-                Anonymiser mon compte
-              </button>
-            </div>
-
-            <div style={styles.modalDivider} />
-
-            <div style={styles.modalOption}>
-              <h3 style={styles.modalOptionTitle}>
-                Option B — Suppression totale (immédiate)
-              </h3>
-
-              <p style={styles.modalOptionDesc}>
-                Ton compte <strong>et tous tes messages</strong> sont définitivement supprimés tout de suite. Cette action est irréversible, aucun délai de grâce.
-              </p>
-
-              <button
-                style={styles.modalBtnDanger}
-                onClick={() => setConfirmAction('delete')}
-                disabled={deleteLoading}
-              >
-                Tout supprimer définitivement
-              </button>
-            </div>
-
-            <button style={styles.modalBtnCancel} onClick={closeDeleteModal}>
-              Annuler
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showDeleteModal && confirmAction && (
-        <div
-          style={styles.modalOverlay}
-          onClick={() => {
-            setConfirmAction(null);
-            setDeleteError('');
-          }}
-        >
-          <div style={styles.modal} onClick={e => e.stopPropagation()}>
-            <h2 style={styles.modalTitle}>
-              {confirmAction === 'anonymize'
-                ? 'Confirmer l\'anonymisation ?'
-                : 'Confirmer la suppression définitive ?'}
-            </h2>
-
-            <p style={styles.modalOptionDesc}>
-              {confirmAction === 'anonymize'
-                ? "Ton pseudo sera masqué tout de suite pour tout le monde. Tu pourras te reconnecter avec ton pseudo et mot de passe actuels pendant 30 jours pour annuler."
-                : "Cette action supprime immédiatement et irréversiblement ton compte et tous tes messages. Aucun moyen de revenir en arrière."}
-            </p>
-
-            {deleteError && (
-              <p style={styles.modalError}>{deleteError}</p>
-            )}
-
-            <button
+      {showDeleteModal &&
+        !confirmAction && (
+          <div
+            style={
+              styles.modalOverlay
+            }
+            onClick={
+              closeDeleteModal
+            }
+          >
+            <div
               style={
-                confirmAction === 'anonymize'
-                  ? styles.modalBtnWarn
-                  : styles.modalBtnDanger
+                styles.modal
               }
-              onClick={
-                confirmAction === 'anonymize'
-                  ? handleAnonymize
-                  : handleDeleteTotal
+              onClick={e =>
+                e.stopPropagation()
               }
-              disabled={deleteLoading}
             >
-              {deleteLoading ? '...' : 'Oui, je confirme'}
-            </button>
+              <h2
+                style={
+                  styles.modalTitle
+                }
+              >
+                Supprimer mon
+                compte
+              </h2>
 
-            <button
-              style={styles.modalBtnCancel}
-              onClick={() => {
-                setConfirmAction(null);
-                setDeleteError('');
-              }}
-              disabled={deleteLoading}
-            >
-              Retour
-            </button>
+              <p
+                style={
+                  styles.modalText
+                }
+              >
+                Choisis une option :
+              </p>
+
+              <div
+                style={
+                  styles.modalOption
+                }
+              >
+                <h3
+                  style={
+                    styles.modalOptionTitle
+                  }
+                >
+                  Option A —
+                  Anonymisation
+                  (réversible 30
+                  jours)
+                </h3>
+
+                <p
+                  style={
+                    styles.modalOptionDesc
+                  }
+                >
+                  Ton pseudo est
+                  masqué
+                  immédiatement
+                  mais tes
+                  messages et
+                  tes amitiés
+                  restent
+                  intacts. Tu
+                  peux te
+                  reconnecter
+                  pendant 30
+                  jours pour
+                  annuler.
+                </p>
+
+                <button
+                  style={
+                    styles.modalBtnWarn
+                  }
+                  onClick={() =>
+                    setConfirmAction(
+                      'anonymize'
+                    )
+                  }
+                  disabled={
+                    deleteLoading
+                  }
+                >
+                  Anonymiser mon
+                  compte
+                </button>
+              </div>
+
+              <div
+                style={
+                  styles.modalDivider
+                }
+              />
+
+              <div
+                style={
+                  styles.modalOption
+                }
+              >
+                <h3
+                  style={
+                    styles.modalOptionTitle
+                  }
+                >
+                  Option B —
+                  Suppression
+                  totale
+                  (immédiate)
+                </h3>
+
+                <p
+                  style={
+                    styles.modalOptionDesc
+                  }
+                >
+                  Ton compte et
+                  tous tes messages
+                  sont définitivement
+                  supprimés tout de
+                  suite.
+                </p>
+
+                <button
+                  style={
+                    styles.modalBtnDanger
+                  }
+                  onClick={() =>
+                    setConfirmAction(
+                      'delete'
+                    )
+                  }
+                  disabled={
+                    deleteLoading
+                  }
+                >
+                  Tout supprimer
+                  définitivement
+                </button>
+              </div>
+
+              <button
+                style={
+                  styles.modalBtnCancel
+                }
+                onClick={
+                  closeDeleteModal
+                }
+              >
+                Annuler
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+      {showDeleteModal &&
+        confirmAction && (
+          <div
+            style={
+              styles.modalOverlay
+            }
+            onClick={() => {
+              setConfirmAction(
+                null
+              );
+              setDeleteError(
+                ''
+              );
+            }}
+          >
+            <div
+              style={
+                styles.modal
+              }
+              onClick={e =>
+                e.stopPropagation()
+              }
+            >
+              <h2
+                style={
+                  styles.modalTitle
+                }
+              >
+                {confirmAction ===
+                'anonymize'
+                  ? "Confirmer l'anonymisation ?"
+                  : 'Confirmer la suppression définitive ?'}
+              </h2>
+
+              <p
+                style={
+                  styles.modalOptionDesc
+                }
+              >
+                {confirmAction ===
+                'anonymize'
+                  ? 'Ton pseudo sera masqué tout de suite pour tout le monde. Tu pourras te reconnecter pendant 30 jours pour annuler.'
+                  : 'Cette action supprime immédiatement et irréversiblement ton compte et tous tes messages.'}
+              </p>
+
+              {deleteError && (
+                <p
+                  style={
+                    styles.modalError
+                  }
+                >
+                  {deleteError}
+                </p>
+              )}
+
+              <button
+                style={
+                  confirmAction ===
+                  'anonymize'
+                    ? styles.modalBtnWarn
+                    : styles.modalBtnDanger
+                }
+                onClick={
+                  confirmAction ===
+                  'anonymize'
+                    ? handleAnonymize
+                    : handleDeleteTotal
+                }
+                disabled={
+                  deleteLoading
+                }
+              >
+                {deleteLoading
+                  ? '...'
+                  : 'Oui, je confirme'}
+              </button>
+
+              <button
+                style={
+                  styles.modalBtnCancel
+                }
+                onClick={() => {
+                  setConfirmAction(
+                    null
+                  );
+                  setDeleteError(
+                    ''
+                  );
+                }}
+                disabled={
+                  deleteLoading
+                }
+              >
+                Retour
+              </button>
+            </div>
+          </div>
+        )}
     </div>
   );
 }
