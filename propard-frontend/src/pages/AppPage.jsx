@@ -171,9 +171,11 @@ export default function AppPage({
             );
 
           if (match) {
-            setSelectedFriend(
-              match.userId
-            );
+            setSelectedFriend({
+              ...match.userId,
+              nickname:
+                match.nickname || null
+            });
             setSelectedProfile(null);
           } else {
             setFriendNotFound(true);
@@ -281,7 +283,8 @@ export default function AppPage({
   const handleProfileRelationshipChanged =
     async (
       action,
-      userId
+      userId,
+      nickname
     ) => {
       setFriendListRefreshKey(
         key => key + 1
@@ -292,11 +295,31 @@ export default function AppPage({
         action === 'blocked'
       ) {
         if (
-          selectedFriend?._id ===
-          userId
+          selectedFriend?._id?.toString() ===
+          userId?.toString()
         ) {
           setSelectedFriend(null);
         }
+      }
+
+      if (
+        action === 'nicknameChanged' &&
+        selectedFriend?._id?.toString() ===
+          userId?.toString()
+      ) {
+        setSelectedFriend(
+          prev =>
+            prev
+              ? {
+                  ...prev,
+                  nickname:
+                    nickname?.trim() ||
+                    null
+                }
+              : prev
+        );
+
+        return;
       }
 
       if (
@@ -304,8 +327,7 @@ export default function AppPage({
         action === 'accepted' ||
         action === 'removed' ||
         action === 'blocked' ||
-        action === 'unblocked' ||
-        action === 'nicknameChanged'
+        action === 'unblocked'
       ) {
         try {
           const res =
@@ -325,17 +347,19 @@ export default function AppPage({
           const current =
             friends.find(
               f =>
-                f.userId?._id ===
-                selectedFriend?._id
+                f.userId?._id?.toString() ===
+                selectedFriend?._id?.toString()
             );
 
           if (current) {
-            setSelectedFriend(
-              current.userId
-            );
+            setSelectedFriend({
+              ...current.userId,
+              nickname:
+                current.nickname || null
+            });
           } else if (
-            selectedFriend?._id ===
-            userId
+            selectedFriend?._id?.toString() ===
+            userId?.toString()
           ) {
             setSelectedFriend(null);
           }
