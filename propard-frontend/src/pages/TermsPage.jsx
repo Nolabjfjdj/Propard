@@ -217,10 +217,10 @@ export default function TermsPage() {
             Pour toute question relative aux présentes CGU :
             {" "}
             <a
-              href="mailto:propard@outlook.fr"
+              href="mailto:support@propard.site"
               style={styles.link}
             >
-              propard@outlook.fr
+              support@propard.site
             </a>
           </p>
         </div>
