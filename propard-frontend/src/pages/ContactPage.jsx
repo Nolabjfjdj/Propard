@@ -10,7 +10,7 @@ export default function ContactPage() {
 
   const handleSend = () => {
     if (!message.trim()) return;
-    window.location.href = `mailto:propard@outlook.fr?subject=Contact Propard - ${encodeURIComponent(name)}&body=${encodeURIComponent(message)}`;
+    window.location.href = `mailto:support@propard.site?subject=Contact Propard - ${encodeURIComponent(name)}&body=${encodeURIComponent(message)}`;
     setSent(true);
   };
 
