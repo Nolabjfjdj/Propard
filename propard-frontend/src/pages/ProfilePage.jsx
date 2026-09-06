@@ -104,17 +104,6 @@ export default function ProfilePage({
   if (error || !profile) {
     return (
       <div style={styles.container}>
-        {isMobile && (
-          <div style={styles.mobileHeader}>
-            <button
-              style={styles.hamburger}
-              onClick={onBack}
-            >
-              ←
-            </button>
-          </div>
-        )}
-
         <p
           style={{
             ...styles.infoText,
@@ -486,17 +475,6 @@ export default function ProfilePage({
 
   return (
     <div style={styles.container}>
-      {isMobile && (
-        <div style={styles.mobileHeader}>
-          <button
-            style={styles.hamburger}
-            onClick={onBack}
-          >
-            ←
-          </button>
-        </div>
-      )}
-
       <div style={styles.card}>
         <div style={styles.avatarWrap}>
           {isEditing ? (
@@ -1031,22 +1009,6 @@ const styles = {
     flexDirection: 'column',
     height: '100%',
     overflowY: 'auto'
-  },
-
-  mobileHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '12px 16px',
-    background: 'var(--bg-secondary)',
-    borderBottom: '1px solid var(--border)'
-  },
-
-  hamburger: {
-    background: 'var(--bg-tertiary)',
-    border: '1px solid var(--border)',
-    borderRadius: '8px',
-    padding: '6px 10px',
-    fontSize: '18px'
   },
 
   infoText: {
