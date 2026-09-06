@@ -1245,6 +1245,7 @@ export default function AppPage({
 
         {isMobile &&
           (selectedFriend ||
+            selectedProfile ||
             friendNotFound) && (
             <div
               style={
