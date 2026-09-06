@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from './context/AuthContext';
 import AuthPage from './pages/AuthPage';
 import AppPage from './pages/AppPage';
@@ -11,19 +11,42 @@ import GlobalAnnouncement from './components/GlobalAnnouncement';
 
 export default function App() {
   const { user, loading } = useAuth();
-  const path = window.location.pathname;
+  const [path, setPath] = useState(window.location.pathname);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setPath(window.location.pathname);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   useEffect(() => {
     if (loading) return;
 
     if (path === '/' && !user) {
-      window.history.replaceState({}, '', '/register');
-      window.dispatchEvent(new PopStateEvent('popstate'));
+      const hasLoggedInBefore =
+        localStorage.getItem('propard_has_logged_in') === 'true';
+
+      const destination = hasLoggedInBefore
+        ? '/login'
+        : '/register';
+
+      if (path !== destination) {
+        window.history.replaceState({}, '', destination);
+        setPath(destination);
+      }
+
+      return;
     }
 
     if ((path === '/login' || path === '/register') && user) {
       window.history.replaceState({}, '', '/');
-      window.dispatchEvent(new PopStateEvent('popstate'));
+      setPath('/');
     }
   }, [loading, user, path]);
 
@@ -67,7 +90,7 @@ export default function App() {
 
   if (path === '/help/contact') {
     if (!user) {
-      window.history.replaceState({}, '', '/register');
+      window.history.replaceState({}, '', '/login');
       return null;
     }
 
@@ -81,7 +104,7 @@ export default function App() {
 
   if (path.startsWith('/chat/')) {
     if (!user) {
-      window.history.replaceState({}, '', '/register');
+      window.history.replaceState({}, '', '/login');
       return null;
     }
 
@@ -97,7 +120,7 @@ export default function App() {
 
   if (path.startsWith('/profile/')) {
     if (!user) {
-      window.history.replaceState({}, '', '/register');
+      window.history.replaceState({}, '', '/login');
       return null;
     }
 
@@ -140,10 +163,15 @@ export default function App() {
     <div style={styles.page}>
       <div style={styles.card}>
         <p style={styles.code}>404</p>
-        <p style={styles.title}>Page introuvable</p>
+
+        <p style={styles.title}>
+          Page introuvable
+        </p>
+
         <p style={styles.sub}>
           Cette page n'existe pas sur Propard.
         </p>
+
         <a href="/" style={styles.btn}>
           Retour à l'accueil
         </a>
@@ -160,6 +188,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center'
   },
+
   card: {
     background: 'var(--bg-secondary)',
     border: '1px solid var(--border)',
@@ -169,6 +198,7 @@ const styles = {
     maxWidth: '400px',
     width: '100%'
   },
+
   code: {
     fontFamily: 'var(--font-mono)',
     fontSize: '64px',
@@ -176,17 +206,20 @@ const styles = {
     color: 'var(--accent)',
     marginBottom: '8px'
   },
+
   title: {
     fontSize: '20px',
     fontWeight: '700',
     color: 'var(--text-primary)',
     marginBottom: '8px'
   },
+
   sub: {
     fontSize: '14px',
     color: 'var(--text-secondary)',
     marginBottom: '24px'
   },
+
   btn: {
     display: 'inline-block',
     background: 'var(--accent)',
