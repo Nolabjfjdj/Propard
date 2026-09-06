@@ -10,7 +10,7 @@ export default function PrivacyPage() {
           <h2 style={styles.sectionTitle}>1. Responsable du traitement</h2>
           <p style={styles.text}>
             Propard est un projet personnel développé et exploité par BananeVR, particulier domicilié en France.
-            Contact : <a href="mailto:propard@outlook.fr" style={styles.link}>propard@outlook.fr</a>
+            Contact : <a href="mailto:support@propard.site" style={styles.link}>support@propard.site</a>
           </p>
         </div>
 
@@ -125,7 +125,7 @@ export default function PrivacyPage() {
             <li><strong>Droit à la portabilité</strong> : recevoir certaines données dans un format structuré et couramment utilisé lorsque ce droit est applicable</li>
           </ul>
           <p style={styles.text}>
-            Pour exercer vos droits, contactez-nous à <a href="mailto:propard@outlook.fr" style={styles.link}>propard@outlook.fr</a>.
+            Pour exercer vos droits, contactez-nous à <a href="mailto:support@propard.site" style={styles.link}>support@propard.site</a>.
           </p>
           <p style={styles.text}>
             Nous traiterons votre demande dans les délais prévus par le RGPD. Nous pouvons être amenés à demander des informations permettant de vérifier votre identité lorsque cela est nécessaire pour protéger vos données.
@@ -150,7 +150,7 @@ export default function PrivacyPage() {
           <p style={styles.text}>
             Pour toute question relative à cette politique de confidentialité ou pour exercer vos droits :
             {" "}
-            <a href="mailto:propard@outlook.fr" style={styles.link}>propard@outlook.fr</a>
+            <a href="mailto:support@propard.site" style={styles.link}>support@propard.site</a>
           </p>
         </div>
       </div>
