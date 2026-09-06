@@ -42,9 +42,6 @@ export default function Chat({
   const messageCountTimer = useRef(null);
   const longPressTimer = useRef(null);
 
-  // --- Grab & Send : détection double-tap puis maintien du 2e tap ---
-  // Fonctionne identiquement en souris (PC) et tactile (mobile) grâce aux
-  // Pointer Events, qui unifient les deux sans code séparé.
   const lastTapRef = useRef({ id: null, time: 0 });
   const grabHoldTimerRef = useRef(null);
   const grabCandidateRef = useRef(null);
@@ -57,6 +54,12 @@ export default function Chat({
 
   const normalize = id => id?.toString();
   const myId = normalize(userId);
+
+  const friendName =
+    friend.nickname?.trim() ||
+    friend.displayName?.trim() ||
+    friend.username ||
+    'Ami';
 
   useEffect(() => {
     return () => {
@@ -363,10 +366,6 @@ export default function Chat({
       );
     };
 
-    // Un message modifié par l'ami arrive ici toujours chiffré (le
-    // serveur ne voit et ne transmet jamais de texte en clair) — on le
-    // déchiffre avec la même clé partagée avant de mettre à jour l'état
-    // local, exactement comme pour un nouveau message.
     const handleEdited = async ({ messageId, content }) => {
       if (!messageId || !content) return;
 
@@ -374,22 +373,34 @@ export default function Chat({
         setMessages(prev =>
           prev.map(m =>
             m._id?.toString() === messageId?.toString()
-              ? { ...m, content: null, decryptionError: true, edited: true }
+              ? {
+                  ...m,
+                  content: null,
+                  decryptionError: true,
+                  edited: true
+                }
               : m
           )
         );
         return;
       }
 
-      const plaintext = await decryptMessage(sharedKey, content);
+      const plaintext = await decryptMessage(
+        sharedKey,
+        content
+      );
 
       setMessages(prev =>
         prev.map(m =>
           m._id?.toString() === messageId?.toString()
             ? {
                 ...m,
-                content: plaintext !== null ? plaintext : null,
-                decryptionError: plaintext === null,
+                content:
+                  plaintext !== null
+                    ? plaintext
+                    : null,
+                decryptionError:
+                  plaintext === null,
                 edited: true
               }
             : m
@@ -650,10 +661,6 @@ export default function Chat({
     setReportSuccess(false);
   };
 
-  // Le client déchiffre déjà le message pour l'afficher — c'est ce texte
-  // en clair qui est envoyé, une seule fois, uniquement pour ce
-  // signalement précis. Le serveur ne peut techniquement pas déchiffrer
-  // lui-même un message E2E.
   const submitReport = async () => {
     if (!reportTarget || reportTarget.decryptionError) return;
 
@@ -793,9 +800,6 @@ export default function Chat({
     );
   };
 
-  // --- Grab & Send : handlers additifs, n'interfèrent pas avec le
-  // menu contextuel existant (clic droit / appui long classique) ---
-
   const clearGrabHold = () => {
     clearTimeout(grabHoldTimerRef.current);
     grabHoldTimerRef.current = null;
@@ -805,11 +809,6 @@ export default function Chat({
   const handleBubblePointerDown = (e, msg) => {
     if (msg.deleted || msg.decryptionError) return;
 
-    // Empêche immédiatement la sélection de texte / le menu de callout
-    // natif que le navigateur tente de déclencher sur un double-tap
-    // (surtout iOS Safari), avant même que notre logique double-tap ne
-    // s'exécute. On préfère bloquer systématiquement plutôt qu'après
-    // coup, une fois la sélection déjà amorcée.
     e.preventDefault();
 
     const now = Date.now();
@@ -832,10 +831,8 @@ export default function Chat({
 
       grabHoldTimerRef.current = setTimeout(() => {
         const c = grabCandidateRef.current;
+
         if (c) {
-          // On annule le menu contextuel (appui long) qui aurait pu être
-          // programmé par ce même 2e tap, pour éviter qu'il s'ouvre
-          // par-dessus le glisser.
           clearTimeout(longPressTimer.current);
 
           if (onGrabStart) {
@@ -848,21 +845,29 @@ export default function Chat({
             });
           }
         }
+
         grabCandidateRef.current = null;
       }, HOLD_TO_GRAB_MS);
     } else {
-      lastTapRef.current = { id: msg._id, time: now };
+      lastTapRef.current = {
+        id: msg._id,
+        time: now
+      };
     }
   };
 
   const handleBubblePointerMoveGrabCheck = e => {
     const c = grabCandidateRef.current;
+
     if (!c) return;
 
     const dx = e.clientX - c.startX;
     const dy = e.clientY - c.startY;
 
-    if (Math.sqrt(dx * dx + dy * dy) > MOVE_CANCEL_PX) {
+    if (
+      Math.sqrt(dx * dx + dy * dy) >
+      MOVE_CANCEL_PX
+    ) {
       clearGrabHold();
     }
   };
@@ -928,14 +933,22 @@ export default function Chat({
     <div style={styles.container}>
       <div style={styles.header}>
         <div style={styles.headerAvatar}>
-          {friend.username
-            ? friend.username[0].toUpperCase()
-            : '?'}
+          {friend.avatar ? (
+            <img
+              src={friend.avatar}
+              alt=""
+              style={styles.headerAvatarImage}
+            />
+          ) : (
+            friendName[0]
+              ? friendName[0].toUpperCase()
+              : '?'
+          )}
         </div>
 
         <div>
           <p style={styles.headerName}>
-            {friend.username || 'Ami'}
+            {friendName}
           </p>
 
           <p style={styles.headerIp}>
@@ -1252,6 +1265,7 @@ export default function Chat({
           contextMenu.msg.sender?._id ||
           contextMenu.msg.sender
         )?.toString();
+
         const isMe = senderId === myId;
 
         return (
@@ -1268,21 +1282,40 @@ export default function Chat({
               <>
                 <button
                   style={styles.contextItem}
-                  onClick={() => startEdit(contextMenu.msg)}
+                  onClick={() =>
+                    startEdit(
+                      contextMenu.msg
+                    )
+                  }
                 >
                   ✏️ Modifier
                 </button>
+
                 <button
-                  style={{ ...styles.contextItem, color: 'var(--danger)' }}
-                  onClick={() => deleteMessage(contextMenu.msg._id)}
+                  style={{
+                    ...styles.contextItem,
+                    color: 'var(--danger)'
+                  }}
+                  onClick={() =>
+                    deleteMessage(
+                      contextMenu.msg._id
+                    )
+                  }
                 >
                   🗑️ Supprimer
                 </button>
               </>
             ) : (
               <button
-                style={{ ...styles.contextItem, color: 'var(--danger)' }}
-                onClick={() => openReport(contextMenu.msg)}
+                style={{
+                  ...styles.contextItem,
+                  color: 'var(--danger)'
+                }}
+                onClick={() =>
+                  openReport(
+                    contextMenu.msg
+                  )
+                }
               >
                 🚩 Signaler
               </button>
@@ -1308,7 +1341,7 @@ export default function Chat({
             sendMessage()
           }
           placeholder={`Message à ${
-            friend.username || ''
+            friendName
           }...`}
           style={styles.input}
         />
@@ -1322,11 +1355,25 @@ export default function Chat({
       </div>
 
       {reportTarget && (
-        <div style={styles.modalOverlay} onClick={closeReport}>
-          <div style={styles.modal} onClick={e => e.stopPropagation()}>
-            <h2 style={styles.modalTitle}>🚩 Signaler ce message</h2>
+        <div
+          style={styles.modalOverlay}
+          onClick={closeReport}
+        >
+          <div
+            style={styles.modal}
+            onClick={e =>
+              e.stopPropagation()
+            }
+          >
+            <h2 style={styles.modalTitle}>
+              🚩 Signaler ce message
+            </h2>
+
             <p style={styles.modalDesc}>
-              Ce message, uniquement celui-ci, en clair, sera envoyé à l'équipe Propard pour modération. Le reste de ta conversation reste privé.
+              Ce message, uniquement celui-ci,
+              en clair, sera envoyé à l'équipe
+              Propard pour modération. Le reste
+              de ta conversation reste privé.
             </p>
 
             <p style={styles.reportedContent}>
@@ -1339,30 +1386,57 @@ export default function Chat({
               style={styles.reportTextarea}
               placeholder="Motif (optionnel)"
               value={reportReason}
-              onChange={e => setReportReason(e.target.value)}
+              onChange={e =>
+                setReportReason(
+                  e.target.value
+                )
+              }
               rows={3}
-              disabled={reportLoading || reportSuccess}
+              disabled={
+                reportLoading ||
+                reportSuccess
+              }
             />
 
             {reportError && (
-              <p style={styles.modalError}>{reportError}</p>
+              <p style={styles.modalError}>
+                {reportError}
+              </p>
             )}
 
             {reportSuccess ? (
-              <p style={styles.reportSuccess}>✓ Signalement envoyé, merci.</p>
+              <p
+                style={
+                  styles.reportSuccess
+                }
+              >
+                ✓ Signalement envoyé, merci.
+              </p>
             ) : (
               <>
                 <button
-                  style={styles.modalBtnDanger}
+                  style={
+                    styles.modalBtnDanger
+                  }
                   onClick={submitReport}
-                  disabled={reportLoading || reportTarget.decryptionError}
+                  disabled={
+                    reportLoading ||
+                    reportTarget.decryptionError
+                  }
                 >
-                  {reportLoading ? '...' : 'Envoyer le signalement'}
+                  {reportLoading
+                    ? '...'
+                    : 'Envoyer le signalement'}
                 </button>
+
                 <button
-                  style={styles.modalBtnCancel}
+                  style={
+                    styles.modalBtnCancel
+                  }
                   onClick={closeReport}
-                  disabled={reportLoading}
+                  disabled={
+                    reportLoading
+                  }
                 >
                   Annuler
                 </button>
@@ -1419,7 +1493,16 @@ const styles = {
     fontSize: '16px',
     fontWeight: '700',
     color: 'var(--accent)',
-    flexShrink: 0
+    flexShrink: 0,
+    overflow: 'hidden'
+  },
+
+  headerAvatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: '50%',
+    objectFit: 'cover',
+    display: 'block'
   },
 
   headerName: {
@@ -1494,9 +1577,6 @@ const styles = {
     userSelect: 'none',
     WebkitUserSelect: 'none',
     WebkitTouchCallout: 'none',
-    // 'none' plutôt que 'pan-y' : empêche le navigateur de démarrer un
-    // scroll natif dès qu'on touche une bulle, ce qui annulait le geste
-    // Grab & Send sur Android avant même le déclenchement du grab.
     touchAction: 'none'
   },
 
