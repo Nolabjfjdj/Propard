@@ -52,6 +52,10 @@ export default function AuthPage({ mode }) {
 
       login(res.data.user, res.data.token);
 
+      // Mémorise que ce navigateur a déjà utilisé Propard.
+      // Cela permet de savoir quelle page afficher après une déconnexion.
+      localStorage.setItem('propard_has_logged_in', 'true');
+
       window.location.href = '/';
     } catch (err) {
       setError(
@@ -71,6 +75,7 @@ export default function AuthPage({ mode }) {
       <div style={styles.card}>
         <div style={{ textAlign: 'center', marginBottom: '8px' }}>
           <span style={styles.logoText}>Propard</span>
+
           <span
             style={{
               color: 'var(--accent)',
@@ -142,6 +147,7 @@ export default function AuthPage({ mode }) {
 
                 <span style={styles.checkboxText}>
                   J'accepte les{' '}
+
                   <a
                     href="/terms"
                     target="_blank"
@@ -165,6 +171,7 @@ export default function AuthPage({ mode }) {
 
                 <span style={styles.checkboxText}>
                   J'accepte la{' '}
+
                   <a
                     href="/privacy"
                     target="_blank"
@@ -240,6 +247,7 @@ const styles = {
     background: 'var(--bg-primary)',
     position: 'relative'
   },
+
   themeBtn: {
     position: 'absolute',
     top: '20px',
@@ -250,6 +258,7 @@ const styles = {
     padding: '8px 12px',
     fontSize: '18px'
   },
+
   card: {
     background: 'var(--bg-secondary)',
     border: '1px solid var(--border)',
@@ -259,23 +268,27 @@ const styles = {
     maxWidth: '400px',
     boxShadow: 'var(--shadow)'
   },
+
   logoText: {
     fontFamily: 'var(--font-mono)',
     fontSize: '32px',
     fontWeight: '700',
     color: 'var(--text-primary)'
   },
+
   subtitle: {
     textAlign: 'center',
     color: 'var(--text-secondary)',
     marginBottom: '32px',
     fontSize: '14px'
   },
+
   form: {
     display: 'flex',
     flexDirection: 'column',
     gap: '12px'
   },
+
   input: {
     background: 'var(--bg-tertiary)',
     border: '1px solid var(--border)',
@@ -285,6 +298,7 @@ const styles = {
     fontSize: '14px',
     boxSizing: 'border-box'
   },
+
   eyeBtn: {
     position: 'absolute',
     right: '10px',
@@ -296,18 +310,21 @@ const styles = {
     cursor: 'pointer',
     padding: '2px'
   },
+
   checkboxes: {
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
     marginTop: '4px'
   },
+
   checkboxLabel: {
     display: 'flex',
     alignItems: 'flex-start',
     gap: '8px',
     cursor: 'pointer'
   },
+
   checkbox: {
     marginTop: '2px',
     flexShrink: 0,
@@ -316,16 +333,19 @@ const styles = {
     height: '15px',
     cursor: 'pointer'
   },
+
   checkboxText: {
     fontSize: '13px',
     color: 'var(--text-secondary)',
     lineHeight: '1.4'
   },
+
   checkboxLink: {
     color: 'var(--accent)',
     textDecoration: 'none',
     fontWeight: '600'
   },
+
   btn: {
     background: 'var(--accent)',
     color: '#fff',
@@ -335,12 +355,14 @@ const styles = {
     fontWeight: '600',
     marginTop: '4px'
   },
+
   switchText: {
     marginTop: '20px',
     textAlign: 'center',
     color: 'var(--text-secondary)',
     fontSize: '13px'
   },
+
   switchLink: {
     color: 'var(--accent)',
     cursor: 'pointer',
