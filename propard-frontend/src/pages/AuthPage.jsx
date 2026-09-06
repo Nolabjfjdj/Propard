@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
-export default function AuthPage({ mode: initialMode = 'login' }) {
+export default function AuthPage({ initialMode = 'login' }) {
   const [mode, setMode] = useState(initialMode);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -12,13 +12,15 @@ export default function AuthPage({ mode: initialMode = 'login' }) {
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
   const { login } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  const navigateToMode = (newMode) => {
+  const switchMode = (newMode) => {
     setMode(newMode);
     setError('');
+    setShowPassword(false);
+    setAcceptTerms(false);
+    setAcceptPrivacy(false);
 
     window.history.pushState(
       {},
@@ -29,19 +31,15 @@ export default function AuthPage({ mode: initialMode = 'login' }) {
     window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
+  const handleSubmit = async () => {
     if (!username || !password) {
-      setError('Remplis tous les champs');
-      return;
+      return setError('Remplis tous les champs');
     }
 
     if (mode === 'register' && (!acceptTerms || !acceptPrivacy)) {
-      setError(
+      return setError(
         'Tu dois accepter les CGU et la politique de confidentialité'
       );
-      return;
     }
 
     setError('');
@@ -72,174 +70,283 @@ export default function AuthPage({ mode: initialMode = 'login' }) {
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-container">
+    <div style={styles.page}>
+      <button onClick={toggleTheme} style={styles.themeBtn}>
+        {theme === 'dark' ? '☀️' : '🌙'}
+      </button>
 
-        <div className="auth-header">
-          <div className="auth-logo">
-            Propard
+      <div style={styles.card}>
+        <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+          <span style={styles.logoText}>Propard</span>
+          <span
+            style={{
+              color: 'var(--accent)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '32px',
+              fontWeight: 700
+            }}
+          >
+            .
+          </span>
+        </div>
+
+        <p style={styles.subtitle}>
+          {mode === 'login'
+            ? 'Content de te revoir'
+            : 'Crée ton compte'}
+        </p>
+
+        <div style={styles.form}>
+          <input
+            style={styles.input}
+            type="text"
+            placeholder="Pseudo"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            onKeyDown={e =>
+              e.key === 'Enter' && handleSubmit()
+            }
+          />
+
+          <div style={{ position: 'relative' }}>
+            <input
+              style={{
+                ...styles.input,
+                width: '100%',
+                paddingRight: '44px'
+              }}
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Mot de passe"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              onKeyDown={e =>
+                e.key === 'Enter' && handleSubmit()
+              }
+            />
+
+            <button
+              style={styles.eyeBtn}
+              onClick={() => setShowPassword(!showPassword)}
+              type="button"
+            >
+              {showPassword ? '🙈' : '👁️'}
+            </button>
           </div>
 
+          {mode === 'register' && (
+            <div style={styles.checkboxes}>
+              <label style={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={acceptTerms}
+                  onChange={e =>
+                    setAcceptTerms(e.target.checked)
+                  }
+                  style={styles.checkbox}
+                />
+
+                <span style={styles.checkboxText}>
+                  J'accepte les{' '}
+                  <a
+                    href="/terms"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={styles.checkboxLink}
+                  >
+                    Conditions d'utilisation
+                  </a>
+                </span>
+              </label>
+
+              <label style={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={acceptPrivacy}
+                  onChange={e =>
+                    setAcceptPrivacy(e.target.checked)
+                  }
+                  style={styles.checkbox}
+                />
+
+                <span style={styles.checkboxText}>
+                  J'accepte la{' '}
+                  <a
+                    href="/privacy"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={styles.checkboxLink}
+                  >
+                    Politique de confidentialité
+                  </a>
+                </span>
+              </label>
+            </div>
+          )}
+
+          {error && (
+            <p
+              style={{
+                color: 'var(--danger)',
+                fontSize: '13px',
+                textAlign: 'center'
+              }}
+            >
+              {error}
+            </p>
+          )}
+
           <button
-            type="button"
-            onClick={toggleTheme}
-            className="theme-toggle"
-            aria-label="Changer de thème"
+            style={{
+              ...styles.btn,
+              opacity: loading ? 0.7 : 1
+            }}
+            onClick={handleSubmit}
+            disabled={loading}
           >
-            {theme === 'dark' ? '☀️' : '🌙'}
+            {loading
+              ? '...'
+              : mode === 'login'
+                ? 'Se connecter'
+                : "S'inscrire"}
           </button>
         </div>
 
-        <div className="auth-card">
-          <h1>
+        <p style={styles.switchText}>
+          {mode === 'login'
+            ? 'Pas encore de compte ? '
+            : 'Déjà un compte ? '}
+
+          <span
+            style={styles.switchLink}
+            onClick={() =>
+              switchMode(
+                mode === 'login' ? 'register' : 'login'
+              )
+            }
+          >
             {mode === 'login'
-              ? 'Se connecter'
-              : "S'inscrire"}
-          </h1>
-
-          <p className="auth-subtitle">
-            {mode === 'login'
-              ? 'Connecte-toi à ton compte Propard'
-              : 'Crée ton compte Propard'}
-          </p>
-
-          <form onSubmit={handleSubmit}>
-
-            <div className="form-group">
-              <label htmlFor="username">
-                Nom d'utilisateur
-              </label>
-
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
-                placeholder="Nom d'utilisateur"
-                disabled={loading}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="password">
-                Mot de passe
-              </label>
-
-              <div className="password-wrapper">
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete={
-                    mode === 'login'
-                      ? 'current-password'
-                      : 'new-password'
-                  }
-                  placeholder="Mot de passe"
-                  disabled={loading}
-                />
-
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="password-toggle"
-                  aria-label={
-                    showPassword
-                      ? 'Masquer le mot de passe'
-                      : 'Afficher le mot de passe'
-                  }
-                >
-                  {showPassword ? '🙈' : '👁️'}
-                </button>
-              </div>
-            </div>
-
-            {mode === 'register' && (
-              <>
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={acceptTerms}
-                    onChange={(e) =>
-                      setAcceptTerms(e.target.checked)
-                    }
-                    disabled={loading}
-                  />
-
-                  <span>
-                    J'accepte les{' '}
-                    <a href="/terms">
-                      CGU
-                    </a>
-                  </span>
-                </label>
-
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={acceptPrivacy}
-                    onChange={(e) =>
-                      setAcceptPrivacy(e.target.checked)
-                    }
-                    disabled={loading}
-                  />
-
-                  <span>
-                    J'accepte la{' '}
-                    <a href="/privacy">
-                      politique de confidentialité
-                    </a>
-                  </span>
-                </label>
-              </>
-            )}
-
-            {error && (
-              <div className="auth-error">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="auth-submit"
-              disabled={loading}
-            >
-              {loading
-                ? 'Chargement...'
-                : mode === 'login'
-                  ? 'Se connecter'
-                  : "S'inscrire"}
-            </button>
-          </form>
-
-          <div className="auth-switch">
-            {mode === 'login' ? (
-              <>
-                Pas encore de compte ?{' '}
-                <button
-                  type="button"
-                  onClick={() => navigateToMode('register')}
-                >
-                  S'inscrire
-                </button>
-              </>
-            ) : (
-              <>
-                Déjà un compte ?{' '}
-                <button
-                  type="button"
-                  onClick={() => navigateToMode('login')}
-                >
-                  Se connecter
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+              ? "S'inscrire"
+              : 'Se connecter'}
+          </span>
+        </p>
       </div>
     </div>
   );
 }
+
+const styles = {
+  page: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'var(--bg-primary)',
+    position: 'relative'
+  },
+  themeBtn: {
+    position: 'absolute',
+    top: '20px',
+    right: '20px',
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: '8px',
+    padding: '8px 12px',
+    fontSize: '18px'
+  },
+  card: {
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    padding: '48px 40px',
+    width: '100%',
+    maxWidth: '400px',
+    boxShadow: 'var(--shadow)'
+  },
+  logoText: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: '32px',
+    fontWeight: '700',
+    color: 'var(--text-primary)'
+  },
+  subtitle: {
+    textAlign: 'center',
+    color: 'var(--text-secondary)',
+    marginBottom: '32px',
+    fontSize: '14px'
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px'
+  },
+  input: {
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: '8px',
+    padding: '12px 16px',
+    color: 'var(--text-primary)',
+    fontSize: '14px',
+    boxSizing: 'border-box'
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: '10px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    background: 'transparent',
+    border: 'none',
+    fontSize: '16px',
+    cursor: 'pointer',
+    padding: '2px'
+  },
+  checkboxes: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    marginTop: '4px'
+  },
+  checkboxLabel: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '8px',
+    cursor: 'pointer'
+  },
+  checkbox: {
+    marginTop: '2px',
+    flexShrink: 0,
+    accentColor: 'var(--accent)',
+    width: '15px',
+    height: '15px',
+    cursor: 'pointer'
+  },
+  checkboxText: {
+    fontSize: '13px',
+    color: 'var(--text-secondary)',
+    lineHeight: '1.4'
+  },
+  checkboxLink: {
+    color: 'var(--accent)',
+    textDecoration: 'none',
+    fontWeight: '600'
+  },
+  btn: {
+    background: 'var(--accent)',
+    color: '#fff',
+    borderRadius: '8px',
+    padding: '13px',
+    fontSize: '15px',
+    fontWeight: '600',
+    marginTop: '4px'
+  },
+  switchText: {
+    marginTop: '20px',
+    textAlign: 'center',
+    color: 'var(--text-secondary)',
+    fontSize: '13px'
+  },
+  switchLink: {
+    color: 'var(--accent)',
+    cursor: 'pointer',
+    fontWeight: '600'
+  }
+};
