@@ -307,16 +307,14 @@ export default function AppPage({
         selectedFriend?._id?.toString() ===
           userId?.toString()
       ) {
-        setSelectedFriend(
-          prev =>
-            prev
-              ? {
-                  ...prev,
-                  nickname:
-                    nickname?.trim() ||
-                    null
-                }
-              : prev
+        setSelectedFriend(prev =>
+          prev
+            ? {
+                ...prev,
+                nickname:
+                  nickname?.trim() || null
+              }
+            : prev
         );
 
         return;
