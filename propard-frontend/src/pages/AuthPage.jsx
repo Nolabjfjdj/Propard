@@ -1,142 +1,219 @@
-import { useState } from 'react';
-import axios from 'axios';
-import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
+import { useState, useEffect } from ‘react’;
+import { useAuth } from ‘./context/AuthContext’;
+import AuthPage from ‘./pages/AuthPage’;
+import AppPage from ‘./pages/AppPage’;
+import HelpPage from ‘./pages/HelpPage’;
+import ContactPage from ‘./pages/ContactPage’;
+import AdminPage from ‘./pages/AdminPage’;
+import PrivacyPage from ‘./pages/PrivacyPage’;
+import TermsPage from ‘./pages/TermsPage’;
+import GlobalAnnouncement from ‘./components/GlobalAnnouncement’;
 
-export default function AuthPage() {
-  const [mode, setMode] = useState('login');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [acceptTerms, setAcceptTerms] = useState(false);
-  const [acceptPrivacy, setAcceptPrivacy] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+export default function App() {
+const { user, loading } = useAuth();
+const [path, setPath] = useState(window.location.pathname);
 
-  const handleSubmit = async () => {
-    if (!username || !password) return setError('Remplis tous les champs');
-    if (mode === 'register' && (!acceptTerms || !acceptPrivacy)) {
-      return setError('Tu dois accepter les CGU et la politique de confidentialité');
-    }
-    setError('');
-    setLoading(true);
-    try {
-      const route = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
-      const res = await axios.post(route, { username, password });
-      login(res.data.user, res.data.token);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Erreur serveur');
-    } finally {
-      setLoading(false);
-    }
-  };
+useEffect(() => {
+const handlePopState = () => {
+setPath(window.location.pathname);
+};
 
-  return (
-    <div style={styles.page}>
-      <button onClick={toggleTheme} style={styles.themeBtn}>{theme === 'dark' ? '☀️' : '🌙'}</button>
-      <div style={styles.card}>
-        <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-          <span style={styles.logoText}>Propard</span>
-          <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: '32px', fontWeight: 700 }}>.</span>
-        </div>
-        <p style={styles.subtitle}>{mode === 'login' ? 'Content de te revoir' : 'Crée ton compte'}</p>
-        <div style={styles.form}>
-          <input style={styles.input} type="text" placeholder="Pseudo"
-            value={username} onChange={e => setUsername(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()} />
+window.addEventListener('popstate', handlePopState);
+return () => {
+  window.removeEventListener('popstate', handlePopState);
+};
 
-          <div style={{ position: 'relative' }}>
-            <input
-              style={{ ...styles.input, width: '100%', paddingRight: '44px' }}
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Mot de passe"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-            />
-            <button
-              style={styles.eyeBtn}
-              onClick={() => setShowPassword(!showPassword)}
-              type="button"
-            >
-              {showPassword ? '🙈' : '👁️'}
-            </button>
-          </div>
+}, []);
 
-          {/* Cases à cocher uniquement à l'inscription */}
-          {mode === 'register' && (
-            <div style={styles.checkboxes}>
-              <label style={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={acceptTerms}
-                  onChange={e => setAcceptTerms(e.target.checked)}
-                  style={styles.checkbox}
-                />
-                <span style={styles.checkboxText}>
-                  J'accepte les{' '}
-                  <a href="/terms" target="_blank" rel="noreferrer" style={styles.checkboxLink}>
-                    Conditions d'utilisation
-                  </a>
-                </span>
-              </label>
+const navigate = (to) => {
+window.history.pushState({}, ‘’, to);
+setPath(to);
+};
 
-              <label style={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={acceptPrivacy}
-                  onChange={e => setAcceptPrivacy(e.target.checked)}
-                  style={styles.checkbox}
-                />
-                <span style={styles.checkboxText}>
-                  J'accepte la{' '}
-                  <a href="/privacy" target="_blank" rel="noreferrer" style={styles.checkboxLink}>
-                    Politique de confidentialité
-                  </a>
-                </span>
-              </label>
-            </div>
-          )}
+if (loading) return (
+<div style={{
+display: ‘flex’,
+alignItems: ‘center’,
+justifyContent: ‘center’,
+height: ‘100vh’
+}}>
+<p style={{
+color: ‘var(–text-secondary)’,
+fontFamily: ‘var(–font-mono)’
+}}>
+Chargement…
+);
 
-          {error && <p style={{ color: 'var(--danger)', fontSize: '13px', textAlign: 'center' }}>{error}</p>}
-          <button style={{ ...styles.btn, opacity: loading ? 0.7 : 1 }} onClick={handleSubmit} disabled={loading}>
-            {loading ? '...' : mode === 'login' ? 'Se connecter' : "S'inscrire"}
-          </button>
-        </div>
-        <p style={styles.switchText}>
-          {mode === 'login' ? "Pas encore de compte ? " : "Déjà un compte ? "}
-          <span style={styles.switchLink} onClick={() => {
-            setMode(mode === 'login' ? 'register' : 'login');
-            setError('');
-            setShowPassword(false);
-            setAcceptTerms(false);
-            setAcceptPrivacy(false);
-          }}>
-            {mode === 'login' ? "S'inscrire" : "Se connecter"}
-          </span>
-        </p>
-      </div>
-    </div>
-  );
+if (path === ‘/help’) return ;
+
+if (path === ‘/help/contact’) {
+if (!user) {
+navigate(’/login’);
+return null;
+}
+
+return (
+  <>
+    <ContactPage />
+    <GlobalAnnouncement />
+  </>
+);
+
+}
+
+if (path.startsWith(’/chat/’)) {
+if (!user) {
+navigate(’/login’);
+return null;
+}
+
+const friendId = path.split('/chat/')[1];
+return (
+  <>
+    <AppPage initialFriendId={friendId} />
+    <GlobalAnnouncement />
+  </>
+);
+
+}
+
+if (path.startsWith(’/profile/’)) {
+if (!user) {
+navigate(’/login’);
+return null;
+}
+
+const profileUserId = path.split('/profile/')[1];
+return (
+  <>
+    <AppPage initialProfileUserId={profileUserId} />
+    <GlobalAnnouncement />
+  </>
+);
+
+}
+
+if (path === ‘/admin-propard-secret’) {
+return ;
+}
+
+if (path === ‘/privacy’) {
+return ;
+}
+
+if (path === ‘/terms’) {
+return ;
+}
+
+// ─── Connexion ─────────────────────────────────────────────
+if (path === ‘/login’) {
+if (user) {
+navigate(’/’);
+return null;
+}
+
+return <AuthPage initialMode="login" />;
+
+}
+
+// ─── Inscription ──────────────────────────────────────────
+if (path === ‘/register’) {
+if (user) {
+navigate(’/’);
+return null;
+}
+
+return <AuthPage initialMode="register" />;
+
+}
+
+// ─── Page principale ──────────────────────────────────────
+if (path === ‘/’) {
+if (user) {
+return (
+<>
+</>
+);
+}
+
+// Pas connecté → inscription
+navigate('/register');
+return null;
+
+}
+
+// ─── 404 ──────────────────────────────────────────────────
+return (
+404
+
+    <p style={styles.title}>
+      Page introuvable
+    </p>
+    <p style={styles.sub}>
+      Cette page n'existe pas sur Propard.
+    </p>
+    <button
+      onClick={() => navigate('/')}
+      style={styles.btn}
+    >
+      ← Retour à l'accueil
+    </button>
+  </div>
+</div>
+
+);
 }
 
 const styles = {
-  page: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)', position: 'relative' },
-  themeBtn: { position: 'absolute', top: '20px', right: '20px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', fontSize: '18px' },
-  card: { background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '48px 40px', width: '100%', maxWidth: '400px', boxShadow: 'var(--shadow)' },
-  logoText: { fontFamily: 'var(--font-mono)', fontSize: '32px', fontWeight: '700', color: 'var(--text-primary)' },
-  subtitle: { textAlign: 'center', color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '14px' },
-  form: { display: 'flex', flexDirection: 'column', gap: '12px' },
-  input: { background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 16px', color: 'var(--text-primary)', fontSize: '14px', boxSizing: 'border-box' },
-  eyeBtn: { position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', fontSize: '16px', cursor: 'pointer', padding: '2px' },
-  checkboxes: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' },
-  checkboxLabel: { display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' },
-  checkbox: { marginTop: '2px', flexShrink: 0, accentColor: 'var(--accent)', width: '15px', height: '15px', cursor: 'pointer' },
-  checkboxText: { fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.4' },
-  checkboxLink: { color: 'var(--accent)', textDecoration: 'none', fontWeight: '600' },
-  btn: { background: 'var(--accent)', color: '#fff', borderRadius: '8px', padding: '13px', fontSize: '15px', fontWeight: '600', marginTop: '4px' },
-  switchText: { marginTop: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' },
-  switchLink: { color: 'var(--accent)', cursor: 'pointer', fontWeight: '600' }
+page: {
+minHeight: ‘100vh’,
+background: ‘var(–bg-primary)’,
+display: ‘flex’,
+alignItems: ‘center’,
+justifyContent: ‘center’
+},
+
+card: {
+background: ‘var(–bg-secondary)’,
+border: ‘1px solid var(–border)’,
+borderRadius: ‘var(–radius)’,
+padding: ‘48px 40px’,
+textAlign: ‘center’,
+maxWidth: ‘400px’,
+width: ‘100%’
+},
+
+code: {
+fontFamily: ‘var(–font-mono)’,
+fontSize: ‘64px’,
+fontWeight: ‘700’,
+color: ‘var(–accent)’,
+marginBottom: ‘8px’
+},
+
+title: {
+fontSize: ‘20px’,
+fontWeight: ‘700’,
+color: ‘var(–text-primary)’,
+marginBottom: ‘8px’
+},
+
+sub: {
+fontSize: ‘14px’,
+color: ‘var(–text-secondary)’,
+marginBottom: ‘24px’
+},
+
+btn: {
+display: ‘inline-block’,
+background: ‘var(–accent)’,
+color: ‘#fff’,
+borderRadius: ‘8px’,
+padding: ‘10px 20px’,
+fontSize: ‘14px’,
+fontWeight: ‘600’,
+textDecoration: ‘none’,
+border: ‘none’,
+cursor: ‘pointer’
+}
 };
