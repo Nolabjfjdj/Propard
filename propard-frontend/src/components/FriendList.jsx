@@ -6,6 +6,7 @@ export default function FriendList({
   token,
   selectedFriend,
   onSelectFriend,
+  onOpenProfile,
   hideFriendIps,
   setHideFriendIps,
   dragOverFriendId,
@@ -20,7 +21,6 @@ export default function FriendList({
 
   useEffect(() => {
     const audio = new Audio('/notification.wav');
-
     audio.preload = 'auto';
 
     notificationAudioRef.current = audio;
@@ -53,9 +53,14 @@ export default function FriendList({
 
   const fetchUnread = async () => {
     try {
-      const res = await axios.get('/api/friends/unread', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await axios.get(
+        '/api/friends/unread',
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
 
       setUnread(res.data || {});
     } catch (err) {
@@ -68,9 +73,14 @@ export default function FriendList({
 
   const fetchData = async () => {
     try {
-      const res = await axios.get('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await axios.get(
+        '/api/auth/me',
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
 
       const friendsList = res.data.friends || [];
       const requestsList = res.data.friendRequests || [];
@@ -184,7 +194,7 @@ export default function FriendList({
         }
       );
 
-      fetchData();
+      await fetchData();
     } catch (err) {
       console.error(
         'Erreur acceptation demande:',
@@ -205,7 +215,7 @@ export default function FriendList({
         }
       );
 
-      fetchData();
+      await fetchData();
     } catch (err) {
       console.error(
         'Erreur refus demande:',
@@ -250,6 +260,16 @@ export default function FriendList({
     onSelectFriend(friend);
   };
 
+  const handleOpenProfile = (e, friend) => {
+    e.stopPropagation();
+
+    const friendId = friend?._id?.toString();
+
+    if (!friendId || !onOpenProfile) return;
+
+    onOpenProfile(friendId);
+  };
+
   return (
     <div style={styles.container}>
       {requests.length > 0 && (
@@ -263,9 +283,37 @@ export default function FriendList({
               key={req.from}
               style={styles.requestItem}
             >
-              <p style={styles.requestName}>
-                {requestUsers[req.from]?.username || '...'}
-              </p>
+              <div
+                style={styles.requestUser}
+                onClick={(e) =>
+                  handleOpenProfile(
+                    e,
+                    requestUsers[req.from]
+                  )
+                }
+              >
+                <div style={styles.requestAvatar}>
+                  {requestUsers[req.from]?.avatar ? (
+                    <img
+                      src={requestUsers[req.from].avatar}
+                      alt=""
+                      style={styles.avatarImg}
+                    />
+                  ) : (
+                    (
+                      requestUsers[req.from]?.displayName ||
+                      requestUsers[req.from]?.username ||
+                      '?'
+                    )[0].toUpperCase()
+                  )}
+                </div>
+
+                <p style={styles.requestName}>
+                  {requestUsers[req.from]?.displayName ||
+                    requestUsers[req.from]?.username ||
+                    '...'}
+                </p>
+              </div>
 
               <div
                 style={{
@@ -296,13 +344,7 @@ export default function FriendList({
         </div>
       )}
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}
-      >
+      <div style={styles.sectionHeader}>
         <p style={styles.sectionTitle}>
           Amis — {friends.length}
         </p>
@@ -326,8 +368,8 @@ export default function FriendList({
       {friends
         .filter(friend => friend.userId)
         .map(friend => {
-          const friendId =
-            friend.userId?._id?.toString();
+          const friendUser = friend.userId;
+          const friendId = friendUser?._id?.toString();
 
           const unreadCount =
             unread[friendId] || 0;
@@ -356,27 +398,50 @@ export default function FriendList({
                   : 'scale(1)'
               }}
               onClick={() =>
-                handleSelect(friend.userId)
+                handleSelect(friendUser)
               }
             >
-              <div style={styles.avatar}>
-                {(friend.userId?.username || '?')[0].toUpperCase()}
+              <div
+                style={styles.avatarButton}
+                onClick={(e) =>
+                  handleOpenProfile(e, friendUser)
+                }
+                title="Voir le profil"
+              >
+                <div style={styles.avatar}>
+                  {friendUser?.avatar ? (
+                    <img
+                      src={friendUser.avatar}
+                      alt=""
+                      style={styles.avatarImg}
+                    />
+                  ) : (
+                    (
+                      friendUser?.displayName ||
+                      friendUser?.username ||
+                      '?'
+                    )[0].toUpperCase()
+                  )}
+                </div>
               </div>
 
               <div
-                style={{
-                  flex: 1,
-                  minWidth: 0
-                }}
+                style={styles.friendInfo}
+                onClick={(e) =>
+                  handleOpenProfile(e, friendUser)
+                }
+                title="Voir le profil"
               >
                 <p style={styles.friendName}>
-                  {friend.userId?.username}
+                  {friend.nickname ||
+                    friendUser?.displayName ||
+                    friendUser?.username}
                 </p>
 
                 <p style={styles.friendIp}>
                   {hideFriendIps
                     ? '███.███.███.███'
-                    : friend.userId?.ipAlias}
+                    : friendUser?.ipAlias}
                 </p>
               </div>
 
@@ -399,7 +464,7 @@ export default function FriendList({
                   style={{
                     ...styles.dot,
                     background:
-                      friend.userId?.isOnline
+                      friendUser?.isOnline
                         ? 'var(--success)'
                         : 'var(--text-muted)'
                   }}
@@ -420,6 +485,12 @@ const styles = {
     flex: 1
   },
 
+  sectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+
   sectionTitle: {
     fontSize: '11px',
     color: 'var(--text-muted)',
@@ -438,6 +509,31 @@ const styles = {
     borderRadius: '8px',
     marginBottom: '4px',
     gap: '8px'
+  },
+
+  requestUser: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    minWidth: 0,
+    flex: 1,
+    cursor: 'pointer'
+  },
+
+  requestAvatar: {
+    width: '32px',
+    height: '32px',
+    borderRadius: '50%',
+    background: 'var(--accent-glow)',
+    border: '1px solid var(--accent)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '13px',
+    fontWeight: '700',
+    color: 'var(--accent)',
+    overflow: 'hidden',
+    flexShrink: 0
   },
 
   requestName: {
@@ -478,6 +574,11 @@ const styles = {
       'background 0.15s, transform 0.15s, box-shadow 0.15s'
   },
 
+  avatarButton: {
+    flexShrink: 0,
+    cursor: 'pointer'
+  },
+
   avatar: {
     width: '36px',
     height: '36px',
@@ -490,7 +591,20 @@ const styles = {
     fontSize: '14px',
     fontWeight: '700',
     color: 'var(--accent)',
-    flexShrink: 0
+    flexShrink: 0,
+    overflow: 'hidden'
+  },
+
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover'
+  },
+
+  friendInfo: {
+    flex: 1,
+    minWidth: 0,
+    cursor: 'pointer'
   },
 
   friendName: {
