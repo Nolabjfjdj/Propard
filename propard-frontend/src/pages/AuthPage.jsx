@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -14,6 +14,14 @@ export default function AuthPage({ initialMode = 'login' }) {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const { theme, toggleTheme } = useTheme();
+
+  useEffect(() => {
+    setMode(initialMode);
+    setError('');
+    setShowPassword(false);
+    setAcceptTerms(false);
+    setAcceptPrivacy(false);
+  }, [initialMode]);
 
   const switchMode = (newMode) => {
     setMode(newMode);
@@ -103,9 +111,7 @@ export default function AuthPage({ initialMode = 'login' }) {
             placeholder="Pseudo"
             value={username}
             onChange={e => setUsername(e.target.value)}
-            onKeyDown={e =>
-              e.key === 'Enter' && handleSubmit()
-            }
+            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
           />
 
           <div style={{ position: 'relative' }}>
@@ -119,9 +125,7 @@ export default function AuthPage({ initialMode = 'login' }) {
               placeholder="Mot de passe"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              onKeyDown={e =>
-                e.key === 'Enter' && handleSubmit()
-              }
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
             />
 
             <button
@@ -139,9 +143,7 @@ export default function AuthPage({ initialMode = 'login' }) {
                 <input
                   type="checkbox"
                   checked={acceptTerms}
-                  onChange={e =>
-                    setAcceptTerms(e.target.checked)
-                  }
+                  onChange={e => setAcceptTerms(e.target.checked)}
                   style={styles.checkbox}
                 />
 
@@ -162,9 +164,7 @@ export default function AuthPage({ initialMode = 'login' }) {
                 <input
                   type="checkbox"
                   checked={acceptPrivacy}
-                  onChange={e =>
-                    setAcceptPrivacy(e.target.checked)
-                  }
+                  onChange={e => setAcceptPrivacy(e.target.checked)}
                   style={styles.checkbox}
                 />
 
