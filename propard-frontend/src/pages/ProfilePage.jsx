@@ -515,11 +515,18 @@ export default function ProfilePage({
                 ) : (
                   initial
                 )}
-
-                <div style={styles.avatarEditHint}>
-                  ✏
-                </div>
               </div>
+
+              <button
+                type="button"
+                style={styles.avatarEditHint}
+                onClick={() =>
+                  fileInputRef.current?.click()
+                }
+                aria-label="Modifier la photo de profil"
+              >
+                ✏
+              </button>
 
               <input
                 ref={fileInputRef}
@@ -1086,17 +1093,23 @@ const styles = {
 
   avatarEditHint: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
+    bottom: '0px',
+    right: '0px',
+    zIndex: 10,
     background: 'var(--bg-secondary)',
-    border: '1px solid var(--border)',
+    border: '2px solid var(--bg-primary)',
     borderRadius: '50%',
-    width: '26px',
-    height: '26px',
+    width: '30px',
+    height: '30px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '12px'
+    fontSize: '13px',
+    lineHeight: 1,
+    padding: 0,
+    cursor: 'pointer',
+    color: 'var(--text-primary)',
+    boxShadow: 'var(--shadow)'
   },
 
   onlineDot: {
