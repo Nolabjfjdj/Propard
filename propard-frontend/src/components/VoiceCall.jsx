@@ -4,6 +4,15 @@ import socket from '../socket';
 const getIceServers = async (token) => {
   const endpoint = '/api/turn-credentials';
 
+  const stunServers = [
+    {
+      urls: 'stun:stun.l.google.com:19302'
+    },
+    {
+      urls: 'stun:stun1.l.google.com:19302'
+    }
+  ];
+
   try {
     const res = await fetch(endpoint, {
       headers: token
@@ -18,7 +27,8 @@ const getIceServers = async (token) => {
 
     if (!res.ok) {
       throw new Error(
-        `turn-credentials fetch failed (status ${res.status}): ${raw.slice(0, 200)}`
+        `turn-credentials fetch failed ` +
+        `(status ${res.status})`
       );
     }
 
@@ -30,21 +40,24 @@ const getIceServers = async (token) => {
 
     const data = JSON.parse(raw);
 
-    const iceServers = Array.isArray(data)
-      ? data
-      : (data.iceServers || data);
+    const iceServers =
+      Array.isArray(data)
+        ? data
+        : (data.iceServers || data);
+
+    if (!Array.isArray(iceServers)) {
+      throw new Error(
+        'Liste ICE servers invalide'
+      );
+    }
 
     return {
       iceServers: [
-        {
-          urls: 'stun:stun.l.google.com:19302'
-        },
-        {
-          urls: 'stun:stun1.l.google.com:19302'
-        },
+        ...stunServers,
         ...iceServers
       ]
     };
+
   } catch (err) {
     console.error(
       'Repli sur STUN seul:',
@@ -52,14 +65,7 @@ const getIceServers = async (token) => {
     );
 
     return {
-      iceServers: [
-        {
-          urls: 'stun:stun.l.google.com:19302'
-        },
-        {
-          urls: 'stun:stun1.l.google.com:19302'
-        }
-      ]
+      iceServers: stunServers
     };
   }
 };
@@ -86,6 +92,36 @@ export default function VoiceCall({
   const hasInitiatedRef = useRef(false);
   const pendingCandidates = useRef([]);
   const timerStartedRef = useRef(false);
+
+  /*
+   * Liste complète des ICE servers reçus du backend.
+   */
+  const iceServersRef = useRef([]);
+
+  /*
+   * Index du serveur TURN actuellement privilégié
+   * lors d'un failover.
+   */
+  const currentTurnIndexRef = useRef(0);
+
+  /*
+   * Empêche deux ICE restarts simultanés.
+   */
+  const restartingIceRef = useRef(false);
+
+  /*
+   * Nombre maximum de tentatives de failover pour
+   * éviter une boucle infinie.
+   */
+  const restartAttemptsRef = useRef(0);
+
+  /*
+   * Permet de savoir si l'utilisateur est l'appelant.
+   *
+   * Seul l'appelant déclenche automatiquement le failover.
+   * L'autre côté reçoit l'offre ICE restart et répond.
+   */
+  const isCallerRef = useRef(!incomingOffer);
 
   const friendName =
     friend?.nickname?.trim() ||
@@ -136,11 +172,176 @@ export default function VoiceCall({
     }
 
     pendingCandidates.current = [];
+
+    iceServersRef.current = [];
+    currentTurnIndexRef.current = 0;
+    restartingIceRef.current = false;
+    restartAttemptsRef.current = 0;
+  };
+
+  /*
+   * Retourne uniquement les serveurs TURN.
+   *
+   * Les STUN ne servent pas au failover TURN.
+   */
+  const getTurnServers = () => {
+    return iceServersRef.current.filter(
+      server => {
+        const urls = Array.isArray(server.urls)
+          ? server.urls
+          : [server.urls];
+
+        return urls.some(
+          url =>
+            typeof url === 'string' &&
+            (
+              url.startsWith('turn:') ||
+              url.startsWith('turns:')
+            )
+        );
+      }
+    );
+  };
+
+  /*
+   * Change le serveur ICE utilisé pour le prochain
+   * redémarrage ICE.
+   */
+  const switchToNextTurnServer = async () => {
+    const peer = peerRef.current;
+
+    if (!peer) return false;
+
+    if (restartingIceRef.current) {
+      return false;
+    }
+
+    const turnServers = getTurnServers();
+
+    if (turnServers.length === 0) {
+      console.error(
+        'Aucun serveur TURN disponible pour le failover.'
+      );
+
+      return false;
+    }
+
+    if (
+      restartAttemptsRef.current >=
+      turnServers.length
+    ) {
+      console.error(
+        'Tous les serveurs TURN disponibles ont ' +
+        'déjà été essayés.'
+      );
+
+      return false;
+    }
+
+    restartingIceRef.current = true;
+
+    const nextIndex =
+      currentTurnIndexRef.current %
+      turnServers.length;
+
+    const nextTurn =
+      turnServers[nextIndex];
+
+    currentTurnIndexRef.current =
+      (nextIndex + 1) %
+      turnServers.length;
+
+    restartAttemptsRef.current += 1;
+
+    try {
+      console.log(
+        '🔄 ICE restart avec le serveur TURN suivant:',
+        nextIndex + 1,
+        '/',
+        turnServers.length
+      );
+
+      /*
+       * On conserve les STUN et on sélectionne le
+       * serveur TURN suivant.
+       */
+      const stunServers =
+        iceServersRef.current.filter(
+          server => {
+            const urls = Array.isArray(server.urls)
+              ? server.urls
+              : [server.urls];
+
+            return urls.some(
+              url =>
+                typeof url === 'string' &&
+                url.startsWith('stun:')
+            );
+          }
+        );
+
+      peer.setConfiguration({
+        iceServers: [
+          ...stunServers,
+          nextTurn
+        ]
+      });
+
+      /*
+       * Demande à WebRTC de refaire ICE sans fermer
+       * le RTCPeerConnection.
+       */
+      peer.restartIce();
+
+      /*
+       * Création d'une nouvelle offer.
+       *
+       * restartIce() fera en sorte que cette offer
+       * contienne les nouveaux paramètres ICE.
+       */
+      const offer =
+        await peer.createOffer();
+
+      await peer.setLocalDescription(
+        offer
+      );
+
+      socket.emit(
+        'iceRestartOffer',
+        {
+          receiverId: friend._id,
+          offer
+        }
+      );
+
+      setStatus('calling');
+
+      return true;
+
+    } catch (err) {
+      console.error(
+        'ICE restart error:',
+        err
+      );
+
+      return false;
+
+    } finally {
+      restartingIceRef.current = false;
+    }
   };
 
   const createPeer = async () => {
-    const config = await getIceServers(token);
+    const config =
+      await getIceServers(token);
 
+    iceServersRef.current =
+      config.iceServers;
+
+    /*
+     * On commence avec toute la liste.
+     * WebRTC peut donc trouver un chemin valide.
+     */
     const peer =
       new RTCPeerConnection(config);
 
@@ -178,7 +379,7 @@ export default function VoiceCall({
         );
     };
 
-    peer.oniceconnectionstatechange = () => {
+    peer.oniceconnectionstatechange = async () => {
       console.log(
         'ICE state:',
         peer.iceConnectionState
@@ -191,23 +392,48 @@ export default function VoiceCall({
           'completed'
       ) {
         setStatus('connected');
-        startTimer();
-      }
 
-      if (
-        peer.iceConnectionState ===
-        'failed'
-      ) {
-        setStatus('failed');
+        startTimer();
+
+        /*
+         * Une connexion est revenue :
+         * on remet le compteur de failover à zéro.
+         */
+        restartAttemptsRef.current = 0;
+
+        return;
       }
 
       if (
         peer.iceConnectionState ===
         'disconnected'
       ) {
+        /*
+         * "disconnected" peut être temporaire.
+         * On ne change donc pas immédiatement de TURN.
+         */
         console.log(
           'Connexion WebRTC temporairement interrompue'
         );
+
+        return;
+      }
+
+      if (
+        peer.iceConnectionState ===
+        'failed'
+      ) {
+        console.warn(
+          '❌ ICE failed : tentative de failover TURN'
+        );
+
+        /*
+         * Seul l'appelant déclenche automatiquement
+         * la nouvelle négociation.
+         */
+        if (isCallerRef.current) {
+          await switchToNextTurnServer();
+        }
       }
     };
 
@@ -270,6 +496,7 @@ export default function VoiceCall({
         receiverId: friend._id,
         offer
       });
+
     } catch (err) {
       console.error(
         'startCall error:',
@@ -282,6 +509,8 @@ export default function VoiceCall({
 
   const answerCall = async () => {
     try {
+      isCallerRef.current = false;
+
       const stream =
         await navigator.mediaDevices.getUserMedia(
           {
@@ -324,6 +553,7 @@ export default function VoiceCall({
         callerId: friend._id,
         answer
       });
+
     } catch (err) {
       console.error(
         'answerCall error:',
@@ -370,9 +600,15 @@ export default function VoiceCall({
       !hasInitiatedRef.current
     ) {
       hasInitiatedRef.current = true;
+
+      isCallerRef.current = true;
+
       startCall();
     }
 
+    /*
+     * Réponse à l'offer initiale.
+     */
     const handleCallAnswered =
       async ({ answer }) => {
         if (!peerRef.current) return;
@@ -388,6 +624,7 @@ export default function VoiceCall({
           await addPendingCandidates(
             peerRef.current
           );
+
         } catch (err) {
           console.error(
             'callAnswered error:',
@@ -396,6 +633,9 @@ export default function VoiceCall({
         }
       };
 
+    /*
+     * Réception d'une candidate ICE.
+     */
     const handleIceCandidate =
       async ({ candidate }) => {
         if (!candidate) return;
@@ -411,15 +651,94 @@ export default function VoiceCall({
                   candidate
                 )
               );
+
           } catch (err) {
             console.error(
               'iceCandidate error:',
               err
             );
           }
+
         } else {
           pendingCandidates.current.push(
             candidate
+          );
+        }
+      };
+
+    /*
+     * L'autre utilisateur nous envoie une nouvelle
+     * offer parce qu'il effectue un ICE restart.
+     *
+     * Cela arrive notamment lorsque l'appelant change
+     * de TURN.
+     */
+    const handleIceRestartOffer =
+      async ({ offer }) => {
+        const peer =
+          peerRef.current;
+
+        if (!peer) return;
+
+        try {
+          console.log(
+            '🔄 Réception d’une ICE restart offer'
+          );
+
+          await peer.setRemoteDescription(
+            new RTCSessionDescription(
+              offer
+            )
+          );
+
+          const answer =
+            await peer.createAnswer();
+
+          await peer.setLocalDescription(
+            answer
+          );
+
+          socket.emit(
+            'iceRestartAnswer',
+            {
+              callerId: friend._id,
+              answer
+            }
+          );
+
+        } catch (err) {
+          console.error(
+            'iceRestartOffer error:',
+            err
+          );
+        }
+      };
+
+    /*
+     * Réception de la réponse à notre ICE restart.
+     */
+    const handleIceRestartAnswer =
+      async ({ answer }) => {
+        const peer =
+          peerRef.current;
+
+        if (!peer) return;
+
+        try {
+          console.log(
+            '🔄 Réception de la réponse ICE restart'
+          );
+
+          await peer.setRemoteDescription(
+            new RTCSessionDescription(
+              answer
+            )
+          );
+
+        } catch (err) {
+          console.error(
+            'iceRestartAnswer error:',
+            err
           );
         }
       };
@@ -444,6 +763,16 @@ export default function VoiceCall({
     );
 
     socket.on(
+      'iceRestartOffer',
+      handleIceRestartOffer
+    );
+
+    socket.on(
+      'iceRestartAnswer',
+      handleIceRestartAnswer
+    );
+
+    socket.on(
       'callEnded',
       handleCallEnded
     );
@@ -462,6 +791,16 @@ export default function VoiceCall({
       socket.off(
         'iceCandidate',
         handleIceCandidate
+      );
+
+      socket.off(
+        'iceRestartOffer',
+        handleIceRestartOffer
+      );
+
+      socket.off(
+        'iceRestartAnswer',
+        handleIceRestartAnswer
       );
 
       socket.off(
