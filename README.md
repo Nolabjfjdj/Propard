@@ -1,202 +1,213 @@
 # Propard
 
-> **Propard** est une plateforme web française de communication entre utilisateurs, développée avec **React**, **Vite**, **Node.js**, **Express**, **MongoDB**, **Mongoose** et **Socket.IO**.
+> Propard est une plateforme web française de communication entre utilisateurs, développée avec React, Vite, Node.js, Express, MongoDB, Mongoose et Socket.IO.
 
-Propard est un projet indépendant développé par **BananeVR**.
+Propard est un projet indépendant développé par BananeVR.
 
----
-
-## 📌 À propos
+## À propos
 
 Propard regroupe plusieurs outils de communication et d'interaction dans une même plateforme web.
 
 Le projet est composé de deux applications principales :
 
 - **Frontend** : application React/Vite exécutée dans le navigateur.
-- **Backend** : serveur Node.js/Express qui fournit l'API, la messagerie temps réel, les appels et sert également le frontend compilé en production.
+- **Backend** : serveur Node.js/Express fournissant l'API, les communications temps réel, la signalisation WebRTC et le service du frontend compilé en production.
 
-Les données persistantes sont stockées dans **MongoDB** via **Mongoose**.
+Les données persistantes sont stockées dans MongoDB via Mongoose.
 
-Le projet utilise **Socket.IO** pour les communications temps réel et **WebRTC** pour les appels entre utilisateurs.
+Socket.IO est utilisé pour les communications temps réel et WebRTC pour les appels entre utilisateurs.
 
 ---
 
-## ✨ Fonctionnalités
+# Fonctionnalités
 
-### 👤 Comptes
+## Comptes
 
 - Création de compte
 - Connexion
 - Authentification JWT
-- Sessions avec jetons valables 30 jours
+- Jetons valables 30 jours
 - Modification du profil
 - Nom d'affichage
 - Avatar
 - Clé publique cryptographique
-- Profil utilisateur
+- Consultation de profils
+- Suppression et restauration de compte
 
-### 👥 Relations entre utilisateurs
+## Relations entre utilisateurs
 
-- Recherche et interaction avec les utilisateurs
+- Recherche/interactions prévues par les routes et composants du projet
 - Demandes d'amis
-- Acceptation/refus des demandes
+- Acceptation des demandes
+- Refus des demandes
 - Liste d'amis
-- Surnoms personnalisés pour les amis
+- Surnoms personnalisés
 - Amis en commun
-- Blocage et déblocage
-- Statut en ligne/hors ligne
+- Blocage
+- Déblocage
+- Présence en ligne/hors ligne
 
-### 💬 Messagerie
+## Messagerie
 
-- Messagerie entre amis
-- Communication en temps réel avec Socket.IO
+- Conversations entre amis
+- Communication temps réel avec Socket.IO
 - Messages chiffrés côté client
 - Édition des messages
 - Suppression des messages
 - Statut de lecture
-- Notifications de nouveaux messages
+- Messages non lus
 - Protection contre l'envoi trop rapide de messages
 
-### 🔐 Cryptographie
+## Cryptographie
 
 Propard utilise un système de chiffrement côté client pour les messages.
 
-Les clés publiques sont enregistrées côté serveur afin de permettre aux clients de communiquer de manière chiffrée.
+Les utilisateurs peuvent enregistrer une clé publique cryptographique.
 
-Le backend vérifie notamment la structure des clés publiques utilisées par Propard.
+Le backend vérifie la structure de la clé publique avant de l'enregistrer.
 
-> **Important :** le terme « chiffrement côté client » ne signifie pas qu'une sécurité cryptographique parfaite ou qu'un protocole E2EE professionnellement audité est garanti. Le système doit être considéré comme une implémentation propre au projet et non comme un protocole cryptographique certifié.
+Le serveur reçoit les messages sous une structure chiffrée et effectue plusieurs validations avant leur traitement.
 
-### 📞 Appels
+> Le chiffrement utilisé par Propard est une implémentation propre au projet. Il ne faut pas le présenter comme un protocole cryptographique professionnellement audité ou comme une garantie absolue de sécurité.
 
-Propard intègre une infrastructure d'appels basée sur :
+## Appels
+
+Les appels utilisent :
 
 - WebRTC
 - Socket.IO pour la signalisation
-- Serveurs STUN
-- Serveurs TURN
+- STUN
+- TURN
 
-Les appels sont actuellement limités aux utilisateurs autorisés à communiquer entre eux.
+Le backend vérifie que les utilisateurs sont authentifiés et autorisés à communiquer.
 
-### ⚡ Temps réel
+Le système de signalisation prend notamment en charge :
+
+- les offres ;
+- les réponses ;
+- les ICE candidates ;
+- la fin des appels ;
+- le redémarrage ICE.
+
+## Temps réel
 
 Socket.IO est utilisé notamment pour :
 
+- l'authentification des sockets ;
 - les nouveaux messages ;
-- les changements de présence ;
-- les appels ;
-- les offres WebRTC ;
-- les réponses WebRTC ;
-- les ICE candidates ;
-- la fin des appels.
+- les confirmations d'envoi ;
+- les erreurs de message ;
+- les avertissements liés au spam ;
+- les appels entrants ;
+- les réponses aux appels ;
+- la fin des appels ;
+- les échecs d'appel ;
+- les communications liées aux relations entre utilisateurs ;
+- les annonces.
 
-Le backend prend également en charge plusieurs connexions simultanées pour un même compte.
+Un même compte peut disposer de plusieurs connexions Socket.IO simultanées.
 
-Ainsi, un utilisateur connecté sur plusieurs onglets ou appareils reste considéré comme en ligne tant qu'au moins une connexion Socket.IO est active.
+Le compte reste en ligne tant qu'au moins une de ses connexions reste active.
 
-### 📢 Annonces
+## Annonces
 
 Propard possède un système d'annonces administratives.
 
 Une annonce possède notamment :
 
 - un titre ;
-- un contenu ;
+- un message ;
 - un état actif/inactif ;
 - une date de création.
 
-Les utilisateurs peuvent également conserver l'information indiquant qu'une annonce a été acceptée.
+Les utilisateurs peuvent enregistrer qu'ils ont accepté une annonce.
 
-### 🛡️ Administration
+Une nouvelle annonce active désactive l'annonce active précédente selon la logique actuelle du backend.
 
-Le backend contient une API d'administration destinée aux fonctionnalités réservées aux comptes disposant des autorisations nécessaires.
+## Signalements
 
-### 🚨 Signalements
+Propard possède un système de signalement.
 
-Propard possède un système de signalement permettant de transmettre des contenus ou comportements à la modération.
+Les signalements sont séparés de la messagerie classique.
 
-Le backend contient également les mécanismes nécessaires au traitement des signalements.
+Le système permet notamment de transmettre un message à la modération avec les informations nécessaires au traitement du signalement.
 
-### 📧 E-mails
+Le backend vérifie plusieurs éléments avant d'accepter un signalement, notamment l'existence du message et la relation entre le signalant et le message concerné.
 
-Le backend utilise **Nodemailer** pour les fonctionnalités nécessitant l'envoi d'e-mails.
+Un mécanisme de limitation empêche également l'envoi trop rapide de plusieurs signalements.
 
-### 🗑️ Suppression de compte
+Le projet possède également une partie d'administration des signalements permettant notamment leur consultation et leur traitement.
 
-La suppression d'un compte est organisée en deux étapes.
+## Administration
+
+Le backend possède des routes administratives protégées par des clés provenant des variables d'environnement.
+
+Les fonctionnalités d'administration comprennent notamment :
+
+- certaines opérations sur les comptes ;
+- la réinitialisation de mot de passe ;
+- la gestion des annonces ;
+- la gestion des signalements.
+
+Les opérations administratives sensibles possèdent également des protections contre les tentatives répétées.
+
+## E-mails
+
+Nodemailer est présent dans les dépendances du backend et est utilisé par les fonctionnalités du projet nécessitant l'envoi d'e-mails.
+
+## Suppression de compte
+
+Propard possède un mécanisme de suppression différée.
 
 Lorsqu'un utilisateur demande la suppression :
 
 1. le compte est anonymisé ;
-2. le pseudonyme original est conservé temporairement ;
-3. une période de restauration de **30 jours** commence ;
-4. l'utilisateur peut restaurer son compte pendant cette période ;
-5. après expiration, le compte est définitivement anonymisé.
+2. certaines informations permettant la restauration sont conservées temporairement ;
+3. une période de restauration de 30 jours commence ;
+4. le compte peut être restauré pendant cette période ;
+5. après expiration, les informations nécessaires à la restauration sont supprimées ou remplacées.
 
-Une suppression définitive immédiate est également disponible via l'API dédiée.
+Une route de suppression immédiate existe également.
 
 ---
 
-# 🧱 Architecture
+# Architecture
 
 ```text
-                         ┌──────────────────────┐
-                         │      Utilisateur     │
-                         │      Navigateur      │
-                         └──────────┬───────────┘
-                                    │
-                                  HTTPS
-                                    │
-                                    ▼
-                    ┌────────────────────────────┐
-                    │          Frontend          │
-                    │                            │
-                    │       React + Vite         │
-                    │                            │
-                    │  ├─ Pages                  │
-                    │  ├─ Components             │
-                    │  ├─ Context               │
-                    │  ├─ Utils                 │
-                    │  └─ Socket.IO Client      │
-                    └──────────────┬─────────────┘
-                                   │
-                         HTTP / Socket.IO
-                                   │
-                                   ▼
-                    ┌────────────────────────────┐
-                    │          Backend           │
-                    │                            │
-                    │      Node.js + Express     │
-                    │                            │
-                    │  ├─ Auth                   │
-                    │  ├─ Friends                │
-                    │  ├─ Messages               │
-                    │  ├─ Profiles               │
-                    │  ├─ Announcements          │
-                    │  ├─ Reports                │
-                    │  ├─ Administration         │
-                    │  └─ TURN / WebRTC          │
-                    └──────────────┬─────────────┘
-                                   │
-                                   ▼
-                         ┌──────────────────┐
-                         │     MongoDB      │
-                         │                  │
-                         │  Users           │
-                         │  Messages        │
-                         │  Announcements   │
-                         └──────────────────┘
+                         Utilisateur
+                             │
+                             │ HTTPS
+                             ▼
+                  ┌─────────────────────┐
+                  │      Frontend       │
+                  │     React + Vite    │
+                  └──────────┬──────────┘
+                             │
+                    HTTP / Socket.IO
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │      Backend        │
+                  │ Node.js + Express   │
+                  │     + Socket.IO     │
+                  └───────┬───────┬─────┘
+                          │       │
+                          │       └── WebRTC / STUN / TURN
+                          │
+                          ▼
+                    ┌─────────────┐
+                    │   MongoDB   │
+                    │  Mongoose   │
+                    └─────────────┘
 ```
 
 ---
 
-# 📁 Structure du dépôt
+# Structure du dépôt
 
 ```text
 Propard/
-│
 ├── propard-backend/
-│   │
 │   ├── middleware/
 │   │   ├── auth.js
 │   │   └── rateLimit.js
@@ -204,6 +215,7 @@ Propard/
 │   ├── models/
 │   │   ├── Announcement.js
 │   │   ├── Message.js
+│   │   ├── Report.js
 │   │   └── User.js
 │   │
 │   ├── routes/
@@ -212,6 +224,7 @@ Propard/
 │   │   ├── auth.js
 │   │   ├── friends.js
 │   │   ├── reports.js
+│   │   ├── reportsAdmin.js
 │   │   └── turn.js
 │   │
 │   ├── utils/
@@ -221,9 +234,7 @@ Propard/
 │   └── package-lock.json
 │
 ├── propard-frontend/
-│   │
 │   ├── public/
-│   │
 │   ├── src/
 │   │   ├── assets/
 │   │   ├── components/
@@ -245,15 +256,15 @@ Propard/
 └── README.md
 ```
 
-> La structure peut évoluer au fil du développement. Le dépôt reste la référence pour connaître l'organisation exacte des fichiers.
+> L'arborescence peut évoluer avec les nouvelles versions du projet. Le dépôt reste la référence pour connaître les fichiers réellement présents.
 
 ---
 
-# 🖥️ Frontend
+# Frontend
 
-Le frontend est une application **React** construite avec **Vite**.
+Le frontend utilise React et Vite.
 
-## Technologies
+## Technologies principales
 
 - React 19
 - React DOM
@@ -265,70 +276,70 @@ Le frontend est une application **React** construite avec **Vite**.
 - ESLint React Hooks
 - ESLint React Refresh
 
-## Scripts disponibles
+## Scripts
 
 Depuis `propard-frontend/` :
-
-### Installation
 
 ```bash
 npm install
 ```
 
-### Développement
+Installe les dépendances.
 
 ```bash
 npm run dev
 ```
 
-### Build de production
+Lance le serveur de développement Vite.
 
 ```bash
 npm run build
 ```
 
-### Vérification ESLint
+Construit la version de production.
 
 ```bash
 npm run lint
 ```
 
-### Prévisualisation du build
+Lance ESLint.
 
 ```bash
 npm run preview
 ```
 
+Lance une prévisualisation du build.
+
 ---
 
-# ⚙️ Backend
+# Backend
 
-Le backend est une application **Node.js + Express**.
+Le backend utilise Node.js et Express.
 
 Il gère notamment :
 
 - l'authentification ;
 - les comptes ;
 - les profils ;
-- les amis ;
+- les relations entre utilisateurs ;
 - les messages ;
 - les annonces ;
 - les signalements ;
 - l'administration ;
-- les informations TURN ;
-- les communications Socket.IO ;
+- les credentials TURN ;
+- Socket.IO ;
 - la signalisation WebRTC.
 
-Le backend peut également servir directement le frontend compilé depuis son dossier `dist`.
+Le backend peut également servir le frontend compilé depuis son dossier `dist`.
 
 ---
 
-# 📦 Technologies backend
+# Technologies backend
 
-Le backend utilise notamment :
+Les dépendances principales comprennent :
 
 - Node.js
-- Express 5
+- Express
 - MongoDB
 - Mongoose
 - JSON Web Token
@@ -341,15 +352,15 @@ Le backend utilise notamment :
 
 ---
 
-# 🔑 Authentification
+# Authentification
 
-Propard utilise des **JSON Web Tokens (JWT)**.
+Propard utilise des JSON Web Tokens.
 
 Lors de l'inscription ou de la connexion, le backend génère un token associé au compte.
 
-Les tokens ont actuellement une durée de validité de **30 jours**.
+La durée actuelle du token est de 30 jours.
 
-Les mots de passe ne sont pas stockés directement : ils sont hachés avec **bcryptjs**.
+Les mots de passe sont hachés avec `bcryptjs`.
 
 Les routes protégées utilisent le middleware :
 
@@ -359,27 +370,7 @@ propard-backend/middleware/auth.js
 
 ---
 
-# 🛡️ Protection contre les abus
-
-Le backend possède un système de limitation de fréquence pour certaines opérations sensibles.
-
-Par exemple :
-
-- les connexions ;
-- les inscriptions ;
-- l'envoi trop rapide de messages.
-
-Les limites sont gérées par :
-
-```text
-propard-backend/middleware/rateLimit.js
-```
-
-Le backend est également configuré pour prendre en compte le proxy inverse utilisé en production.
-
----
-
-# 👤 Profils utilisateurs
+# Profils utilisateurs
 
 Le modèle `User` contient notamment :
 
@@ -400,32 +391,23 @@ acceptedAnnouncements
 createdAt
 ```
 
-Le profil public peut notamment exposer :
+Certaines informations internes ne sont pas renvoyées au client, notamment le mot de passe.
 
-- username ;
-- nom d'affichage ;
-- avatar ;
-- alias IP ;
-- clé publique ;
-- statut en ligne ;
-- informations liées à la relation avec le visiteur ;
-- amis en commun.
-
-Certaines informations internes, comme le mot de passe et le nom d'utilisateur temporairement conservé pour une suppression différée, ne sont pas exposées au client.
+Le profil utilisateur permet également de récupérer les informations liées à la relation entre deux utilisateurs et les amis en commun.
 
 ---
 
-# 🌐 Alias IP
+# Alias IP
 
-Propard attribue aux comptes un `ipAlias`.
+Chaque compte possède un `ipAlias`.
 
-Cet alias est généré aléatoirement et ne correspond pas directement à l'adresse IP réelle de l'utilisateur.
+Cet alias est généré par le backend et ne correspond pas directement à l'adresse IP réelle de l'utilisateur.
 
-Il sert notamment à disposer d'un identifiant d'affichage alternatif lié à la protection de la vie privée.
+Il sert notamment d'identifiant alternatif dans certaines interactions du système.
 
 ---
 
-# 👥 Système d'amis
+# Système d'amis
 
 Le système d'amis est principalement géré par :
 
@@ -433,22 +415,25 @@ Le système d'amis est principalement géré par :
 propard-backend/routes/friends.js
 ```
 
-Les utilisateurs peuvent notamment :
+Il permet notamment :
 
-- envoyer une demande ;
-- accepter une demande ;
-- gérer leurs amis ;
-- définir un surnom pour un ami ;
-- bloquer un utilisateur ;
-- débloquer un utilisateur.
+- d'envoyer des demandes ;
+- d'accepter des demandes ;
+- de refuser des demandes ;
+- de consulter ses amis ;
+- de définir des surnoms ;
+- de supprimer une relation ;
+- de bloquer un utilisateur ;
+- de débloquer un utilisateur ;
+- de récupérer certaines informations de relation.
 
-Certaines fonctionnalités de communication sont volontairement limitées aux utilisateurs qui sont amis.
+Certaines fonctions de communication nécessitent que les utilisateurs soient amis.
 
 ---
 
-# 💬 Messagerie
+# Messagerie
 
-Les messages sont stockés avec le modèle :
+Les messages sont stockés dans :
 
 ```text
 propard-backend/models/Message.js
@@ -468,35 +453,41 @@ read
 createdAt
 ```
 
-Le contenu transmis au backend est attendu sous forme de message chiffré.
+Le backend vérifie notamment :
 
-Le serveur effectue également des vérifications avant d'accepter l'enregistrement d'un message.
+- l'authentification ;
+- l'identité du destinataire ;
+- la relation d'amitié ;
+- la structure du message chiffré ;
+- la fréquence d'envoi.
 
----
-
-# 🔐 Chiffrement
-
-Le système de messagerie utilise une paire de clés cryptographiques côté client.
-
-La clé publique peut être enregistrée sur le compte utilisateur afin de permettre aux autres clients de préparer des messages chiffrés destinés à cet utilisateur.
-
-Le backend vérifie notamment que la clé publique fournie respecte le format attendu par Propard.
-
-La clé privée n'a pas vocation à être stockée dans la base MongoDB.
-
-> **Attention :** cette architecture ne constitue pas une preuve formelle de sécurité cryptographique. Le système n'est pas présenté comme ayant été audité par un organisme indépendant.
+Les messages sont également transmis en temps réel par Socket.IO.
 
 ---
 
-# ⚡ Socket.IO
+# Chiffrement des messages
 
-Le serveur Socket.IO est initialisé directement dans :
+Le chiffrement est effectué côté client.
+
+La clé publique d'un utilisateur peut être enregistrée dans son profil.
+
+Le backend vérifie notamment que la clé publique respecte le format cryptographique attendu par le projet.
+
+La clé privée n'est pas enregistrée dans le modèle `User`.
+
+Le backend attend pour les messages une structure contenant notamment les éléments nécessaires au contenu chiffré.
+
+---
+
+# Socket.IO
+
+Le serveur Socket.IO est initialisé dans :
 
 ```text
 propard-backend/index.js
 ```
 
-Il gère notamment :
+Les principaux événements entrants comprennent :
 
 ```text
 authenticate
@@ -504,10 +495,12 @@ sendMessage
 callUser
 answerCall
 iceCandidate
+iceRestartOffer
+iceRestartAnswer
 endCall
 ```
 
-Des événements sont également envoyés aux clients pour :
+Le serveur utilise également différents événements sortants, notamment :
 
 ```text
 authenticated
@@ -521,44 +514,61 @@ callEnded
 callFailed
 ```
 
----
-
-# 🟢 Présence en ligne
-
-Propard maintient une liste des connexions Socket.IO actives.
-
-Un même compte peut donc être connecté :
-
-- dans plusieurs onglets ;
-- sur plusieurs appareils ;
-- avec plusieurs connexions simultanées.
-
-Le compte n'est marqué hors ligne que lorsque sa dernière connexion active disparaît.
+Le nombre exact d'événements peut évoluer avec le développement du projet.
 
 ---
 
-# 📞 WebRTC
+# Présence
+
+Le backend maintient les connexions Socket.IO actives par utilisateur.
+
+Cela permet à un même compte d'avoir plusieurs connexions simultanées.
+
+Exemples :
+
+- plusieurs onglets ;
+- plusieurs appareils ;
+- plusieurs sockets.
+
+Le compte reste considéré comme en ligne tant qu'une connexion active existe.
+
+---
+
+# WebRTC
 
 Les appels utilisent WebRTC.
 
-Socket.IO sert de canal de signalisation entre les utilisateurs pour transmettre notamment :
+Socket.IO sert de canal de signalisation.
 
-- les offres ;
-- les réponses ;
+Le système prend en charge notamment :
+
+- l'appel ;
+- la réponse ;
 - les ICE candidates ;
-- les événements de fin d'appel.
+- la fin d'appel ;
+- le redémarrage ICE.
 
-Les informations nécessaires au fonctionnement de STUN/TURN sont fournies par :
+Le serveur vérifie l'authentification et les autorisations de communication avant de transmettre les informations de signalisation.
+
+---
+
+# STUN / TURN
+
+Les informations nécessaires à WebRTC sont fournies par :
 
 ```text
 propard-backend/routes/turn.js
 ```
 
-Les appels sont soumis aux mêmes contrôles d'autorisation que la messagerie : le serveur vérifie notamment que les utilisateurs sont authentifiés et autorisés à communiquer.
+Le backend peut récupérer des credentials TURN auprès de plusieurs configurations Metered.
+
+Les serveurs retournés sont utilisés comme ICE servers par le frontend.
+
+La route TURN est protégée et possède une limitation de fréquence.
 
 ---
 
-# 📢 Annonces
+# Annonces
 
 Les annonces sont gérées par :
 
@@ -566,13 +576,13 @@ Les annonces sont gérées par :
 propard-backend/routes/announcements.js
 ```
 
-Le modèle associé est :
+Le modèle est :
 
 ```text
 propard-backend/models/Announcement.js
 ```
 
-Une annonce contient notamment :
+Une annonce contient :
 
 ```text
 title
@@ -581,11 +591,16 @@ active
 createdAt
 ```
 
-Une seule annonce peut être considérée comme active à la fois selon la logique actuelle du modèle.
+Le backend gère notamment :
+
+- la récupération de l'annonce active ;
+- l'acceptation d'une annonce ;
+- la désactivation des annonces précédentes lors de la création d'une nouvelle annonce ;
+- la diffusion de changements via Socket.IO.
 
 ---
 
-# 🚨 Signalements
+# Signalements
 
 Les signalements sont gérés par :
 
@@ -593,146 +608,241 @@ Les signalements sont gérés par :
 propard-backend/routes/reports.js
 ```
 
-Ils permettent de transmettre des informations à la modération.
+Le modèle est :
 
-Le mécanisme de signalement est séparé du système de messagerie classique.
+```text
+propard-backend/models/Report.js
+```
+
+Le projet possède également une route d'administration :
+
+```text
+propard-backend/routes/reportsAdmin.js
+```
+
+Le système de modération permet notamment de gérer l'état des signalements.
+
+Les signalements possèdent des informations permettant notamment de retrouver :
+
+- le message concerné ;
+- l'utilisateur signalé ;
+- le contenu concerné ;
+- le motif ;
+- la date associée au message ;
+- l'état du signalement ;
+- les informations de traitement.
+
+Le système limite également la fréquence des signalements.
 
 ---
 
-# 🛡️ Administration
+# Administration
 
-Les fonctionnalités d'administration sont regroupées dans :
+Les fonctionnalités administratives sont principalement regroupées dans :
 
 ```text
 propard-backend/routes/admin.js
 ```
 
-Elles sont destinées aux utilisateurs disposant des autorisations administratives nécessaires.
+Certaines fonctionnalités nécessitent une clé secrète fournie par une variable d'environnement.
+
+Les opérations administratives sont protégées contre les tentatives répétées.
+
+Les fonctionnalités comprennent notamment la gestion d'annonces et certaines opérations sur les comptes.
 
 ---
 
-# 🗄️ Base de données
+# Base de données
 
-Propard utilise **MongoDB** avec **Mongoose**.
+Propard utilise MongoDB avec Mongoose.
 
-## Modèles actuels
+Les modèles actuellement présents comprennent notamment :
 
-### `User`
+```text
+User
+Message
+Announcement
+Report
+```
 
-Stocke les informations nécessaires aux comptes, profils, relations, présence et mécanismes de suppression.
+## User
 
-### `Message`
+Gère :
 
-Stocke les messages échangés entre utilisateurs.
+- comptes ;
+- profils ;
+- relations ;
+- demandes d'amis ;
+- blocages ;
+- présence ;
+- clés publiques ;
+- suppression différée.
 
-### `Announcement`
+## Message
 
-Stocke les annonces publiées sur la plateforme.
+Gère les messages échangés entre utilisateurs.
+
+## Announcement
+
+Gère les annonces administratives.
+
+## Report
+
+Gère les signalements transmis au système de modération.
 
 ---
 
-# 📡 API
+# API
 
-Les principales routes sont montées dans `propard-backend/index.js`.
+Les routes sont montées dans `propard-backend/index.js`.
 
-| Préfixe | Fonction |
-|---|---|
-| `/api/auth` | Comptes, connexion, profils et gestion des données personnelles |
-| `/api/friends` | Relations entre utilisateurs |
-| `/api/admin` | Administration |
-| `/api/announcements` | Annonces |
-| `/api/reports` | Signalements |
-| `/api` | Fonctions liées à TURN |
-| `/health` | Vérification de l'état du serveur |
+```text
+/api/auth
+```
 
-Le backend expose également Socket.IO pour les fonctionnalités temps réel.
+Authentification, comptes, profils et gestion du compte.
 
-> Les endpoints précis et leurs paramètres peuvent évoluer avec les nouvelles versions de Propard.
+```text
+/api/friends
+```
+
+Relations entre utilisateurs et fonctionnalités liées aux messages.
+
+```text
+/api/admin
+```
+
+Administration.
+
+```text
+/api/announcements
+```
+
+Annonces.
+
+```text
+/api/reports
+```
+
+Création de signalements.
+
+```text
+/api/reports-admin
+```
+
+Gestion administrative des signalements.
+
+```text
+/api/turn-credentials
+```
+
+Récupération des credentials nécessaires à WebRTC.
+
+```text
+/health
+```
+
+Vérification de l'état du serveur.
 
 ---
 
-# ❤️ Endpoint de santé
+# Endpoint de santé
 
-Le backend fournit :
+Le backend possède :
 
 ```text
 GET /health
 ```
 
-Une réponse HTTP `200` avec :
+Une requête correcte renvoie :
 
 ```text
 OK
 ```
 
-indique que le serveur HTTP répond correctement.
+avec le statut HTTP `200`.
 
 ---
 
-# 🧰 Installation
+# Protection contre les abus
 
-## Prérequis
+Le backend possède un système de limitation de fréquence dans :
 
-Pour développer Propard localement, il faut notamment :
-
-- Node.js ;
-- npm ;
-- une instance MongoDB accessible ;
-- les variables d'environnement nécessaires au backend.
-
----
-
-## 1. Cloner le dépôt
-
-```bash
-git clone https://github.com/Nolabjfjdj/Propard.git
-cd Propard
+```text
+propard-backend/middleware/rateLimit.js
 ```
 
+Il est utilisé pour plusieurs opérations sensibles.
+
+Cela comprend notamment :
+
+- les inscriptions ;
+- les connexions ;
+- les messages ;
+- les signalements ;
+- certaines opérations administratives ;
+- les demandes de credentials TURN.
+
+Le backend utilise également `trust proxy` afin de fonctionner correctement derrière un reverse proxy.
+
 ---
 
-## 2. Installer le backend
+# Sécurité applicative
 
-```bash
-cd propard-backend
-npm install
+Le backend utilise notamment :
+
+- JWT ;
+- bcryptjs ;
+- middleware d'authentification ;
+- rate limiting ;
+- validation des entrées ;
+- vérification des permissions ;
+- contrôle des relations entre utilisateurs ;
+- variables d'environnement pour les secrets ;
+- CORS ;
+- en-têtes HTTP de sécurité ;
+- Content Security Policy.
+
+Les en-têtes configurés comprennent notamment :
+
+```text
+X-Content-Type-Options
+X-Frame-Options
+Referrer-Policy
+Content-Security-Policy
 ```
 
----
-
-## 3. Installer le frontend
-
-```bash
-cd ../propard-frontend
-npm install
-```
+La sécurité du projet dépend néanmoins de l'ensemble du code, de sa configuration et de son environnement de déploiement.
 
 ---
 
-# 🔐 Variables d'environnement
+# Variables d'environnement
 
 Le backend utilise `dotenv`.
 
-Les secrets et paramètres de déploiement doivent être configurés dans l'environnement du serveur.
+Les secrets ne doivent pas être placés directement dans le code source.
 
-Exemple minimal :
+Les variables principales comprennent notamment :
 
-```env
-MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=your_long_random_secret
-PORT=3000
-FRONTEND_ORIGIN=https://propard.site
+```text
+MONGO_URI
+JWT_SECRET
+FRONTEND_ORIGIN
+PORT
 ```
 
-Selon les fonctionnalités activées, d'autres variables d'environnement peuvent être nécessaires, notamment pour les services externes utilisés par Propard.
+D'autres variables sont utilisées par les fonctionnalités externes, notamment :
 
-> **Ne copiez pas cet exemple tel quel en production.**
+```text
+METERED_DOMAIN
+METERED_SECRET_KEY
+```
 
----
+ainsi que les configurations Metered supplémentaires utilisées par le système TURN.
 
-# ⚠️ Sécurité des secrets
+Les variables administratives et autres secrets externes doivent également être configurés dans l'environnement de déploiement.
 
-Ne commitez jamais dans Git :
+Ne commitez jamais :
 
 - mots de passe ;
 - secrets JWT ;
@@ -745,33 +855,63 @@ Ne commitez jamais dans Git :
 - webhooks privés ;
 - fichiers `.env`.
 
-Utilisez les variables d'environnement du système ou celles fournies par votre hébergeur.
+---
+
+# Installation
+
+## Prérequis
+
+- Node.js
+- npm
+- MongoDB accessible
+- variables d'environnement nécessaires
+
+## Cloner le dépôt
+
+```bash
+git clone https://github.com/Nolabjfjdj/Propard.git
+cd Propard
+```
+
+## Installer le backend
+
+```bash
+cd propard-backend
+npm install
+```
+
+## Installer le frontend
+
+```bash
+cd ../propard-frontend
+npm install
+```
 
 ---
 
-# ▶️ Développement
+# Développement
 
 ## Backend
 
-Depuis `propard-backend/` :
-
 ```bash
+cd propard-backend
 npm run dev
 ```
 
-Le script utilise Nodemon pour redémarrer automatiquement le serveur lors des modifications.
+Le script utilise Nodemon.
 
 ## Frontend
 
-Depuis `propard-frontend/` :
+Dans un autre terminal :
 
 ```bash
+cd propard-frontend
 npm run dev
 ```
 
 ---
 
-# 🏗️ Production
+# Production
 
 Le frontend est compilé avec :
 
@@ -780,11 +920,11 @@ cd propard-frontend
 npm run build
 ```
 
-Le résultat est ensuite placé dans le dossier `dist`.
+Le résultat est placé dans `dist`.
 
-Le backend est capable de servir le frontend compilé depuis son propre dossier `dist`.
+Le backend peut ensuite servir le frontend compilé depuis son propre environnement de production.
 
-En production, le serveur peut être démarré avec :
+Le backend peut être lancé avec :
 
 ```bash
 cd propard-backend
@@ -793,73 +933,32 @@ npm start
 
 ---
 
-# 🌍 Déploiement
+# Déploiement
 
 L'architecture de production peut être représentée ainsi :
 
 ```text
-                         propard.site
-                              │
-                              ▼
-                     ┌────────────────┐
-                     │    Frontend    │
-                     │  React / Vite  │
-                     └───────┬────────┘
-                             │
-                       HTTPS / WSS
-                             │
-                             ▼
-                     ┌────────────────┐
-                     │    Backend     │
-                     │ Node / Express │
-                     │   Socket.IO    │
-                     └───────┬────────┘
-                             │
-                 ┌───────────┴───────────┐
-                 ▼                       ▼
-          ┌─────────────┐        ┌─────────────┐
-          │   MongoDB   │        │ STUN / TURN │
-          └─────────────┘        └─────────────┘
+propard.site
+     │
+     ▼
+Frontend React / Vite
+     │
+     │ HTTPS / WSS
+     ▼
+Backend Node.js / Express / Socket.IO
+     │
+     ├── MongoDB
+     │
+     └── STUN / TURN
 ```
 
-Le déploiement réel peut utiliser un reverse proxy ou une plateforme d'hébergement fournissant HTTPS et la gestion des variables d'environnement.
+Le backend peut être placé derrière un reverse proxy ou une plateforme d'hébergement fournissant HTTPS et la gestion des variables d'environnement.
 
 ---
 
-# 🔒 Sécurité applicative
+# Suppression et restauration
 
-Le backend met notamment en place :
-
-- JWT ;
-- bcryptjs pour les mots de passe ;
-- middleware d'authentification ;
-- limitation de fréquence ;
-- validation de plusieurs entrées ;
-- vérification des permissions pour les messages et appels ;
-- protection contre certaines interactions non autorisées ;
-- en-têtes HTTP de sécurité ;
-- Content Security Policy ;
-- contrôle de l'origine frontend ;
-- utilisation des variables d'environnement pour les secrets.
-
-Le serveur configure notamment :
-
-```text
-X-Content-Type-Options
-X-Frame-Options
-Referrer-Policy
-Content-Security-Policy
-```
-
-> Aucun mécanisme de sécurité ne garantit qu'une application est invulnérable. Toute évolution importante de l'authentification, du chiffrement, des permissions ou du traitement des données doit être testée attentivement.
-
----
-
-# 🗑️ Suppression et restauration d'un compte
-
-Propard possède un mécanisme de suppression différée.
-
-Lorsqu'une suppression est demandée :
+Lorsqu'une suppression différée est demandée :
 
 ```text
 Compte actif
@@ -875,24 +974,24 @@ Période de restauration
 Anonymisation définitive
 ```
 
-Pendant les 30 jours, l'utilisateur peut restaurer son compte avec ses identifiants habituels.
+Pendant la période de restauration, le compte peut être restauré avec les mécanismes prévus par l'API.
 
-Après expiration, les informations nécessaires à la restauration sont supprimées ou remplacées et le compte ne peut plus être restauré par ce mécanisme.
+Après expiration, les informations nécessaires à la restauration sont supprimées ou remplacées.
+
+Une suppression immédiate est également disponible.
 
 ---
 
-# 🧪 Vérifications
+# Vérifications
 
 ## Frontend
-
-Vérifier le code avec ESLint :
 
 ```bash
 cd propard-frontend
 npm run lint
 ```
 
-Construire le frontend :
+Puis :
 
 ```bash
 npm run build
@@ -900,14 +999,12 @@ npm run build
 
 ## Backend
 
-Lancer le backend :
-
 ```bash
 cd propard-backend
 npm run dev
 ```
 
-Tester ensuite :
+Puis vérifier :
 
 ```text
 GET /health
@@ -915,179 +1012,40 @@ GET /health
 
 ---
 
-# 📋 Checklist de déploiement
+# Licence
 
-Avant une mise en production :
+Le projet possède une licence propriétaire.
 
-- [ ] MongoDB configuré
-- [ ] `MONGO_URI` configuré
-- [ ] `JWT_SECRET` généré aléatoirement
-- [ ] `FRONTEND_ORIGIN` configuré
-- [ ] Secrets externes configurés
-- [ ] HTTPS activé
-- [ ] Socket.IO fonctionnel
-- [ ] MongoDB accessible depuis le backend
-- [ ] STUN/TURN vérifié
-- [ ] Inscription testée
-- [ ] Connexion testée
-- [ ] Profils testés
-- [ ] Demandes d'amis testées
-- [ ] Blocage testé
-- [ ] Messagerie testée
-- [ ] Chiffrement testé
-- [ ] Appels testés
-- [ ] Annonces testées
-- [ ] Signalements testés
-- [ ] Administration testée
-- [ ] Suppression/restauration testée
-- [ ] Endpoint `/health` vérifié
-- [ ] Aucun secret présent dans Git
+Le fichier `LICENSE` indique que la copie, la modification, la distribution ou l'utilisation du code nécessitent une autorisation écrite préalable.
+
+Consultez `LICENSE` avant toute réutilisation du code.
 
 ---
 
-# 📂 Fichiers importants
+# Liens
 
-## Backend
+Site :
 
-```text
-propard-backend/index.js
-propard-backend/middleware/auth.js
-propard-backend/middleware/rateLimit.js
+https://propard.site
 
-propard-backend/models/User.js
-propard-backend/models/Message.js
-propard-backend/models/Announcement.js
+Dépôt :
 
-propard-backend/routes/auth.js
-propard-backend/routes/friends.js
-propard-backend/routes/admin.js
-propard-backend/routes/announcements.js
-propard-backend/routes/reports.js
-propard-backend/routes/turn.js
-```
-
-## Frontend
-
-```text
-propard-frontend/src/App.jsx
-propard-frontend/src/main.jsx
-propard-frontend/src/socket.js
-
-propard-frontend/src/components/
-propard-frontend/src/context/
-propard-frontend/src/pages/
-propard-frontend/src/utils/
-```
+https://github.com/Nolabjfjdj/Propard
 
 ---
 
-# 🗺️ Vue fonctionnelle
+# État du dépôt
 
-```text
-PROPARD
-│
-├── 👤 Comptes
-│   ├── Inscription
-│   ├── Connexion
-│   ├── JWT
-│   ├── Profil
-│   └── Suppression / restauration
-│
-├── 👥 Relations
-│   ├── Demandes d'amis
-│   ├── Amis
-│   ├── Surnoms
-│   ├── Blocage
-│   └── Amis en commun
-│
-├── 💬 Communication
-│   ├── Messagerie
-│   ├── Socket.IO
-│   ├── Chiffrement côté client
-│   └── Notifications
-│
-├── 📞 Appels
-│   ├── WebRTC
-│   ├── STUN
-│   ├── TURN
-│   └── Signalisation Socket.IO
-│
-├── 📢 Contenu
-│   └── Annonces
-│
-└── 🛡️ Modération
-    ├── Administration
-    └── Signalements
-```
+Ce README décrit le fonctionnement du projet tel qu'il est présenté dans la version actuelle du dépôt.
 
----
+Le dépôt est la source de vérité pour :
 
-# 📜 Licence
+- les fichiers présents ;
+- les routes ;
+- les modèles ;
+- les dépendances ;
+- les fonctionnalités ;
+- les paramètres ;
+- les évolutions futures.
 
-Propard est distribué sous une **licence propriétaire**.
-
-La licence complète se trouve dans [`LICENSE`](./LICENSE).
-
-La présence du projet sur GitHub ne signifie pas que son code peut être librement copié, modifié, redistribué ou exploité.
-
-Toute utilisation doit respecter les conditions indiquées dans `LICENSE`.
-
----
-
-# 🤝 Contributions
-
-Les contributions externes ne sont pas automatiquement autorisées.
-
-Avant de proposer une modification importante, une redistribution ou une version dérivée de Propard, consultez `LICENSE` et contactez l'auteur du projet si nécessaire.
-
----
-
-# 🐛 Signaler un problème
-
-Pour signaler un bug, indiquez si possible :
-
-1. Une description du problème ;
-2. Les étapes permettant de le reproduire ;
-3. Le comportement attendu ;
-4. Le comportement observé ;
-5. Le navigateur et l'appareil utilisés ;
-6. Les logs pertinents ;
-7. Une capture d'écran si elle est utile.
-
-Ne publiez jamais :
-
-- mot de passe ;
-- token ;
-- clé privée ;
-- secret JWT ;
-- clé API ;
-- identifiant MongoDB ;
-- données personnelles ;
-- informations confidentielles.
-
----
-
-# 🌐 Propard
-
-- 🌐 **Site officiel :** https://propard.site
-- 💻 **Dépôt GitHub :** https://github.com/Nolabjfjdj/Propard
-
----
-
-# 👨‍💻 Projet
-
-**Propard**
-
-Projet indépendant français.
-
-**Développeur : BananeVR**
-
-**2026**
-
-Tous droits réservés.
-
-Voir [`LICENSE`](./LICENSE) pour les conditions complètes d'utilisation du code.
-
----
-
-> **Propard — Communication, simplicité et sécurité.**
+Le README peut devenir obsolète si le code évolue sans que sa documentation soit mise à jour.
