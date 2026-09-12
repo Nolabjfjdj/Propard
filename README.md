@@ -4,6 +4,10 @@
 
 Propard est un projet indépendant développé par BananeVR.
 
+[![Website](https://img.shields.io/badge/Website-propard.site-blue?style=flat-square)](https://propard.site)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-black?style=flat-square&logo=github)](https://github.com/Nolabjfjdj/Propard)
+[![License](https://img.shields.io/badge/License-Proprietary-red?style=flat-square)](./LICENSE)
+
 ## À propos
 
 Propard regroupe plusieurs outils de communication et d'interaction dans une même plateforme web.
