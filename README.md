@@ -1,4 +1,4 @@
-# 🍌 Propard
+# Propard
 
 > **Propard** est une plateforme web de communication et d'interaction française entre utilisateurs, développée avec **React**, **Node.js**, **Express**, **MongoDB** et **Socket.IO**.
 
