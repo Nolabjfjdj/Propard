@@ -7,6 +7,7 @@ import FriendList from '../components/FriendList';
 import Chat from '../components/Chat';
 import AddFriend from '../components/AddFriend';
 import VoiceCall from '../components/VoiceCall';
+import OfflineGame from '../components/OfflineGame';
 import ProfilePage from './ProfilePage';
 import {
   deriveSharedKey,
@@ -33,6 +34,9 @@ export default function AppPage({
     useState(0);
 
   const [showAddFriend, setShowAddFriend] =
+    useState(false);
+
+  const [showOfflineGame, setShowOfflineGame] =
     useState(false);
 
   const [showSidebar, setShowSidebar] =
@@ -84,6 +88,7 @@ export default function AppPage({
     useState('');
 
   const grabRef = useRef(null);
+
   const [grabVisual, setGrabVisual] =
     useState(null);
 
@@ -128,6 +133,7 @@ export default function AppPage({
         'connect',
         authenticate
       );
+
       socket.disconnect();
     };
   }, [token]);
@@ -176,6 +182,7 @@ export default function AppPage({
               nickname:
                 match.nickname || null
             });
+
             setSelectedProfile(null);
           } else {
             setFriendNotFound(true);
@@ -507,12 +514,15 @@ export default function AppPage({
             )
           : null;
 
-      g.dragOverFriendId =
+      const targetFriendId =
         targetId &&
         targetId !==
           g.sourceFriendId
           ? targetId
           : null;
+
+      g.dragOverFriendId =
+        targetFriendId;
     };
 
   const forwardGrabbedMessage =
@@ -936,6 +946,20 @@ export default function AppPage({
             >
               Discord
             </a>
+
+            <button
+              type="button"
+              onClick={() =>
+                setShowOfflineGame(true)
+              }
+              style={
+                styles.gameBtn
+              }
+              title="Propard Space"
+              aria-label="Ouvrir Propard Space"
+            >
+              🚀
+            </button>
 
             <button
               onClick={
@@ -1630,6 +1654,7 @@ export default function AppPage({
               setConfirmAction(
                 null
               );
+
               setDeleteError(
                 ''
               );
@@ -1705,6 +1730,7 @@ export default function AppPage({
                   setConfirmAction(
                     null
                   );
+
                   setDeleteError(
                     ''
                   );
@@ -1718,6 +1744,31 @@ export default function AppPage({
             </div>
           </div>
         )}
+
+      {showOfflineGame && (
+        <div style={styles.gameOverlay}>
+          <button
+            type="button"
+            onClick={() =>
+              setShowOfflineGame(false)
+            }
+            style={
+              styles.gameCloseBtn
+            }
+            title="Retour à Propard"
+            aria-label="Retour à Propard"
+          >
+            ← Propard
+          </button>
+
+          <OfflineGame
+            manual
+            onRetry={() =>
+              setShowOfflineGame(false)
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -1780,6 +1831,23 @@ const styles = {
     textDecoration: 'none',
     display: 'flex',
     alignItems: 'center'
+  },
+
+  gameBtn: {
+    width: '34px',
+    height: '34px',
+    padding: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: '8px',
+    fontSize: '15px',
+    cursor: 'pointer',
+    opacity: 0.72,
+    transition:
+      'opacity 0.15s ease, transform 0.15s ease'
   },
 
   iconBtn: {
@@ -2001,6 +2069,31 @@ const styles = {
     border: 'none',
     cursor: 'pointer',
     marginTop: '8px'
+  },
+
+  gameOverlay: {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 1000,
+    background: 'var(--bg-primary)'
+  },
+
+  gameCloseBtn: {
+    position: 'fixed',
+    top: 'max(12px, env(safe-area-inset-top))',
+    left: '12px',
+    zIndex: 1100,
+    background: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+    border: '1px solid var(--border)',
+    borderRadius: '9px',
+    padding: '8px 12px',
+    fontSize: '12px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    boxShadow:
+      '0 4px 18px rgba(0,0,0,0.25)',
+    opacity: 0.92
   },
 
   modalOverlay: {
