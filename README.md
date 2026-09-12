@@ -432,4 +432,4 @@ Consultez [`LICENSE`](./LICENSE) pour connaître les conditions complètes d'uti
 
 Développé par **BananeVR**.
 
-> 🍌 **Propard — Communication, simplicité et sécurité.**
+> **Propard — Communication, simplicité et sécurité.**
