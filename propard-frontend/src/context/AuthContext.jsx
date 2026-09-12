@@ -11,41 +11,74 @@ const AuthContext = createContext(null);
 
 const ensureEncryptionKeys = async (userId, authToken) => {
   if (!userId || !authToken) return;
+
   try {
     const existingPriv = getStoredPrivateKeyJwk(userId);
 
     if (existingPriv) {
-      // Une clé locale existe déjà : on renvoie systématiquement la clé
-      // publique correspondante au serveur (idempotent, sans régénérer
-      // de nouvelle paire). Ça corrige automatiquement les comptes dont
-      // un envoi précédent avait échoué silencieusement (ex: coupure
-      // réseau, backend indisponible) sans jamais casser le
-      // déchiffrement des messages déjà échangés.
-      const derivedPublicKeyJwk = publicKeyFromPrivateJwk(existingPriv);
-      await axios.patch('/api/auth/publickey', { publicKey: JSON.stringify(derivedPublicKeyJwk) }, {
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
+      const derivedPublicKeyJwk =
+        publicKeyFromPrivateJwk(existingPriv);
+
+      await axios.patch(
+        '/api/auth/publickey',
+        {
+          publicKey: JSON.stringify(
+            derivedPublicKeyJwk
+          )
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`
+          }
+        }
+      );
+
       return;
     }
 
-    // Aucune clé locale : première fois sur cet appareil.
-    const { publicKeyJwk, privateKeyJwk } = await generateKeyPair();
+    const {
+      publicKeyJwk,
+      privateKeyJwk
+    } = await generateKeyPair();
 
-    await axios.patch('/api/auth/publickey', { publicKey: JSON.stringify(publicKeyJwk) }, {
-      headers: { Authorization: `Bearer ${authToken}` }
-    });
+    await axios.patch(
+      '/api/auth/publickey',
+      {
+        publicKey: JSON.stringify(publicKeyJwk)
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`
+        }
+      }
+    );
 
-    // Important : on ne stocke la clé privée QU'APRÈS confirmation que le
-    // serveur a bien reçu la clé publique correspondante. Sinon, une
-    // panne réseau ponctuelle laisserait une clé locale à jamais
-    // désynchronisée du serveur, sans aucun moyen de le détecter aux
-    // connexions suivantes (c'était le bug : hasStoredPrivateKey()
-    // renvoyait true pour toujours, donc plus aucune tentative de
-    // renvoi n'avait lieu).
-    storePrivateKey(userId, privateKeyJwk);
-    console.log('🔐 Clés E2EE générées avec succès');
+    storePrivateKey(
+      userId,
+      privateKeyJwk
+    );
+
+    console.log(
+      '🔐 Clés E2EE générées avec succès'
+    );
   } catch (err) {
-    console.error('❌ Erreur génération/synchronisation des clés de chiffrement:', err);
+    /*
+     * Une erreur réseau ne doit jamais déconnecter
+     * l'utilisateur.
+     *
+     * Les clés seront resynchronisées au prochain
+     * passage où le serveur sera disponible.
+     */
+    if (err.response?.status === 401) {
+      console.warn(
+        '🔐 Session expirée pendant la synchronisation E2EE.'
+      );
+      return;
+    }
+
+    console.warn(
+      '🔐 Serveur indisponible : synchronisation E2EE reportée.'
+    );
   }
 };
 
@@ -55,92 +88,246 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem('propard_token');
-    const savedUser = localStorage.getItem('propard_user');
-    if (!savedToken || !savedUser) { setLoading(false); return; }
+    const savedToken =
+      localStorage.getItem('propard_token');
+
+    const savedUser =
+      localStorage.getItem('propard_user');
+
+    if (!savedToken || !savedUser) {
+      setLoading(false);
+      return;
+    }
 
     let parsedUser;
-    try { parsedUser = JSON.parse(savedUser); } catch {
+
+    try {
+      parsedUser = JSON.parse(savedUser);
+    } catch {
       localStorage.removeItem('propard_token');
       localStorage.removeItem('propard_user');
       setLoading(false);
       return;
     }
 
+    /*
+     * On restaure immédiatement les données locales.
+     *
+     * Ça permet notamment au système offline de ne pas
+     * considérer l'utilisateur comme déconnecté simplement
+     * parce que le backend est temporairement inaccessible.
+     */
+    setToken(savedToken);
+    setUser(parsedUser);
+
     const verify = async () => {
       try {
-        const response = await axios.get('/api/auth/me', { headers: { Authorization: `Bearer ${savedToken}` } });
+        const response = await axios.get(
+          '/api/auth/me',
+          {
+            headers: {
+              Authorization: `Bearer ${savedToken}`
+            }
+          }
+        );
+
         const serverUser = response.data;
-        const normalizedUser = { ...serverUser, id: serverUser.id || serverUser._id };
+
+        const normalizedUser = {
+          ...serverUser,
+          id: serverUser.id || serverUser._id
+        };
+
         setToken(savedToken);
         setUser(normalizedUser);
-        localStorage.setItem('propard_user', JSON.stringify(normalizedUser));
-        await ensureEncryptionKeys(normalizedUser.id, savedToken);
+
+        localStorage.setItem(
+          'propard_user',
+          JSON.stringify(normalizedUser)
+        );
+
+        await ensureEncryptionKeys(
+          normalizedUser.id,
+          savedToken
+        );
       } catch (err) {
-        console.error('Erreur vérification session:', err);
-        localStorage.removeItem('propard_token');
-        localStorage.removeItem('propard_user');
-        window.location.href = '/';
-      } finally { setLoading(false); }
+        /*
+         * SEULEMENT un vrai 401 signifie que la session
+         * n'est plus valide.
+         */
+        if (err.response?.status === 401) {
+          localStorage.removeItem(
+            'propard_token'
+          );
+
+          localStorage.removeItem(
+            'propard_user'
+          );
+
+          setToken(null);
+          setUser(null);
+
+          window.location.href = '/';
+
+          return;
+        }
+
+        /*
+         * Erreur réseau / backend indisponible :
+         * on conserve la session locale.
+         */
+        console.warn(
+          '🌐 Propard est temporairement indisponible. Session conservée localement.'
+        );
+      } finally {
+        setLoading(false);
+      }
     };
+
     verify();
 
-    const interval = setInterval(() => {
-      axios.get('/api/auth/me', { headers: { Authorization: `Bearer ${savedToken}` } }).catch(() => {
-        localStorage.removeItem('propard_token');
-        localStorage.removeItem('propard_user');
-        window.location.href = '/';
-      });
+    const interval = setInterval(async () => {
+      try {
+        await axios.get(
+          '/api/auth/me',
+          {
+            headers: {
+              Authorization: `Bearer ${savedToken}`
+            }
+          }
+        );
+      } catch (err) {
+        /*
+         * Une déconnexion automatique n'est effectuée
+         * que pour un vrai 401.
+         */
+        if (err.response?.status === 401) {
+          localStorage.removeItem(
+            'propard_token'
+          );
+
+          localStorage.removeItem(
+            'propard_user'
+          );
+
+          setToken(null);
+          setUser(null);
+
+          window.location.href = '/';
+        }
+      }
     }, 30000);
+
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    const interceptor = axios.interceptors.response.use(
-      response => response,
-      error => {
-        if (error.response?.status === 401) {
-          localStorage.removeItem('propard_token');
-          localStorage.removeItem('propard_user');
-          window.location.href = '/';
+    const interceptor =
+      axios.interceptors.response.use(
+        response => response,
+
+        error => {
+          if (error.response?.status === 401) {
+            localStorage.removeItem(
+              'propard_token'
+            );
+
+            localStorage.removeItem(
+              'propard_user'
+            );
+
+            window.location.href = '/';
+          }
+
+          return Promise.reject(error);
         }
-        return Promise.reject(error);
-      }
-    );
-    return () => axios.interceptors.response.eject(interceptor);
+      );
+
+    return () =>
+      axios.interceptors.response.eject(
+        interceptor
+      );
   }, []);
 
-  const login = async (userData, userToken) => {
-    const normalized = { ...userData, id: userData.id || userData._id };
-    setUser(normalized); setToken(userToken);
-    localStorage.setItem('propard_token', userToken);
-    localStorage.setItem('propard_user', JSON.stringify(normalized));
-    await ensureEncryptionKeys(normalized.id, userToken);
+  const login = async (
+    userData,
+    userToken
+  ) => {
+    const normalized = {
+      ...userData,
+      id: userData.id || userData._id
+    };
+
+    setUser(normalized);
+    setToken(userToken);
+
+    localStorage.setItem(
+      'propard_token',
+      userToken
+    );
+
+    localStorage.setItem(
+      'propard_user',
+      JSON.stringify(normalized)
+    );
+
+    localStorage.setItem(
+      'propard_has_logged_in',
+      'true'
+    );
+
+    await ensureEncryptionKeys(
+      normalized.id,
+      userToken
+    );
   };
 
   const logout = () => {
-    setUser(null); setToken(null);
-    localStorage.removeItem('propard_token');
-    localStorage.removeItem('propard_user');
+    setUser(null);
+    setToken(null);
+
+    localStorage.removeItem(
+      'propard_token'
+    );
+
+    localStorage.removeItem(
+      'propard_user'
+    );
   };
 
-  // Mise à jour locale partielle du user courant (ex: après modification du
-  // profil), pour refléter immédiatement displayName/avatar dans l'UI sans
-  // attendre le prochain polling /api/auth/me (30s).
-  const updateUser = (partial) => {
+  const updateUser = partial => {
     setUser(prev => {
       if (!prev) return prev;
-      const next = { ...prev, ...partial };
-      localStorage.setItem('propard_user', JSON.stringify(next));
+
+      const next = {
+        ...prev,
+        ...partial
+      };
+
+      localStorage.setItem(
+        'propard_user',
+        JSON.stringify(next)
+      );
+
       return next;
     });
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, updateUser, loading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        login,
+        logout,
+        updateUser,
+        loading
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () =>
+  useContext(AuthContext);
