@@ -5,7 +5,7 @@ export default function PrivacyPage() {
         <a href="/help" style={styles.back}>← Retour</a>
 
         <h1 style={styles.title}>Politique de Confidentialité</h1>
-        <p style={styles.date}>En vigueur depuis le 12 avril 2026</p>
+        <p style={styles.date}>En vigueur depuis le 12 septembre 2026</p>
 
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>1. Responsable du traitement</h2>
@@ -86,7 +86,8 @@ export default function PrivacyPage() {
             </li>
             <li>
               Les informations nécessaires au traitement des signalements
-              effectués par les utilisateurs
+              effectués par les utilisateurs, notamment le contenu signalé
+              lorsque celui-ci est fourni dans le cadre du signalement
             </li>
             <li>
               Certaines données techniques nécessaires à la sécurité et au
@@ -138,7 +139,9 @@ export default function PrivacyPage() {
               exécution du contrat et sécurité des communications.
             </li>
             <li>
-              <strong>Sécurité, prévention des abus et protection du service :</strong>
+              <strong>
+                Sécurité, prévention des abus et protection du service :
+              </strong>
               intérêt légitime de Propard à maintenir un service sécurisé,
               fonctionnel et à prévenir les utilisations abusives.
             </li>
@@ -166,7 +169,9 @@ export default function PrivacyPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>4. Messages privés et chiffrement de bout en bout</h2>
+          <h2 style={styles.sectionTitle}>
+            4. Messages privés et chiffrement de bout en bout
+          </h2>
 
           <p style={styles.text}>
             Les messages privés sont chiffrés de bout en bout (E2EE) avant leur
@@ -201,8 +206,9 @@ export default function PrivacyPage() {
             La fonctionnalité « Signaler » constitue une exception volontaire au
             fonctionnement habituel du chiffrement. Lorsqu'un utilisateur
             signale un message, les informations nécessaires au traitement du
-            signalement peuvent être transmises à Propard, notamment le contenu
-            du message signalé lorsque cela est nécessaire.
+            signalement peuvent être transmises à Propard et enregistrées dans
+            son système de gestion des signalements, notamment le contenu du
+            message signalé lorsque cela est nécessaire.
           </p>
 
           <p style={styles.text}>
@@ -220,7 +226,9 @@ export default function PrivacyPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>5. Signalements et destinataires</h2>
+          <h2 style={styles.sectionTitle}>
+            5. Signalements et destinataires
+          </h2>
 
           <p style={styles.text}>
             Lorsqu'un utilisateur effectue un signalement, Propard peut traiter
@@ -230,52 +238,49 @@ export default function PrivacyPage() {
           </p>
 
           <p style={styles.text}>
-            Dans le fonctionnement actuellement utilisé par Propard, les
-            informations nécessaires au traitement du signalement peuvent être
-            transmises automatiquement à Discord via un webhook configuré par
-            Propard.
+            Les informations nécessaires au traitement d'un signalement sont
+            enregistrées dans une collection dédiée de la base de données de
+            Propard. Elles peuvent notamment comprendre le contenu du message
+            signalé, le compte ayant effectué le signalement, le compte signalé,
+            l'identifiant du message, le motif du signalement ainsi que les
+            dates associées.
           </p>
 
           <p style={styles.text}>
-            Les informations transmises peuvent notamment comprendre le contenu
-            du message signalé lorsqu'il est nécessaire à l'examen du
-            signalement, ainsi que les informations permettant d'identifier le
-            signalement et les utilisateurs concernés.
+            Ces informations sont accessibles uniquement dans le cadre de
+            l'administration et de la modération de Propard. Elles sont utilisées
+            afin d'examiner les signalements, de faire respecter les présentes
+            CGU, de prévenir les abus et, lorsque cela est nécessaire, de
+            répondre aux obligations légales applicables.
           </p>
 
           <p style={styles.text}>
-            Ces informations sont transmises à un salon Discord privé dédié aux
-            signalements. Ce salon est configuré de manière à ce que seul le
-            responsable de Propard puisse y accéder. La transmission à Discord
-            reste toutefois nécessaire pour acheminer les informations vers ce
-            salon.
+            Les signalements peuvent être classés comme nouveaux, traités ou
+            rejetés. Les informations associées à un signalement peuvent être
+            supprimées lorsqu'elles ne sont plus nécessaires à son traitement,
+            sous réserve des obligations légales ou des nécessités liées à la
+            sécurité et à la défense des droits de Propard.
           </p>
 
           <p style={styles.text}>
-            Les informations transmises à Discord sont utilisées uniquement afin
-            de permettre au responsable de Propard d'examiner et de traiter les
-            signalements. Elles ne sont pas utilisées à des fins publicitaires
-            ou commerciales.
+            Le contenu transmis dans le cadre d'un signalement constitue une
+            exception au fonctionnement habituel du chiffrement de bout en bout :
+            lorsqu'un utilisateur choisit volontairement de signaler un message,
+            le contenu fourni dans le signalement peut être enregistré en clair
+            afin de permettre son examen.
           </p>
 
           <p style={styles.text}>
-            L'utilisation de Discord pour recevoir les signalements constitue
-            une solution temporaire. Propard prévoit de remplacer ce système par
-            un système de signalement directement intégré au site. À terme, les
-            signalements seront traités exclusivement au sein de Propard et ne
-            seront plus transmis à Discord.
-          </p>
-
-          <p style={styles.text}>
-            Propard ne conserve pas volontairement une copie supplémentaire du
-            contenu signalé dans une base de données dédiée aux signalements
-            lorsque cette conservation n'est pas nécessaire au fonctionnement
-            du service.
+            Propard ne transmet actuellement plus les signalements à Discord.
+            Le système de traitement des signalements est directement intégré
+            à l'infrastructure de Propard.
           </p>
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>6. Hébergement et prestataires techniques</h2>
+          <h2 style={styles.sectionTitle}>
+            6. Hébergement et prestataires techniques
+          </h2>
 
           <p style={styles.text}>
             Propard utilise plusieurs prestataires techniques nécessaires à son
@@ -292,15 +297,16 @@ export default function PrivacyPage() {
               données ;
             </li>
             <li>
-              <strong>Discord</strong> pour la réception temporaire des
-              notifications et informations relatives aux signalements dans le
-              cadre du système actuellement utilisé ;
-            </li>
-            <li>
               <strong>Metered</strong> pour certains services techniques liés
               au relais TURN utilisé lors des communications en temps réel.
             </li>
           </ul>
+
+          <p style={styles.text}>
+            Les signalements sont enregistrés directement dans la base de données
+            utilisée par Propard et ne sont pas transmis à un service tiers de
+            messagerie ou de notification pour leur traitement.
+          </p>
 
           <p style={styles.text}>
             Ces prestataires peuvent traiter certaines données personnelles
@@ -350,11 +356,11 @@ export default function PrivacyPage() {
             <li>
               <strong>Signalements :</strong> pendant la durée nécessaire à leur
               traitement, à la gestion d'une contestation éventuelle ou au
-              respect d'une obligation légale. Lorsque le système temporaire
-              utilisant Discord est actif, les informations transmises à Discord
-              sont utilisées dans le cadre du traitement des signalements et
-              cessent d'être transmises à Discord lorsque ce système est remplacé
-              par le système de signalement interne de Propard.
+              respect d'une obligation légale. Les signalements enregistrés dans
+              la base de données de Propard peuvent être supprimés lorsqu'ils
+              ne sont plus nécessaires aux finalités pour lesquelles ils ont été
+              conservés, sous réserve des obligations légales ou des nécessités
+              liées à la sécurité et à la défense des droits de Propard.
             </li>
             <li>
               <strong>Données techniques et de sécurité :</strong> pendant la
