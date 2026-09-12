@@ -91,37 +91,58 @@ export default function VoiceCall({
 
   const hasInitiatedRef = useRef(false);
   const pendingCandidates = useRef([]);
+
   const timerStartedRef = useRef(false);
 
   /*
-   * Liste complète des ICE servers reçus du backend.
+   * Liste complète des serveurs ICE récupérés
+   * depuis le backend.
    */
   const iceServersRef = useRef([]);
 
   /*
-   * Index du serveur TURN actuellement privilégié
-   * lors d'un failover.
+   * Liste uniquement des serveurs TURN.
+   */
+  const turnServersRef = useRef([]);
+
+  /*
+   * Index du prochain serveur TURN à essayer.
    */
   const currentTurnIndexRef = useRef(0);
 
   /*
-   * Empêche deux ICE restarts simultanés.
+   * Empêche plusieurs ICE restarts simultanés.
    */
   const restartingIceRef = useRef(false);
 
   /*
-   * Nombre maximum de tentatives de failover pour
-   * éviter une boucle infinie.
+   * Nombre de serveurs TURN déjà essayés
+   * depuis la dernière connexion stable.
    */
   const restartAttemptsRef = useRef(0);
 
   /*
    * Permet de savoir si l'utilisateur est l'appelant.
    *
-   * Seul l'appelant déclenche automatiquement le failover.
-   * L'autre côté reçoit l'offre ICE restart et répond.
+   * Seul l'appelant lance automatiquement
+   * les ICE restarts.
    */
   const isCallerRef = useRef(!incomingOffer);
+
+  /*
+   * Évite de lancer un failover après fermeture
+   * du composant.
+   */
+  const closedRef = useRef(false);
+
+  /*
+   * Timer utilisé lorsqu'on passe par disconnected.
+   *
+   * disconnected peut être temporaire, donc on
+   * attend quelques secondes avant d'envisager
+   * un failover.
+   */
+  const disconnectedTimerRef = useRef(null);
 
   const friendName =
     friend?.nickname?.trim() ||
@@ -148,9 +169,24 @@ export default function VoiceCall({
       .padStart(2, '0')}`;
   };
 
+  const clearDisconnectedTimer = () => {
+    if (disconnectedTimerRef.current) {
+      clearTimeout(
+        disconnectedTimerRef.current
+      );
+
+      disconnectedTimerRef.current = null;
+    }
+  };
+
   const cleanup = () => {
+    closedRef.current = true;
+
     clearInterval(timerRef.current);
     timerRef.current = null;
+
+    clearDisconnectedTimer();
+
     timerStartedRef.current = false;
 
     if (localStreamRef.current) {
@@ -162,11 +198,16 @@ export default function VoiceCall({
     }
 
     if (peerRef.current) {
+      peerRef.current.onicecandidate = null;
+      peerRef.current.ontrack = null;
+      peerRef.current.oniceconnectionstatechange = null;
+
       peerRef.current.close();
       peerRef.current = null;
     }
 
     if (remoteAudioRef.current) {
+      remoteAudioRef.current.pause();
       remoteAudioRef.current.srcObject = null;
       remoteAudioRef.current = null;
     }
@@ -174,6 +215,8 @@ export default function VoiceCall({
     pendingCandidates.current = [];
 
     iceServersRef.current = [];
+    turnServersRef.current = [];
+
     currentTurnIndexRef.current = 0;
     restartingIceRef.current = false;
     restartAttemptsRef.current = 0;
@@ -181,42 +224,226 @@ export default function VoiceCall({
 
   /*
    * Retourne uniquement les serveurs TURN.
-   *
-   * Les STUN ne servent pas au failover TURN.
    */
   const getTurnServers = () => {
-    return iceServersRef.current.filter(
-      server => {
-        const urls = Array.isArray(server.urls)
-          ? server.urls
-          : [server.urls];
-
-        return urls.some(
-          url =>
-            typeof url === 'string' &&
-            (
-              url.startsWith('turn:') ||
-              url.startsWith('turns:')
-            )
-        );
-      }
-    );
+    return turnServersRef.current;
   };
 
   /*
-   * Change le serveur ICE utilisé pour le prochain
-   * redémarrage ICE.
+   * Essaie de déterminer quel serveur TURN est
+   * réellement utilisé actuellement.
+   *
+   * On regarde le selected candidate pair puis
+   * le local candidate. Si son type est "relay",
+   * c'est un candidat TURN.
+   */
+  const getActiveTurnServer = async peer => {
+    try {
+      const stats =
+        await peer.getStats();
+
+      let selectedPair = null;
+
+      stats.forEach(report => {
+        if (
+          report.type === 'candidate-pair' &&
+          (
+            report.selected === true ||
+            report.state === 'succeeded' &&
+            report.nominated === true
+          )
+        ) {
+          selectedPair = report;
+        }
+      });
+
+      if (!selectedPair) {
+        stats.forEach(report => {
+          if (
+            !selectedPair &&
+            report.type === 'candidate-pair' &&
+            report.state === 'succeeded'
+          ) {
+            selectedPair = report;
+          }
+        });
+      }
+
+      if (!selectedPair) {
+        return null;
+      }
+
+      const localCandidate =
+        stats.get(
+          selectedPair.localCandidateId
+        );
+
+      if (!localCandidate) {
+        return null;
+      }
+
+      if (
+        localCandidate.candidateType !==
+        'relay'
+      ) {
+        return null;
+      }
+
+      /*
+       * Selon le navigateur, "url" peut être
+       * disponible directement sur le candidate.
+       */
+      if (localCandidate.url) {
+        return localCandidate.url;
+      }
+
+      /*
+       * Fallback : certaines implémentations
+       * peuvent fournir une adresse mais pas l'URL
+       * TURN complète.
+       */
+      return null;
+
+    } catch (err) {
+      console.error(
+        'Impossible de déterminer le TURN actif:',
+        err
+      );
+
+      return null;
+    }
+  };
+
+  /*
+   * Trouve l'index d'un serveur TURN à partir
+   * de son URL.
+   */
+  const findTurnIndexByUrl = turnUrl => {
+    if (!turnUrl) return -1;
+
+    const turnServers =
+      getTurnServers();
+
+    for (
+      let i = 0;
+      i < turnServers.length;
+      i++
+    ) {
+      const server =
+        turnServers[i];
+
+      const urls =
+        Array.isArray(server.urls)
+          ? server.urls
+          : [server.urls];
+
+      const found =
+        urls.some(url => {
+          if (
+            typeof url !== 'string'
+          ) {
+            return false;
+          }
+
+          /*
+           * On compare principalement le
+           * serveur/hôte/port.
+           */
+          return url === turnUrl;
+        });
+
+      if (found) {
+        return i;
+      }
+    }
+
+    return -1;
+  };
+
+  /*
+   * Définit le prochain TURN à utiliser.
+   *
+   * Si le TURN actif est connu :
+   *
+   * TURN 1 actif
+   * → TURN 2
+   *
+   * TURN 2 actif
+   * → TURN 3
+   *
+   * TURN 3 actif
+   * → TURN 1
+   *
+   * Si le TURN actif n'est pas identifiable,
+   * on commence avec le premier TURN.
+   */
+  const prepareNextTurnServer = async peer => {
+    const turnServers =
+      getTurnServers();
+
+    if (turnServers.length === 0) {
+      console.error(
+        'Aucun serveur TURN disponible pour le failover.'
+      );
+
+      return null;
+    }
+
+    const activeTurnUrl =
+      await getActiveTurnServer(peer);
+
+    const activeIndex =
+      findTurnIndexByUrl(
+        activeTurnUrl
+      );
+
+    let nextIndex;
+
+    if (activeIndex >= 0) {
+      nextIndex =
+        (activeIndex + 1) %
+        turnServers.length;
+    } else {
+      nextIndex =
+        currentTurnIndexRef.current %
+        turnServers.length;
+    }
+
+    currentTurnIndexRef.current =
+      (nextIndex + 1) %
+      turnServers.length;
+
+    return {
+      server: turnServers[nextIndex],
+      index: nextIndex
+    };
+  };
+
+  /*
+   * Effectue un ICE restart avec le prochain
+   * serveur TURN.
    */
   const switchToNextTurnServer = async () => {
     const peer = peerRef.current;
 
-    if (!peer) return false;
-
-    if (restartingIceRef.current) {
+    if (!peer) {
       return false;
     }
 
-    const turnServers = getTurnServers();
+    if (closedRef.current) {
+      return false;
+    }
+
+    if (restartingIceRef.current) {
+      console.log(
+        'ICE restart déjà en cours.'
+      );
+
+      return false;
+    }
+
+    const turnServers =
+      getTurnServers();
 
     if (turnServers.length === 0) {
       console.error(
@@ -226,51 +453,59 @@ export default function VoiceCall({
       return false;
     }
 
+    /*
+     * Empêche de faire une boucle infinie
+     * sans limite.
+     */
     if (
       restartAttemptsRef.current >=
       turnServers.length
     ) {
       console.error(
-        'Tous les serveurs TURN disponibles ont ' +
-        'déjà été essayés.'
+        'Tous les serveurs TURN disponibles ' +
+        'ont déjà été essayés.'
       );
+
+      setStatus('failed');
 
       return false;
     }
 
     restartingIceRef.current = true;
 
-    const nextIndex =
-      currentTurnIndexRef.current %
-      turnServers.length;
-
-    const nextTurn =
-      turnServers[nextIndex];
-
-    currentTurnIndexRef.current =
-      (nextIndex + 1) %
-      turnServers.length;
-
-    restartAttemptsRef.current += 1;
-
     try {
+      const next =
+        await prepareNextTurnServer(
+          peer
+        );
+
+      if (!next) {
+        return false;
+      }
+
+      const nextTurn =
+        next.server;
+
+      restartAttemptsRef.current += 1;
+
       console.log(
-        '🔄 ICE restart avec le serveur TURN suivant:',
-        nextIndex + 1,
+        '🔄 ICE restart avec TURN:',
+        next.index + 1,
         '/',
         turnServers.length
       );
 
       /*
-       * On conserve les STUN et on sélectionne le
-       * serveur TURN suivant.
+       * On conserve les STUN et on utilise
+       * uniquement le TURN sélectionné.
        */
       const stunServers =
         iceServersRef.current.filter(
           server => {
-            const urls = Array.isArray(server.urls)
-              ? server.urls
-              : [server.urls];
+            const urls =
+              Array.isArray(server.urls)
+                ? server.urls
+                : [server.urls];
 
             return urls.some(
               url =>
@@ -288,19 +523,19 @@ export default function VoiceCall({
       });
 
       /*
-       * Demande à WebRTC de refaire ICE sans fermer
-       * le RTCPeerConnection.
+       * Demande un nouvel ICE generation.
        */
       peer.restartIce();
 
       /*
-       * Création d'une nouvelle offer.
-       *
-       * restartIce() fera en sorte que cette offer
-       * contienne les nouveaux paramètres ICE.
+       * Création de la nouvelle offer.
        */
       const offer =
         await peer.createOffer();
+
+      if (closedRef.current) {
+        return false;
+      }
 
       await peer.setLocalDescription(
         offer
@@ -315,6 +550,10 @@ export default function VoiceCall({
       );
 
       setStatus('calling');
+
+      console.log(
+        '✅ ICE restart offer envoyée.'
+      );
 
       return true;
 
@@ -335,26 +574,70 @@ export default function VoiceCall({
     const config =
       await getIceServers(token);
 
+    if (closedRef.current) {
+      throw new Error(
+        'Appel fermé pendant la récupération ICE.'
+      );
+    }
+
     iceServersRef.current =
       config.iceServers;
 
-    /*
-     * On commence avec toute la liste.
-     * WebRTC peut donc trouver un chemin valide.
-     */
+    turnServersRef.current =
+      config.iceServers.filter(
+        server => {
+          const urls =
+            Array.isArray(server.urls)
+              ? server.urls
+              : [server.urls];
+
+          return urls.some(
+            url =>
+              typeof url === 'string' &&
+              (
+                url.startsWith('turn:') ||
+                url.startsWith('turns:')
+              )
+          );
+        }
+      );
+
+    console.log(
+      'ICE servers:',
+      iceServersRef.current
+    );
+
+    console.log(
+      'TURN servers disponibles:',
+      turnServersRef.current.length
+    );
+
     const peer =
-      new RTCPeerConnection(config);
+      new RTCPeerConnection(
+        config
+      );
 
     peer.onicecandidate = e => {
       if (!e.candidate) return;
 
-      socket.emit('iceCandidate', {
-        receiverId: friend._id,
-        candidate: e.candidate
-      });
+      if (closedRef.current) {
+        return;
+      }
+
+      socket.emit(
+        'iceCandidate',
+        {
+          receiverId: friend._id,
+          candidate: e.candidate
+        }
+      );
     };
 
     peer.ontrack = e => {
+      if (closedRef.current) {
+        return;
+      }
+
       if (!remoteAudioRef.current) {
         remoteAudioRef.current =
           new Audio();
@@ -379,76 +662,168 @@ export default function VoiceCall({
         );
     };
 
-    peer.oniceconnectionstatechange = async () => {
-      console.log(
-        'ICE state:',
-        peer.iceConnectionState
-      );
-
-      if (
-        peer.iceConnectionState ===
-          'connected' ||
-        peer.iceConnectionState ===
-          'completed'
-      ) {
-        setStatus('connected');
-
-        startTimer();
-
-        /*
-         * Une connexion est revenue :
-         * on remet le compteur de failover à zéro.
-         */
-        restartAttemptsRef.current = 0;
-
-        return;
-      }
-
-      if (
-        peer.iceConnectionState ===
-        'disconnected'
-      ) {
-        /*
-         * "disconnected" peut être temporaire.
-         * On ne change donc pas immédiatement de TURN.
-         */
-        console.log(
-          'Connexion WebRTC temporairement interrompue'
-        );
-
-        return;
-      }
-
-      if (
-        peer.iceConnectionState ===
-        'failed'
-      ) {
-        console.warn(
-          '❌ ICE failed : tentative de failover TURN'
-        );
-
-        /*
-         * Seul l'appelant déclenche automatiquement
-         * la nouvelle négociation.
-         */
-        if (isCallerRef.current) {
-          await switchToNextTurnServer();
+    peer.oniceconnectionstatechange =
+      async () => {
+        if (closedRef.current) {
+          return;
         }
-      }
-    };
+
+        const state =
+          peer.iceConnectionState;
+
+        console.log(
+          'ICE state:',
+          state
+        );
+
+        if (
+          state === 'connected' ||
+          state === 'completed'
+        ) {
+          clearDisconnectedTimer();
+
+          setStatus('connected');
+
+          startTimer();
+
+          /*
+           * Une connexion est revenue.
+           * On peut autoriser un nouveau cycle
+           * de failover si une panne survient
+           * beaucoup plus tard.
+           */
+          restartAttemptsRef.current = 0;
+
+          /*
+           * On essaie de mémoriser le TURN actif
+           * pour que le prochain failover parte
+           * réellement au serveur suivant.
+           */
+          const activeTurnUrl =
+            await getActiveTurnServer(
+              peer
+            );
+
+          const activeIndex =
+            findTurnIndexByUrl(
+              activeTurnUrl
+            );
+
+          if (activeIndex >= 0) {
+            currentTurnIndexRef.current =
+              (activeIndex + 1) %
+              getTurnServers().length;
+          }
+
+          return;
+        }
+
+        if (
+          state === 'disconnected'
+        ) {
+          /*
+           * Ne pas basculer immédiatement :
+           * disconnected peut être temporaire.
+           */
+          console.log(
+            '⚠️ Connexion WebRTC temporairement interrompue.'
+          );
+
+          clearDisconnectedTimer();
+
+          disconnectedTimerRef.current =
+            setTimeout(
+              async () => {
+                disconnectedTimerRef.current =
+                  null;
+
+                if (
+                  closedRef.current ||
+                  !peerRef.current
+                ) {
+                  return;
+                }
+
+                /*
+                 * Si la connexion est revenue entre
+                 * temps, aucun failover.
+                 */
+                if (
+                  peer.iceConnectionState !==
+                  'disconnected'
+                ) {
+                  return;
+                }
+
+                /*
+                 * On laisse WebRTC décider si elle
+                 * passe naturellement à failed.
+                 */
+                console.log(
+                  '⚠️ ICE toujours disconnected après délai.'
+                );
+              },
+              8000
+            );
+
+          return;
+        }
+
+        if (
+          state === 'failed'
+        ) {
+          clearDisconnectedTimer();
+
+          console.warn(
+            '❌ ICE failed.'
+          );
+
+          /*
+           * Seul l'appelant effectue le
+           * changement de TURN.
+           */
+          if (
+            isCallerRef.current
+          ) {
+            await switchToNextTurnServer();
+          }
+
+          return;
+        }
+      };
 
     return peer;
   };
 
   const addPendingCandidates = async peer => {
+    if (
+      !peer ||
+      closedRef.current
+    ) {
+      return;
+    }
+
+    if (
+      !peer.remoteDescription
+    ) {
+      return;
+    }
+
+    const candidates =
+      [...pendingCandidates.current];
+
+    pendingCandidates.current = [];
+
     for (
-      const candidate of
-      pendingCandidates.current
+      const candidate of candidates
     ) {
       try {
         await peer.addIceCandidate(
-          new RTCIceCandidate(candidate)
+          new RTCIceCandidate(
+            candidate
+          )
         );
+
       } catch (err) {
         console.error(
           'candidate error:',
@@ -456,25 +831,46 @@ export default function VoiceCall({
         );
       }
     }
-
-    pendingCandidates.current = [];
   };
 
   const startCall = async () => {
     try {
       const stream =
-        await navigator.mediaDevices.getUserMedia(
-          {
+        await navigator.mediaDevices
+          .getUserMedia({
             audio: true
-          }
-        );
+          });
 
-      localStreamRef.current = stream;
+      if (closedRef.current) {
+        stream
+          .getTracks()
+          .forEach(track =>
+            track.stop()
+          );
+
+        return;
+      }
+
+      localStreamRef.current =
+        stream;
 
       const peer =
         await createPeer();
 
-      peerRef.current = peer;
+      if (closedRef.current) {
+        peer.close();
+
+        stream
+          .getTracks()
+          .forEach(track =>
+            track.stop()
+          );
+
+        return;
+      }
+
+      peerRef.current =
+        peer;
 
       stream
         .getTracks()
@@ -492,10 +888,17 @@ export default function VoiceCall({
         offer
       );
 
-      socket.emit('callUser', {
-        receiverId: friend._id,
-        offer
-      });
+      if (closedRef.current) {
+        return;
+      }
+
+      socket.emit(
+        'callUser',
+        {
+          receiverId: friend._id,
+          offer
+        }
+      );
 
     } catch (err) {
       console.error(
@@ -503,7 +906,9 @@ export default function VoiceCall({
         err
       );
 
-      setStatus('error');
+      if (!closedRef.current) {
+        setStatus('error');
+      }
     }
   };
 
@@ -512,18 +917,41 @@ export default function VoiceCall({
       isCallerRef.current = false;
 
       const stream =
-        await navigator.mediaDevices.getUserMedia(
-          {
+        await navigator.mediaDevices
+          .getUserMedia({
             audio: true
-          }
-        );
+          });
 
-      localStreamRef.current = stream;
+      if (closedRef.current) {
+        stream
+          .getTracks()
+          .forEach(track =>
+            track.stop()
+          );
+
+        return;
+      }
+
+      localStreamRef.current =
+        stream;
 
       const peer =
         await createPeer();
 
-      peerRef.current = peer;
+      if (closedRef.current) {
+        peer.close();
+
+        stream
+          .getTracks()
+          .forEach(track =>
+            track.stop()
+          );
+
+        return;
+      }
+
+      peerRef.current =
+        peer;
 
       stream
         .getTracks()
@@ -540,7 +968,13 @@ export default function VoiceCall({
         )
       );
 
-      await addPendingCandidates(peer);
+      /*
+       * Les candidates reçues avant l'offer
+       * peuvent maintenant être ajoutées.
+       */
+      await addPendingCandidates(
+        peer
+      );
 
       const answer =
         await peer.createAnswer();
@@ -549,10 +983,19 @@ export default function VoiceCall({
         answer
       );
 
-      socket.emit('answerCall', {
-        callerId: friend._id,
-        answer
-      });
+      if (closedRef.current) {
+        return;
+      }
+
+      socket.emit(
+        'answerCall',
+        {
+          callerId: friend._id,
+          answer
+        }
+      );
+
+      setStatus('calling');
 
     } catch (err) {
       console.error(
@@ -560,69 +1003,84 @@ export default function VoiceCall({
         err
       );
 
-      setStatus('error');
+      if (!closedRef.current) {
+        setStatus('error');
+      }
     }
   };
 
   const declineCall = () => {
-    socket.emit('endCall', {
-      receiverId: friend._id
-    });
+    socket.emit(
+      'endCall',
+      {
+        receiverId: friend._id
+      }
+    );
 
     cleanup();
     onClose();
   };
 
   const hangUp = () => {
-    socket.emit('endCall', {
-      receiverId: friend._id
-    });
+    socket.emit(
+      'endCall',
+      {
+        receiverId: friend._id
+      }
+    );
 
     cleanup();
     onClose();
   };
 
   const toggleMute = () => {
-    if (!localStreamRef.current) return;
+    if (
+      !localStreamRef.current
+    ) {
+      return;
+    }
 
     localStreamRef.current
       .getAudioTracks()
       .forEach(track => {
-        track.enabled = !track.enabled;
+        track.enabled =
+          !track.enabled;
       });
 
     setMuted(prev => !prev);
   };
 
   useEffect(() => {
-    if (
-      !incomingOffer &&
-      !hasInitiatedRef.current
-    ) {
-      hasInitiatedRef.current = true;
-
-      isCallerRef.current = true;
-
-      startCall();
-    }
+    closedRef.current = false;
 
     /*
      * Réponse à l'offer initiale.
      */
     const handleCallAnswered =
       async ({ answer }) => {
-        if (!peerRef.current) return;
+        const peer =
+          peerRef.current;
+
+        if (
+          !peer ||
+          closedRef.current
+        ) {
+          return;
+        }
 
         try {
-          await peerRef.current
-            .setRemoteDescription(
-              new RTCSessionDescription(
-                answer
-              )
-            );
+          await peer.setRemoteDescription(
+            new RTCSessionDescription(
+              answer
+            )
+          );
 
+          /*
+           * Les candidates reçues avant
+           * l'answer sont maintenant valides.
+           */
           await addPendingCandidates(
-            peerRef.current
+            peer
           );
 
         } catch (err) {
@@ -638,19 +1096,26 @@ export default function VoiceCall({
      */
     const handleIceCandidate =
       async ({ candidate }) => {
-        if (!candidate) return;
+        if (
+          !candidate ||
+          closedRef.current
+        ) {
+          return;
+        }
+
+        const peer =
+          peerRef.current;
 
         if (
-          peerRef.current &&
-          peerRef.current.remoteDescription
+          peer &&
+          peer.remoteDescription
         ) {
           try {
-            await peerRef.current
-              .addIceCandidate(
-                new RTCIceCandidate(
-                  candidate
-                )
-              );
+            await peer.addIceCandidate(
+              new RTCIceCandidate(
+                candidate
+              )
+            );
 
           } catch (err) {
             console.error(
@@ -667,18 +1132,20 @@ export default function VoiceCall({
       };
 
     /*
-     * L'autre utilisateur nous envoie une nouvelle
-     * offer parce qu'il effectue un ICE restart.
-     *
-     * Cela arrive notamment lorsque l'appelant change
-     * de TURN.
+     * Réception d'une nouvelle offer
+     * déclenchée par un ICE restart.
      */
     const handleIceRestartOffer =
       async ({ offer }) => {
         const peer =
           peerRef.current;
 
-        if (!peer) return;
+        if (
+          !peer ||
+          closedRef.current
+        ) {
+          return;
+        }
 
         try {
           console.log(
@@ -691,12 +1158,26 @@ export default function VoiceCall({
             )
           );
 
+          /*
+           * IMPORTANT :
+           * les candidates reçues avant cette
+           * nouvelle offer sont maintenant
+           * ajoutées.
+           */
+          await addPendingCandidates(
+            peer
+          );
+
           const answer =
             await peer.createAnswer();
 
           await peer.setLocalDescription(
             answer
           );
+
+          if (closedRef.current) {
+            return;
+          }
 
           socket.emit(
             'iceRestartAnswer',
@@ -715,14 +1196,20 @@ export default function VoiceCall({
       };
 
     /*
-     * Réception de la réponse à notre ICE restart.
+     * Réception de la réponse à notre
+     * ICE restart.
      */
     const handleIceRestartAnswer =
       async ({ answer }) => {
         const peer =
           peerRef.current;
 
-        if (!peer) return;
+        if (
+          !peer ||
+          closedRef.current
+        ) {
+          return;
+        }
 
         try {
           console.log(
@@ -733,6 +1220,15 @@ export default function VoiceCall({
             new RTCSessionDescription(
               answer
             )
+          );
+
+          /*
+           * Les candidates éventuellement
+           * reçues avant la réponse peuvent
+           * maintenant être appliquées.
+           */
+          await addPendingCandidates(
+            peer
           );
 
         } catch (err) {
@@ -749,9 +1245,16 @@ export default function VoiceCall({
     };
 
     const handleCallFailed = () => {
-      setStatus('failed');
+      if (!closedRef.current) {
+        setStatus('failed');
+      }
     };
 
+    /*
+     * IMPORTANT :
+     * On installe les listeners AVANT de
+     * lancer startCall().
+     */
     socket.on(
       'callAnswered',
       handleCallAnswered
@@ -781,6 +1284,20 @@ export default function VoiceCall({
       'callFailed',
       handleCallFailed
     );
+
+    /*
+     * Appel sortant.
+     */
+    if (
+      !incomingOffer &&
+      !hasInitiatedRef.current
+    ) {
+      hasInitiatedRef.current = true;
+
+      isCallerRef.current = true;
+
+      startCall();
+    }
 
     return () => {
       socket.off(
