@@ -5,15 +5,17 @@ export default function TermsPage() {
         <a href="/help" style={styles.back}>← Retour</a>
 
         <h1 style={styles.title}>Conditions Générales d'Utilisation</h1>
-        <p style={styles.date}>En vigueur depuis le 12 avril 2026</p>
+        <p style={styles.date}>En vigueur depuis le 12 septembre 2026</p>
 
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>1. Présentation du service</h2>
+
           <p style={styles.text}>
             Propard (<a href="https://propard.site" style={styles.link}>propard.site</a>)
             est une plateforme de messagerie instantanée permettant à des utilisateurs
             de communiquer via des adresses IP aliases anonymes.
           </p>
+
           <p style={styles.text}>
             Le service est développé et exploité par BananeVR, particulier domicilié en France.
           </p>
@@ -21,6 +23,7 @@ export default function TermsPage() {
 
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>2. Acceptation des CGU</h2>
+
           <p style={styles.text}>
             En créant un compte sur Propard, vous acceptez les présentes Conditions
             Générales d'Utilisation. Si vous n'acceptez pas ces conditions, vous ne
@@ -30,9 +33,11 @@ export default function TermsPage() {
 
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>3. Accès au service</h2>
+
           <p style={styles.text}>
             L'accès à Propard est gratuit et ouvert aux personnes âgées d'au moins 13 ans.
           </p>
+
           <p style={styles.text}>
             Chaque utilisateur est responsable de la confidentialité de ses identifiants
             de connexion et de l'utilisation effectuée depuis son compte.
@@ -66,7 +71,9 @@ export default function TermsPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>5. Messages privés, chiffrement et signalements</h2>
+          <h2 style={styles.sectionTitle}>
+            5. Messages privés, chiffrement et signalements
+          </h2>
 
           <p style={styles.text}>
             Les communications privées échangées sur Propard utilisent un système
@@ -98,10 +105,10 @@ export default function TermsPage() {
 
           <p style={styles.text}>
             Lorsqu'un utilisateur signale un message privé, les informations nécessaires
-            au traitement du signalement peuvent être transmises à Propard, notamment le
-            contenu du message signalé lorsque cela est nécessaire. Cette transmission
-            intervient à la suite de l'action volontaire de l'utilisateur qui effectue
-            le signalement.
+            au traitement du signalement peuvent être transmises à Propard et enregistrées
+            dans son système de gestion des signalements, notamment le contenu du message
+            signalé lorsque cela est nécessaire. Cette transmission intervient à la suite
+            de l'action volontaire de l'utilisateur qui effectue le signalement.
           </p>
 
           <p style={styles.text}>
@@ -109,10 +116,18 @@ export default function TermsPage() {
             déterminer s'il constitue une violation des présentes CGU ou de la réglementation
             applicable et afin de permettre à Propard de prendre les mesures appropriées.
           </p>
+
+          <p style={styles.text}>
+            Les informations relatives aux signalements peuvent être conservées pendant
+            la durée nécessaire à leur traitement, à la gestion d'une contestation éventuelle,
+            à la sécurité du service ou au respect d'une obligation légale.
+          </p>
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>6. Contenus des utilisateurs et mesures</h2>
+          <h2 style={styles.sectionTitle}>
+            6. Contenus des utilisateurs et mesures
+          </h2>
 
           <p style={styles.text}>
             Les contenus transmis ou publiés par les utilisateurs demeurent sous la
@@ -215,7 +230,7 @@ export default function TermsPage() {
 
           <p style={styles.text}>
             Pour toute question relative aux présentes CGU :
-            {" "}
+            {' '}
             <a
               href="mailto:support@propard.site"
               style={styles.link}
