@@ -27,6 +27,20 @@ export default function AdminPage() {
   const [announcementLoading, setAnnouncementLoading] = useState(false);
 
   // ============================
+  // SIGNALEMENTS
+  // ============================
+
+  const [reportKey, setReportKey] = useState('');
+  const [reports, setReports] = useState([]);
+  const [newReportCount, setNewReportCount] = useState(0);
+
+  const [reportsError, setReportsError] = useState('');
+  const [reportsResult, setReportsResult] = useState('');
+  const [reportsLoading, setReportsLoading] = useState(false);
+
+  const [reportActionLoading, setReportActionLoading] = useState(null);
+
+  // ============================
   // RESET PASSWORD
   // ============================
 
@@ -161,6 +175,258 @@ export default function AdminPage() {
     }
   };
 
+  // ============================
+  // CHARGER LES SIGNALEMENTS
+  // ============================
+
+  const loadReports = async () => {
+    if (!reportKey) {
+      setReportsError(
+        'Entre la clé des signalements'
+      );
+      return;
+    }
+
+    setReportsError('');
+    setReportsResult('');
+    setReportsLoading(true);
+
+    try {
+      const res = await axios.post(
+        '/api/admin/reports/list',
+        {
+          reportKey
+        }
+      );
+
+      setReports(
+        res.data.reports || []
+      );
+
+      setNewReportCount(
+        res.data.newCount || 0
+      );
+
+      setReportsResult(
+        `${res.data.reports?.length || 0} signalement(s) chargé(s).`
+      );
+
+    } catch (err) {
+      setReportsError(
+        err.response?.data?.error ||
+        'Erreur lors du chargement des signalements'
+      );
+
+      setReports([]);
+      setNewReportCount(0);
+
+    } finally {
+      setReportsLoading(false);
+    }
+  };
+
+  // ============================
+  // CHANGER STATUT
+  // ============================
+
+  const updateReportStatus = async (
+    reportId,
+    status
+  ) => {
+    if (!reportKey) {
+      setReportsError(
+        'Entre d’abord la clé des signalements'
+      );
+      return;
+    }
+
+    setReportActionLoading(reportId);
+    setReportsError('');
+    setReportsResult('');
+
+    try {
+      await axios.post(
+        `/api/admin/reports/${reportId}/status`,
+        {
+          reportKey,
+          status
+        }
+      );
+
+      setReports(prev =>
+        prev.map(report =>
+          report._id === reportId
+            ? {
+                ...report,
+                status,
+                processedAt:
+                  status === 'new'
+                    ? null
+                    : new Date().toISOString()
+              }
+            : report
+        )
+      );
+
+      setNewReportCount(prev => {
+        const report =
+          reports.find(
+            item =>
+              item._id === reportId
+          );
+
+        if (!report) {
+          return prev;
+        }
+
+        if (
+          report.status === 'new' &&
+          status !== 'new'
+        ) {
+          return Math.max(
+            0,
+            prev - 1
+          );
+        }
+
+        if (
+          report.status !== 'new' &&
+          status === 'new'
+        ) {
+          return prev + 1;
+        }
+
+        return prev;
+      });
+
+      setReportsResult(
+        'Statut du signalement mis à jour.'
+      );
+
+    } catch (err) {
+      setReportsError(
+        err.response?.data?.error ||
+        'Erreur lors de la modification du signalement'
+      );
+
+    } finally {
+      setReportActionLoading(null);
+    }
+  };
+
+  // ============================
+  // SUPPRIMER SIGNALEMENT
+  // ============================
+
+  const deleteReport = async (
+    reportId
+  ) => {
+    if (!reportKey) {
+      setReportsError(
+        'Entre d’abord la clé des signalements'
+      );
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        'Supprimer définitivement ce signalement ?'
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setReportActionLoading(reportId);
+    setReportsError('');
+    setReportsResult('');
+
+    try {
+      await axios.post(
+        `/api/admin/reports/${reportId}/delete`,
+        {
+          reportKey
+        }
+      );
+
+      const deletedReport =
+        reports.find(
+          report =>
+            report._id === reportId
+        );
+
+      setReports(prev =>
+        prev.filter(
+          report =>
+            report._id !== reportId
+        )
+      );
+
+      if (
+        deletedReport?.status === 'new'
+      ) {
+        setNewReportCount(prev =>
+          Math.max(0, prev - 1)
+        );
+      }
+
+      setReportsResult(
+        'Signalement supprimé.'
+      );
+
+    } catch (err) {
+      setReportsError(
+        err.response?.data?.error ||
+        'Erreur lors de la suppression du signalement'
+      );
+
+    } finally {
+      setReportActionLoading(null);
+    }
+  };
+
+  // ============================
+  // HELPERS SIGNALEMENTS
+  // ============================
+
+  const getStatusLabel = status => {
+    if (status === 'processed') {
+      return 'Traité';
+    }
+
+    if (status === 'rejected') {
+      return 'Rejeté';
+    }
+
+    return 'Nouveau';
+  };
+
+  const getStatusStyle = status => {
+    if (status === 'processed') {
+      return styles.statusProcessed;
+    }
+
+    if (status === 'rejected') {
+      return styles.statusRejected;
+    }
+
+    return styles.statusNew;
+  };
+
+  const formatDate = date => {
+    if (!date) {
+      return '?';
+    }
+
+    try {
+      return new Date(date).toLocaleString(
+        'fr-FR'
+      );
+    } catch {
+      return '?';
+    }
+  };
+
   return (
     <div style={styles.page}>
       <div style={styles.container}>
@@ -201,7 +467,9 @@ export default function AdminPage() {
               placeholder="Clé secrète"
               value={adminKey}
               onChange={e =>
-                setAdminKey(e.target.value)
+                setAdminKey(
+                  e.target.value
+                )
               }
               autoComplete="off"
             />
@@ -216,7 +484,9 @@ export default function AdminPage() {
               placeholder="Ex: BananeVR"
               value={username}
               onChange={e =>
-                setUsername(e.target.value)
+                setUsername(
+                  e.target.value
+                )
               }
               autoComplete="off"
             />
@@ -231,7 +501,9 @@ export default function AdminPage() {
               placeholder="Nouveau mot de passe"
               value={newPassword}
               onChange={e =>
-                setNewPassword(e.target.value)
+                setNewPassword(
+                  e.target.value
+                )
               }
               autoComplete="new-password"
             />
@@ -251,12 +523,15 @@ export default function AdminPage() {
             <button
               style={{
                 ...styles.btn,
-                opacity: passwordLoading
-                  ? 0.7
-                  : 1
+                opacity:
+                  passwordLoading
+                    ? 0.7
+                    : 1
               }}
               onClick={handleReset}
-              disabled={passwordLoading}
+              disabled={
+                passwordLoading
+              }
             >
               {passwordLoading
                 ? '...'
@@ -265,7 +540,6 @@ export default function AdminPage() {
 
           </div>
         </section>
-
 
         {/* ========================================
             ANNOUNCEMENT
@@ -295,7 +569,9 @@ export default function AdminPage() {
               placeholder="Clé secrète des annonces"
               value={announcementKey}
               onChange={e =>
-                setAnnouncementKey(e.target.value)
+                setAnnouncementKey(
+                  e.target.value
+                )
               }
               autoComplete="off"
             />
@@ -310,7 +586,9 @@ export default function AdminPage() {
               placeholder="Ex: Mise à jour importante"
               value={announcementTitle}
               onChange={e =>
-                setAnnouncementTitle(e.target.value)
+                setAnnouncementTitle(
+                  e.target.value
+                )
               }
               maxLength={150}
             />
@@ -324,7 +602,9 @@ export default function AdminPage() {
               placeholder="Contenu de l'annonce..."
               value={announcementMessage}
               onChange={e =>
-                setAnnouncementMessage(e.target.value)
+                setAnnouncementMessage(
+                  e.target.value
+                )
               }
               maxLength={5000}
             />
@@ -344,12 +624,17 @@ export default function AdminPage() {
             <button
               style={{
                 ...styles.btn,
-                opacity: announcementLoading
-                  ? 0.7
-                  : 1
+                opacity:
+                  announcementLoading
+                    ? 0.7
+                    : 1
               }}
-              onClick={handleCreateAnnouncement}
-              disabled={announcementLoading}
+              onClick={
+                handleCreateAnnouncement
+              }
+              disabled={
+                announcementLoading
+              }
             >
               {announcementLoading
                 ? '...'
@@ -359,12 +644,17 @@ export default function AdminPage() {
             <button
               style={{
                 ...styles.deleteBtn,
-                opacity: announcementLoading
-                  ? 0.7
-                  : 1
+                opacity:
+                  announcementLoading
+                    ? 0.7
+                    : 1
               }}
-              onClick={handleDeleteAnnouncement}
-              disabled={announcementLoading}
+              onClick={
+                handleDeleteAnnouncement
+              }
+              disabled={
+                announcementLoading
+              }
             >
               Désactiver l’annonce actuelle
             </button>
@@ -372,6 +662,277 @@ export default function AdminPage() {
           </div>
         </section>
 
+        {/* ========================================
+            SIGNALEMENTS
+        ======================================== */}
+
+        <section style={styles.card}>
+          <div style={styles.reportHeader}>
+            <div>
+              <h2 style={styles.sectionTitle}>
+                🚩 Signalements
+              </h2>
+
+              <p style={styles.description}>
+                Les signalements envoyés par les
+                utilisateurs sont enregistrés ici.
+                Cette section est protégée par une
+                clé d'administration séparée.
+              </p>
+            </div>
+
+            {newReportCount > 0 && (
+              <div style={styles.newBadge}>
+                {newReportCount} nouveau
+                {newReportCount > 1
+                  ? 'x'
+                  : ''}
+              </div>
+            )}
+          </div>
+
+          <div style={styles.form}>
+
+            <label style={styles.label}>
+              Clé des signalements
+            </label>
+
+            <input
+              style={styles.input}
+              type="password"
+              placeholder="ADMIN_KEY_REPORTS"
+              value={reportKey}
+              onChange={e =>
+                setReportKey(
+                  e.target.value
+                )
+              }
+              autoComplete="off"
+            />
+
+            {reportsError && (
+              <p style={styles.error}>
+                {reportsError}
+              </p>
+            )}
+
+            {reportsResult && (
+              <p style={styles.success}>
+                ✅ {reportsResult}
+              </p>
+            )}
+
+            <button
+              style={{
+                ...styles.btn,
+                opacity:
+                  reportsLoading
+                    ? 0.7
+                    : 1
+              }}
+              onClick={loadReports}
+              disabled={reportsLoading}
+            >
+              {reportsLoading
+                ? 'Chargement...'
+                : '🚩 Charger les signalements'}
+            </button>
+
+          </div>
+
+          {reports.length > 0 && (
+            <div style={styles.reportsList}>
+
+              {reports.map(report => (
+                <div
+                  key={report._id}
+                  style={styles.reportCard}
+                >
+
+                  <div style={styles.reportTop}>
+                    <div>
+                      <span
+                        style={{
+                          ...styles.status,
+                          ...getStatusStyle(
+                            report.status
+                          )
+                        }}
+                      >
+                        {getStatusLabel(
+                          report.status
+                        )}
+                      </span>
+                    </div>
+
+                    <span style={styles.reportDate}>
+                      Signalé le{' '}
+                      {formatDate(
+                        report.createdAt
+                      )}
+                    </span>
+                  </div>
+
+                  <div style={styles.reportInfo}>
+
+                    <div>
+                      <span style={styles.infoLabel}>
+                        Signalé par
+                      </span>
+
+                      <span style={styles.infoValue}>
+                        {report.reporter?.username ||
+                          'Compte supprimé'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span style={styles.infoLabel}>
+                        Utilisateur signalé
+                      </span>
+
+                      <span style={styles.infoValue}>
+                        {report.reportedUser?.username ||
+                          'Compte supprimé'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span style={styles.infoLabel}>
+                        Date du message
+                      </span>
+
+                      <span style={styles.infoValue}>
+                        {formatDate(
+                          report.messageCreatedAt
+                        )}
+                      </span>
+                    </div>
+
+                  </div>
+
+                  <div style={styles.reportBlock}>
+                    <div style={styles.infoLabel}>
+                      Motif
+                    </div>
+
+                    <div style={styles.reason}>
+                      {report.reason ||
+                        'Aucun motif précisé'}
+                    </div>
+                  </div>
+
+                  <div style={styles.reportBlock}>
+                    <div style={styles.infoLabel}>
+                      Message signalé
+                    </div>
+
+                    <div style={styles.messageContent}>
+                      {report.content}
+                    </div>
+                  </div>
+
+                  <div style={styles.reportBlock}>
+                    <div style={styles.infoLabel}>
+                      Message ID
+                    </div>
+
+                    <code style={styles.messageId}>
+                      {report.messageId}
+                    </code>
+                  </div>
+
+                  <div style={styles.reportActions}>
+
+                    {report.status !== 'processed' && (
+                      <button
+                        style={styles.processBtn}
+                        disabled={
+                          reportActionLoading ===
+                          report._id
+                        }
+                        onClick={() =>
+                          updateReportStatus(
+                            report._id,
+                            'processed'
+                          )
+                        }
+                      >
+                        {reportActionLoading ===
+                        report._id
+                          ? '...'
+                          : '✓ Marquer traité'}
+                      </button>
+                    )}
+
+                    {report.status !== 'rejected' && (
+                      <button
+                        style={styles.rejectBtn}
+                        disabled={
+                          reportActionLoading ===
+                          report._id
+                        }
+                        onClick={() =>
+                          updateReportStatus(
+                            report._id,
+                            'rejected'
+                          )
+                        }
+                      >
+                        ✕ Rejeter
+                      </button>
+                    )}
+
+                    {report.status !== 'new' && (
+                      <button
+                        style={styles.reopenBtn}
+                        disabled={
+                          reportActionLoading ===
+                          report._id
+                        }
+                        onClick={() =>
+                          updateReportStatus(
+                            report._id,
+                            'new'
+                          )
+                        }
+                      >
+                        ↩ Nouveau
+                      </button>
+                    )}
+
+                    <button
+                      style={styles.deleteReportBtn}
+                      disabled={
+                        reportActionLoading ===
+                        report._id
+                      }
+                      onClick={() =>
+                        deleteReport(
+                          report._id
+                        )
+                      }
+                    >
+                      🗑 Supprimer
+                    </button>
+
+                  </div>
+
+                </div>
+              ))}
+
+            </div>
+          )}
+
+          {!reportsLoading &&
+            reports.length === 0 &&
+            reportsResult && (
+              <div style={styles.emptyReports}>
+                Aucun signalement enregistré.
+              </div>
+            )}
+
+        </section>
 
         <a
           href="/"
@@ -384,7 +945,6 @@ export default function AdminPage() {
     </div>
   );
 }
-
 
 const styles = {
   page: {
@@ -522,5 +1082,190 @@ const styles = {
     fontSize: '13px',
     color: 'var(--text-secondary)',
     textDecoration: 'none'
+  },
+
+  reportHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: '15px'
+  },
+
+  newBadge: {
+    flexShrink: 0,
+    background: 'var(--danger)',
+    color: '#fff',
+    borderRadius: '999px',
+    padding: '6px 10px',
+    fontSize: '11px',
+    fontWeight: '700'
+  },
+
+  reportsList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '14px',
+    marginTop: '25px'
+  },
+
+  reportCard: {
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: '10px',
+    padding: '18px'
+  },
+
+  reportTop: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '10px',
+    marginBottom: '18px'
+  },
+
+  status: {
+    display: 'inline-block',
+    borderRadius: '999px',
+    padding: '5px 9px',
+    fontSize: '11px',
+    fontWeight: '700'
+  },
+
+  statusNew: {
+    background: 'rgba(231, 76, 60, 0.15)',
+    color: 'var(--danger)'
+  },
+
+  statusProcessed: {
+    background: 'rgba(46, 204, 113, 0.15)',
+    color: 'var(--success)'
+  },
+
+  statusRejected: {
+    background: 'rgba(127, 127, 127, 0.15)',
+    color: 'var(--text-secondary)'
+  },
+
+  reportDate: {
+    color: 'var(--text-muted)',
+    fontSize: '11px',
+    textAlign: 'right'
+  },
+
+  reportInfo: {
+    display: 'grid',
+    gridTemplateColumns:
+      'repeat(auto-fit, minmax(150px, 1fr))',
+    gap: '12px',
+    marginBottom: '18px'
+  },
+
+  infoLabel: {
+    display: 'block',
+    color: 'var(--text-muted)',
+    fontSize: '10px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.8px',
+    marginBottom: '5px'
+  },
+
+  infoValue: {
+    display: 'block',
+    color: 'var(--text-primary)',
+    fontSize: '13px',
+    wordBreak: 'break-word'
+  },
+
+  reportBlock: {
+    marginTop: '14px'
+  },
+
+  reason: {
+    color: 'var(--text-primary)',
+    fontSize: '13px',
+    lineHeight: '1.5',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word'
+  },
+
+  messageContent: {
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border)',
+    borderRadius: '8px',
+    padding: '12px',
+    color: 'var(--text-primary)',
+    fontSize: '14px',
+    lineHeight: '1.5',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word'
+  },
+
+  messageId: {
+    display: 'block',
+    color: 'var(--text-secondary)',
+    fontSize: '11px',
+    wordBreak: 'break-all'
+  },
+
+  reportActions: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    marginTop: '20px'
+  },
+
+  processBtn: {
+    background: 'var(--success)',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '7px',
+    padding: '9px 12px',
+    fontSize: '12px',
+    fontWeight: '600',
+    cursor: 'pointer'
+  },
+
+  rejectBtn: {
+    background: 'transparent',
+    color: 'var(--danger)',
+    border: '1px solid var(--danger)',
+    borderRadius: '7px',
+    padding: '8px 12px',
+    fontSize: '12px',
+    fontWeight: '600',
+    cursor: 'pointer'
+  },
+
+  reopenBtn: {
+    background: 'transparent',
+    color: 'var(--text-secondary)',
+    border: '1px solid var(--border)',
+    borderRadius: '7px',
+    padding: '8px 12px',
+    fontSize: '12px',
+    fontWeight: '600',
+    cursor: 'pointer'
+  },
+
+  deleteReportBtn: {
+    background: 'transparent',
+    color: 'var(--danger)',
+    border: '1px solid var(--danger)',
+    borderRadius: '7px',
+    padding: '8px 12px',
+    fontSize: '12px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    marginLeft: 'auto'
+  },
+
+  emptyReports: {
+    marginTop: '20px',
+    padding: '20px',
+    textAlign: 'center',
+    color: 'var(--text-secondary)',
+    fontSize: '13px',
+    border: '1px dashed var(--border)',
+    borderRadius: '8px'
   }
 };
