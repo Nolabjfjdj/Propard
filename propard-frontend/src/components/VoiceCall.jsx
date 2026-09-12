@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import socket from '../socket';
 
+const POSITION_STORAGE_KEY = 'propard_voice_call_position';
+
 const getIceServers = async (token) => {
   const endpoint = '/api/turn-credentials';
 
@@ -84,6 +86,16 @@ export default function VoiceCall({
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
 
+  /*
+   * Position de la fenêtre flottante.
+   *
+   * left/top sont utilisés plutôt que right/bottom
+   * afin que le déplacement soit simple à calculer.
+   */
+  const [windowPosition, setWindowPosition] = useState(null);
+
+  const [isDragging, setIsDragging] = useState(false);
+
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
   const remoteAudioRef = useRef(null);
@@ -94,61 +106,369 @@ export default function VoiceCall({
 
   const timerStartedRef = useRef(false);
 
-  /*
-   * Liste complète des serveurs ICE récupérés
-   * depuis le backend.
-   */
   const iceServersRef = useRef([]);
-
-  /*
-   * Liste uniquement des serveurs TURN.
-   */
   const turnServersRef = useRef([]);
-
-  /*
-   * Index du prochain serveur TURN à essayer.
-   */
   const currentTurnIndexRef = useRef(0);
 
-  /*
-   * Empêche plusieurs ICE restarts simultanés.
-   */
   const restartingIceRef = useRef(false);
-
-  /*
-   * Nombre de serveurs TURN déjà essayés
-   * depuis la dernière connexion stable.
-   */
   const restartAttemptsRef = useRef(0);
 
-  /*
-   * Permet de savoir si l'utilisateur est l'appelant.
-   *
-   * Seul l'appelant lance automatiquement
-   * les ICE restarts.
-   */
   const isCallerRef = useRef(!incomingOffer);
 
-  /*
-   * Évite de lancer un failover après fermeture
-   * du composant.
-   */
   const closedRef = useRef(false);
+  const disconnectedTimerRef = useRef(null);
 
   /*
-   * Timer utilisé lorsqu'on passe par disconnected.
-   *
-   * disconnected peut être temporaire, donc on
-   * attend quelques secondes avant d'envisager
-   * un failover.
+   * Référence vers la fenêtre flottante.
    */
-  const disconnectedTimerRef = useRef(null);
+  const cardRef = useRef(null);
+
+  /*
+   * Informations utilisées pendant le drag.
+   */
+  const dragRef = useRef({
+    active: false,
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    startLeft: 0,
+    startTop: 0
+  });
 
   const friendName =
     friend?.nickname?.trim() ||
     friend?.displayName?.trim() ||
     friend?.username ||
     'Appel inconnu';
+
+  /*
+   * --------------------------------------------------
+   * POSITION DE LA FENÊTRE
+   * --------------------------------------------------
+   */
+
+  const clampWindowPosition = (
+    left,
+    top
+  ) => {
+    const card =
+      cardRef.current;
+
+    const width =
+      card?.offsetWidth || 300;
+
+    const height =
+      card?.offsetHeight || 150;
+
+    const margin = 10;
+
+    const maxLeft =
+      Math.max(
+        margin,
+        window.innerWidth -
+          width -
+          margin
+      );
+
+    const maxTop =
+      Math.max(
+        margin,
+        window.innerHeight -
+          height -
+          margin
+      );
+
+    return {
+      x: Math.min(
+        Math.max(left, margin),
+        maxLeft
+      ),
+      y: Math.min(
+        Math.max(top, margin),
+        maxTop
+      )
+    };
+  };
+
+  const saveWindowPosition = position => {
+    try {
+      localStorage.setItem(
+        POSITION_STORAGE_KEY,
+        JSON.stringify(position)
+      );
+    } catch (err) {
+      console.error(
+        'Impossible de sauvegarder la position de la fenêtre:',
+        err
+      );
+    }
+  };
+
+  const loadWindowPosition = () => {
+    try {
+      const saved =
+        localStorage.getItem(
+          POSITION_STORAGE_KEY
+        );
+
+      if (!saved) {
+        return null;
+      }
+
+      const parsed =
+        JSON.parse(saved);
+
+      if (
+        typeof parsed?.x !== 'number' ||
+        typeof parsed?.y !== 'number'
+      ) {
+        return null;
+      }
+
+      return parsed;
+
+    } catch (err) {
+      console.error(
+        'Impossible de charger la position de la fenêtre:',
+        err
+      );
+
+      return null;
+    }
+  };
+
+  /*
+   * Initialise la fenêtre.
+   *
+   * Si une position précédente existe,
+   * elle est restaurée.
+   *
+   * Sinon :
+   * → en bas à droite.
+   */
+  useEffect(() => {
+    const savedPosition =
+      loadWindowPosition();
+
+    if (savedPosition) {
+      setWindowPosition(
+        clampWindowPosition(
+          savedPosition.x,
+          savedPosition.y
+        )
+      );
+
+      return;
+    }
+
+    const card =
+      cardRef.current;
+
+    const width =
+      card?.offsetWidth || 300;
+
+    const height =
+      card?.offsetHeight || 150;
+
+    const margin = 20;
+
+    const defaultPosition = {
+      x:
+        window.innerWidth -
+        width -
+        margin,
+
+      y:
+        window.innerHeight -
+        height -
+        margin
+    };
+
+    setWindowPosition(
+      clampWindowPosition(
+        defaultPosition.x,
+        defaultPosition.y
+      )
+    );
+  }, []);
+
+  /*
+   * Si la fenêtre est redimensionnée,
+   * on empêche la fenêtre de sortir de l'écran.
+   */
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowPosition(prev => {
+        if (!prev) {
+          return prev;
+        }
+
+        const next =
+          clampWindowPosition(
+            prev.x,
+            prev.y
+          );
+
+        saveWindowPosition(next);
+
+        return next;
+      });
+    };
+
+    window.addEventListener(
+      'resize',
+      handleResize
+    );
+
+    return () => {
+      window.removeEventListener(
+        'resize',
+        handleResize
+      );
+    };
+  }, []);
+
+  /*
+   * Début du déplacement.
+   *
+   * Pointer Events = souris + tactile.
+   */
+  const handleDragStart = event => {
+    /*
+     * On ne démarre pas le drag avec un bouton.
+     */
+    if (
+      event.target.closest?.('button')
+    ) {
+      return;
+    }
+
+    if (!cardRef.current) {
+      return;
+    }
+
+    if (!windowPosition) {
+      return;
+    }
+
+    /*
+     * On accepte :
+     * - souris
+     * - doigt
+     * - stylet
+     */
+    if (
+      event.pointerType !== 'mouse' &&
+      event.pointerType !== 'touch' &&
+      event.pointerType !== 'pen'
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    dragRef.current = {
+      active: true,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: windowPosition.x,
+      startTop: windowPosition.y
+    };
+
+    setIsDragging(true);
+
+    try {
+      event.currentTarget.setPointerCapture(
+        event.pointerId
+      );
+    } catch {
+      // Certains navigateurs peuvent ne pas
+      // supporter setPointerCapture.
+    }
+  };
+
+  /*
+   * Déplacement de la fenêtre.
+   */
+  const handleDragMove = event => {
+    const drag =
+      dragRef.current;
+
+    if (
+      !drag.active ||
+      drag.pointerId !== event.pointerId
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const deltaX =
+      event.clientX -
+      drag.startX;
+
+    const deltaY =
+      event.clientY -
+      drag.startY;
+
+    const newPosition =
+      clampWindowPosition(
+        drag.startLeft + deltaX,
+        drag.startTop + deltaY
+      );
+
+    setWindowPosition(
+      newPosition
+    );
+  };
+
+  /*
+   * Fin du déplacement.
+   */
+  const handleDragEnd = event => {
+    const drag =
+      dragRef.current;
+
+    if (
+      !drag.active ||
+      drag.pointerId !== event.pointerId
+    ) {
+      return;
+    }
+
+    dragRef.current.active =
+      false;
+
+    setIsDragging(false);
+
+    /*
+     * Sauvegarde immédiatement la nouvelle
+     * position.
+     */
+    setWindowPosition(current => {
+      if (current) {
+        saveWindowPosition(current);
+      }
+
+      return current;
+    });
+
+    try {
+      event.currentTarget.releasePointerCapture(
+        event.pointerId
+      );
+    } catch {
+      // Rien à faire si le navigateur
+      // ne permet pas releasePointerCapture.
+    }
+  };
+
+  /*
+   * --------------------------------------------------
+   * WEBRTC
+   * --------------------------------------------------
+   */
 
   const startTimer = () => {
     if (timerStartedRef.current) return;
@@ -192,7 +512,9 @@ export default function VoiceCall({
     if (localStreamRef.current) {
       localStreamRef.current
         .getTracks()
-        .forEach(track => track.stop());
+        .forEach(track =>
+          track.stop()
+        );
 
       localStreamRef.current = null;
     }
@@ -220,23 +542,20 @@ export default function VoiceCall({
     currentTurnIndexRef.current = 0;
     restartingIceRef.current = false;
     restartAttemptsRef.current = 0;
+
+    /*
+     * IMPORTANT :
+     * On ne supprime PAS windowPosition.
+     *
+     * Elle est volontairement conservée dans
+     * localStorage pour le prochain appel.
+     */
   };
 
-  /*
-   * Retourne uniquement les serveurs TURN.
-   */
   const getTurnServers = () => {
     return turnServersRef.current;
   };
 
-  /*
-   * Essaie de déterminer quel serveur TURN est
-   * réellement utilisé actuellement.
-   *
-   * On regarde le selected candidate pair puis
-   * le local candidate. Si son type est "relay",
-   * c'est un candidat TURN.
-   */
   const getActiveTurnServer = async peer => {
     try {
       const stats =
@@ -289,19 +608,10 @@ export default function VoiceCall({
         return null;
       }
 
-      /*
-       * Selon le navigateur, "url" peut être
-       * disponible directement sur le candidate.
-       */
       if (localCandidate.url) {
         return localCandidate.url;
       }
 
-      /*
-       * Fallback : certaines implémentations
-       * peuvent fournir une adresse mais pas l'URL
-       * TURN complète.
-       */
       return null;
 
     } catch (err) {
@@ -314,10 +624,6 @@ export default function VoiceCall({
     }
   };
 
-  /*
-   * Trouve l'index d'un serveur TURN à partir
-   * de son URL.
-   */
   const findTurnIndexByUrl = turnUrl => {
     if (!turnUrl) return -1;
 
@@ -345,10 +651,6 @@ export default function VoiceCall({
             return false;
           }
 
-          /*
-           * On compare principalement le
-           * serveur/hôte/port.
-           */
           return url === turnUrl;
         });
 
@@ -360,23 +662,6 @@ export default function VoiceCall({
     return -1;
   };
 
-  /*
-   * Définit le prochain TURN à utiliser.
-   *
-   * Si le TURN actif est connu :
-   *
-   * TURN 1 actif
-   * → TURN 2
-   *
-   * TURN 2 actif
-   * → TURN 3
-   *
-   * TURN 3 actif
-   * → TURN 1
-   *
-   * Si le TURN actif n'est pas identifiable,
-   * on commence avec le premier TURN.
-   */
   const prepareNextTurnServer = async peer => {
     const turnServers =
       getTurnServers();
@@ -419,12 +704,9 @@ export default function VoiceCall({
     };
   };
 
-  /*
-   * Effectue un ICE restart avec le prochain
-   * serveur TURN.
-   */
   const switchToNextTurnServer = async () => {
-    const peer = peerRef.current;
+    const peer =
+      peerRef.current;
 
     if (!peer) {
       return false;
@@ -453,10 +735,6 @@ export default function VoiceCall({
       return false;
     }
 
-    /*
-     * Empêche de faire une boucle infinie
-     * sans limite.
-     */
     if (
       restartAttemptsRef.current >=
       turnServers.length
@@ -495,10 +773,6 @@ export default function VoiceCall({
         turnServers.length
       );
 
-      /*
-       * On conserve les STUN et on utilise
-       * uniquement le TURN sélectionné.
-       */
       const stunServers =
         iceServersRef.current.filter(
           server => {
@@ -522,14 +796,8 @@ export default function VoiceCall({
         ]
       });
 
-      /*
-       * Demande un nouvel ICE generation.
-       */
       peer.restartIce();
 
-      /*
-       * Création de la nouvelle offer.
-       */
       const offer =
         await peer.createOffer();
 
@@ -686,19 +954,8 @@ export default function VoiceCall({
 
           startTimer();
 
-          /*
-           * Une connexion est revenue.
-           * On peut autoriser un nouveau cycle
-           * de failover si une panne survient
-           * beaucoup plus tard.
-           */
           restartAttemptsRef.current = 0;
 
-          /*
-           * On essaie de mémoriser le TURN actif
-           * pour que le prochain failover parte
-           * réellement au serveur suivant.
-           */
           const activeTurnUrl =
             await getActiveTurnServer(
               peer
@@ -721,10 +978,6 @@ export default function VoiceCall({
         if (
           state === 'disconnected'
         ) {
-          /*
-           * Ne pas basculer immédiatement :
-           * disconnected peut être temporaire.
-           */
           console.log(
             '⚠️ Connexion WebRTC temporairement interrompue.'
           );
@@ -744,10 +997,6 @@ export default function VoiceCall({
                   return;
                 }
 
-                /*
-                 * Si la connexion est revenue entre
-                 * temps, aucun failover.
-                 */
                 if (
                   peer.iceConnectionState !==
                   'disconnected'
@@ -755,10 +1004,6 @@ export default function VoiceCall({
                   return;
                 }
 
-                /*
-                 * On laisse WebRTC décider si elle
-                 * passe naturellement à failed.
-                 */
                 console.log(
                   '⚠️ ICE toujours disconnected après délai.'
                 );
@@ -778,10 +1023,6 @@ export default function VoiceCall({
             '❌ ICE failed.'
           );
 
-          /*
-           * Seul l'appelant effectue le
-           * changement de TURN.
-           */
           if (
             isCallerRef.current
           ) {
@@ -968,10 +1209,6 @@ export default function VoiceCall({
         )
       );
 
-      /*
-       * Les candidates reçues avant l'offer
-       * peuvent maintenant être ajoutées.
-       */
       await addPendingCandidates(
         peer
       );
@@ -1053,9 +1290,6 @@ export default function VoiceCall({
   useEffect(() => {
     closedRef.current = false;
 
-    /*
-     * Réponse à l'offer initiale.
-     */
     const handleCallAnswered =
       async ({ answer }) => {
         const peer =
@@ -1075,10 +1309,6 @@ export default function VoiceCall({
             )
           );
 
-          /*
-           * Les candidates reçues avant
-           * l'answer sont maintenant valides.
-           */
           await addPendingCandidates(
             peer
           );
@@ -1091,9 +1321,6 @@ export default function VoiceCall({
         }
       };
 
-    /*
-     * Réception d'une candidate ICE.
-     */
     const handleIceCandidate =
       async ({ candidate }) => {
         if (
@@ -1131,10 +1358,6 @@ export default function VoiceCall({
         }
       };
 
-    /*
-     * Réception d'une nouvelle offer
-     * déclenchée par un ICE restart.
-     */
     const handleIceRestartOffer =
       async ({ offer }) => {
         const peer =
@@ -1158,12 +1381,6 @@ export default function VoiceCall({
             )
           );
 
-          /*
-           * IMPORTANT :
-           * les candidates reçues avant cette
-           * nouvelle offer sont maintenant
-           * ajoutées.
-           */
           await addPendingCandidates(
             peer
           );
@@ -1195,10 +1412,6 @@ export default function VoiceCall({
         }
       };
 
-    /*
-     * Réception de la réponse à notre
-     * ICE restart.
-     */
     const handleIceRestartAnswer =
       async ({ answer }) => {
         const peer =
@@ -1222,11 +1435,6 @@ export default function VoiceCall({
             )
           );
 
-          /*
-           * Les candidates éventuellement
-           * reçues avant la réponse peuvent
-           * maintenant être appliquées.
-           */
           await addPendingCandidates(
             peer
           );
@@ -1250,11 +1458,6 @@ export default function VoiceCall({
       }
     };
 
-    /*
-     * IMPORTANT :
-     * On installe les listeners AVANT de
-     * lancer startCall().
-     */
     socket.on(
       'callAnswered',
       handleCallAnswered
@@ -1285,9 +1488,6 @@ export default function VoiceCall({
       handleCallFailed
     );
 
-    /*
-     * Appel sortant.
-     */
     if (
       !incomingOffer &&
       !hasInitiatedRef.current
@@ -1334,17 +1534,68 @@ export default function VoiceCall({
     };
   }, []);
 
-  return (
-    <div style={styles.container}>
-      <div style={styles.card}>
+  /*
+   * Style dynamique de la fenêtre.
+   */
+  const containerStyle = {
+    ...styles.container,
 
-        <div style={styles.identity}>
+    ...(windowPosition
+      ? {
+          left: `${windowPosition.x}px`,
+          top: `${windowPosition.y}px`,
+          right: 'auto',
+          bottom: 'auto'
+        }
+      : {
+          right: '20px',
+          bottom: '20px'
+        })
+  };
+
+  return (
+    <div style={containerStyle}>
+      <div
+        ref={cardRef}
+        style={{
+          ...styles.card,
+          cursor: isDragging
+            ? 'grabbing'
+            : 'default',
+          userSelect: isDragging
+            ? 'none'
+            : 'auto'
+        }}
+      >
+
+        {/*
+         * Zone de déplacement.
+         *
+         * Le header/identité peut être glissé
+         * avec la souris ou le doigt.
+         */}
+        <div
+          style={styles.identity}
+          onPointerDown={
+            handleDragStart
+          }
+          onPointerMove={
+            handleDragMove
+          }
+          onPointerUp={
+            handleDragEnd
+          }
+          onPointerCancel={
+            handleDragEnd
+          }
+        >
           <div style={styles.avatar}>
             {friend?.avatar ? (
               <img
                 src={friend.avatar}
                 alt=""
                 style={styles.avatarImage}
+                draggable="false"
               />
             ) : (
               friendName[0]
@@ -1439,8 +1690,6 @@ export default function VoiceCall({
 const styles = {
   container: {
     position: 'fixed',
-    right: '20px',
-    bottom: '20px',
     zIndex: 9999,
     pointerEvents: 'none'
   },
@@ -1461,10 +1710,19 @@ const styles = {
     gap: '14px'
   },
 
+  /*
+   * Zone de déplacement.
+   *
+   * touchAction: none empêche le navigateur
+   * de faire défiler la page pendant qu'on
+   * déplace la fenêtre avec le doigt.
+   */
   identity: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px'
+    gap: '12px',
+    cursor: 'grab',
+    touchAction: 'none'
   },
 
   avatar: {
@@ -1480,7 +1738,8 @@ const styles = {
     justifyContent: 'center',
     fontSize: '20px',
     fontWeight: '700',
-    color: 'var(--accent)',
+    color:
+      'var(--accent)',
     flexShrink: 0,
     overflow: 'hidden'
   },
@@ -1490,7 +1749,9 @@ const styles = {
     height: '100%',
     borderRadius: '50%',
     objectFit: 'cover',
-    display: 'block'
+    display: 'block',
+    userSelect: 'none',
+    pointerEvents: 'none'
   },
 
   identityText: {
@@ -1513,7 +1774,8 @@ const styles = {
     margin: '4px 0 0',
     fontSize: '12px',
     color:
-      'var(--text-secondary)'
+      'var(--text-secondary)',
+    pointerEvents: 'none'
   },
 
   buttons: {
@@ -1531,7 +1793,8 @@ const styles = {
       'var(--success)',
     border: 'none',
     fontSize: '20px',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    touchAction: 'manipulation'
   },
 
   hangupBtn: {
@@ -1542,7 +1805,8 @@ const styles = {
       'var(--danger)',
     border: 'none',
     fontSize: '20px',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    touchAction: 'manipulation'
   },
 
   muteBtn: {
@@ -1551,6 +1815,7 @@ const styles = {
     borderRadius: '50%',
     border: 'none',
     fontSize: '20px',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    touchAction: 'manipulation'
   }
 };
