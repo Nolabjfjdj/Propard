@@ -22,105 +22,70 @@ export default function AppPage({
   const { user, token, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  const [selectedFriend, setSelectedFriend] =
-    useState(null);
+  const [selectedFriend, setSelectedFriend] = useState(null);
 
-  const [selectedProfile, setSelectedProfile] =
-    useState(
-      initialProfileUserId || null
-    );
+  const [selectedProfile, setSelectedProfile] = useState(
+    initialProfileUserId || null
+  );
 
   const [friendListRefreshKey, setFriendListRefreshKey] =
     useState(0);
 
-  const [showAddFriend, setShowAddFriend] =
-    useState(false);
+  const [showAddFriend, setShowAddFriend] = useState(false);
 
-  const [showOfflineGame, setShowOfflineGame] =
-    useState(false);
+  const [showOfflineGame, setShowOfflineGame] = useState(false);
 
-  const [showSidebar, setShowSidebar] =
-    useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
 
-  const [hideIp, setHideIp] =
-    useState(
-      () =>
-        localStorage.getItem(
-          'propard_hideIp'
-        ) === 'true'
-    );
+  const [hideIp, setHideIp] = useState(
+    () =>
+      localStorage.getItem('propard_hideIp') === 'true'
+  );
 
-  const [hideFriendIps, setHideFriendIps] =
-    useState(
-      () =>
-        localStorage.getItem(
-          'propard_hideFriendIps'
-        ) === 'true'
-    );
+  const [hideFriendIps, setHideFriendIps] = useState(
+    () =>
+      localStorage.getItem('propard_hideFriendIps') === 'true'
+  );
 
-  const [isMobile, setIsMobile] =
-    useState(
-      window.innerWidth < 768
-    );
+  const [isMobile, setIsMobile] = useState(
+    window.innerWidth < 768
+  );
 
-  const [friendNotFound, setFriendNotFound] =
-    useState(false);
+  const [friendNotFound, setFriendNotFound] = useState(false);
 
-  const [incomingCall, setIncomingCall] =
-    useState(null);
+  const [incomingCall, setIncomingCall] = useState(null);
 
-  const [showDeleteModal, setShowDeleteModal] =
-    useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  const [confirmAction, setConfirmAction] =
-    useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
 
-  const [deleteLoading, setDeleteLoading] =
-    useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const [deleteError, setDeleteError] =
-    useState('');
+  const [deleteError, setDeleteError] = useState('');
 
-  const [cancelLoading, setCancelLoading] =
-    useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
-  const [cancelError, setCancelError] =
-    useState('');
+  const [cancelError, setCancelError] = useState('');
 
   const grabRef = useRef(null);
 
-  const [grabVisual, setGrabVisual] =
-    useState(null);
+  const [grabVisual, setGrabVisual] = useState(null);
 
   useEffect(() => {
     const check = () =>
-      setIsMobile(
-        window.innerWidth < 768
-      );
+      setIsMobile(window.innerWidth < 768);
 
-    window.addEventListener(
-      'resize',
-      check
-    );
+    window.addEventListener('resize', check);
 
     return () =>
-      window.removeEventListener(
-        'resize',
-        check
-      );
+      window.removeEventListener('resize', check);
   }, []);
 
   useEffect(() => {
     const authenticate = () =>
-      socket.emit(
-        'authenticate',
-        token
-      );
+      socket.emit('authenticate', token);
 
-    socket.on(
-      'connect',
-      authenticate
-    );
+    socket.on('connect', authenticate);
 
     socket.connect();
 
@@ -129,19 +94,13 @@ export default function AppPage({
     }
 
     return () => {
-      socket.off(
-        'connect',
-        authenticate
-      );
-
+      socket.off('connect', authenticate);
       socket.disconnect();
     };
   }, [token]);
 
   useEffect(() => {
-    setSelectedProfile(
-      initialProfileUserId || null
-    );
+    setSelectedProfile(initialProfileUserId || null);
 
     if (initialProfileUserId) {
       setSelectedFriend(null);
@@ -152,70 +111,51 @@ export default function AppPage({
   useEffect(() => {
     if (!initialFriendId || !token) return;
 
-    const loadInitialFriend =
-      async () => {
-        try {
-          const res =
-            await axios.get(
-              '/api/auth/me',
-              {
-                headers: {
-                  Authorization:
-                    `Bearer ${token}`
-                }
-              }
-            );
-
-          const friends =
-            res.data.friends || [];
-
-          const match =
-            friends.find(
-              f =>
-                f.userId?._id ===
-                initialFriendId
-            );
-
-          if (match) {
-            setSelectedFriend({
-              ...match.userId,
-              nickname:
-                match.nickname || null
-            });
-
-            setSelectedProfile(null);
-          } else {
-            setFriendNotFound(true);
+    const loadInitialFriend = async () => {
+      try {
+        const res = await axios.get('/api/auth/me', {
+          headers: {
+            Authorization: `Bearer ${token}`
           }
-        } catch (err) {
-          console.error(err);
+        });
+
+        const friends = res.data.friends || [];
+
+        const match = friends.find(
+          f => f.userId?._id === initialFriendId
+        );
+
+        if (match) {
+          setSelectedFriend({
+            ...match.userId,
+            nickname: match.nickname || null
+          });
+
+          setSelectedProfile(null);
+        } else {
+          setFriendNotFound(true);
         }
-      };
+      } catch (err) {
+        console.error(err);
+      }
+    };
 
     loadInitialFriend();
-  }, [
-    initialFriendId,
-    token
-  ]);
+  }, [initialFriendId, token]);
 
   useEffect(() => {
     socket.on(
       'incomingCall',
-      async ({
-        callerId,
-        offer
-      }) => {
+      async ({ callerId, offer }) => {
         try {
-          const res =
-            await axios.get(
-              `/api/auth/user/${callerId}`,
-              {
-                headers: {
-                  Authorization:
-                    `Bearer ${token}`
-                }
+          const res = await axios.get(
+            `/api/auth/user/${callerId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`
               }
-            );
+            }
+          );
 
           setIncomingCall({
             friend: {
@@ -231,14 +171,10 @@ export default function AppPage({
     );
 
     return () =>
-      socket.off(
-        'incomingCall'
-      );
+      socket.off('incomingCall');
   }, [token]);
 
-  const handleSelectFriend = (
-    friend
-  ) => {
+  const handleSelectFriend = friend => {
     setSelectedFriend(friend);
     setSelectedProfile(null);
     setFriendNotFound(false);
@@ -254,13 +190,8 @@ export default function AppPage({
     }
   };
 
-  const handleOpenProfile = (
-    userId
-  ) => {
-    setSelectedProfile(
-      userId
-    );
-
+  const handleOpenProfile = userId => {
+    setSelectedProfile(userId);
     setSelectedFriend(null);
     setFriendNotFound(false);
 
@@ -280,22 +211,12 @@ export default function AppPage({
     setSelectedProfile(null);
     setFriendNotFound(false);
 
-    window.history.pushState(
-      {},
-      '',
-      '/'
-    );
+    window.history.pushState({}, '', '/');
   };
 
   const handleProfileRelationshipChanged =
-    async (
-      action,
-      userId,
-      nickname
-    ) => {
-      setFriendListRefreshKey(
-        key => key + 1
-      );
+    async (action, userId, nickname) => {
+      setFriendListRefreshKey(key => key + 1);
 
       if (
         action === 'removed' ||
@@ -318,8 +239,7 @@ export default function AppPage({
           prev
             ? {
                 ...prev,
-                nickname:
-                  nickname?.trim() || null
+                nickname: nickname?.trim() || null
               }
             : prev
         );
@@ -335,32 +255,24 @@ export default function AppPage({
         action === 'unblocked'
       ) {
         try {
-          const res =
-            await axios.get(
-              '/api/auth/me',
-              {
-                headers: {
-                  Authorization:
-                    `Bearer ${token}`
-                }
-              }
-            );
+          const res = await axios.get('/api/auth/me', {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
 
-          const friends =
-            res.data.friends || [];
+          const friends = res.data.friends || [];
 
-          const current =
-            friends.find(
-              f =>
-                f.userId?._id?.toString() ===
-                selectedFriend?._id?.toString()
-            );
+          const current = friends.find(
+            f =>
+              f.userId?._id?.toString() ===
+              selectedFriend?._id?.toString()
+          );
 
           if (current) {
             setSelectedFriend({
               ...current.userId,
-              nickname:
-                current.nickname || null
+              nickname: current.nickname || null
             });
           } else if (
             selectedFriend?._id?.toString() ===
@@ -374,487 +286,431 @@ export default function AppPage({
       }
     };
 
-  const closeDeleteModal =
-    () => {
-      setShowDeleteModal(false);
-      setConfirmAction(null);
-      setDeleteError('');
-    };
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setConfirmAction(null);
+    setDeleteError('');
+  };
 
-  const handleAnonymize =
-    async () => {
-      setDeleteLoading(true);
-      setDeleteError('');
+  const handleAnonymize = async () => {
+    setDeleteLoading(true);
+    setDeleteError('');
 
-      try {
-        await axios.delete(
-          '/api/auth/anonymize',
-          {
-            headers: {
-              Authorization:
-                `Bearer ${token}`
-            }
-          }
-        );
-
-        logout();
-      } catch (e) {
-        setDeleteError(
-          e.response?.data?.error ||
-          'Erreur serveur'
-        );
-
-        setDeleteLoading(false);
-      }
-    };
-
-  const handleDeleteTotal =
-    async () => {
-      setDeleteLoading(true);
-      setDeleteError('');
-
-      try {
-        await axios.delete(
-          '/api/auth/delete',
-          {
-            headers: {
-              Authorization:
-                `Bearer ${token}`
-            }
-          }
-        );
-
-        logout();
-      } catch (e) {
-        setDeleteError(
-          e.response?.data?.error ||
-          'Erreur serveur'
-        );
-
-        setDeleteLoading(false);
-      }
-    };
-
-  const handleCancelDeletion =
-    async () => {
-      setCancelLoading(true);
-      setCancelError('');
-
-      try {
-        await axios.post(
-          '/api/auth/cancel-deletion',
-          {},
-          {
-            headers: {
-              Authorization:
-                `Bearer ${token}`
-            }
-          }
-        );
-
-        window.location.reload();
-      } catch (e) {
-        setCancelError(
-          e.response?.data?.error ||
-          'Erreur serveur'
-        );
-
-        setCancelLoading(false);
-      }
-    };
-
-  const lockPageSelection =
-    locked => {
-      document.body.style.userSelect =
-        locked ? 'none' : '';
-
-      document.body.style.webkitUserSelect =
-        locked ? 'none' : '';
-    };
-
-  const handleGrabMoveImpl =
-    e => {
-      const g = grabRef.current;
-
-      if (!g) return;
-
-      if (
-        g.pointerId != null &&
-        e.pointerId !==
-          g.pointerId
-      ) {
-        return;
-      }
-
-      e.preventDefault();
-
-      g.raw = {
-        x: e.clientX,
-        y: e.clientY
-      };
-
-      const el =
-        document.elementFromPoint(
-          e.clientX,
-          e.clientY
-        );
-
-      const zone =
-        el &&
-        el.closest
-          ? el.closest(
-              '[data-friend-drop-zone]'
-            )
-          : null;
-
-      const targetId =
-        zone
-          ? zone.getAttribute(
-              'data-friend-id'
-            )
-          : null;
-
-      const targetFriendId =
-        targetId &&
-        targetId !==
-          g.sourceFriendId
-          ? targetId
-          : null;
-
-      g.dragOverFriendId =
-        targetFriendId;
-    };
-
-  const forwardGrabbedMessage =
-    async (
-      g,
-      targetId
-    ) => {
-      try {
-        const res =
-          await axios.get(
-            `/api/auth/user/${targetId}`,
-            {
-              headers: {
-                Authorization:
-                  `Bearer ${token}`
-              }
-            }
-          );
-
-        const rawPublicKey =
-          res.data?.publicKey;
-
-        if (!rawPublicKey) {
-          throw new Error(
-            'Clé publique du destinataire indisponible.'
-          );
+    try {
+      await axios.delete('/api/auth/anonymize', {
+        headers: {
+          Authorization: `Bearer ${token}`
         }
+      });
 
-        const targetPublicKey =
-          typeof rawPublicKey ===
-          'string'
-            ? JSON.parse(
-                rawPublicKey
-              )
-            : rawPublicKey;
+      logout();
+    } catch (e) {
+      setDeleteError(
+        e.response?.data?.error ||
+          'Erreur serveur'
+      );
 
-        const myPrivateKeyJwk =
-          getStoredPrivateKeyJwk(
-            user?.id
-          );
+      setDeleteLoading(false);
+    }
+  };
 
-        if (!myPrivateKeyJwk) {
-          throw new Error(
-            'Clé privée locale introuvable.'
-          );
+  const handleDeleteTotal = async () => {
+    setDeleteLoading(true);
+    setDeleteError('');
+
+    try {
+      await axios.delete('/api/auth/delete', {
+        headers: {
+          Authorization: `Bearer ${token}`
         }
+      });
 
-        const sharedKey =
-          await deriveSharedKey(
-            myPrivateKeyJwk,
-            targetPublicKey
-          );
+      logout();
+    } catch (e) {
+      setDeleteError(
+        e.response?.data?.error ||
+          'Erreur serveur'
+      );
 
-        const encryptedContent =
-          await encryptMessage(
-            sharedKey,
-            g.msg.content
-          );
+      setDeleteLoading(false);
+    }
+  };
 
-        socket.emit(
-          'sendMessage',
-          {
-            receiverId:
-              targetId,
-            content:
-              encryptedContent
+  const handleCancelDeletion = async () => {
+    setCancelLoading(true);
+    setCancelError('');
+
+    try {
+      await axios.post(
+        '/api/auth/cancel-deletion',
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
           }
-        );
-      } catch (err) {
-        console.error(
-          'Erreur transfert de message (Grab & Send):',
-          err
-        );
-      }
+        }
+      );
+
+      window.location.reload();
+    } catch (e) {
+      setCancelError(
+        e.response?.data?.error ||
+          'Erreur serveur'
+      );
+
+      setCancelLoading(false);
+    }
+  };
+
+  const lockPageSelection = locked => {
+    document.body.style.userSelect =
+      locked ? 'none' : '';
+
+    document.body.style.webkitUserSelect =
+      locked ? 'none' : '';
+  };
+
+  const handleGrabMoveImpl = e => {
+    const g = grabRef.current;
+
+    if (!g) return;
+
+    if (
+      g.pointerId != null &&
+      e.pointerId !== g.pointerId
+    ) {
+      return;
+    }
+
+    e.preventDefault();
+
+    g.raw = {
+      x: e.clientX,
+      y: e.clientY
     };
 
-  const handleGrabEndImpl =
-    e => {
-      const g = grabRef.current;
+    const el = document.elementFromPoint(
+      e.clientX,
+      e.clientY
+    );
 
-      if (!g) return;
+    const zone =
+      el && el.closest
+        ? el.closest(
+            '[data-friend-drop-zone]'
+          )
+        : null;
 
-      if (
-        g.pointerId != null &&
-        e &&
-        e.pointerId !==
-          g.pointerId
-      ) {
-        return;
+    const targetId = zone
+      ? zone.getAttribute(
+          'data-friend-id'
+        )
+      : null;
+
+    const targetFriendId =
+      targetId &&
+      targetId !== g.sourceFriendId
+        ? targetId
+        : null;
+
+    g.dragOverFriendId =
+      targetFriendId;
+  };
+
+  const forwardGrabbedMessage = async (
+    g,
+    targetId
+  ) => {
+    try {
+      const res = await axios.get(
+        `/api/auth/user/${targetId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      const rawPublicKey =
+        res.data?.publicKey;
+
+      if (!rawPublicKey) {
+        throw new Error(
+          'Clé publique du destinataire indisponible.'
+        );
       }
 
-      window.removeEventListener(
-        'pointermove',
-        g.moveHandler
-      );
+      const targetPublicKey =
+        typeof rawPublicKey === 'string'
+          ? JSON.parse(rawPublicKey)
+          : rawPublicKey;
 
-      window.removeEventListener(
-        'pointerup',
-        g.endHandler
-      );
+      const myPrivateKeyJwk =
+        getStoredPrivateKeyJwk(user?.id);
 
-      window.removeEventListener(
-        'pointercancel',
-        g.endHandler
-      );
-
-      cancelAnimationFrame(
-        g.rafId
-      );
-
-      lockPageSelection(false);
-
-      const targetId =
-        g.dragOverFriendId;
-
-      if (targetId) {
-        setGrabVisual(
-          v =>
-            v && {
-              ...v,
-              landing: true,
-              dragOverFriendId:
-                targetId
-            }
+      if (!myPrivateKeyJwk) {
+        throw new Error(
+          'Clé privée locale introuvable.'
         );
-
-        forwardGrabbedMessage(
-          g,
-          targetId
-        );
-
-        setTimeout(() => {
-          setGrabVisual(null);
-          grabRef.current = null;
-
-          if (
-            g.forcedSidebarOpen
-          ) {
-            setShowSidebar(false);
-          }
-        }, 190);
-      } else {
-        setGrabVisual(
-          v =>
-            v && {
-              ...v,
-              x: g.originRect.left,
-              y: g.originRect.top,
-              rotation: 0,
-              returning: true,
-              dragOverFriendId:
-                null
-            }
-        );
-
-        setTimeout(() => {
-          setGrabVisual(null);
-          grabRef.current = null;
-
-          if (
-            g.forcedSidebarOpen
-          ) {
-            setShowSidebar(false);
-          }
-        }, 260);
       }
-    };
 
-  const handleGrabStart =
-    ({
+      const sharedKey =
+        await deriveSharedKey(
+          myPrivateKeyJwk,
+          targetPublicKey
+        );
+
+      const encryptedContent =
+        await encryptMessage(
+          sharedKey,
+          g.msg.content
+        );
+
+      socket.emit('sendMessage', {
+        receiverId: targetId,
+        content: encryptedContent
+      });
+    } catch (err) {
+      console.error(
+        'Erreur transfert de message (Grab & Send):',
+        err
+      );
+    }
+  };
+
+  const handleGrabEndImpl = e => {
+    const g = grabRef.current;
+
+    if (!g) return;
+
+    if (
+      g.pointerId != null &&
+      e &&
+      e.pointerId !== g.pointerId
+    ) {
+      return;
+    }
+
+    window.removeEventListener(
+      'pointermove',
+      g.moveHandler
+    );
+
+    window.removeEventListener(
+      'pointerup',
+      g.endHandler
+    );
+
+    window.removeEventListener(
+      'pointercancel',
+      g.endHandler
+    );
+
+    cancelAnimationFrame(g.rafId);
+
+    lockPageSelection(false);
+
+    const targetId =
+      g.dragOverFriendId;
+
+    if (targetId) {
+      setGrabVisual(
+        v =>
+          v && {
+            ...v,
+            landing: true,
+            dragOverFriendId:
+              targetId
+          }
+      );
+
+      forwardGrabbedMessage(
+        g,
+        targetId
+      );
+
+      setTimeout(() => {
+        setGrabVisual(null);
+        grabRef.current = null;
+
+        if (g.forcedSidebarOpen) {
+          setShowSidebar(false);
+        }
+      }, 190);
+    } else {
+      setGrabVisual(
+        v =>
+          v && {
+            ...v,
+            x: g.originRect.left,
+            y: g.originRect.top,
+            rotation: 0,
+            returning: true,
+            dragOverFriendId: null
+          }
+      );
+
+      setTimeout(() => {
+        setGrabVisual(null);
+        grabRef.current = null;
+
+        if (g.forcedSidebarOpen) {
+          setShowSidebar(false);
+        }
+      }, 260);
+    }
+  };
+
+  const handleGrabStart = (
+    {
       msg,
       clientX,
       clientY,
       rect,
       pointerId
-    }, sourceFriendId) => {
-      if (grabRef.current) return;
+    },
+    sourceFriendId
+  ) => {
+    if (grabRef.current) return;
 
-      const wasSidebarHidden =
-        isMobile &&
-        !showSidebar;
+    const wasSidebarHidden =
+      isMobile && !showSidebar;
 
-      if (wasSidebarHidden) {
-        setShowSidebar(true);
-      }
+    if (wasSidebarHidden) {
+      setShowSidebar(true);
+    }
 
-      lockPageSelection(true);
+    lockPageSelection(true);
 
-      const moveHandler =
-        e =>
-          handleGrabMoveImpl(e);
+    const moveHandler = e =>
+      handleGrabMoveImpl(e);
 
-      const endHandler =
-        e =>
-          handleGrabEndImpl(e);
+    const endHandler = e =>
+      handleGrabEndImpl(e);
 
-      grabRef.current = {
-        msg,
-        sourceFriendId:
-          sourceFriendId
-            ? sourceFriendId.toString()
-            : null,
-        originRect: rect,
-        pointerId:
-          pointerId != null
-            ? pointerId
-            : null,
-        raw: {
-          x: clientX,
-          y: clientY
-        },
-        prevRaw: {
-          x: clientX,
-          y: clientY
-        },
-        ghost: {
-          x: rect.left,
-          y: rect.top
-        },
-        rotation: 0,
-        dragOverFriendId:
-          null,
-        forcedSidebarOpen:
-          wasSidebarHidden,
-        moveHandler,
-        endHandler,
-        rafId: null
-      };
-
-      setGrabVisual({
-        msgId: msg._id,
+    grabRef.current = {
+      msg,
+      sourceFriendId: sourceFriendId
+        ? sourceFriendId.toString()
+        : null,
+      originRect: rect,
+      pointerId:
+        pointerId != null
+          ? pointerId
+          : null,
+      raw: {
+        x: clientX,
+        y: clientY
+      },
+      prevRaw: {
+        x: clientX,
+        y: clientY
+      },
+      ghost: {
         x: rect.left,
-        y: rect.top,
-        width: rect.width,
-        rotation: 0,
-        content: msg.content,
-        dragOverFriendId: null,
-        landing: false,
-        returning: false
-      });
+        y: rect.top
+      },
+      rotation: 0,
+      dragOverFriendId: null,
+      forcedSidebarOpen:
+        wasSidebarHidden,
+      moveHandler,
+      endHandler,
+      rafId: null
+    };
 
-      window.addEventListener(
-        'pointermove',
-        moveHandler,
-        {
-          passive: false
-        }
-      );
+    setGrabVisual({
+      msgId: msg._id,
+      x: rect.left,
+      y: rect.top,
+      width: rect.width,
+      rotation: 0,
+      content: msg.content,
+      dragOverFriendId: null,
+      landing: false,
+      returning: false
+    });
 
-      window.addEventListener(
-        'pointerup',
-        endHandler
-      );
+    window.addEventListener(
+      'pointermove',
+      moveHandler,
+      {
+        passive: false
+      }
+    );
 
-      window.addEventListener(
-        'pointercancel',
-        endHandler
-      );
+    window.addEventListener(
+      'pointerup',
+      endHandler
+    );
 
-      const loop = () => {
-        const g =
-          grabRef.current;
+    window.addEventListener(
+      'pointercancel',
+      endHandler
+    );
 
-        if (!g) return;
+    const loop = () => {
+      const g =
+        grabRef.current;
 
-        const FOLLOW = 0.28;
+      if (!g) return;
 
-        const targetX =
-          g.raw.x -
-          g.originRect.width /
-            2;
+      const FOLLOW = 0.28;
 
-        const targetY =
-          g.raw.y - 24;
+      const targetX =
+        g.raw.x -
+        g.originRect.width / 2;
 
-        g.ghost.x +=
-          (targetX -
-            g.ghost.x) *
-          FOLLOW;
+      const targetY =
+        g.raw.y - 24;
 
-        g.ghost.y +=
-          (targetY -
-            g.ghost.y) *
-          FOLLOW;
+      g.ghost.x +=
+        (targetX - g.ghost.x) *
+        FOLLOW;
 
-        const vx =
-          g.raw.x -
-          g.prevRaw.x;
+      g.ghost.y +=
+        (targetY - g.ghost.y) *
+        FOLLOW;
 
-        g.prevRaw = {
-          x: g.raw.x,
-          y: g.raw.y
-        };
+      const vx =
+        g.raw.x -
+        g.prevRaw.x;
 
-        const targetRotation =
-          Math.max(
-            -8,
-            Math.min(
-              8,
-              vx * 1.4
-            )
-          );
-
-        g.rotation +=
-          (targetRotation -
-            g.rotation) *
-          0.25;
-
-        setGrabVisual(
-          v =>
-            v && {
-              ...v,
-              x: g.ghost.x,
-              y: g.ghost.y,
-              rotation:
-                g.rotation,
-              dragOverFriendId:
-                g.dragOverFriendId
-            }
-        );
-
-        g.rafId =
-          requestAnimationFrame(
-            loop
-          );
+      g.prevRaw = {
+        x: g.raw.x,
+        y: g.raw.y
       };
 
-      grabRef.current.rafId =
-        requestAnimationFrame(
-          loop
+      const targetRotation =
+        Math.max(
+          -8,
+          Math.min(8, vx * 1.4)
         );
+
+      g.rotation +=
+        (targetRotation -
+          g.rotation) *
+        0.25;
+
+      setGrabVisual(
+        v =>
+          v && {
+            ...v,
+            x: g.ghost.x,
+            y: g.ghost.y,
+            rotation: g.rotation,
+            dragOverFriendId:
+              g.dragOverFriendId
+          }
+      );
+
+      g.rafId =
+        requestAnimationFrame(loop);
     };
+
+    grabRef.current.rafId =
+      requestAnimationFrame(loop);
+  };
 
   return (
     <div style={styles.layout}>
@@ -874,12 +730,8 @@ export default function AppPage({
           position: isMobile
             ? 'fixed'
             : 'relative',
-          top: isMobile
-            ? 0
-            : 'auto',
-          left: isMobile
-            ? 0
-            : 'auto',
+          top: isMobile ? 0 : 'auto',
+          left: isMobile ? 0 : 'auto',
           bottom: isMobile
             ? 0
             : 'auto',
@@ -890,37 +742,25 @@ export default function AppPage({
             : 'translateX(0)'
         }}
       >
-        <div
-          style={
-            styles.sidebarHeader
-          }
-        >
+        <div style={styles.sidebarHeader}>
           <div
             style={{
               display: 'flex',
-              flexDirection:
-                'column'
+              flexDirection: 'column'
             }}
           >
             <a
               href="/help"
-              style={
-                styles.helpLink
-              }
+              style={styles.helpLink}
             >
               help
             </a>
 
-            <span
-              style={
-                styles.appName
-              }
-            >
+            <span style={styles.appName}>
               Propard
               <span
                 style={{
-                  color:
-                    'var(--accent)'
+                  color: 'var(--accent)'
                 }}
               >
                 .
@@ -932,45 +772,23 @@ export default function AppPage({
             style={{
               display: 'flex',
               gap: '6px',
-              alignItems:
-                'center'
+              alignItems: 'center'
             }}
           >
             <a
               href="https://discord.gg/hsMdJQz6EY"
               target="_blank"
               rel="noreferrer"
-              style={
-                styles.discordLink
-              }
+              style={styles.discordLink}
             >
               Discord
             </a>
 
             <button
-              type="button"
-              onClick={() =>
-                setShowOfflineGame(true)
-              }
-              style={
-                styles.gameBtn
-              }
-              title="Propard Space"
-              aria-label="Ouvrir Propard Space"
+              onClick={toggleTheme}
+              style={styles.iconBtn}
             >
-              🚀
-            </button>
-
-            <button
-              onClick={
-                toggleTheme
-              }
-              style={
-                styles.iconBtn
-              }
-            >
-              {theme ===
-              'dark'
+              {theme === 'dark'
                 ? '☀️'
                 : '🌙'}
             </button>
@@ -978,13 +796,9 @@ export default function AppPage({
             {isMobile && (
               <button
                 onClick={() =>
-                  setShowSidebar(
-                    false
-                  )
+                  setShowSidebar(false)
                 }
-                style={
-                  styles.iconBtn
-                }
+                style={styles.iconBtn}
               >
                 ✕
               </button>
@@ -993,18 +807,9 @@ export default function AppPage({
         </div>
 
         {user?.pendingDeletion && (
-          <div
-            style={
-              styles.pendingBanner
-            }
-          >
-            <p
-              style={
-                styles.pendingBannerText
-              }
-            >
-              ⏳ Compte en cours de
-              suppression
+          <div style={styles.pendingBanner}>
+            <p style={styles.pendingBannerText}>
+              ⏳ Compte en cours de suppression
               {user.deletionExpiresAt
                 ? ` — restaurable jusqu'au ${new Date(
                     user.deletionExpiresAt
@@ -1015,15 +820,9 @@ export default function AppPage({
             </p>
 
             <button
-              style={
-                styles.pendingBannerBtn
-              }
-              onClick={
-                handleCancelDeletion
-              }
-              disabled={
-                cancelLoading
-              }
+              style={styles.pendingBannerBtn}
+              onClick={handleCancelDeletion}
+              disabled={cancelLoading}
             >
               {cancelLoading
                 ? '...'
@@ -1042,18 +841,12 @@ export default function AppPage({
           </div>
         )}
 
-        <div
-          style={styles.ipCard}
-        >
-          <p
-            style={styles.ipLabel}
-          >
+        <div style={styles.ipCard}>
+          <p style={styles.ipLabel}>
             Ton adresse
           </p>
 
-          <p
-            style={styles.ipValue}
-          >
+          <p style={styles.ipValue}>
             {hideIp
               ? '███.███.███.███'
               : user?.ipAlias}
@@ -1063,14 +856,11 @@ export default function AppPage({
             style={{
               display: 'flex',
               gap: '6px',
-              justifyContent:
-                'center'
+              justifyContent: 'center'
             }}
           >
             <button
-              style={
-                styles.copyBtn
-              }
+              style={styles.copyBtn}
               onClick={() =>
                 navigator.clipboard.writeText(
                   user?.ipAlias
@@ -1081,16 +871,11 @@ export default function AppPage({
             </button>
 
             <button
-              style={
-                styles.copyBtn
-              }
+              style={styles.copyBtn}
               onClick={() => {
-                const next =
-                  !hideIp;
+                const next = !hideIp;
 
-                setHideIp(
-                  next
-                );
+                setHideIp(next);
 
                 localStorage.setItem(
                   'propard_hideIp',
@@ -1116,54 +901,32 @@ export default function AppPage({
 
         <FriendList
           token={token}
-          selectedFriend={
-            selectedFriend
-          }
-          onSelectFriend={
-            handleSelectFriend
-          }
-          onOpenProfile={
-            handleOpenProfile
-          }
-          hideFriendIps={
-            hideFriendIps
-          }
-          setHideFriendIps={
-            value => {
-              setHideFriendIps(
-                value
-              );
+          selectedFriend={selectedFriend}
+          onSelectFriend={handleSelectFriend}
+          onOpenProfile={handleOpenProfile}
+          hideFriendIps={hideFriendIps}
+          setHideFriendIps={value => {
+            setHideFriendIps(value);
 
-              localStorage.setItem(
-                'propard_hideFriendIps',
-                value
-              );
-            }
-          }
+            localStorage.setItem(
+              'propard_hideFriendIps',
+              value
+            );
+          }}
           dragOverFriendId={
             grabVisual?.dragOverFriendId ||
             null
           }
-          refreshKey={
-            friendListRefreshKey
-          }
+          refreshKey={friendListRefreshKey}
         />
 
         <button
-          style={
-            styles.profileBtn
-          }
+          style={styles.profileBtn}
           onClick={() =>
-            handleOpenProfile(
-              user?.id
-            )
+            handleOpenProfile(user?.id)
           }
         >
-          <div
-            style={
-              styles.profileAvatar
-            }
-          >
+          <div style={styles.profileAvatar}>
             {user?.avatar ? (
               <img
                 src={user.avatar}
@@ -1181,16 +944,8 @@ export default function AppPage({
             )}
           </div>
 
-          <div
-            style={
-              styles.profileInfo
-            }
-          >
-            <span
-              style={
-                styles.profileName
-              }
-            >
+          <div style={styles.profileInfo}>
+            <span style={styles.profileName}>
               {user?.displayName ||
                 user?.username}
             </span>
@@ -1206,22 +961,16 @@ export default function AppPage({
         </button>
 
         <button
-          style={
-            styles.logoutBtn
-          }
+          style={styles.logoutBtn}
           onClick={logout}
         >
           Déconnexion
         </button>
 
         <button
-          style={
-            styles.deleteAccountBtn
-          }
+          style={styles.deleteAccountBtn}
           onClick={() =>
-            setShowDeleteModal(
-              true
-            )
+            setShowDeleteModal(true)
           }
         >
           Supprimer mon compte
@@ -1229,32 +978,38 @@ export default function AppPage({
       </div>
 
       <div style={styles.main}>
+        {!selectedFriend &&
+          !selectedProfile &&
+          !friendNotFound && (
+            <button
+              type="button"
+              onClick={() =>
+                setShowOfflineGame(true)
+              }
+              style={styles.gameBtn}
+              title="Propard Space"
+              aria-label="Ouvrir Propard Space"
+            >
+              🚀
+            </button>
+          )}
+
         {isMobile &&
           !selectedFriend &&
           !selectedProfile &&
           !friendNotFound && (
-            <div
-              style={
-                styles.mobileHeader
-              }
-            >
+            <div style={styles.mobileHeader}>
               <button
-                style={
-                  styles.hamburger
-                }
+                style={styles.hamburger}
                 onClick={() =>
-                  setShowSidebar(
-                    true
-                  )
+                  setShowSidebar(true)
                 }
               >
                 ☰
               </button>
 
               <span
-                style={
-                  styles.mobileTitle
-                }
+                style={styles.mobileTitle}
               >
                 Propard
               </span>
@@ -1271,18 +1026,10 @@ export default function AppPage({
           (selectedFriend ||
             selectedProfile ||
             friendNotFound) && (
-            <div
-              style={
-                styles.mobileHeader
-              }
-            >
+            <div style={styles.mobileHeader}>
               <button
-                style={
-                  styles.hamburger
-                }
-                onClick={
-                  handleBack
-                }
+                style={styles.hamburger}
+                onClick={handleBack}
               >
                 ←
               </button>
@@ -1297,23 +1044,12 @@ export default function AppPage({
 
         {selectedProfile ? (
           <ProfilePage
-            userId={
-              selectedProfile
-            }
-            isMobile={
-              isMobile
-            }
-            onBack={
-              handleBack
-            }
+            userId={selectedProfile}
+            isMobile={isMobile}
+            onBack={handleBack}
             onOpenChat={friend => {
-              setSelectedProfile(
-                null
-              );
-
-              setSelectedFriend(
-                friend
-              );
+              setSelectedProfile(null);
+              setSelectedFriend(friend);
 
               window.history.pushState(
                 {},
@@ -1322,9 +1058,7 @@ export default function AppPage({
               );
 
               if (isMobile) {
-                setShowSidebar(
-                  false
-                );
+                setShowSidebar(false);
               }
             }}
             onRelationshipChanged={
@@ -1333,17 +1067,11 @@ export default function AppPage({
           />
         ) : selectedFriend ? (
           <Chat
-            friend={
-              selectedFriend
-            }
+            friend={selectedFriend}
             token={token}
             userId={user?.id}
-            hideFriendIps={
-              hideFriendIps
-            }
-            isMobile={
-              isMobile
-            }
+            hideFriendIps={hideFriendIps}
+            isMobile={isMobile}
             onGrabStart={payload =>
               handleGrabStart(
                 payload,
@@ -1351,61 +1079,41 @@ export default function AppPage({
               )
             }
             grabbedMessageId={
-              grabVisual?.msgId ||
-              null
+              grabVisual?.msgId || null
             }
           />
         ) : friendNotFound ? (
-          <div
-            style={styles.empty}
-          >
+          <div style={styles.empty}>
             <p
               style={{
-                fontSize:
-                  '48px'
+                fontSize: '48px'
               }}
             >
               🚫
             </p>
 
-            <p
-              style={
-                styles.emptyText
-              }
-            >
-              Tu n'as pas cet
-              ami
+            <p style={styles.emptyText}>
+              Tu n'as pas cet ami
             </p>
 
             <button
-              style={
-                styles.backBtn
-              }
-              onClick={
-                handleBack
-              }
+              style={styles.backBtn}
+              onClick={handleBack}
             >
               Retour
             </button>
           </div>
         ) : (
-          <div
-            style={styles.empty}
-          >
+          <div style={styles.empty}>
             <p
               style={{
-                fontSize:
-                  '48px'
+                fontSize: '48px'
               }}
             >
               💬
             </p>
 
-            <p
-              style={
-                styles.emptyText
-              }
-            >
+            <p style={styles.emptyText}>
               {isMobile
                 ? 'Appuie sur ☰ pour voir tes amis'
                 : 'Sélectionne un ami pour chatter'}
@@ -1418,24 +1126,18 @@ export default function AppPage({
         <AddFriend
           token={token}
           onClose={() =>
-            setShowAddFriend(
-              false
-            )
+            setShowAddFriend(false)
           }
         />
       )}
 
       {incomingCall && (
         <VoiceCall
-          friend={
-            incomingCall.friend
-          }
+          friend={incomingCall.friend}
           userId={user?.id}
           token={token}
           onClose={() =>
-            setIncomingCall(
-              null
-            )
+            setIncomingCall(null)
           }
           incomingOffer={
             incomingCall.offer
@@ -1449,33 +1151,23 @@ export default function AppPage({
             position: 'fixed',
             left: 0,
             top: 0,
-            width:
-              grabVisual.width,
+            width: grabVisual.width,
             maxWidth: '65%',
-            padding:
-              '10px 14px',
-            borderRadius:
-              '12px',
-            background:
-              'var(--accent)',
+            padding: '10px 14px',
+            borderRadius: '12px',
+            background: 'var(--accent)',
             color: '#fff',
             fontSize: '14px',
             lineHeight: '1.4',
-            whiteSpace:
-              'pre-wrap',
-            overflowWrap:
-              'anywhere',
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'anywhere',
             boxShadow:
               '0 14px 30px rgba(0,0,0,0.35)',
-            pointerEvents:
-              'none',
-            userSelect:
-              'none',
+            pointerEvents: 'none',
+            userSelect: 'none',
             zIndex: 500,
             opacity:
-              grabVisual.landing
-                ? 0
-                : 1,
+              grabVisual.landing ? 0 : 1,
             transform: `translate(${grabVisual.x}px, ${grabVisual.y}px) rotate(${grabVisual.rotation}deg) scale(${grabVisual.landing ? 0.82 : 1.04})`,
             transition:
               grabVisual.returning
@@ -1492,42 +1184,29 @@ export default function AppPage({
       {showDeleteModal &&
         !confirmAction && (
           <div
-            style={
-              styles.modalOverlay
-            }
-            onClick={
-              closeDeleteModal
-            }
+            style={styles.modalOverlay}
+            onClick={closeDeleteModal}
           >
             <div
-              style={
-                styles.modal
-              }
+              style={styles.modal}
               onClick={e =>
                 e.stopPropagation()
               }
             >
               <h2
-                style={
-                  styles.modalTitle
-                }
+                style={styles.modalTitle}
               >
-                Supprimer mon
-                compte
+                Supprimer mon compte
               </h2>
 
               <p
-                style={
-                  styles.modalText
-                }
+                style={styles.modalText}
               >
                 Choisis une option :
               </p>
 
               <div
-                style={
-                  styles.modalOption
-                }
+                style={styles.modalOption}
               >
                 <h3
                   style={
@@ -1536,8 +1215,7 @@ export default function AppPage({
                 >
                   Option A —
                   Anonymisation
-                  (réversible 30
-                  jours)
+                  (réversible 30 jours)
                 </h3>
 
                 <p
@@ -1545,19 +1223,12 @@ export default function AppPage({
                     styles.modalOptionDesc
                   }
                 >
-                  Ton pseudo est
-                  masqué
-                  immédiatement
-                  mais tes
-                  messages et
-                  tes amitiés
-                  restent
-                  intacts. Tu
-                  peux te
-                  reconnecter
-                  pendant 30
-                  jours pour
-                  annuler.
+                  Ton pseudo est masqué
+                  immédiatement mais tes
+                  messages et tes amitiés
+                  restent intacts. Tu peux
+                  te reconnecter pendant
+                  30 jours pour annuler.
                 </p>
 
                 <button
@@ -1569,25 +1240,18 @@ export default function AppPage({
                       'anonymize'
                     )
                   }
-                  disabled={
-                    deleteLoading
-                  }
+                  disabled={deleteLoading}
                 >
-                  Anonymiser mon
-                  compte
+                  Anonymiser mon compte
                 </button>
               </div>
 
               <div
-                style={
-                  styles.modalDivider
-                }
+                style={styles.modalDivider}
               />
 
               <div
-                style={
-                  styles.modalOption
-                }
+                style={styles.modalOption}
               >
                 <h3
                   style={
@@ -1595,8 +1259,7 @@ export default function AppPage({
                   }
                 >
                   Option B —
-                  Suppression
-                  totale
+                  Suppression totale
                   (immédiate)
                 </h3>
 
@@ -1605,11 +1268,10 @@ export default function AppPage({
                     styles.modalOptionDesc
                   }
                 >
-                  Ton compte et
-                  tous tes messages
-                  sont définitivement
-                  supprimés tout de
-                  suite.
+                  Ton compte et tous tes
+                  messages sont
+                  définitivement supprimés
+                  tout de suite.
                 </p>
 
                 <button
@@ -1621,9 +1283,7 @@ export default function AppPage({
                       'delete'
                     )
                   }
-                  disabled={
-                    deleteLoading
-                  }
+                  disabled={deleteLoading}
                 >
                   Tout supprimer
                   définitivement
@@ -1634,9 +1294,7 @@ export default function AppPage({
                 style={
                   styles.modalBtnCancel
                 }
-                onClick={
-                  closeDeleteModal
-                }
+                onClick={closeDeleteModal}
               >
                 Annuler
               </button>
@@ -1647,31 +1305,20 @@ export default function AppPage({
       {showDeleteModal &&
         confirmAction && (
           <div
-            style={
-              styles.modalOverlay
-            }
+            style={styles.modalOverlay}
             onClick={() => {
-              setConfirmAction(
-                null
-              );
-
-              setDeleteError(
-                ''
-              );
+              setConfirmAction(null);
+              setDeleteError('');
             }}
           >
             <div
-              style={
-                styles.modal
-              }
+              style={styles.modal}
               onClick={e =>
                 e.stopPropagation()
               }
             >
               <h2
-                style={
-                  styles.modalTitle
-                }
+                style={styles.modalTitle}
               >
                 {confirmAction ===
                 'anonymize'
@@ -1692,9 +1339,7 @@ export default function AppPage({
 
               {deleteError && (
                 <p
-                  style={
-                    styles.modalError
-                  }
+                  style={styles.modalError}
                 >
                   {deleteError}
                 </p>
@@ -1713,9 +1358,7 @@ export default function AppPage({
                     ? handleAnonymize
                     : handleDeleteTotal
                 }
-                disabled={
-                  deleteLoading
-                }
+                disabled={deleteLoading}
               >
                 {deleteLoading
                   ? '...'
@@ -1727,17 +1370,10 @@ export default function AppPage({
                   styles.modalBtnCancel
                 }
                 onClick={() => {
-                  setConfirmAction(
-                    null
-                  );
-
-                  setDeleteError(
-                    ''
-                  );
+                  setConfirmAction(null);
+                  setDeleteError('');
                 }}
-                disabled={
-                  deleteLoading
-                }
+                disabled={deleteLoading}
               >
                 Retour
               </button>
@@ -1752,9 +1388,7 @@ export default function AppPage({
             onClick={() =>
               setShowOfflineGame(false)
             }
-            style={
-              styles.gameCloseBtn
-            }
+            style={styles.gameCloseBtn}
             title="Retour à Propard"
             aria-label="Retour à Propard"
           >
@@ -1834,8 +1468,11 @@ const styles = {
   },
 
   gameBtn: {
-    width: '34px',
-    height: '34px',
+    position: 'absolute',
+    top: '14px',
+    right: '14px',
+    width: '30px',
+    height: '30px',
     padding: 0,
     display: 'flex',
     alignItems: 'center',
@@ -1843,9 +1480,10 @@ const styles = {
     background: 'var(--bg-tertiary)',
     border: '1px solid var(--border)',
     borderRadius: '8px',
-    fontSize: '15px',
+    fontSize: '14px',
     cursor: 'pointer',
-    opacity: 0.72,
+    opacity: 0.65,
+    zIndex: 20,
     transition:
       'opacity 0.15s ease, transform 0.15s ease'
   },
@@ -2014,6 +1652,7 @@ const styles = {
   },
 
   main: {
+    position: 'relative',
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
