@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from './context/AuthContext';
 import AuthPage from './pages/AuthPage';
 import AppPage from './pages/AppPage';
@@ -8,6 +8,134 @@ import AdminPage from './pages/AdminPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import GlobalAnnouncement from './components/GlobalAnnouncement';
+import OfflineGame from './components/OfflineGame';
+
+async function checkPropardServer() {
+  if (!navigator.onLine) {
+    return false;
+  }
+
+  try {
+    const response = await fetch('/api/auth/me', {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache'
+      }
+    });
+
+    /*
+     * 401 = le serveur fonctionne mais aucun token valide.
+     * 200 = le serveur fonctionne et le token est valide.
+     *
+     * Les 5xx sont considérés comme indisponibilité du backend.
+     */
+    return response.status < 500;
+  } catch {
+    /*
+     * Failed fetch = pas de connexion au serveur/origine.
+     */
+    return false;
+  }
+}
+
+function OfflineGate({ children }) {
+  const [serverAvailable, setServerAvailable] = useState(true);
+  const [checking, setChecking] = useState(true);
+
+  const check = useCallback(async () => {
+    const available = await checkPropardServer();
+
+    setServerAvailable(available);
+    setChecking(false);
+
+    return available;
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    let interval;
+
+    const initialCheck = async () => {
+      const available = await checkPropardServer();
+
+      if (!mounted) return;
+
+      setServerAvailable(available);
+      setChecking(false);
+    };
+
+    initialCheck();
+
+    const handleOnline = () => {
+      check();
+    };
+
+    const handleOffline = () => {
+      setServerAvailable(false);
+      setChecking(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    /*
+     * Si le Wi-Fi fonctionne mais que le backend Propard tombe,
+     * navigator.onLine ne changera pas. On reteste donc régulièrement.
+     */
+    interval = window.setInterval(() => {
+      check();
+    }, 10000);
+
+    return () => {
+      mounted = false;
+
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+
+      window.clearInterval(interval);
+    };
+  }, [check]);
+
+  if (checking) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          background: 'var(--bg-primary)',
+          color: 'var(--text-secondary)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 13
+        }}
+      >
+        Connexion à Propard...
+      </div>
+    );
+  }
+
+  if (!serverAvailable) {
+    return (
+      <OfflineGame
+        onRetry={async () => {
+          const available = await check();
+
+          if (available) {
+            /*
+             * On recharge l'URL actuelle afin que la page demandée
+             * reprenne normalement.
+             */
+            window.location.reload();
+          }
+        }}
+      />
+    );
+  }
+
+  return children;
+}
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -52,16 +180,21 @@ export default function App() {
 
   if (loading) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh'
-      }}>
-        <p style={{
-          color: 'var(--text-secondary)',
-          fontFamily: 'var(--font-mono)'
-        }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          background: 'var(--bg-primary)'
+        }}
+      >
+        <p
+          style={{
+            color: 'var(--text-secondary)',
+            fontFamily: 'var(--font-mono)'
+          }}
+        >
           Chargement...
         </p>
       </div>
@@ -179,6 +312,16 @@ export default function App() {
     </div>
   );
 }
+
+function AppWithOfflineGate() {
+  return (
+    <OfflineGate>
+      <App />
+    </OfflineGate>
+  );
+}
+
+export { AppWithOfflineGate };
 
 const styles = {
   page: {
