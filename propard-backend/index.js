@@ -171,6 +171,11 @@ app.use(
 );
 
 app.use(
+  '/api/admin/reports',
+  require('./routes/reportsAdmin')
+);
+
+app.use(
   '/api/announcements',
   require('./routes/announcements')
 );
