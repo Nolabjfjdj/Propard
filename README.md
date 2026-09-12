@@ -31,10 +31,10 @@ Les données sont stockées avec **MongoDB** via **Mongoose**, tandis que **Sock
 | 💬 Messagerie | Messages privés entre utilisateurs |
 | 🔒 Chiffrement | Chiffrement côté client des messages |
 | ⚡ Temps réel | Communications via Socket.IO |
-| 📢 Annonces | Système d'annonces pour les utilisateurs |
-| 🚨 Signalements | Signalement de messages et gestion de leur statut |
+| 📢 Annonces | Système d'annonces |
+| 🚨 Signalements | Signalement et gestion des messages signalés |
 | 🛡️ Administration | Fonctions d'administration protégées |
-| 📞 WebRTC | Signalisation et infrastructure STUN/TURN pour les appels |
+| 📞 WebRTC | Signalisation et infrastructure STUN/TURN |
 | 🗄️ Base de données | MongoDB avec Mongoose |
 | 🗑️ Suppression de compte | Gestion de la suppression et de la restauration temporaire |
 
@@ -143,8 +143,6 @@ Le frontend est développé avec **React** et construit avec **Vite**.
 - ⚡ Vite
 - 🧹 ESLint
 
-Le frontend contient notamment les pages, composants, contextes, utilitaires et la gestion de la connexion Socket.IO.
-
 ---
 
 ## ⚙️ Backend
@@ -162,19 +160,19 @@ Le backend repose sur :
 - 🔧 dotenv
 - 🌐 CORS
 
-Le serveur fournit également le frontend compilé en production et gère le routage de l'application.
+Le serveur peut également servir le frontend compilé en production.
 
 ---
 
 ## 🔑 Authentification
 
-Propard utilise **JWT** pour l'authentification et **bcryptjs** pour le traitement sécurisé des mots de passe.
+Propard utilise **JWT** pour l'authentification et **bcryptjs** pour le traitement des mots de passe.
 
 Les inscriptions appliquent notamment des règles sur :
 
 - le format du nom d'utilisateur ;
 - sa longueur ;
-- l'unicité du compte ;
+- son unicité ;
 - la longueur minimale du mot de passe.
 
 Les routes nécessitant une authentification utilisent le middleware dédié.
@@ -209,7 +207,7 @@ La messagerie prend notamment en charge :
 - 🔔 messages non lus ;
 - ⚡ réception en temps réel.
 
-Les messages sont transmis au backend sous forme chiffrée lorsqu'ils utilisent le format cryptographique prévu par le client.
+Les messages utilisant le système cryptographique prévu par le client sont transmis au backend sous forme chiffrée.
 
 ---
 
@@ -224,8 +222,6 @@ Le backend reçoit notamment des données contenant :
 - le contenu chiffré (`ct`).
 
 Les clés publiques sont enregistrées côté serveur afin de permettre au client d'utiliser le système cryptographique prévu par l'application.
-
-> ⚠️ Le système de chiffrement n'a pas été présenté comme un protocole cryptographique audité professionnellement.
 
 ---
 
@@ -309,17 +305,13 @@ Le backend fournit les informations ICE via :
 
 `/api/turn-credentials`
 
-La configuration peut utiliser plusieurs serveurs **STUN/TURN**.
-
-Les serveurs TURN configurés sont récupérés en parallèle puis regroupés côté serveur afin d'être fournis au client.
+La configuration peut utiliser plusieurs serveurs **STUN/TURN**, récupérés en parallèle puis regroupés côté serveur.
 
 ---
 
 ## 🗄️ Base de données
 
 Propard utilise **MongoDB** avec **Mongoose**.
-
-### Modèles principaux
 
 | Modèle | Utilisation |
 |---|---|
@@ -352,6 +344,92 @@ Les limitations de requêtes actuelles utilisent un stockage en mémoire du proc
 
 ### Cloner le dépôt
 
-```bash
-git clone https://github.com/Nolabjfjdj/Propard.git
-cd Propard
+    git clone https://github.com/Nolabjfjdj/Propard.git
+    cd Propard
+
+### Backend
+
+    cd propard-backend
+    npm install
+
+### Frontend
+
+    cd ../propard-frontend
+    npm install
+
+---
+
+## ▶️ Développement
+
+### Backend
+
+    cd propard-backend
+    npm run dev
+
+### Frontend
+
+    cd propard-frontend
+    npm run dev
+
+---
+
+## 🏗️ Production
+
+Construire le frontend :
+
+    cd propard-frontend
+    npm run build
+
+Le backend peut ensuite servir le dossier `dist` généré par le frontend.
+
+---
+
+## 🔐 Variables d'environnement
+
+Le backend utilise `dotenv` pour sa configuration.
+
+Les secrets et paramètres sensibles doivent être définis dans les variables d'environnement et ne doivent pas être commités dans le dépôt.
+
+Les principales configurations concernent notamment :
+
+- 🗄️ MongoDB
+- 🔑 JWT
+- 🛡️ clés d'administration
+- 🌐 origine du frontend
+- 📞 serveurs TURN
+
+---
+
+## ❤️ Health Check
+
+Le backend possède une route de vérification :
+
+`GET /health`
+
+Elle permet notamment de vérifier que le serveur répond correctement.
+
+---
+
+## 📜 Licence
+
+Le projet est distribué sous une **licence propriétaire**.
+
+Consultez [`LICENSE`](./LICENSE) pour connaître les conditions complètes d'utilisation.
+
+---
+
+## 🔗 Liens
+
+🌐 **Site officiel :** https://propard.site
+
+💻 **GitHub :** https://github.com/Nolabjfjdj/Propard
+
+---
+
+## 👨‍💻 Projet
+
+**Propard** — Projet indépendant français 🇫🇷
+
+Développé par **BananeVR**.
+
+> 🍌 **Propard — Communication, simplicité et sécurité.**
