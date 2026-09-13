@@ -5,209 +5,280 @@ import {
   storePrivateKey,
   getStoredPrivateKeyJwk,
   publicKeyFromPrivateJwk,
-  publicKeysEqual,
-  createPrivateKeyBackup,
+  encryptPrivateKeyBackup,
   decryptPrivateKeyBackup
 } from '../utils/crypto';
 
 const AuthContext = createContext(null);
 
-const syncEncryptionKeys = async (
+const samePublicKey = (a, b) => {
+  if (!a || !b) return false;
+
+  return (
+    a.kty === b.kty &&
+    a.crv === b.crv &&
+    a.x === b.x &&
+    a.y === b.y
+  );
+};
+
+const parsePublicKey = value => {
+  if (!value) return null;
+
+  try {
+    return typeof value === 'string'
+      ? JSON.parse(value)
+      : value;
+  } catch {
+    return null;
+  }
+};
+
+const uploadKeyBackup = async (authToken, privateKeyJwk, password) => {
+  if (!password) return false;
+
+  const backup = await encryptPrivateKeyBackup(
+    privateKeyJwk,
+    password
+  );
+
+  await axios.post(
+    '/api/auth/keybackup',
+    { backup },
+    {
+      headers: {
+        Authorization: `Bearer ${authToken}`
+      }
+    }
+  );
+
+  return true;
+};
+
+const ensureEncryptionKeys = async (
   userId,
   authToken,
-  password = null
+  password = null,
+  serverPublicKey = null
 ) => {
-  if (!userId || !authToken) {
-    return;
-  }
+  if (!userId || !authToken) return;
 
-  /*
-   * On récupère l'état de la sauvegarde E2EE avant de choisir
-   * quelle clé doit être utilisée.
-   */
-  const backupResponse =
-    await axios.get(
-      '/api/auth/keybackup',
-      {
-        headers: {
-          Authorization:
-            `Bearer ${authToken}`
-        }
-      }
-    );
-
-  const serverPublicKey =
-    backupResponse.data?.publicKey || null;
-
-  const backup =
-    backupResponse.data?.backup || null;
-
-  let privateKey =
-    getStoredPrivateKeyJwk(userId);
-
-  /*
-   * Si une sauvegarde existe et que le mot de passe est disponible,
-   * elle devient la source de vérité. Cela permet à un nouvel
-   * appareil de retrouver exactement la même identité E2EE.
-   */
-  if (
-    backup &&
-    password
-  ) {
-    const restored =
-      await decryptPrivateKeyBackup(
-        backup,
-        password
-      );
-
-    if (restored) {
-      privateKey = restored;
-
-      storePrivateKey(
-        userId,
-        restored
-      );
-    } else if (!privateKey) {
-      throw new Error(
-        'Impossible de déchiffrer la sauvegarde de votre clé E2EE. Vérifie ton mot de passe.'
-      );
-    }
-  }
-
-  /*
-   * Aucun backup et aucune clé locale :
-   *
-   * - nouveau compte => on peut créer une identité ;
-   * - ancien compte => remplacer la clé casserait les anciens
-   *   messages, donc on refuse plutôt que de détruire l'identité.
-   */
-  if (!privateKey) {
-    if (serverPublicKey) {
-      throw new Error(
-        'Clé E2EE locale introuvable et aucune sauvegarde E2EE récupérable. Ce navigateur ne peut pas remplacer la clé sans risquer de rendre les anciens messages illisibles.'
-      );
-    }
-
-    const generated =
-      await generateKeyPair();
-
-    privateKey =
-      generated.privateKeyJwk;
-  }
-
-  const publicKey =
-    publicKeyFromPrivateJwk(
-      privateKey
-    );
-
-  /*
-   * Si le serveur possède déjà une clé différente, cela peut
-   * simplement être une ancienne version de Propard qui utilisait
-   * une autre clé sur cet appareil. Si nous avons pu restaurer le
-   * backup avec le mot de passe, le backup est la clé canonique.
-   *
-   * Pour une clé locale sans backup, on conserve la clé locale :
-   * elle est la seule copie connue capable de déchiffrer les anciens
-   * messages.
-   */
-  if (
-    !serverPublicKey ||
-    !publicKeysEqual(
-      serverPublicKey,
-      publicKey
-    )
-  ) {
-    await axios.patch(
-      '/api/auth/publickey',
-      {
-        publicKey:
-          JSON.stringify(publicKey)
-      },
-      {
-        headers: {
-          Authorization:
-            `Bearer ${authToken}`
-        }
-      }
-    );
-  }
-
-  /*
-   * La sauvegarde n'est créée/actualisée que lorsque le mot de passe
-   * est disponible. Il n'est jamais stocké par Propard.
-   */
-  if (password) {
-    const backupExists =
-      !!backup;
+  try {
+    const existingPriv = getStoredPrivateKeyJwk(userId);
+    const serverPub = parsePublicKey(serverPublicKey);
 
     /*
-     * Si nous avons restauré un backup existant, inutile de refaire
-     * 600 000 itérations PBKDF2 à chaque connexion.
-     *
-     * S'il n'existe pas encore de backup, on en crée un maintenant.
+     * CAS 1 — la clé privée existe déjà sur cet appareil.
+     * On la conserve absolument : c'est elle qui permet de déchiffrer
+     * les messages existants. On synchronise sa clé publique et, si
+     * possible, on crée la sauvegarde chiffrée.
      */
-    if (!backupExists) {
-      const encryptedBackup =
-        await createPrivateKeyBackup(
-          privateKey,
-          password
+    if (existingPriv) {
+      const derivedPublicKeyJwk =
+        publicKeyFromPrivateJwk(existingPriv);
+
+      let backup = null;
+
+      if (password) {
+        const backupResponse = await axios.get(
+          '/api/auth/keybackup',
+          {
+            headers: {
+              Authorization: `Bearer ${authToken}`
+            }
+          }
         );
 
-      await axios.put(
-        '/api/auth/keybackup',
-        encryptedBackup,
+        backup = backupResponse.data?.backup || null;
+      }
+
+      /*
+       * S'il existe déjà une sauvegarde, elle représente l'identité E2EE
+       * canonique du compte. On vérifie donc que la clé locale correspond.
+       * Cela évite qu'un appareil contenant une autre clé écrase l'identité.
+       *
+       * S'il n'existe PAS encore de sauvegarde, la clé locale est la seule
+       * copie historique connue. Elle devient alors la clé canonique et sa
+       * clé publique peut être resynchronisée sur le serveur. C'est important
+       * pour récupérer un compte ancien dont la clé publique a été remplacée
+       * par erreur sur un autre navigateur avant la migration.
+       */
+      if (backup) {
+        const restoredFromBackup =
+          await decryptPrivateKeyBackup(
+            backup,
+            password
+          );
+
+        const backupPublicKey =
+          publicKeyFromPrivateJwk(restoredFromBackup);
+
+        if (!samePublicKey(derivedPublicKeyJwk, backupPublicKey)) {
+          throw new Error(
+            'La clé E2EE locale ne correspond pas à la sauvegarde du compte.'
+          );
+        }
+      }
+
+      await axios.patch(
+        '/api/auth/publickey',
+        {
+          publicKey: JSON.stringify(derivedPublicKeyJwk)
+        },
         {
           headers: {
-            Authorization:
-              `Bearer ${authToken}`
+            Authorization: `Bearer ${authToken}`
           }
         }
       );
+
+      if (password && !backup) {
+        await uploadKeyBackup(
+          authToken,
+          existingPriv,
+          password
+        );
+      }
+
+      return;
     }
+
+    /*
+     * CAS 2 — nouvel appareil.
+     * Si le compte possède une sauvegarde, on restaure EXACTEMENT la
+     * même clé privée. Il ne faut surtout pas en générer une nouvelle.
+     */
+    if (password) {
+      const backupResponse = await axios.get(
+        '/api/auth/keybackup',
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`
+          }
+        }
+      );
+
+      const backup = backupResponse.data?.backup;
+
+      if (backup) {
+        const restoredPrivateKey =
+          await decryptPrivateKeyBackup(
+            backup,
+            password
+          );
+
+        const restoredPublicKey =
+          publicKeyFromPrivateJwk(restoredPrivateKey);
+
+        if (
+          serverPub &&
+          !samePublicKey(restoredPublicKey, serverPub)
+        ) {
+          throw new Error(
+            'La sauvegarde E2EE ne correspond pas à la clé publique du compte.'
+          );
+        }
+
+        storePrivateKey(
+          userId,
+          restoredPrivateKey
+        );
+
+        console.log(
+          '🔐 Clé E2EE restaurée depuis la sauvegarde chiffrée.'
+        );
+
+        return;
+      }
+    }
+
+    /*
+     * CAS 3 — ancien compte sans sauvegarde.
+     * Si le serveur connaît déjà une clé publique, NE JAMAIS en générer
+     * une autre : cela casserait les messages existants. L'utilisateur
+     * doit simplement revenir sur l'ancien appareil pour créer la backup.
+     */
+    if (serverPub) {
+      console.warn(
+        '🔐 Aucune sauvegarde E2EE disponible sur ce compte. Aucune nouvelle clé n’a été générée.'
+      );
+      return;
+    }
+
+    /*
+     * CAS 4 — compte totalement nouveau sans clé publique.
+     * On génère la première paire de clés puis on sauvegarde la clé privée
+     * chiffrée si le mot de passe est disponible.
+     */
+    const {
+      publicKeyJwk,
+      privateKeyJwk
+    } = await generateKeyPair();
+
+    await axios.patch(
+      '/api/auth/publickey',
+      {
+        publicKey: JSON.stringify(publicKeyJwk)
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`
+        }
+      }
+    );
+
+    storePrivateKey(
+      userId,
+      privateKeyJwk
+    );
+
+    if (password) {
+      await uploadKeyBackup(
+        authToken,
+        privateKeyJwk,
+        password
+      );
+    }
+
+    console.log(
+      '🔐 Clés E2EE générées avec succès'
+    );
+  } catch (err) {
+    /*
+     * Les erreurs cryptographiques doivent remonter lorsque l'utilisateur
+     * vient de se connecter : sinon il pourrait entrer sur un nouvel appareil
+     * avec une clé incorrecte et casser silencieusement son identité E2EE.
+     */
+    if (err.response?.status === 401) {
+      console.warn(
+        '🔐 Session expirée pendant la synchronisation E2EE.'
+      );
+      return;
+    }
+
+    if (password && !err.response) {
+      throw err;
+    }
+
+    console.warn(
+      '🔐 Serveur indisponible : synchronisation E2EE reportée.'
+    );
   }
-
-  /*
-   * Une nouvelle clé peut avoir été générée pour un compte neuf.
-   * On s'assure également qu'elle est conservée localement.
-   */
-  storePrivateKey(
-    userId,
-    privateKey
-  );
-
-  return {
-    privateKey,
-    publicKey
-  };
 };
 
-export function AuthProvider({
-  children
-}) {
-  const [user, setUser] =
-    useState(null);
-
-  const [token, setToken] =
-    useState(null);
-
-  const [loading, setLoading] =
-    useState(true);
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const savedToken =
-      localStorage.getItem(
-        'propard_token'
-      );
+      localStorage.getItem('propard_token');
 
     const savedUser =
-      localStorage.getItem(
-        'propard_user'
-      );
+      localStorage.getItem('propard_user');
 
-    if (
-      !savedToken ||
-      !savedUser
-    ) {
+    if (!savedToken || !savedUser) {
       setLoading(false);
       return;
     }
@@ -215,150 +286,125 @@ export function AuthProvider({
     let parsedUser;
 
     try {
-      parsedUser =
-        JSON.parse(savedUser);
+      parsedUser = JSON.parse(savedUser);
     } catch {
-      localStorage.removeItem(
-        'propard_token'
-      );
-
-      localStorage.removeItem(
-        'propard_user'
-      );
-
+      localStorage.removeItem('propard_token');
+      localStorage.removeItem('propard_user');
       setLoading(false);
       return;
     }
 
+    /*
+     * On restaure immédiatement les données locales.
+     *
+     * Ça permet notamment au système offline de ne pas
+     * considérer l'utilisateur comme déconnecté simplement
+     * parce que le backend est temporairement inaccessible.
+     */
     setToken(savedToken);
     setUser(parsedUser);
 
-    const verify =
-      async () => {
-        try {
-          const response =
-            await axios.get(
-              '/api/auth/me',
-              {
-                headers: {
-                  Authorization:
-                    `Bearer ${savedToken}`
-                }
-              }
-            );
-
-          const serverUser =
-            response.data;
-
-          const normalizedUser = {
-            ...serverUser,
-            id:
-              serverUser.id ||
-              serverUser._id
-          };
-
-          setToken(
-            savedToken
-          );
-
-          setUser(
-            normalizedUser
-          );
-
-          localStorage.setItem(
-            'propard_user',
-            JSON.stringify(
-              normalizedUser
-            )
-          );
-
-          /*
-           * Au simple rechargement, le mot de passe n'est pas
-           * disponible et ne doit pas être mémorisé. Une clé locale
-           * existante reste donc utilisable telle quelle.
-           */
-          try {
-            await syncEncryptionKeys(
-              normalizedUser.id,
-              savedToken,
-              null
-            );
-          } catch (keyError) {
-            console.warn(
-              '🔐 Synchronisation E2EE reportée :',
-              keyError.message
-            );
+    const verify = async () => {
+      try {
+        const response = await axios.get(
+          '/api/auth/me',
+          {
+            headers: {
+              Authorization: `Bearer ${savedToken}`
+            }
           }
-        } catch (err) {
-          if (
-            err.response?.status === 401
-          ) {
-            localStorage.removeItem(
-              'propard_token'
-            );
+        );
 
-            localStorage.removeItem(
-              'propard_user'
-            );
+        const serverUser = response.data;
 
-            setToken(null);
-            setUser(null);
+        const normalizedUser = {
+          ...serverUser,
+          id: serverUser.id || serverUser._id
+        };
 
-            window.location.href =
-              '/';
+        setToken(savedToken);
+        setUser(normalizedUser);
 
-            return;
-          }
+        localStorage.setItem(
+          'propard_user',
+          JSON.stringify(normalizedUser)
+        );
 
-          console.warn(
-            '🌐 Propard est temporairement indisponible. Session conservée localement.'
+        await ensureEncryptionKeys(
+          normalizedUser.id,
+          savedToken,
+          null,
+          normalizedUser.publicKey
+        );
+      } catch (err) {
+        /*
+         * SEULEMENT un vrai 401 signifie que la session
+         * n'est plus valide.
+         */
+        if (err.response?.status === 401) {
+          localStorage.removeItem(
+            'propard_token'
           );
-        } finally {
-          setLoading(false);
+
+          localStorage.removeItem(
+            'propard_user'
+          );
+
+          setToken(null);
+          setUser(null);
+
+          window.location.href = '/';
+
+          return;
         }
-      };
+
+        /*
+         * Erreur réseau / backend indisponible :
+         * on conserve la session locale.
+         */
+        console.warn(
+          '🌐 Propard est temporairement indisponible. Session conservée localement.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
 
     verify();
 
-    const interval =
-      setInterval(
-        async () => {
-          try {
-            await axios.get(
-              '/api/auth/me',
-              {
-                headers: {
-                  Authorization:
-                    `Bearer ${savedToken}`
-                }
-              }
-            );
-          } catch (err) {
-            if (
-              err.response?.status ===
-              401
-            ) {
-              localStorage.removeItem(
-                'propard_token'
-              );
-
-              localStorage.removeItem(
-                'propard_user'
-              );
-
-              setToken(null);
-              setUser(null);
-
-              window.location.href =
-                '/';
+    const interval = setInterval(async () => {
+      try {
+        await axios.get(
+          '/api/auth/me',
+          {
+            headers: {
+              Authorization: `Bearer ${savedToken}`
             }
           }
-        },
-        30000
-      );
+        );
+      } catch (err) {
+        /*
+         * Une déconnexion automatique n'est effectuée
+         * que pour un vrai 401.
+         */
+        if (err.response?.status === 401) {
+          localStorage.removeItem(
+            'propard_token'
+          );
 
-    return () =>
-      clearInterval(interval);
+          localStorage.removeItem(
+            'propard_user'
+          );
+
+          setToken(null);
+          setUser(null);
+
+          window.location.href = '/';
+        }
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -367,10 +413,7 @@ export function AuthProvider({
         response => response,
 
         error => {
-          if (
-            error.response?.status ===
-            401
-          ) {
+          if (error.response?.status === 401) {
             localStorage.removeItem(
               'propard_token'
             );
@@ -379,13 +422,10 @@ export function AuthProvider({
               'propard_user'
             );
 
-            window.location.href =
-              '/';
+            window.location.href = '/';
           }
 
-          return Promise.reject(
-            error
-          );
+          return Promise.reject(error);
         }
       );
 
@@ -402,20 +442,19 @@ export function AuthProvider({
   ) => {
     const normalized = {
       ...userData,
-      id:
-        userData.id ||
-        userData._id
+      id: userData.id || userData._id
     };
 
     /*
-     * On prépare/récupère la clé AVANT de rendre la session active.
-     * Ainsi, une nouvelle connexion sur un nouvel appareil ne crée
-     * jamais silencieusement une nouvelle identité E2EE.
+     * On synchronise/restaure d'abord l'identité E2EE.
+     * Ainsi, si la restauration échoue, on ne laisse pas une session
+     * partiellement enregistrée dans localStorage.
      */
-    await syncEncryptionKeys(
+    await ensureEncryptionKeys(
       normalized.id,
       userToken,
-      password
+      password,
+      normalized.publicKey
     );
 
     setUser(normalized);
@@ -428,9 +467,7 @@ export function AuthProvider({
 
     localStorage.setItem(
       'propard_user',
-      JSON.stringify(
-        normalized
-      )
+      JSON.stringify(normalized)
     );
 
     localStorage.setItem(
@@ -454,9 +491,7 @@ export function AuthProvider({
 
   const updateUser = partial => {
     setUser(prev => {
-      if (!prev) {
-        return prev;
-      }
+      if (!prev) return prev;
 
       const next = {
         ...prev,
@@ -488,8 +523,5 @@ export function AuthProvider({
   );
 }
 
-export const useAuth =
-  () =>
-    useContext(
-      AuthContext
-    );
+export const useAuth = () =>
+  useContext(AuthContext);
