@@ -5,6 +5,8 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Message = require('../models/Message');
+const Group = require('../models/Group');
+const GroupMessage = require('../models/GroupMessage');
 const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 
@@ -543,6 +545,48 @@ router.delete('/delete', authMiddleware, async (req, res) => {
         { receiver: userId }
       ]
     });
+
+    await GroupMessage.deleteMany({
+      sender: userId
+    });
+
+    const ownedGroups =
+      await Group.find({
+        owner: userId
+      }).select('_id');
+
+    const ownedGroupIds =
+      ownedGroups.map(group => group._id);
+
+    if (ownedGroupIds.length > 0) {
+      await GroupMessage.deleteMany({
+        group: {
+          $in: ownedGroupIds
+        }
+      });
+
+      await Group.deleteMany({
+        _id: {
+          $in: ownedGroupIds
+        }
+      });
+    }
+
+    await Group.updateMany(
+      {
+        'members.userId': userId
+      },
+      {
+        $pull: {
+          members: {
+            userId
+          },
+          keyPackages: {
+            userId
+          }
+        }
+      }
+    );
 
     await User.updateMany(
       { 'friends.userId': userId },
