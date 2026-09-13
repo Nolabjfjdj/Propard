@@ -460,18 +460,8 @@ export function AuthProvider({ children }) {
       id: userData.id || userData._id
     };
 
-    /*
-     * On synchronise/restaure d'abord l'identité E2EE.
-     * Ainsi, si la restauration échoue, on ne laisse pas une session
-     * partiellement enregistrée dans localStorage.
-     */
-    await ensureEncryptionKeys(
-      normalized.id,
-      userToken,
-      password,
-      normalized.publicKey
-    );
-
+    // La connexion au compte ne doit jamais être confondue avec la
+    // restauration E2EE. On enregistre d'abord la session.
     setUser(normalized);
     setToken(userToken);
 
@@ -489,6 +479,28 @@ export function AuthProvider({ children }) {
       'propard_has_logged_in',
       'true'
     );
+
+    try {
+      await ensureEncryptionKeys(
+        normalized.id,
+        userToken,
+        password,
+        normalized.publicKey
+      );
+    } catch (err) {
+      console.error('Erreur de restauration E2EE:', err);
+
+      // Le compte est bien connecté. On remonte toutefois une erreur
+      // explicite à AuthPage au lieu du générique « Erreur serveur ».
+      const message =
+        err.response?.data?.error ||
+        err.message ||
+        'Impossible de restaurer la clé E2EE sur cet appareil.';
+
+      const e2eeError = new Error(message);
+      e2eeError.code = 'E2EE_RESTORE_FAILED';
+      throw e2eeError;
+    }
   };
 
   const logout = () => {
