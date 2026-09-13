@@ -66,6 +66,30 @@ export default function GroupChat({
   const [mentionStart, setMentionStart] =
     useState(-1);
 
+  const [editingId, setEditingId] =
+    useState(null);
+
+  const [editContent, setEditContent] =
+    useState('');
+
+  const [contextMenu, setContextMenu] =
+    useState(null);
+
+  const [reportTarget, setReportTarget] =
+    useState(null);
+
+  const [reportReason, setReportReason] =
+    useState('');
+
+  const [reportLoading, setReportLoading] =
+    useState(false);
+
+  const [reportError, setReportError] =
+    useState('');
+
+  const [reportSuccess, setReportSuccess] =
+    useState(false);
+
   /*
    * L'ID utilisateur peut être fourni par
    * AppPage, mais si ce n'est pas le cas,
@@ -693,6 +717,11 @@ export default function GroupChat({
       handleGroupMessageDeleted
     );
 
+    socket.on(
+      'groupMessageEdited',
+      handleGroupMessageEdited
+    );
+
     return () => {
       socket.off(
         'newGroupMessage',
@@ -718,6 +747,11 @@ export default function GroupChat({
         'groupMessageDeleted',
         handleGroupMessageDeleted
       );
+
+      socket.off(
+        'groupMessageEdited',
+        handleGroupMessageEdited
+      );
     };
   }, [
     initialGroup?._id,
@@ -739,7 +773,9 @@ export default function GroupChat({
    * Fermer les menus / suggestions.
    */
   useEffect(() => {
-    const close = () => {};
+    const close = () => {
+      setContextMenu(null);
+    };
 
     window.addEventListener(
       'click',
@@ -997,6 +1033,433 @@ export default function GroupChat({
           cursor
         );
       });
+    };
+
+
+  /*
+   * Menu contextuel / édition /
+   * suppression / signalement.
+   */
+  const getContextMenuPosition =
+    (x, y) => ({
+      x: Math.min(
+        Math.max(8, x),
+        Math.max(8, window.innerWidth - 178)
+      ),
+      y: Math.min(
+        Math.max(8, y),
+        Math.max(8, window.innerHeight - 125)
+      )
+    });
+
+  const openContextMenu =
+    (message, x, y) => {
+      if (
+        !message ||
+        message.deleted ||
+        message.decryptionError
+      ) {
+        return;
+      }
+
+      const position =
+        getContextMenuPosition(
+          x,
+          y
+        );
+
+      setContextMenu({
+        message,
+        x:
+          position.x,
+        y:
+          position.y
+      });
+    };
+
+  const handleBubbleContextMenu =
+    (e, message) => {
+      e.preventDefault();
+
+      openContextMenu(
+        message,
+        e.clientX,
+        e.clientY
+      );
+    };
+
+  /*
+   * Appui long : ouvre le même menu
+   * que le clic droit sur desktop.
+   *
+   * Le grab reste indépendant :
+   * double-tap + maintien continue
+   * d'appeler onGrabStart.
+   */
+  const handleBubbleLongPressStart =
+    (e, message) => {
+      if (
+        e.pointerType === 'mouse' ||
+        message.deleted ||
+        message.decryptionError
+      ) {
+        return;
+      }
+
+      clearTimeout(
+        longPressTimer.current
+      );
+
+      const clientX =
+        e.clientX ??
+        (e.touches?.[0]?.clientX || 0);
+
+      const clientY =
+        e.clientY ??
+        (e.touches?.[0]?.clientY || 0);
+
+      longPressTimer.current =
+        setTimeout(() => {
+          openContextMenu(
+            message,
+            clientX,
+            clientY
+          );
+        }, 500);
+    };
+
+  const cancelBubbleLongPress =
+    () => {
+      clearTimeout(
+        longPressTimer.current
+      );
+
+      longPressTimer.current =
+        null;
+    };
+
+  const isOwnGroupMessage =
+    message => {
+      const senderId =
+        (
+          message?.sender?._id ||
+          message?.sender
+        )?.toString();
+
+      return (
+        senderId &&
+        senderId === myId
+      );
+    };
+
+  const startEditGroupMessage =
+    message => {
+      if (
+        !isOwnGroupMessage(message) ||
+        message.deleted ||
+        message.decryptionError ||
+        typeof message.content !==
+          'string'
+      ) {
+        return;
+      }
+
+      setEditingId(
+        message._id
+      );
+
+      setEditContent(
+        message.content
+      );
+
+      setContextMenu(
+        null
+      );
+    };
+
+  const cancelEditGroupMessage =
+    () => {
+      setEditingId(
+        null
+      );
+
+      setEditContent('');
+    };
+
+  const saveEditGroupMessage =
+    async messageId => {
+      const plaintext =
+        editContent.trim();
+
+      if (
+        !plaintext ||
+        !key
+      ) {
+        return;
+      }
+
+      try {
+        const encryptedContent =
+          await encryptMessage(
+            key,
+            plaintext
+          );
+
+        await axios.patch(
+          `/api/groups/${group._id}/messages/${messageId}`,
+          {
+            content:
+              encryptedContent
+          },
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`
+            }
+          }
+        );
+
+        /*
+         * Le socket groupMessageEdited
+         * mettra aussi à jour les autres
+         * clients. On met le nôtre à jour
+         * immédiatement.
+         */
+        setMessages(prev =>
+          prev.map(message =>
+            message._id?.toString() ===
+            messageId?.toString()
+              ? {
+                  ...message,
+                  content:
+                    plaintext,
+                  edited:
+                    true
+                }
+              : message
+          )
+        );
+
+        cancelEditGroupMessage();
+      } catch (err) {
+        console.error(
+          'Group message edit error:',
+          err
+        );
+
+        setLoadError(
+          err.response?.data?.error ||
+          'Impossible de modifier le message.'
+        );
+
+        setTimeout(() => {
+          setLoadError(null);
+        }, 4000);
+      }
+    };
+
+  const deleteGroupMessage =
+    async messageId => {
+      setContextMenu(
+        null
+      );
+
+      try {
+        await axios.delete(
+          `/api/groups/${group._id}/messages/${messageId}`,
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`
+            }
+          }
+        );
+
+        setMessages(prev =>
+          prev.filter(
+            message =>
+              message._id?.toString() !==
+              messageId?.toString()
+          )
+        );
+      } catch (err) {
+        console.error(
+          'Group message delete error:',
+          err
+        );
+
+        setLoadError(
+          err.response?.data?.error ||
+          'Impossible de supprimer le message.'
+        );
+
+        setTimeout(() => {
+          setLoadError(null);
+        }, 4000);
+      }
+    };
+
+  const openReport =
+    message => {
+      if (
+        isOwnGroupMessage(message)
+      ) {
+        return;
+      }
+
+      setContextMenu(
+        null
+      );
+
+      setReportTarget(
+        message
+      );
+
+      setReportReason('');
+      setReportError('');
+      setReportSuccess(
+        false
+      );
+    };
+
+  const closeReport =
+    () => {
+      if (reportLoading) {
+        return;
+      }
+
+      setReportTarget(
+        null
+      );
+
+      setReportReason('');
+      setReportError('');
+      setReportSuccess(
+        false
+      );
+    };
+
+  const submitReport =
+    async () => {
+      if (
+        !reportTarget ||
+        reportLoading
+      ) {
+        return;
+      }
+
+      const reportedUserId =
+        (
+          reportTarget.sender?._id ||
+          reportTarget.sender
+        )?.toString();
+
+      if (
+        !reportedUserId ||
+        reportedUserId === myId
+      ) {
+        return;
+      }
+
+      setReportLoading(
+        true
+      );
+
+      setReportError('');
+
+      try {
+        await axios.post(
+          '/api/reports',
+          {
+            messageId:
+              reportTarget._id,
+            reportedUserId,
+            content:
+              reportTarget.content,
+            reason:
+              reportReason.trim() ||
+              undefined,
+            groupMessage:
+              true,
+            groupId:
+              group._id
+          },
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`
+            }
+          }
+        );
+
+        setReportSuccess(
+          true
+        );
+      } catch (err) {
+        console.error(
+          'Group message report error:',
+          err
+        );
+
+        setReportError(
+          err.response?.data?.error ||
+          'Impossible d’envoyer le signalement.'
+        );
+      } finally {
+        setReportLoading(
+          false
+        );
+      }
+    };
+
+  /*
+   * Message de groupe modifié
+   * en temps réel.
+   */
+  const handleGroupMessageEdited =
+    async data => {
+      if (
+        data?.groupId?.toString() !==
+        initialGroup?._id?.toString()
+      ) {
+        return;
+      }
+
+      if (
+        !key ||
+        !data.content
+      ) {
+        return;
+      }
+
+      const plaintext =
+        await decryptMessage(
+          key,
+          data.content
+        );
+
+      if (
+        plaintext === null
+      ) {
+        return;
+      }
+
+      setMessages(prev =>
+        prev.map(message =>
+          message._id?.toString() ===
+          data.messageId?.toString()
+            ? {
+                ...message,
+                content:
+                  plaintext,
+                edited:
+                  true,
+                decryptionError:
+                  false
+              }
+            : message
+        )
+      );
     };
 
   /*
@@ -1669,21 +2132,42 @@ export default function GroupChat({
                               ? 0
                               : 1
                         }}
-                        onPointerDown={e =>
-                          handleBubblePointerDown(
+                        onContextMenu={e =>
+                          handleBubbleContextMenu(
                             e,
                             message
                           )
                         }
-                        onPointerMove={
-                          handleBubblePointerMoveGrabCheck
-                        }
-                        onPointerUp={
-                          handleBubblePointerUpCancel
-                        }
-                        onPointerCancel={
-                          handleBubblePointerUpCancel
-                        }
+                        onPointerDown={e => {
+                          handleBubbleLongPressStart(
+                            e,
+                            message
+                          );
+
+                          handleBubblePointerDown(
+                            e,
+                            message
+                          );
+                        }}
+                        onPointerMove={e => {
+                          cancelBubbleLongPress();
+
+                          handleBubblePointerMoveGrabCheck(
+                            e
+                          );
+                        }}
+                        onPointerUp={e => {
+                          cancelBubbleLongPress();
+
+                          handleBubblePointerUpCancel(
+                            e
+                          );
+                        }}
+                        onPointerCancel={() => {
+                          cancelBubbleLongPress();
+
+                          handleBubblePointerUpCancel();
+                        }}
                       >
 
                         {!isMe && (
@@ -1696,13 +2180,93 @@ export default function GroupChat({
                           </p>
                         )}
 
-                        <p
-                          style={
-                            styles.text
-                          }
-                        >
-                          {content}
-                        </p>
+                        {editingId ===
+                        message._id ? (
+                          <div
+                            style={
+                              styles.editContainer
+                            }
+                            onPointerDown={e =>
+                              e.stopPropagation()
+                            }
+                          >
+                            <textarea
+                              autoFocus
+                              value={
+                                editContent
+                              }
+                              onChange={e =>
+                                setEditContent(
+                                  e.target.value
+                                )
+                              }
+                              onKeyDown={e => {
+                                if (
+                                  e.key ===
+                                    'Enter' &&
+                                  !e.shiftKey
+                                ) {
+                                  e.preventDefault();
+
+                                  saveEditGroupMessage(
+                                    message._id
+                                  );
+                                }
+
+                                if (
+                                  e.key ===
+                                  'Escape'
+                                ) {
+                                  cancelEditGroupMessage();
+                                }
+                              }}
+                              style={
+                                styles.editInput
+                              }
+                              rows={2}
+                            />
+
+                            <div
+                              style={
+                                styles.editActions
+                              }
+                            >
+                              <button
+                                type="button"
+                                style={
+                                  styles.editBtn
+                                }
+                                onClick={() =>
+                                  saveEditGroupMessage(
+                                    message._id
+                                  )
+                                }
+                              >
+                                ✓
+                              </button>
+
+                              <button
+                                type="button"
+                                style={
+                                  styles.cancelBtn
+                                }
+                                onClick={
+                                  cancelEditGroupMessage
+                                }
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p
+                            style={
+                              styles.text
+                            }
+                          >
+                            {content}
+                          </p>
+                        )}
 
                         <div
                           style={{
@@ -1761,6 +2325,215 @@ export default function GroupChat({
         />
 
       </div>
+
+
+      {contextMenu && (
+        <div
+          style={{
+            ...styles.contextMenu,
+            left:
+              contextMenu.x,
+            top:
+              contextMenu.y
+          }}
+          onClick={e =>
+            e.stopPropagation()
+          }
+          onPointerDown={e =>
+            e.stopPropagation()
+          }
+        >
+          {isOwnGroupMessage(
+            contextMenu.message
+          ) ? (
+            <>
+              <button
+                type="button"
+                style={
+                  styles.contextItem
+                }
+                onClick={() =>
+                  startEditGroupMessage(
+                    contextMenu.message
+                  )
+                }
+              >
+                ✏️ Modifier
+              </button>
+
+              <button
+                type="button"
+                style={
+                  styles.contextItemDanger
+                }
+                onClick={() =>
+                  deleteGroupMessage(
+                    contextMenu.message._id
+                  )
+                }
+              >
+                🗑️ Supprimer
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              style={
+                styles.contextItem
+              }
+              onClick={() =>
+                openReport(
+                  contextMenu.message
+                )
+              }
+            >
+              🚩 Signaler
+            </button>
+          )}
+        </div>
+      )}
+
+      {reportTarget && (
+        <div
+          style={
+            styles.modalOverlay
+          }
+          onClick={e => {
+            if (
+              e.target ===
+              e.currentTarget
+            ) {
+              closeReport();
+            }
+          }}
+        >
+          <div
+            style={
+              styles.modal
+            }
+          >
+            <h3
+              style={
+                styles.modalTitle
+              }
+            >
+              Signaler ce message
+            </h3>
+
+            {!reportSuccess ? (
+              <>
+                <p
+                  style={
+                    styles.modalDesc
+                  }
+                >
+                  Uniquement ce message sera
+                  transmis à la modération de
+                  Propard. Le reste de la
+                  conversation reste privé.
+                </p>
+
+                <div
+                  style={
+                    styles.reportedContent
+                  }
+                >
+                  {reportTarget.content}
+                </div>
+
+                <textarea
+                  value={
+                    reportReason
+                  }
+                  onChange={e =>
+                    setReportReason(
+                      e.target.value
+                    )
+                  }
+                  placeholder="Motif du signalement (facultatif)"
+                  maxLength={500}
+                  style={
+                    styles.reportTextarea
+                  }
+                  disabled={
+                    reportLoading
+                  }
+                />
+
+                {reportError && (
+                  <p
+                    style={
+                      styles.modalError
+                    }
+                  >
+                    {reportError}
+                  </p>
+                )}
+
+                <div
+                  style={
+                    styles.modalActions
+                  }
+                >
+                  <button
+                    type="button"
+                    style={
+                      styles.modalBtnCancel
+                    }
+                    onClick={
+                      closeReport
+                    }
+                    disabled={
+                      reportLoading
+                    }
+                  >
+                    Annuler
+                  </button>
+
+                  <button
+                    type="button"
+                    style={
+                      styles.modalBtnDanger
+                    }
+                    onClick={
+                      submitReport
+                    }
+                    disabled={
+                      reportLoading
+                    }
+                  >
+                    {reportLoading
+                      ? 'Envoi...'
+                      : 'Signaler'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p
+                  style={
+                    styles.reportSuccess
+                  }
+                >
+                  ✓ Signalement envoyé.
+                </p>
+
+                <button
+                  type="button"
+                  style={
+                    styles.modalBtnCancel
+                  }
+                  onClick={
+                    closeReport
+                  }
+                >
+                  Fermer
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {spamWarning && (
         <div
@@ -2123,6 +2896,228 @@ const styles = {
       'rgba(255,255,255,0.4)',
     marginTop: '4px',
     marginBottom: 0
+  },
+
+
+  editContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '7px',
+    minWidth: '190px'
+  },
+
+  editInput: {
+    width: '100%',
+    boxSizing: 'border-box',
+    minHeight: '58px',
+    resize: 'vertical',
+    padding: '8px',
+    borderRadius: '8px',
+    border:
+      '1px solid var(--border)',
+    background:
+      'var(--bg-secondary)',
+    color:
+      'var(--text-primary)',
+    outline: 'none',
+    fontSize: '14px',
+    fontFamily:
+      'inherit'
+  },
+
+  editActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '6px'
+  },
+
+  editBtn: {
+    border: 0,
+    borderRadius: '7px',
+    padding: '5px 9px',
+    background:
+      'var(--accent)',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: '700'
+  },
+
+  cancelBtn: {
+    border:
+      '1px solid var(--border)',
+    borderRadius: '7px',
+    padding: '5px 9px',
+    background:
+      'var(--bg-tertiary)',
+    color:
+      'var(--text-primary)',
+    cursor: 'pointer'
+  },
+
+  contextMenu: {
+    position: 'fixed',
+    width: '160px',
+    background:
+      'var(--bg-secondary)',
+    border:
+      '1px solid var(--border)',
+    borderRadius: '10px',
+    boxShadow:
+      'var(--shadow)',
+    padding: '5px',
+    zIndex: 1000
+  },
+
+  contextItem: {
+    width: '100%',
+    border: 0,
+    background:
+      'transparent',
+    color:
+      'var(--text-primary)',
+    borderRadius: '7px',
+    padding: '9px 10px',
+    textAlign: 'left',
+    cursor: 'pointer',
+    fontSize: '13px'
+  },
+
+  contextItemDanger: {
+    width: '100%',
+    border: 0,
+    background:
+      'transparent',
+    color:
+      'var(--danger)',
+    borderRadius: '7px',
+    padding: '9px 10px',
+    textAlign: 'left',
+    cursor: 'pointer',
+    fontSize: '13px'
+  },
+
+  modalOverlay: {
+    position: 'fixed',
+    inset: 0,
+    background:
+      'rgba(0,0,0,0.55)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
+    zIndex: 1100
+  },
+
+  modal: {
+    width: '100%',
+    maxWidth: '430px',
+    boxSizing: 'border-box',
+    background:
+      'var(--bg-secondary)',
+    border:
+      '1px solid var(--border)',
+    borderRadius: '14px',
+    padding: '20px',
+    boxShadow:
+      'var(--shadow)'
+  },
+
+  modalTitle: {
+    margin:
+      '0 0 8px',
+    color:
+      'var(--text-primary)',
+    fontSize: '18px'
+  },
+
+  modalDesc: {
+    margin:
+      '0 0 12px',
+    color:
+      'var(--text-muted)',
+    fontSize: '13px',
+    lineHeight: '1.45'
+  },
+
+  reportedContent: {
+    padding: '10px',
+    borderRadius: '8px',
+    background:
+      'var(--bg-tertiary)',
+    color:
+      'var(--text-primary)',
+    fontSize: '13px',
+    whiteSpace: 'pre-wrap',
+    overflowWrap: 'anywhere',
+    maxHeight: '150px',
+    overflowY: 'auto',
+    marginBottom: '10px'
+  },
+
+  reportTextarea: {
+    width: '100%',
+    boxSizing: 'border-box',
+    minHeight: '90px',
+    resize: 'vertical',
+    padding: '10px',
+    borderRadius: '8px',
+    border:
+      '1px solid var(--border)',
+    background:
+      'var(--bg-tertiary)',
+    color:
+      'var(--text-primary)',
+    outline: 'none',
+    fontSize: '13px',
+    fontFamily:
+      'inherit'
+  },
+
+  modalActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '8px',
+    marginTop: '12px'
+  },
+
+  modalBtnDanger: {
+    border: 0,
+    borderRadius: '8px',
+    padding: '9px 13px',
+    background:
+      'var(--danger)',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: '600'
+  },
+
+  modalBtnCancel: {
+    border:
+      '1px solid var(--border)',
+    borderRadius: '8px',
+    padding: '9px 13px',
+    background:
+      'var(--bg-tertiary)',
+    color:
+      'var(--text-primary)',
+    cursor: 'pointer'
+  },
+
+  modalError: {
+    color:
+      'var(--danger)',
+    fontSize: '12px',
+    margin:
+      '8px 0 0'
+  },
+
+  reportSuccess: {
+    color:
+      'var(--text-primary)',
+    fontSize: '14px',
+    lineHeight: '1.5',
+    margin:
+      '0 0 16px'
   },
 
   spamAlert: {
