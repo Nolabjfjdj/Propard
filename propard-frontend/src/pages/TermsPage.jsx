@@ -93,6 +93,24 @@ export default function TermsPage() {
           </p>
 
           <p style={styles.text}>
+            Les clés privées nécessaires au fonctionnement du chiffrement sont générées
+            et utilisées côté client. Elles ne sont pas transmises au serveur en clair.
+            Afin de permettre la récupération de l'identité E2EE sur un autre navigateur
+            ou appareil, Propard peut également stocker une sauvegarde chiffrée de la
+            clé privée. Cette sauvegarde est chiffrée côté client avant sa transmission
+            au serveur et n'est pas accompagnée du mot de passe permettant de la
+            déchiffrer.
+          </p>
+
+          <p style={styles.text}>
+            Cette sauvegarde permet notamment de retrouver la même identité
+            cryptographique lors d'une nouvelle connexion sur un autre navigateur
+            ou appareil, lorsque les informations nécessaires à sa récupération sont
+            disponibles. Propard ne reçoit pas le mot de passe utilisé pour protéger
+            cette sauvegarde.
+          </p>
+
+          <p style={styles.text}>
             Les utilisateurs restent responsables de l'utilisation qu'ils font du service
             et doivent respecter les présentes CGU ainsi que les lois et règlements
             applicables.
