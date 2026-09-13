@@ -452,6 +452,148 @@ router.patch('/publickey', authMiddleware, async (req, res) => {
   }
 });
 
+/*
+ * ============================================================
+ * SAUVEGARDE E2EE MULTI-APPAREIL
+ * ============================================================
+ *
+ * Le client chiffre sa clé privée avec une clé dérivée du mot de
+ * passe avant de l'envoyer ici. Le serveur ne reçoit donc jamais
+ * la clé privée en clair ni le mot de passe.
+ */
+
+router.get('/keybackup', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id)
+      .select('publicKey e2eeKeyBackup');
+
+    if (!user) {
+      return res.status(404).json({
+        error: 'Utilisateur introuvable'
+      });
+    }
+
+    const backup = user.e2eeKeyBackup;
+
+    res.json({
+      publicKey: user.publicKey || null,
+      backup: backup?.ciphertext
+        ? {
+            version: backup.version,
+            iterations: backup.iterations,
+            salt: backup.salt,
+            iv: backup.iv,
+            ciphertext: backup.ciphertext
+          }
+        : null
+    });
+  } catch (e) {
+    console.error(
+      'E2EE key backup read error:',
+      e
+    );
+
+    res.status(500).json({
+      error: 'Erreur serveur'
+    });
+  }
+});
+
+router.put('/keybackup', authMiddleware, async (req, res) => {
+  try {
+    const {
+      version,
+      iterations,
+      salt,
+      iv,
+      ciphertext
+    } = req.body || {};
+
+    if (
+      version !== 1 ||
+      !Number.isInteger(iterations) ||
+      iterations < 100000 ||
+      iterations > 2000000 ||
+      typeof salt !== 'string' ||
+      typeof iv !== 'string' ||
+      typeof ciphertext !== 'string'
+    ) {
+      return res.status(400).json({
+        error: 'Sauvegarde E2EE invalide'
+      });
+    }
+
+    if (
+      salt.length > 100 ||
+      iv.length > 100 ||
+      ciphertext.length > 20000
+    ) {
+      return res.status(400).json({
+        error: 'Sauvegarde E2EE trop volumineuse'
+      });
+    }
+
+    /*
+     * Les champs doivent être du Base64 classique. Cela évite
+     * notamment de stocker des données arbitraires dans MongoDB.
+     */
+    const base64Pattern =
+      /^[A-Za-z0-9+/]+={0,2}$/;
+
+    if (
+      !base64Pattern.test(salt) ||
+      !base64Pattern.test(iv) ||
+      !base64Pattern.test(ciphertext)
+    ) {
+      return res.status(400).json({
+        error: 'Format de sauvegarde E2EE invalide'
+      });
+    }
+
+    const user = await User.findById(
+      req.user.id
+    ).select('publicKey');
+
+    if (!user) {
+      return res.status(404).json({
+        error: 'Utilisateur introuvable'
+      });
+    }
+
+    if (!user.publicKey) {
+      return res.status(400).json({
+        error:
+          'Clé publique E2EE absente. Synchronise d’abord ta clé publique.'
+      });
+    }
+
+    user.e2eeKeyBackup = {
+      version,
+      iterations,
+      salt,
+      iv,
+      ciphertext,
+      updatedAt: new Date()
+    };
+
+    await user.save();
+
+    res.json({
+      success: true
+    });
+  } catch (e) {
+    console.error(
+      'E2EE key backup write error:',
+      e
+    );
+
+    res.status(500).json({
+      error: 'Erreur serveur'
+    });
+  }
+});
+
+
 router.delete('/anonymize', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
