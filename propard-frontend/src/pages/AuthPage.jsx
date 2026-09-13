@@ -50,7 +50,7 @@ export default function AuthPage({ mode }) {
         password
       });
 
-      login(res.data.user, res.data.token);
+      await login(res.data.user, res.data.token, password);
 
       // Mémorise que ce navigateur a déjà utilisé Propard.
       // Cela permet de savoir quelle page afficher après une déconnexion.
