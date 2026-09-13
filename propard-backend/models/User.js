@@ -38,6 +38,41 @@ const userSchema = new mongoose.Schema({
     default: null
   },
 
+  /*
+   * Sauvegarde de la clé privée E2EE chiffrée côté client.
+   * Le serveur ne reçoit jamais le mot de passe ni la clé privée
+   * en clair.
+   */
+  e2eeKeyBackup: {
+    version: {
+      type: Number,
+      default: null
+    },
+    iterations: {
+      type: Number,
+      default: null
+    },
+    salt: {
+      type: String,
+      default: null,
+      maxlength: 100
+    },
+    iv: {
+      type: String,
+      default: null,
+      maxlength: 100
+    },
+    ciphertext: {
+      type: String,
+      default: null,
+      maxlength: 20000
+    },
+    updatedAt: {
+      type: Date,
+      default: null
+    }
+  },
+
   realUsername: {
     type: String,
     default: null
