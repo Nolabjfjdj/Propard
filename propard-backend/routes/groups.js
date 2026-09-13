@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+
 const Group = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
 const User = require('../models/User');
@@ -8,43 +9,49 @@ const authMiddleware = require('../middleware/auth');
 
 router.use(authMiddleware);
 
-/*
- * Retourne le membre correspondant à un utilisateur.
- *
- * Fonctionne aussi bien lorsque m.userId est :
- * - un ObjectId
- * - un document User après populate()
- */
-const memberOf = (group, userId) => {
-  const targetId = userId?.toString();
 
-  if (!targetId || !group?.members) {
+/* =========================
+   HELPERS
+========================= */
+
+const memberOf = (group, userId) => {
+  const targetId =
+    userId?.toString();
+
+  if (
+    !targetId ||
+    !group?.members
+  ) {
     return null;
   }
 
-  return group.members.find(member => {
-    const memberId =
-      member.userId?._id ||
-      member.userId;
+  return group.members.find(
+    member => {
+      const memberId =
+        member.userId?._id ||
+        member.userId;
 
-    return (
-      memberId &&
-      memberId.toString() === targetId
-    );
-  });
+      return (
+        memberId &&
+        memberId.toString() ===
+          targetId
+      );
+    }
+  );
 };
 
+
 const safeMembers = group =>
-  group.members.map(m => {
+  group.members.map(member => {
     const user =
-      m.userId &&
-      typeof m.userId === 'object'
-        ? m.userId
+      member.userId &&
+      typeof member.userId === 'object'
+        ? member.userId
         : null;
 
     const userId =
       user?._id ||
-      m.userId;
+      member.userId;
 
     return {
       _id: userId,
@@ -52,16 +59,13 @@ const safeMembers = group =>
       displayName: user?.displayName,
       avatar: user?.avatar,
       publicKey: user?.publicKey,
-      role: m.role,
-      joinedAt: m.joinedAt,
-      lastReadAt: m.lastReadAt
+      role: member.role,
+      joinedAt: member.joinedAt,
+      lastReadAt: member.lastReadAt
     };
   });
 
-/*
- * Vérifie que les paquets de clés correspondent
- * exactement aux membres du groupe.
- */
+
 const validPackages = (
   packages,
   memberIds,
@@ -75,38 +79,53 @@ const validPackages = (
     return false;
   }
 
-  if (packages.length !== memberIds.size) {
+  if (
+    packages.length !==
+    memberIds.size
+  ) {
     return false;
   }
 
-  const seen = new Set();
+  const seen =
+    new Set();
 
-  for (const p of packages) {
-    if (!p) {
+  for (
+    const packageData of packages
+  ) {
+    if (!packageData) {
       return false;
     }
 
     if (
-      !mongoose.isValidObjectId(p.userId) ||
-      !mongoose.isValidObjectId(p.senderId)
+      !mongoose.isValidObjectId(
+        packageData.userId
+      ) ||
+      !mongoose.isValidObjectId(
+        packageData.senderId
+      )
     ) {
       return false;
     }
 
-    if (p.version !== version) {
+    if (
+      packageData.version !==
+      version
+    ) {
       return false;
     }
 
     if (
-      typeof p.encryptedKey !== 'string' ||
-      !p.encryptedKey.length ||
-      p.encryptedKey.length > 10000
+      typeof packageData.encryptedKey !==
+        'string' ||
+      !packageData.encryptedKey.length ||
+      packageData.encryptedKey.length >
+        10000
     ) {
       return false;
     }
 
     const userId =
-      p.userId.toString();
+      packageData.userId.toString();
 
     if (seen.has(userId)) {
       return false;
@@ -126,64 +145,117 @@ const validPackages = (
 };
 
 
+const getIo = req =>
+  req.app.get('io');
+
+
+const getEmitToUser = req =>
+  req.app.get('emitToUser');
+
+
+const emitGroupEvent = (
+  req,
+  group,
+  event,
+  payload
+) => {
+  const io =
+    getIo(req);
+
+  const emitToUser =
+    getEmitToUser(req);
+
+  if (!io || !emitToUser) {
+    return;
+  }
+
+  for (
+    const member of group.members
+  ) {
+    const memberId =
+      member.userId?._id ||
+      member.userId;
+
+    if (!memberId) {
+      continue;
+    }
+
+    emitToUser(
+      io,
+      memberId.toString(),
+      event,
+      payload
+    );
+  }
+};
+
+
 /* =========================
    LISTE DES GROUPES
 ========================= */
 
-router.get('/', async (req, res) => {
-  try {
-    const groups =
-      await Group.find({
-        'members.userId': req.user.id
-      })
-        .sort({
-          lastMessageAt: -1,
-          createdAt: -1
-        })
-        .populate(
-          'members.userId',
-          'username displayName avatar publicKey'
-        );
-
-    const result =
-      groups.map(g => {
-        const me =
-          memberOf(
-            g,
+router.get(
+  '/',
+  async (req, res) => {
+    try {
+      const groups =
+        await Group.find({
+          'members.userId':
             req.user.id
+        })
+          .sort({
+            lastMessageAt: -1,
+            createdAt: -1
+          })
+          .populate(
+            'members.userId',
+            'username displayName avatar publicKey'
           );
 
-        const obj =
-          g.toObject();
+      const result =
+        groups.map(group => {
+          const me =
+            memberOf(
+              group,
+              req.user.id
+            );
 
-        obj.members =
-          safeMembers(g);
+          const obj =
+            group.toObject();
 
-        obj.memberCount =
-          g.members.length;
+          obj.members =
+            safeMembers(group);
 
-        obj.unreadCount =
-          me?.lastReadAt &&
-          g.lastMessageAt &&
-          g.lastMessageAt >
-            me.lastReadAt
-            ? 1
-            : 0;
+          obj.memberCount =
+            group.members.length;
 
-        delete obj.keyPackages;
+          obj.unreadCount =
+            me?.lastReadAt &&
+            group.lastMessageAt &&
+            group.lastMessageAt >
+              me.lastReadAt
+              ? 1
+              : 0;
 
-        return obj;
+          delete obj.keyPackages;
+
+          return obj;
+        });
+
+      res.json(result);
+    } catch (e) {
+      console.error(
+        'Group list error:',
+        e
+      );
+
+      res.status(500).json({
+        error:
+          'Erreur serveur'
       });
-
-    res.json(result);
-  } catch (e) {
-    console.error(e);
-
-    res.status(500).json({
-      error: 'Erreur serveur'
-    });
+    }
   }
-});
+);
 
 
 /* =========================
@@ -226,10 +298,6 @@ router.post(
         });
       }
 
-      /*
-       * Le créateur est automatiquement
-       * ajouté aux membres.
-       */
       const uniqueIds = [
         ...new Set([
           req.user.id.toString(),
@@ -242,7 +310,9 @@ router.post(
       if (
         uniqueIds.some(
           id =>
-            !mongoose.isValidObjectId(id)
+            !mongoose.isValidObjectId(
+              id
+            )
         )
       ) {
         return res.status(400).json({
@@ -276,10 +346,6 @@ router.post(
           )
         );
 
-      /*
-       * Tous les membres sélectionnés
-       * doivent être des amis.
-       */
       for (
         const id of uniqueIds.slice(1)
       ) {
@@ -295,7 +361,8 @@ router.post(
         if (
           (me.blockedUsers || []).some(
             blockedId =>
-              blockedId.toString() === id
+              blockedId.toString() ===
+              id
           )
         ) {
           return res.status(403).json({
@@ -305,11 +372,6 @@ router.post(
         }
       }
 
-      /*
-       * Les keyPackages doivent contenir
-       * exactement un paquet pour chaque membre,
-       * y compris le créateur.
-       */
       const memberIdSet =
         new Set(uniqueIds);
 
@@ -326,14 +388,10 @@ router.post(
         });
       }
 
-      /*
-       * Tous les paquets doivent avoir
-       * été chiffrés par le créateur.
-       */
       if (
         keyPackages.some(
-          p =>
-            p.senderId.toString() !==
+          packageData =>
+            packageData.senderId.toString() !==
             req.user.id.toString()
         )
       ) {
@@ -379,32 +437,15 @@ router.post(
         });
       }
 
-      const io =
-        req.app.get('io');
-
-      const emitToUser =
-        req.app.get(
-          'emitToUser'
-        );
-
-      for (
-        const member of
-        populated.members
-      ) {
-        const memberId =
-          member.userId?._id ||
-          member.userId;
-
-        emitToUser(
-          io,
-          memberId.toString(),
-          'groupUpdated',
-          {
-            groupId:
-              group._id.toString()
-          }
-        );
-      }
+      emitGroupEvent(
+        req,
+        populated,
+        'groupUpdated',
+        {
+          groupId:
+            group._id.toString()
+        }
+      );
 
       res.status(201).json({
         ...populated.toObject(),
@@ -417,8 +458,8 @@ router.post(
 
         keyPackage:
           populated.keyPackages.find(
-            p =>
-              p.userId.toString() ===
+            packageData =>
+              packageData.userId.toString() ===
               req.user.id.toString()
           )
       });
@@ -495,8 +536,8 @@ router.get(
 
       obj.keyPackage =
         group.keyPackages.find(
-          p =>
-            p.userId.toString() ===
+          packageData =>
+            packageData.userId.toString() ===
             req.user.id.toString()
         ) || null;
 
@@ -504,7 +545,10 @@ router.get(
 
       res.json(obj);
     } catch (e) {
-      console.error(e);
+      console.error(
+        'Get group error:',
+        e
+      );
 
       res.status(500).json({
         error:
@@ -568,7 +612,10 @@ router.get(
 
       res.json(messages);
     } catch (e) {
-      console.error(e);
+      console.error(
+        'Group messages error:',
+        e
+      );
 
       res.status(500).json({
         error:
@@ -587,6 +634,17 @@ router.patch(
   '/:groupId/read',
   async (req, res) => {
     try {
+      if (
+        !mongoose.isValidObjectId(
+          req.params.groupId
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            'ID invalide'
+        });
+      }
+
       const group =
         await Group.findById(
           req.params.groupId
@@ -621,7 +679,10 @@ router.patch(
         success: true
       });
     } catch (e) {
-      console.error(e);
+      console.error(
+        'Group read error:',
+        e
+      );
 
       res.status(500).json({
         error:
@@ -640,6 +701,17 @@ router.patch(
   '/:groupId',
   async (req, res) => {
     try {
+      if (
+        !mongoose.isValidObjectId(
+          req.params.groupId
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            'ID invalide'
+        });
+      }
+
       const group =
         await Group.findById(
           req.params.groupId
@@ -652,21 +724,17 @@ router.patch(
         });
       }
 
-      const me =
-        memberOf(
-          group,
-          req.user.id
-        );
-
+      /*
+       * Seul le propriétaire peut
+       * modifier le groupe.
+       */
       if (
-        !me ||
-        !['owner', 'admin'].includes(
-          me.role
-        )
+        group.owner.toString() !==
+        req.user.id.toString()
       ) {
         return res.status(403).json({
           error:
-            'Droits insuffisants'
+            'Seul le propriétaire peut modifier le groupe.'
         });
       }
 
@@ -676,19 +744,29 @@ router.patch(
       ) {
         if (
           typeof req.body.name !==
-            'string' ||
-          !req.body.name.trim() ||
-          req.body.name.trim().length >
-            50
+            'string'
         ) {
           return res.status(400).json({
             error:
-              'Nom invalide'
+              'Nom de groupe invalide'
+          });
+        }
+
+        const cleanName =
+          req.body.name.trim();
+
+        if (
+          !cleanName ||
+          cleanName.length > 50
+        ) {
+          return res.status(400).json({
+            error:
+              'Nom de groupe invalide'
           });
         }
 
         group.name =
-          req.body.name.trim();
+          cleanName;
       }
 
       if (
@@ -724,37 +802,315 @@ router.patch(
 
       await group.save();
 
-      const io =
-        req.app.get('io');
-
-      const emitToUser =
-        req.app.get(
-          'emitToUser'
+      const populated =
+        await Group.findById(
+          group._id
+        ).populate(
+          'members.userId',
+          'username displayName avatar publicKey'
         );
 
-      group.members.forEach(
-        member => {
-          const memberId =
-            member.userId?._id ||
-            member.userId;
+      if (!populated) {
+        return res.status(500).json({
+          error:
+            'Impossible de récupérer le groupe après modification.'
+        });
+      }
 
-          emitToUser(
-            io,
-            memberId.toString(),
-            'groupUpdated',
-            {
-              groupId:
-                group._id.toString()
-            }
-          );
+      const obj =
+        populated.toObject();
+
+      obj.members =
+        safeMembers(
+          populated
+        );
+
+      obj.memberCount =
+        populated.members.length;
+
+      obj.keyPackage =
+        populated.keyPackages.find(
+          packageData =>
+            packageData.userId.toString() ===
+            req.user.id.toString()
+        ) || null;
+
+      delete obj.keyPackages;
+
+      emitGroupEvent(
+        req,
+        populated,
+        'groupUpdated',
+        {
+          groupId:
+            populated._id.toString()
         }
       );
 
+      res.json(obj);
+    } catch (e) {
+      console.error(
+        'Group update error:',
+        e
+      );
+
+      res.status(500).json({
+        error:
+          'Erreur serveur'
+      });
+    }
+  }
+);
+
+
+/* =========================
+   RETIRER UN MEMBRE
+========================= */
+
+router.delete(
+  '/:groupId/members/:memberId',
+  async (req, res) => {
+    try {
+      const {
+        groupId,
+        memberId
+      } = req.params;
+
+      if (
+        !mongoose.isValidObjectId(
+          groupId
+        ) ||
+        !mongoose.isValidObjectId(
+          memberId
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            'ID invalide'
+        });
+      }
+
+      const group =
+        await Group.findById(
+          groupId
+        ).populate(
+          'members.userId',
+          'username displayName avatar publicKey'
+        );
+
+      if (!group) {
+        return res.status(404).json({
+          error:
+            'Groupe introuvable'
+        });
+      }
+
+      /*
+       * Seul le propriétaire peut
+       * retirer un membre.
+       */
+      if (
+        group.owner.toString() !==
+        req.user.id.toString()
+      ) {
+        return res.status(403).json({
+          error:
+            'Seul le propriétaire peut retirer un membre.'
+        });
+      }
+
+      /*
+       * Le propriétaire ne peut
+       * pas se retirer lui-même.
+       */
+      if (
+        memberId ===
+        group.owner.toString()
+      ) {
+        return res.status(400).json({
+          error:
+            'Le propriétaire ne peut pas être retiré.'
+        });
+      }
+
+      const targetMember =
+        memberOf(
+          group,
+          memberId
+        );
+
+      if (!targetMember) {
+        return res.status(404).json({
+          error:
+            'Ce membre ne fait pas partie du groupe.'
+        });
+      }
+
+      /*
+       * Membres restants.
+       */
+      const remaining =
+        group.members.filter(
+          member => {
+            const id =
+              member.userId?._id ||
+              member.userId;
+
+            return (
+              id.toString() !==
+              memberId
+            );
+          }
+        );
+
+      const remainingIds =
+        new Set(
+          remaining.map(
+            member => {
+              const id =
+                member.userId?._id ||
+                member.userId;
+
+              return id.toString();
+            }
+          )
+        );
+
+      const nextVersion =
+        group.keyVersion + 1;
+
+      /*
+       * Le propriétaire doit fournir
+       * une nouvelle clé pour tous
+       * les membres restants.
+       */
+      if (
+        !validPackages(
+          req.body?.keyPackages,
+          remainingIds,
+          nextVersion
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            'Rotation de clé invalide.'
+        });
+      }
+
+      /*
+       * Les paquets doivent tous
+       * provenir du propriétaire.
+       */
+      if (
+        req.body.keyPackages.some(
+          packageData =>
+            packageData.senderId.toString() !==
+            req.user.id.toString()
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            'Émetteur de clé invalide.'
+        });
+      }
+
+      /*
+       * Rotation de la clé.
+       */
+      group.members =
+        remaining;
+
+      group.keyVersion =
+        nextVersion;
+
+      group.keyPackages =
+        req.body.keyPackages;
+
+      await group.save();
+
+      /*
+       * Les membres restants rechargent
+       * le groupe et sa nouvelle clé.
+       */
+      emitGroupEvent(
+        req,
+        group,
+        'groupUpdated',
+        {
+          groupId:
+            group._id.toString()
+        }
+      );
+
+      /*
+       * Le membre retiré perd immédiatement
+       * l'accès au groupe.
+       */
+      const io =
+        getIo(req);
+
+      const emitToUser =
+        getEmitToUser(req);
+
+      if (
+        io &&
+        emitToUser
+      ) {
+        emitToUser(
+          io,
+          memberId,
+          'groupDeleted',
+          {
+            groupId:
+              group._id.toString()
+          }
+        );
+      }
+
+      const populated =
+        await Group.findById(
+          group._id
+        ).populate(
+          'members.userId',
+          'username displayName avatar publicKey'
+        );
+
+      if (!populated) {
+        return res.status(500).json({
+          error:
+            'Groupe modifié mais impossible de le récupérer.'
+        });
+      }
+
+      const obj =
+        populated.toObject();
+
+      obj.members =
+        safeMembers(
+          populated
+        );
+
+      obj.memberCount =
+        populated.members.length;
+
+      obj.keyPackage =
+        populated.keyPackages.find(
+          packageData =>
+            packageData.userId.toString() ===
+            req.user.id.toString()
+        ) || null;
+
+      delete obj.keyPackages;
+
       res.json({
-        success: true
+        success: true,
+        group: obj
       });
     } catch (e) {
-      console.error(e);
+      console.error(
+        'Remove group member error:',
+        e
+      );
 
       res.status(500).json({
         error:
@@ -773,6 +1129,17 @@ router.delete(
   '/:groupId',
   async (req, res) => {
     try {
+      if (
+        !mongoose.isValidObjectId(
+          req.params.groupId
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            'ID invalide'
+        });
+      }
+
       const group =
         await Group.findById(
           req.params.groupId
@@ -802,41 +1169,52 @@ router.delete(
 
       const memberIds =
         group.members.map(
-          member =>
-            (
+          member => {
+            const id =
               member.userId?._id ||
-              member.userId
-            ).toString()
+              member.userId;
+
+            return id.toString();
+          }
         );
+
+      const groupId =
+        group._id.toString();
 
       await group.deleteOne();
 
       const io =
-        req.app.get('io');
+        getIo(req);
 
       const emitToUser =
-        req.app.get(
-          'emitToUser'
-        );
+        getEmitToUser(req);
 
-      memberIds.forEach(
-        memberId =>
-          emitToUser(
-            io,
-            memberId,
-            'groupDeleted',
-            {
-              groupId:
-                group._id.toString()
-            }
-          )
-      );
+      if (
+        io &&
+        emitToUser
+      ) {
+        memberIds.forEach(
+          memberId => {
+            emitToUser(
+              io,
+              memberId,
+              'groupDeleted',
+              {
+                groupId
+              }
+            );
+          }
+        );
+      }
 
       res.json({
         success: true
       });
     } catch (e) {
-      console.error(e);
+      console.error(
+        'Group deletion error:',
+        e
+      );
 
       res.status(500).json({
         error:
@@ -855,6 +1233,17 @@ router.post(
   '/:groupId/leave',
   async (req, res) => {
     try {
+      if (
+        !mongoose.isValidObjectId(
+          req.params.groupId
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            'ID invalide'
+        });
+      }
+
       const group =
         await Group.findById(
           req.params.groupId
@@ -909,13 +1298,15 @@ router.post(
 
       const remainingIds =
         new Set(
-          remaining.map(member => {
-            const memberId =
-              member.userId?._id ||
-              member.userId;
+          remaining.map(
+            member => {
+              const memberId =
+                member.userId?._id ||
+                member.userId;
 
-            return memberId.toString();
-          })
+              return memberId.toString();
+            }
+          )
         );
 
       const nextVersion =
@@ -923,7 +1314,7 @@ router.post(
 
       if (
         !validPackages(
-          req.body.keyPackages,
+          req.body?.keyPackages,
           remainingIds,
           nextVersion
         )
@@ -945,47 +1336,45 @@ router.post(
 
       await group.save();
 
-      const io =
-        req.app.get('io');
-
-      const emitToUser =
-        req.app.get(
-          'emitToUser'
-        );
-
-      remaining.forEach(
-        member => {
-          const memberId =
-            member.userId?._id ||
-            member.userId;
-
-          emitToUser(
-            io,
-            memberId.toString(),
-            'groupUpdated',
-            {
-              groupId:
-                group._id.toString()
-            }
-          );
-        }
-      );
-
-      emitToUser(
-        io,
-        req.user.id.toString(),
-        'groupDeleted',
+      emitGroupEvent(
+        req,
+        group,
+        'groupUpdated',
         {
           groupId:
             group._id.toString()
         }
       );
 
+      const io =
+        getIo(req);
+
+      const emitToUser =
+        getEmitToUser(req);
+
+      if (
+        io &&
+        emitToUser
+      ) {
+        emitToUser(
+          io,
+          req.user.id.toString(),
+          'groupDeleted',
+          {
+            groupId:
+              group._id.toString()
+          }
+        );
+      }
+
       res.json({
         success: true
       });
     } catch (e) {
-      console.error(e);
+      console.error(
+        'Group leave error:',
+        e
+      );
 
       res.status(500).json({
         error:
@@ -994,5 +1383,6 @@ router.post(
     }
   }
 );
+
 
 module.exports = router;
