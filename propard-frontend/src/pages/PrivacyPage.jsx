@@ -78,6 +78,11 @@ export default function PrivacyPage() {
               chiffrement de bout en bout des communications
             </li>
             <li>
+              Une sauvegarde chiffrée côté client de la clé privée E2EE,
+              lorsqu'elle est créée pour permettre la récupération de l'identité
+              cryptographique sur un autre navigateur ou appareil
+            </li>
+            <li>
               Les informations nécessaires au fonctionnement de la messagerie
             </li>
             <li>
@@ -135,8 +140,12 @@ export default function PrivacyPage() {
               par l'utilisateur.
             </li>
             <li>
-              <strong>Chiffrement et gestion des clés publiques :</strong>
-              exécution du contrat et sécurité des communications.
+              <strong>Chiffrement et gestion des clés cryptographiques :</strong>
+              exécution du contrat et sécurité des communications. Propard
+              conserve notamment la clé publique nécessaire aux échanges
+              chiffrés ainsi qu'une sauvegarde chiffrée de la clé privée lorsque
+              cette sauvegarde est utilisée pour permettre la récupération de
+              l'identité E2EE sur un autre navigateur ou appareil.
             </li>
             <li>
               <strong>
@@ -181,19 +190,58 @@ export default function PrivacyPage() {
           </p>
 
           <p style={styles.text}>
-            La clé privée nécessaire au déchiffrement est conservée localement
-            sur l'appareil de l'utilisateur et n'est pas transmise au serveur
-            dans le fonctionnement normal du système.
+            La paire de clés cryptographiques utilisée pour l'identité E2EE est
+            générée côté client. La clé privée est conservée localement sur
+            l'appareil dans le stockage du navigateur et n'est pas transmise
+            au serveur en clair dans le fonctionnement normal du système.
           </p>
 
           <p style={styles.text}>
-            Propard ne dispose donc normalement pas de la clé privée permettant
-            de déchiffrer les messages privés stockés sur ses serveurs.
+            Afin de permettre la récupération de la même identité E2EE sur un
+            autre navigateur ou appareil, Propard peut également conserver une
+            sauvegarde chiffrée de la clé privée.
           </p>
 
           <p style={styles.text}>
-            La perte de la clé privée peut rendre définitivement inaccessible le
-            contenu de certains messages chiffrés.
+            Cette sauvegarde est chiffrée côté client avant d'être transmise au
+            serveur. Le chiffrement de la sauvegarde utilise une clé dérivée du
+            mot de passe du compte à l'aide d'un mécanisme de dérivation de clé,
+            puis un chiffrement authentifié. Le mot de passe lui-même et la clé
+            privée en clair ne sont pas transmis à Propard dans le cadre de ce
+            mécanisme.
+          </p>
+
+          <p style={styles.text}>
+            La sauvegarde chiffrée est stockée avec les paramètres cryptographiques
+            nécessaires à sa tentative de déchiffrement, tels que le sel, le
+            vecteur d'initialisation, le nombre d'itérations et le contenu
+            chiffré. Ces éléments seuls ne permettent normalement pas de
+            reconstituer la clé privée sans le secret nécessaire à la dérivation
+            de la clé de sauvegarde.
+          </p>
+
+          <p style={styles.text}>
+            Lorsqu'un utilisateur se reconnecte sur un autre navigateur ou
+            appareil et fournit son mot de passe, le client peut récupérer cette
+            sauvegarde et tenter de restaurer la même clé privée E2EE. Cela
+            permet d'éviter qu'une nouvelle clé cryptographique soit créée
+            automatiquement et rende les anciens messages chiffrés
+            inaccessibles.
+          </p>
+
+          <p style={styles.text}>
+            Si la sauvegarde chiffrée est absente, invalide ou impossible à
+            déchiffrer, la récupération de l'identité E2EE peut rester
+            impossible. La suppression ou la perte de toutes les copies
+            disponibles de la clé privée peut notamment rendre définitivement
+            inaccessible le contenu de certains messages chiffrés.
+          </p>
+
+          <p style={styles.text}>
+            Propard ne dispose normalement pas de la clé privée en clair
+            permettant de déchiffrer les messages privés. La présence d'une
+            sauvegarde chiffrée côté serveur ne signifie donc pas que Propard
+            possède directement la clé privée utilisable en clair.
           </p>
 
           <p style={styles.text}>
@@ -303,6 +351,12 @@ export default function PrivacyPage() {
           </ul>
 
           <p style={styles.text}>
+            Les sauvegardes chiffrées de clés E2EE sont stockées dans la base de
+            données de Propard lorsqu'elles sont utilisées par le service. Elles
+            sont transmises sous une forme chiffrée depuis le client.
+          </p>
+
+          <p style={styles.text}>
             Les signalements sont enregistrés directement dans la base de données
             utilisée par Propard et ne sont pas transmis à un service tiers de
             messagerie ou de notification pour leur traitement.
@@ -352,6 +406,13 @@ export default function PrivacyPage() {
               fonctionnement de la messagerie, jusqu'à leur suppression ou
               jusqu'à la suppression définitive du compte, sous réserve des
               obligations légales applicables.
+            </li>
+            <li>
+              <strong>Clé publique et sauvegarde E2EE :</strong> pendant la
+              durée nécessaire au fonctionnement du chiffrement, à la
+              récupération de l'identité E2EE et à la fourniture des
+              fonctionnalités associées, sous réserve des obligations légales
+              applicables. La sauvegarde est conservée sous forme chiffrée.
             </li>
             <li>
               <strong>Signalements :</strong> pendant la durée nécessaire à leur
@@ -508,6 +569,27 @@ export default function PrivacyPage() {
           </p>
 
           <p style={styles.text}>
+            Le stockage local peut également contenir la clé privée E2EE
+            nécessaire au fonctionnement des communications chiffrées sur
+            l'appareil. Cette clé privée n'est pas transmise au serveur en clair.
+          </p>
+
+          <p style={styles.text}>
+            En complément, une sauvegarde chiffrée de cette clé privée peut être
+            conservée côté serveur afin de permettre sa récupération lors d'une
+            nouvelle connexion sur un autre navigateur ou appareil. Cette
+            sauvegarde est chiffrée côté client et ne contient pas le mot de
+            passe utilisé pour la protéger.
+          </p>
+
+          <p style={styles.text}>
+            La suppression du stockage local peut donc supprimer la copie locale
+            de la clé privée. Lorsque la sauvegarde E2EE correspondante est
+            toujours disponible, le client peut tenter de restaurer cette clé
+            lors d'une nouvelle connexion avec le mot de passe du compte.
+          </p>
+
+          <p style={styles.text}>
             Ces mécanismes ne sont pas utilisés par Propard pour vendre des
             données personnelles ou réaliser du suivi publicitaire.
           </p>
@@ -539,9 +621,22 @@ export default function PrivacyPage() {
 
           <p style={styles.text}>
             Ces mesures comprennent notamment le hachage des mots de passe,
-            l'utilisation du chiffrement pour les messages privés, des contrôles
-            d'accès, des mécanismes de limitation des requêtes et différentes
-            mesures de sécurité applicative.
+            l'utilisation du chiffrement pour les messages privés, la protection
+            cryptographique des sauvegardes de clés E2EE, des contrôles d'accès,
+            des mécanismes de limitation des requêtes et différentes mesures de
+            sécurité applicative.
+          </p>
+
+          <p style={styles.text}>
+            La sauvegarde de clé E2EE est chiffrée côté client avant son stockage
+            sur le serveur. Propard ne reçoit pas le mot de passe utilisé pour
+            dériver la clé permettant de déchiffrer cette sauvegarde.
+          </p>
+
+          <p style={styles.text}>
+            L'implémentation du chiffrement constitue une mesure technique de
+            protection des communications. Elle n'est pas présentée comme ayant
+            fait l'objet d'un audit cryptographique professionnel indépendant.
           </p>
 
           <p style={styles.text}>
