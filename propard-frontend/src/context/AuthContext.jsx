@@ -170,12 +170,27 @@ const ensureEncryptionKeys = async (
         const restoredPublicKey =
           publicKeyFromPrivateJwk(restoredPrivateKey);
 
+        /*
+         * La sauvegarde est la source de vérité pour l'identité E2EE.
+         * Si la clé publique actuellement enregistrée sur le serveur est
+         * différente (par exemple parce qu'un ancien navigateur a généré
+         * une mauvaise paire), on la remplace par la clé publique dérivée
+         * de la clé privée restaurée. Cela ne modifie aucun message existant.
+         */
         if (
-          serverPub &&
+          !serverPub ||
           !samePublicKey(restoredPublicKey, serverPub)
         ) {
-          throw new Error(
-            'La sauvegarde E2EE ne correspond pas à la clé publique du compte.'
+          await axios.patch(
+            '/api/auth/publickey',
+            {
+              publicKey: JSON.stringify(restoredPublicKey)
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${authToken}`
+              }
+            }
           );
         }
 
