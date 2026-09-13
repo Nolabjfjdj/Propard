@@ -190,6 +190,11 @@ app.use(
   require('./routes/reports')
 );
 
+app.use(
+  '/api/groups',
+  require('./routes/groups')
+);
+
 app.get(
   '/health',
   (req,res)=>
@@ -204,6 +209,12 @@ const Message =
 
 const User =
   require('./models/User');
+
+const Group =
+  require('./models/Group');
+
+const GroupMessage =
+  require('./models/GroupMessage');
 
 async function areFriends(
   userId,
@@ -448,6 +459,129 @@ io.on(
             {
               message:
                 'Impossible d’envoyer le message.'
+            }
+          );
+        }
+      }
+    );
+
+    // ─────────────────────────────────────
+    // MESSAGES DE GROUPE
+    // ─────────────────────────────────────
+
+    socket.on(
+      'sendGroupMessage',
+      async ({
+        groupId,
+        content
+      })=>{
+        try{
+          if(!socket.userId) return;
+
+          if(
+            !mongoose.isValidObjectId(groupId) ||
+            typeof content !== 'string' ||
+            !content.trim()
+          ){
+            return socket.emit(
+              'groupMessageError',
+              {message:'Message de groupe invalide.'}
+            );
+          }
+
+          let encrypted;
+          try {
+            encrypted=JSON.parse(content);
+          } catch {
+            return socket.emit(
+              'groupMessageError',
+              {message:'Message chiffré invalide.'}
+            );
+          }
+
+          if(
+            !encrypted ||
+            encrypted.v!==1 ||
+            typeof encrypted.iv!=='string' ||
+            typeof encrypted.ct!=='string'
+          ){
+            return socket.emit(
+              'groupMessageError',
+              {message:'Message chiffré invalide.'}
+            );
+          }
+
+          const group=await Group.findOne({
+            _id:groupId,
+            'members.userId':socket.userId
+          });
+
+          if(!group){
+            return socket.emit(
+              'groupMessageError',
+              {message:'Tu ne fais pas partie de ce groupe.'}
+            );
+          }
+
+          const now=Date.now();
+          const last=lastMessageTimes.get(socket.userId)||0;
+
+          if(now-last<1000){
+            return socket.emit(
+              'spamWarning',
+              {message:'Envoie pas si vite !'}
+            );
+          }
+
+          lastMessageTimes.set(socket.userId,now);
+
+          const message=await GroupMessage.create({
+            group:groupId,
+            sender:socket.userId,
+            content:content.trim(),
+            encrypted:true
+          });
+
+          group.lastMessageAt=message.createdAt;
+          await group.save();
+
+          const sender=await User.findById(socket.userId)
+            .select('username displayName avatar ipAlias');
+
+          const messageData={
+            _id:message._id.toString(),
+            group:groupId.toString(),
+            sender:socket.userId,
+            senderInfo:sender,
+            content:message.content,
+            encrypted:true,
+            createdAt:message.createdAt
+          };
+
+          for(const member of group.members){
+            emitToUser(
+              io,
+              member.userId.toString(),
+              'newGroupMessage',
+              messageData
+            );
+          }
+
+          socket.emit(
+            'groupMessageSent',
+            messageData
+          );
+        }catch(e){
+          console.error(
+            'sendGroupMessage error:',
+            e
+          );
+
+          socket.emit(
+            'groupMessageError',
+            {
+              message:
+                'Impossible d’envoyer le message de groupe.'
             }
           );
         }
