@@ -11,10 +11,9 @@ import {
   generateGroupKey
 } from '../utils/groupCrypto';
 
-import {
-  getStoredPrivateKeyJwk,
-  storePrivateKeyJwk
-} from '../utils/crypto';
+import { 
+  getStoredPrivateKeyJwk
+} from "../utils/crypto";
 
 
 export default function GroupProfile({
