@@ -5,7 +5,7 @@ export default function TermsPage() {
         <a href="/help" style={styles.back}>← Retour</a>
 
         <h1 style={styles.title}>Conditions Générales d'Utilisation</h1>
-        <p style={styles.date}>En vigueur depuis le 12 septembre 2026</p>
+        <p style={styles.date}>En vigueur depuis le 14 septembre 2026</p>
 
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>1. Présentation du service</h2>
@@ -65,14 +65,67 @@ export default function TermsPage() {
           </ul>
 
           <p style={styles.text}>
+            Ces règles s'appliquent également aux groupes, à leurs profils et
+            aux messages qui y sont échangés. Le fait qu'un contenu soit envoyé
+            dans un groupe ne dispense pas son auteur du respect des présentes CGU.
+          </p>
+
+          <p style={styles.text}>
             Tout manquement aux présentes règles peut entraîner la suspension,
             la restriction ou la suppression définitive du compte concerné.
           </p>
         </div>
 
         <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>5. Groupes et messages de groupe</h2>
+
+          <p style={styles.text}>
+            Propard permet aux utilisateurs de créer et de rejoindre des groupes
+            avec certains de leurs amis. Les groupes peuvent comporter un propriétaire,
+            des administrateurs et des membres, selon les fonctionnalités disponibles.
+          </p>
+
+          <p style={styles.text}>
+            Le propriétaire et les administrateurs disposent de certaines possibilités
+            de gestion du groupe, notamment concernant les membres et les paramètres
+            prévus par le service. Les membres doivent respecter les présentes CGU dans
+            les groupes auxquels ils participent.
+          </p>
+
+          <p style={styles.text}>
+            Les messages de groupe sont chiffrés côté client dans le fonctionnement
+            normal du service. Propard stocke le contenu des messages de groupe sous
+            une forme chiffrée et ne reçoit normalement pas leur contenu en clair.
+            Le système utilise des clés de groupe et des paquets de clés chiffrés
+            associés aux membres autorisés.
+          </p>
+
+          <p style={styles.text}>
+            Lorsqu'un membre est retiré d'un groupe, le service peut procéder à une
+            rotation de la clé du groupe afin que les nouveaux messages soient protégés
+            avec une nouvelle version de clé et que le membre retiré ne puisse plus
+            recevoir les nouvelles clés du groupe.
+          </p>
+
+          <p style={styles.text}>
+            Les messages de groupe peuvent être modifiés ou supprimés selon les
+            fonctionnalités disponibles. Une suppression peut conserver certaines
+            informations techniques ou historiques nécessaires au fonctionnement,
+            à la sécurité ou au traitement d'un signalement.
+          </p>
+
+          <p style={styles.text}>
+            Un message de groupe peut être signalé par un utilisateur lorsqu'il estime
+            qu'il contrevient aux présentes CGU ou à la réglementation applicable.
+            Comme pour les messages privés signalés, le contenu fourni volontairement
+            dans le cadre d'un signalement peut être transmis et examiné par Propard
+            lorsque cela est nécessaire au traitement du signalement.
+          </p>
+        </div>
+
+        <div style={styles.section}>
           <h2 style={styles.sectionTitle}>
-            5. Messages privés, chiffrement et signalements
+            6. Messages privés, chiffrement et signalements
           </h2>
 
           <p style={styles.text}>
@@ -144,7 +197,7 @@ export default function TermsPage() {
 
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>
-            6. Contenus des utilisateurs et mesures
+            7. Contenus des utilisateurs et mesures
           </h2>
 
           <p style={styles.text}>
@@ -180,7 +233,7 @@ export default function TermsPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>7. Propriété intellectuelle</h2>
+          <h2 style={styles.sectionTitle}>8. Propriété intellectuelle</h2>
 
           <p style={styles.text}>
             Le nom "Propard", le logo et le code source de la plateforme sont la propriété
@@ -196,7 +249,7 @@ export default function TermsPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>8. Disponibilité du service</h2>
+          <h2 style={styles.sectionTitle}>9. Disponibilité du service</h2>
 
           <p style={styles.text}>
             Propard est fourni sans garantie de disponibilité continue. Des interruptions
@@ -212,7 +265,7 @@ export default function TermsPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>9. Modification des CGU</h2>
+          <h2 style={styles.sectionTitle}>10. Modification des CGU</h2>
 
           <p style={styles.text}>
             Propard se réserve le droit de modifier les présentes CGU afin notamment de
@@ -229,7 +282,7 @@ export default function TermsPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>10. Droit applicable</h2>
+          <h2 style={styles.sectionTitle}>11. Droit applicable</h2>
 
           <p style={styles.text}>
             Les présentes CGU sont soumises au droit français, sous réserve des dispositions
@@ -244,7 +297,7 @@ export default function TermsPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>11. Contact</h2>
+          <h2 style={styles.sectionTitle}>12. Contact</h2>
 
           <p style={styles.text}>
             Pour toute question relative aux présentes CGU :
