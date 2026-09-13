@@ -68,85 +68,10 @@ const ensureEncryptionKeys = async (
     const serverPub = parsePublicKey(serverPublicKey);
 
     /*
-     * CAS 1 — la clé privée existe déjà sur cet appareil.
-     * On la conserve absolument : c'est elle qui permet de déchiffrer
-     * les messages existants. On synchronise sa clé publique et, si
-     * possible, on crée la sauvegarde chiffrée.
-     */
-    if (existingPriv) {
-      const derivedPublicKeyJwk =
-        publicKeyFromPrivateJwk(existingPriv);
-
-      let backup = null;
-
-      if (password) {
-        const backupResponse = await axios.get(
-          '/api/auth/keybackup',
-          {
-            headers: {
-              Authorization: `Bearer ${authToken}`
-            }
-          }
-        );
-
-        backup = backupResponse.data?.backup || null;
-      }
-
-      /*
-       * S'il existe déjà une sauvegarde, elle représente l'identité E2EE
-       * canonique du compte. On vérifie donc que la clé locale correspond.
-       * Cela évite qu'un appareil contenant une autre clé écrase l'identité.
-       *
-       * S'il n'existe PAS encore de sauvegarde, la clé locale est la seule
-       * copie historique connue. Elle devient alors la clé canonique et sa
-       * clé publique peut être resynchronisée sur le serveur. C'est important
-       * pour récupérer un compte ancien dont la clé publique a été remplacée
-       * par erreur sur un autre navigateur avant la migration.
-       */
-      if (backup) {
-        const restoredFromBackup =
-          await decryptPrivateKeyBackup(
-            backup,
-            password
-          );
-
-        const backupPublicKey =
-          publicKeyFromPrivateJwk(restoredFromBackup);
-
-        if (!samePublicKey(derivedPublicKeyJwk, backupPublicKey)) {
-          throw new Error(
-            'La clé E2EE locale ne correspond pas à la sauvegarde du compte.'
-          );
-        }
-      }
-
-      await axios.patch(
-        '/api/auth/publickey',
-        {
-          publicKey: JSON.stringify(derivedPublicKeyJwk)
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`
-          }
-        }
-      );
-
-      if (password && !backup) {
-        await uploadKeyBackup(
-          authToken,
-          existingPriv,
-          password
-        );
-      }
-
-      return;
-    }
-
-    /*
-     * CAS 2 — nouvel appareil.
-     * Si le compte possède une sauvegarde, on restaure EXACTEMENT la
-     * même clé privée. Il ne faut surtout pas en générer une nouvelle.
+     * IMPORTANT : lorsqu'un mot de passe est disponible (connexion
+     * explicite), la sauvegarde serveur est la source de vérité.
+     * Même si un ancien navigateur possède déjà une clé locale différente,
+     * on restaure la clé canonique avant toute synchronisation de publicKey.
      */
     if (password) {
       const backupResponse = await axios.get(
@@ -158,7 +83,7 @@ const ensureEncryptionKeys = async (
         }
       );
 
-      const backup = backupResponse.data?.backup;
+      const backup = backupResponse.data?.backup || null;
 
       if (backup) {
         const restoredPrivateKey =
@@ -171,12 +96,11 @@ const ensureEncryptionKeys = async (
           publicKeyFromPrivateJwk(restoredPrivateKey);
 
         /*
-         * La sauvegarde est la source de vérité pour l'identité E2EE.
-         * Si la clé publique actuellement enregistrée sur le serveur est
-         * différente (par exemple parce qu'un ancien navigateur a généré
-         * une mauvaise paire), on la remplace par la clé publique dérivée
-         * de la clé privée restaurée. Cela ne modifie aucun message existant.
+         * La clé privée restaurée est canonique. On la stocke avant de
+         * synchroniser le serveur, puis on remet exactement sa clé publique.
          */
+        storePrivateKey(userId, restoredPrivateKey);
+
         if (
           !serverPub ||
           !samePublicKey(restoredPublicKey, serverPub)
@@ -194,36 +118,77 @@ const ensureEncryptionKeys = async (
           );
         }
 
-        storePrivateKey(
-          userId,
-          restoredPrivateKey
-        );
-
         console.log(
-          '🔐 Clé E2EE restaurée depuis la sauvegarde chiffrée.'
+          '🔐 Clé E2EE canonique restaurée depuis la sauvegarde.'
         );
 
+        return;
+      }
+
+      /*
+       * Pas de backup : on ne génère jamais une nouvelle clé si une clé
+       * locale ou publique existe déjà, car cela pourrait rendre les anciens
+       * messages indéchiffrables.
+       */
+      if (existingPriv) {
+        const derivedPublicKeyJwk =
+          publicKeyFromPrivateJwk(existingPriv);
+
+        if (
+          !serverPub ||
+          !samePublicKey(derivedPublicKeyJwk, serverPub)
+        ) {
+          await axios.patch(
+            '/api/auth/publickey',
+            {
+              publicKey: JSON.stringify(derivedPublicKeyJwk)
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${authToken}`
+              }
+            }
+          );
+        }
+
+        await uploadKeyBackup(
+          authToken,
+          existingPriv,
+          password
+        );
+
+        return;
+      }
+
+      if (serverPub) {
+        console.warn(
+          '🔐 Aucune sauvegarde E2EE disponible. Aucune nouvelle clé n’a été générée.'
+        );
         return;
       }
     }
 
     /*
-     * CAS 3 — ancien compte sans sauvegarde.
-     * Si le serveur connaît déjà une clé publique, NE JAMAIS en générer
-     * une autre : cela casserait les messages existants. L'utilisateur
-     * doit simplement revenir sur l'ancien appareil pour créer la backup.
+     * Restauration automatique de session (sans mot de passe) :
+     * ne JAMAIS modifier la clé publique du compte à partir d'une clé locale.
+     * Une ancienne clé locale pourrait être obsolète. La synchronisation
+     * canonique se fait lors de la connexion avec le backup + mot de passe.
      */
-    if (serverPub) {
-      console.warn(
-        '🔐 Aucune sauvegarde E2EE disponible sur ce compte. Aucune nouvelle clé n’a été générée.'
-      );
+    if (existingPriv) {
       return;
     }
 
     /*
-     * CAS 4 — compte totalement nouveau sans clé publique.
-     * On génère la première paire de clés puis on sauvegarde la clé privée
-     * chiffrée si le mot de passe est disponible.
+     * Si aucun mot de passe n'est disponible et que le serveur possède déjà
+     * une clé publique, on attend une connexion explicite pour restaurer la
+     * clé privée depuis la sauvegarde.
+     */
+    if (serverPub) {
+      return;
+    }
+
+    /*
+     * Compte totalement nouveau : génération de la première paire.
      */
     const {
       publicKeyJwk,
@@ -247,23 +212,10 @@ const ensureEncryptionKeys = async (
       privateKeyJwk
     );
 
-    if (password) {
-      await uploadKeyBackup(
-        authToken,
-        privateKeyJwk,
-        password
-      );
-    }
-
     console.log(
       '🔐 Clés E2EE générées avec succès'
     );
   } catch (err) {
-    /*
-     * Les erreurs cryptographiques doivent remonter lorsque l'utilisateur
-     * vient de se connecter : sinon il pourrait entrer sur un nouvel appareil
-     * avec une clé incorrecte et casser silencieusement son identité E2EE.
-     */
     if (err.response?.status === 401) {
       console.warn(
         '🔐 Session expirée pendant la synchronisation E2EE.'
@@ -271,12 +223,17 @@ const ensureEncryptionKeys = async (
       return;
     }
 
-    if (password && !err.response) {
+    /*
+     * Une erreur cryptographique pendant une connexion explicite doit être
+     * visible : continuer avec une clé absente ou incorrecte casserait les
+     * anciens messages sans que l'utilisateur le sache.
+     */
+    if (password) {
       throw err;
     }
 
     console.warn(
-      '🔐 Serveur indisponible : synchronisation E2EE reportée.'
+      '🔐 Synchronisation E2EE automatique reportée.'
     );
   }
 };
