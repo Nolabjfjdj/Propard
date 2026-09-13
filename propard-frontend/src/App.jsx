@@ -251,6 +251,23 @@ export default function App() {
     );
   }
 
+  if (path.startsWith('/group/')) {
+    if (!user) {
+      window.history.replaceState({}, '', '/login');
+      return null;
+    }
+
+    const groupId =
+      path.split('/group/')[1];
+
+    return (
+      <>
+        <AppPage initialGroupId={groupId} />
+        <GlobalAnnouncement />
+      </>
+    );
+  }
+
   if (path.startsWith('/profile/')) {
     if (!user) {
       window.history.replaceState({}, '', '/login');
