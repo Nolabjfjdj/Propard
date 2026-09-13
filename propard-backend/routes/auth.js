@@ -541,9 +541,9 @@ router.post('/keybackup', authMiddleware, async (req, res) => {
       success: true
     });
   } catch (e) {
-    console.error(e);
+    console.error('POST /keybackup:', e);
     res.status(500).json({
-      error: 'Erreur serveur'
+      error: 'Impossible d’enregistrer la sauvegarde E2EE'
     });
   }
 });
