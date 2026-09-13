@@ -259,7 +259,7 @@ router.get(
 
 
 /* =========================
-   CRÉATION D'UN GROUPE
+   CRÃATION D'UN GROUPE
 ========================= */
 
 router.post(
@@ -334,7 +334,7 @@ router.post(
       ) {
         return res.status(400).json({
           error:
-            'Clé publique indisponible. Recharge la page puis réessaie.'
+            'ClÃ© publique indisponible. Recharge la page puis rÃ©essaie.'
         });
       }
 
@@ -354,7 +354,7 @@ router.post(
         ) {
           return res.status(403).json({
             error:
-              'Tous les membres doivent être tes amis.'
+              'Tous les membres doivent Ãªtre tes amis.'
           });
         }
 
@@ -367,7 +367,7 @@ router.post(
         ) {
           return res.status(403).json({
             error:
-              'Membre bloqué.'
+              'Membre bloquÃ©.'
           });
         }
       }
@@ -384,7 +384,7 @@ router.post(
       ) {
         return res.status(400).json({
           error:
-            'Paquets de clés invalides.'
+            'Paquets de clÃ©s invalides.'
         });
       }
 
@@ -397,7 +397,7 @@ router.post(
       ) {
         return res.status(400).json({
           error:
-            'Émetteur de clé invalide.'
+            'Ãmetteur de clÃ© invalide.'
         });
       }
 
@@ -433,7 +433,7 @@ router.post(
       if (!populated) {
         return res.status(500).json({
           error:
-            'Groupe créé mais impossible de le récupérer.'
+            'Groupe crÃ©Ã© mais impossible de le rÃ©cupÃ©rer.'
         });
       }
 
@@ -592,7 +592,7 @@ router.get(
       ) {
         return res.status(403).json({
           error:
-            'Accès refusé'
+            'AccÃ¨s refusÃ©'
         });
       }
 
@@ -614,6 +614,278 @@ router.get(
     } catch (e) {
       console.error(
         'Group messages error:',
+        e
+      );
+
+      res.status(500).json({
+        error:
+          'Erreur serveur'
+      });
+    }
+  }
+);
+
+
+
+/* =========================
+   MODIFIER UN MESSAGE
+========================= */
+
+router.patch(
+  '/:groupId/messages/:messageId',
+  async (req, res) => {
+    try {
+      const {
+        groupId,
+        messageId
+      } = req.params;
+
+      if (
+        !mongoose.isValidObjectId(groupId) ||
+        !mongoose.isValidObjectId(messageId)
+      ) {
+        return res.status(400).json({
+          error:
+            'ID invalide'
+        });
+      }
+
+      const group =
+        await Group.findById(
+          groupId
+        );
+
+      if (
+        !group ||
+        !memberOf(
+          group,
+          req.user.id
+        )
+      ) {
+        return res.status(403).json({
+          error:
+            'AccÃ¨s refusÃ©'
+        });
+      }
+
+      const encryptedContent =
+        req.body?.content;
+
+      /*
+       * Le contenu reste chiffrÃ© cÃ´tÃ©
+       * client. Le serveur ne voit donc
+       * jamais le texte en clair.
+       */
+      if (
+        typeof encryptedContent !==
+          'string' ||
+        !encryptedContent.trim() ||
+        encryptedContent.length >
+          20000
+      ) {
+        return res.status(400).json({
+          error:
+            'Contenu du message invalide'
+        });
+      }
+
+      const message =
+        await GroupMessage.findOne({
+          _id:
+            messageId,
+          group:
+            groupId
+        });
+
+      if (!message) {
+        return res.status(404).json({
+          error:
+            'Message introuvable'
+        });
+      }
+
+      if (
+        message.sender.toString() !==
+        req.user.id.toString()
+      ) {
+        return res.status(403).json({
+          error:
+            'Tu ne peux modifier que tes propres messages.'
+        });
+      }
+
+      if (message.deleted) {
+        return res.status(400).json({
+          error:
+            'Ce message a dÃ©jÃ  Ã©tÃ© supprimÃ©.'
+        });
+      }
+
+      message.content =
+        encryptedContent.trim();
+
+      message.edited =
+        true;
+
+      await message.save();
+
+      emitGroupEvent(
+        req,
+        group,
+        'groupMessageEdited',
+        {
+          groupId:
+            groupId.toString(),
+          messageId:
+            messageId.toString(),
+          content:
+            message.content,
+          edited:
+            true
+        }
+      );
+
+      res.json({
+        success:
+          true,
+        message: {
+          _id:
+            message._id,
+          group:
+            message.group,
+          sender:
+            message.sender,
+          content:
+            message.content,
+          edited:
+            message.edited,
+          deleted:
+            message.deleted,
+          createdAt:
+            message.createdAt
+        }
+      });
+    } catch (e) {
+      console.error(
+        'Group message edit error:',
+        e
+      );
+
+      res.status(500).json({
+        error:
+          'Erreur serveur'
+      });
+    }
+  }
+);
+
+
+/* =========================
+   SUPPRIMER UN MESSAGE
+========================= */
+
+router.delete(
+  '/:groupId/messages/:messageId',
+  async (req, res) => {
+    try {
+      const {
+        groupId,
+        messageId
+      } = req.params;
+
+      if (
+        !mongoose.isValidObjectId(groupId) ||
+        !mongoose.isValidObjectId(messageId)
+      ) {
+        return res.status(400).json({
+          error:
+            'ID invalide'
+        });
+      }
+
+      const group =
+        await Group.findById(
+          groupId
+        );
+
+      if (
+        !group ||
+        !memberOf(
+          group,
+          req.user.id
+        )
+      ) {
+        return res.status(403).json({
+          error:
+            'AccÃ¨s refusÃ©'
+        });
+      }
+
+      const message =
+        await GroupMessage.findOne({
+          _id:
+            messageId,
+          group:
+            groupId
+        });
+
+      if (!message) {
+        return res.status(404).json({
+          error:
+            'Message introuvable'
+        });
+      }
+
+      if (
+        message.sender.toString() !==
+        req.user.id.toString()
+      ) {
+        return res.status(403).json({
+          error:
+            'Tu ne peux supprimer que tes propres messages.'
+        });
+      }
+
+      if (message.deleted) {
+        return res.json({
+          success:
+            true
+        });
+      }
+
+      /*
+       * Suppression logique :
+       * le document reste prÃ©sent afin
+       * de conserver la cohÃ©rence des
+       * historiques / signalements.
+       */
+      message.deleted =
+        true;
+
+      message.content =
+        '';
+
+      await message.save();
+
+      emitGroupEvent(
+        req,
+        group,
+        'groupMessageDeleted',
+        {
+          groupId:
+            groupId.toString(),
+          messageId:
+            messageId.toString()
+        }
+      );
+
+      res.json({
+        success:
+          true
+      });
+    } catch (e) {
+      console.error(
+        'Group message delete error:',
         e
       );
 
@@ -666,7 +938,7 @@ router.patch(
       if (!me) {
         return res.status(403).json({
           error:
-            'Accès refusé'
+            'AccÃ¨s refusÃ©'
         });
       }
 
@@ -725,7 +997,7 @@ router.patch(
       }
 
       /*
-       * Seul le propriétaire peut
+       * Seul le propriÃ©taire peut
        * modifier le groupe.
        */
       if (
@@ -734,7 +1006,7 @@ router.patch(
       ) {
         return res.status(403).json({
           error:
-            'Seul le propriétaire peut modifier le groupe.'
+            'Seul le propriÃ©taire peut modifier le groupe.'
         });
       }
 
@@ -813,7 +1085,7 @@ router.patch(
       if (!populated) {
         return res.status(500).json({
           error:
-            'Impossible de récupérer le groupe après modification.'
+            'Impossible de rÃ©cupÃ©rer le groupe aprÃ¨s modification.'
         });
       }
 
@@ -906,7 +1178,7 @@ router.delete(
       }
 
       /*
-       * Seul le propriétaire peut
+       * Seul le propriÃ©taire peut
        * retirer un membre.
        */
       if (
@@ -915,13 +1187,13 @@ router.delete(
       ) {
         return res.status(403).json({
           error:
-            'Seul le propriétaire peut retirer un membre.'
+            'Seul le propriÃ©taire peut retirer un membre.'
         });
       }
 
       /*
-       * Le propriétaire ne peut
-       * pas se retirer lui-même.
+       * Le propriÃ©taire ne peut
+       * pas se retirer lui-mÃªme.
        */
       if (
         memberId ===
@@ -929,7 +1201,7 @@ router.delete(
       ) {
         return res.status(400).json({
           error:
-            'Le propriétaire ne peut pas être retiré.'
+            'Le propriÃ©taire ne peut pas Ãªtre retirÃ©.'
         });
       }
 
@@ -980,8 +1252,8 @@ router.delete(
         group.keyVersion + 1;
 
       /*
-       * Le propriétaire doit fournir
-       * une nouvelle clé pour tous
+       * Le propriÃ©taire doit fournir
+       * une nouvelle clÃ© pour tous
        * les membres restants.
        */
       if (
@@ -993,13 +1265,13 @@ router.delete(
       ) {
         return res.status(400).json({
           error:
-            'Rotation de clé invalide.'
+            'Rotation de clÃ© invalide.'
         });
       }
 
       /*
        * Les paquets doivent tous
-       * provenir du propriétaire.
+       * provenir du propriÃ©taire.
        */
       if (
         req.body.keyPackages.some(
@@ -1010,12 +1282,12 @@ router.delete(
       ) {
         return res.status(400).json({
           error:
-            'Émetteur de clé invalide.'
+            'Ãmetteur de clÃ© invalide.'
         });
       }
 
       /*
-       * Rotation de la clé.
+       * Rotation de la clÃ©.
        */
       group.members =
         remaining;
@@ -1030,7 +1302,7 @@ router.delete(
 
       /*
        * Les membres restants rechargent
-       * le groupe et sa nouvelle clé.
+       * le groupe et sa nouvelle clÃ©.
        */
       emitGroupEvent(
         req,
@@ -1043,8 +1315,8 @@ router.delete(
       );
 
       /*
-       * Le membre retiré perd immédiatement
-       * l'accès au groupe.
+       * Le membre retirÃ© perd immÃ©diatement
+       * l'accÃ¨s au groupe.
        */
       const io =
         getIo(req);
@@ -1078,7 +1350,7 @@ router.delete(
       if (!populated) {
         return res.status(500).json({
           error:
-            'Groupe modifié mais impossible de le récupérer.'
+            'Groupe modifiÃ© mais impossible de le rÃ©cupÃ©rer.'
         });
       }
 
@@ -1158,7 +1430,7 @@ router.delete(
       ) {
         return res.status(403).json({
           error:
-            'Seul le propriétaire peut supprimer le groupe.'
+            'Seul le propriÃ©taire peut supprimer le groupe.'
         });
       }
 
@@ -1278,7 +1550,7 @@ router.post(
       ) {
         return res.status(400).json({
           error:
-            'Le propriétaire doit supprimer le groupe.'
+            'Le propriÃ©taire doit supprimer le groupe.'
         });
       }
 
@@ -1321,7 +1593,7 @@ router.post(
       ) {
         return res.status(400).json({
           error:
-            'Rotation de clé invalide.'
+            'Rotation de clÃ© invalide.'
         });
       }
 
