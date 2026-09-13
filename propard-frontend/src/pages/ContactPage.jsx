@@ -19,7 +19,7 @@ export default function ContactPage() {
       <div style={styles.card}>
         <a href="/help" style={styles.back}>← Retour à l'aide</a>
         <h1 style={styles.title}>Nous contacter</h1>
-        <p style={styles.subtitle}>On te répondra à <strong>propard@outlook.fr</strong></p>
+        <p style={styles.subtitle}>On te répondra à <strong>support@propard.site</strong></p>
         {sent ? (
           <div style={styles.success}>
             ✅ Ton client mail s'est ouvert ! Envoie le mail pour nous contacter.
