@@ -8,22 +8,55 @@ const authMiddleware = require('../middleware/auth');
 
 router.use(authMiddleware);
 
-const memberOf = (group, userId) =>
-  group.members.find(
-    m => m.userId.toString() === userId.toString()
-  );
+/*
+ * Retourne le membre correspondant à un utilisateur.
+ *
+ * Fonctionne aussi bien lorsque m.userId est :
+ * - un ObjectId
+ * - un document User après populate()
+ */
+const memberOf = (group, userId) => {
+  const targetId = userId?.toString();
+
+  if (!targetId || !group?.members) {
+    return null;
+  }
+
+  return group.members.find(member => {
+    const memberId =
+      member.userId?._id ||
+      member.userId;
+
+    return (
+      memberId &&
+      memberId.toString() === targetId
+    );
+  });
+};
 
 const safeMembers = group =>
-  group.members.map(m => ({
-    _id: m.userId._id || m.userId,
-    username: m.userId.username,
-    displayName: m.userId.displayName,
-    avatar: m.userId.avatar,
-    publicKey: m.userId.publicKey,
-    role: m.role,
-    joinedAt: m.joinedAt,
-    lastReadAt: m.lastReadAt
-  }));
+  group.members.map(m => {
+    const user =
+      m.userId &&
+      typeof m.userId === 'object'
+        ? m.userId
+        : null;
+
+    const userId =
+      user?._id ||
+      m.userId;
+
+    return {
+      _id: userId,
+      username: user?.username,
+      displayName: user?.displayName,
+      avatar: user?.avatar,
+      publicKey: user?.publicKey,
+      role: m.role,
+      joinedAt: m.joinedAt,
+      lastReadAt: m.lastReadAt
+    };
+  });
 
 /*
  * Vérifie que les paquets de clés correspondent
@@ -72,7 +105,8 @@ const validPackages = (
       return false;
     }
 
-    const userId = p.userId.toString();
+    const userId =
+      p.userId.toString();
 
     if (seen.has(userId)) {
       return false;
@@ -85,7 +119,10 @@ const validPackages = (
     seen.add(userId);
   }
 
-  return seen.size === memberIds.size;
+  return (
+    seen.size ===
+    memberIds.size
+  );
 };
 
 
@@ -95,42 +132,48 @@ const validPackages = (
 
 router.get('/', async (req, res) => {
   try {
-    const groups = await Group.find({
-      'members.userId': req.user.id
-    })
-      .sort({
-        lastMessageAt: -1,
-        createdAt: -1
+    const groups =
+      await Group.find({
+        'members.userId': req.user.id
       })
-      .populate(
-        'members.userId',
-        'username displayName avatar publicKey'
-      );
+        .sort({
+          lastMessageAt: -1,
+          createdAt: -1
+        })
+        .populate(
+          'members.userId',
+          'username displayName avatar publicKey'
+        );
 
-    const result = groups.map(g => {
-      const me = memberOf(
-        g,
-        req.user.id
-      );
+    const result =
+      groups.map(g => {
+        const me =
+          memberOf(
+            g,
+            req.user.id
+          );
 
-      const obj = g.toObject();
+        const obj =
+          g.toObject();
 
-      obj.members = safeMembers(g);
+        obj.members =
+          safeMembers(g);
 
-      obj.memberCount =
-        g.members.length;
+        obj.memberCount =
+          g.members.length;
 
-      obj.unreadCount =
-        me?.lastReadAt &&
-        g.lastMessageAt &&
-        g.lastMessageAt > me.lastReadAt
-          ? 1
-          : 0;
+        obj.unreadCount =
+          me?.lastReadAt &&
+          g.lastMessageAt &&
+          g.lastMessageAt >
+            me.lastReadAt
+            ? 1
+            : 0;
 
-      delete obj.keyPackages;
+        delete obj.keyPackages;
 
-      return obj;
-    });
+        return obj;
+      });
 
     res.json(result);
   } catch (e) {
@@ -147,219 +190,251 @@ router.get('/', async (req, res) => {
    CRÉATION D'UN GROUPE
 ========================= */
 
-router.post('/create', async (req, res) => {
-  try {
-    const {
-      name,
-      avatar = null,
-      memberIds = [],
-      keyPackages = []
-    } = req.body;
+router.post(
+  '/create',
+  async (req, res) => {
+    try {
+      const {
+        name,
+        avatar = null,
+        memberIds = [],
+        keyPackages = []
+      } = req.body;
 
-    const cleanName =
-      typeof name === 'string'
-        ? name.trim()
-        : '';
+      const cleanName =
+        typeof name === 'string'
+          ? name.trim()
+          : '';
 
-    if (
-      !cleanName ||
-      cleanName.length > 50
-    ) {
-      return res.status(400).json({
-        error: 'Nom de groupe invalide'
-      });
-    }
-
-    if (
-      !Array.isArray(memberIds) ||
-      memberIds.length > 49
-    ) {
-      return res.status(400).json({
-        error: 'Nombre de membres invalide'
-      });
-    }
-
-    /*
-     * Le créateur est automatiquement ajouté
-     * aux membres du groupe.
-     */
-    const uniqueIds = [
-      ...new Set([
-        req.user.id.toString(),
-        ...memberIds.map(String)
-      ])
-    ];
-
-    if (
-      uniqueIds.some(
-        id =>
-          !mongoose.isValidObjectId(id)
-      )
-    ) {
-      return res.status(400).json({
-        error: 'Membre invalide'
-      });
-    }
-
-    const me =
-      await User.findById(
-        req.user.id
-      ).select(
-        'friends blockedUsers publicKey'
-      );
-
-    if (
-      !me ||
-      !me.publicKey
-    ) {
-      return res.status(400).json({
-        error:
-          'Clé publique indisponible. Recharge la page puis réessaie.'
-      });
-    }
-
-    const friendIds = new Set(
-      me.friends.map(
-        f => f.userId.toString()
-      )
-    );
-
-    /*
-     * Tous les membres sélectionnés
-     * doivent être des amis.
-     */
-    for (
-      const id of uniqueIds.slice(1)
-    ) {
-      if (!friendIds.has(id)) {
-        return res.status(403).json({
+      if (
+        !cleanName ||
+        cleanName.length > 50
+      ) {
+        return res.status(400).json({
           error:
-            'Tous les membres doivent être tes amis.'
+            'Nom de groupe invalide'
         });
       }
 
       if (
-        (me.blockedUsers || []).some(
-          b =>
-            b.toString() === id
-        )
+        !Array.isArray(memberIds) ||
+        memberIds.length > 49
       ) {
-        return res.status(403).json({
-          error: 'Membre bloqué.'
+        return res.status(400).json({
+          error:
+            'Nombre de membres invalide'
         });
       }
-    }
 
-    /*
-     * Les keyPackages doivent contenir
-     * exactement un paquet pour chaque membre,
-     * y compris le créateur.
-     */
-    const memberIdSet =
-      new Set(uniqueIds);
+      /*
+       * Le créateur est automatiquement
+       * ajouté aux membres.
+       */
+      const uniqueIds = [
+        ...new Set([
+          req.user.id.toString(),
+          ...memberIds.map(
+            id => id.toString()
+          )
+        ])
+      ];
 
-    if (
-      !validPackages(
-        keyPackages,
-        memberIdSet,
-        1
-      )
-    ) {
-      return res.status(400).json({
-        error:
-          'Paquets de clés invalides.'
-      });
-    }
+      if (
+        uniqueIds.some(
+          id =>
+            !mongoose.isValidObjectId(id)
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            'Membre invalide'
+        });
+      }
 
-    /*
-     * Tous les paquets doivent avoir été
-     * chiffrés par le créateur.
-     */
-    if (
-      keyPackages.some(
-        p =>
-          p.senderId.toString() !==
-          req.user.id.toString()
-      )
-    ) {
-      return res.status(400).json({
-        error:
-          'Émetteur de clé invalide.'
-      });
-    }
+      const me =
+        await User.findById(
+          req.user.id
+        ).select(
+          'friends blockedUsers publicKey'
+        );
 
-    const group =
-      await Group.create({
-        name: cleanName,
-        avatar: avatar || null,
-        owner: req.user.id,
+      if (
+        !me ||
+        !me.publicKey
+      ) {
+        return res.status(400).json({
+          error:
+            'Clé publique indisponible. Recharge la page puis réessaie.'
+        });
+      }
 
-        members: uniqueIds.map(
-          (id, i) => ({
-            userId: id,
-            role:
-              i === 0
-                ? 'owner'
-                : 'member'
-          })
-        ),
+      const friendIds =
+        new Set(
+          (me.friends || []).map(
+            friend =>
+              friend.userId.toString()
+          )
+        );
 
-        keyVersion: 1,
-        keyPackages
-      });
-
-    const populated =
-      await Group.findById(
-        group._id
-      ).populate(
-        'members.userId',
-        'username displayName avatar publicKey'
-      );
-
-    const io =
-      req.app.get('io');
-
-    const emitToUser =
-      req.app.get('emitToUser');
-
-    for (
-      const m of populated.members
-    ) {
-      emitToUser(
-        io,
-        m.userId._id.toString(),
-        'groupUpdated',
-        {
-          groupId:
-            group._id.toString()
+      /*
+       * Tous les membres sélectionnés
+       * doivent être des amis.
+       */
+      for (
+        const id of uniqueIds.slice(1)
+      ) {
+        if (
+          !friendIds.has(id)
+        ) {
+          return res.status(403).json({
+            error:
+              'Tous les membres doivent être tes amis.'
+          });
         }
-      );
-    }
 
-    res.status(201).json({
-      ...populated.toObject(),
+        if (
+          (me.blockedUsers || []).some(
+            blockedId =>
+              blockedId.toString() === id
+          )
+        ) {
+          return res.status(403).json({
+            error:
+              'Membre bloqué.'
+          });
+        }
+      }
 
-      members:
-        safeMembers(populated),
+      /*
+       * Les keyPackages doivent contenir
+       * exactement un paquet pour chaque membre,
+       * y compris le créateur.
+       */
+      const memberIdSet =
+        new Set(uniqueIds);
 
-      memberCount:
-        populated.members.length,
+      if (
+        !validPackages(
+          keyPackages,
+          memberIdSet,
+          1
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            'Paquets de clés invalides.'
+        });
+      }
 
-      keyPackage:
-        populated.keyPackages.find(
+      /*
+       * Tous les paquets doivent avoir
+       * été chiffrés par le créateur.
+       */
+      if (
+        keyPackages.some(
           p =>
-            p.userId.toString() ===
+            p.senderId.toString() !==
             req.user.id.toString()
         )
-    });
-  } catch (e) {
-    console.error(e);
+      ) {
+        return res.status(400).json({
+          error:
+            'Émetteur de clé invalide.'
+        });
+      }
 
-    res.status(500).json({
-      error: 'Erreur serveur'
-    });
+      const group =
+        await Group.create({
+          name: cleanName,
+          avatar: avatar || null,
+          owner: req.user.id,
+
+          members:
+            uniqueIds.map(
+              (id, index) => ({
+                userId: id,
+                role:
+                  index === 0
+                    ? 'owner'
+                    : 'member'
+              })
+            ),
+
+          keyVersion: 1,
+          keyPackages
+        });
+
+      const populated =
+        await Group.findById(
+          group._id
+        ).populate(
+          'members.userId',
+          'username displayName avatar publicKey'
+        );
+
+      if (!populated) {
+        return res.status(500).json({
+          error:
+            'Groupe créé mais impossible de le récupérer.'
+        });
+      }
+
+      const io =
+        req.app.get('io');
+
+      const emitToUser =
+        req.app.get(
+          'emitToUser'
+        );
+
+      for (
+        const member of
+        populated.members
+      ) {
+        const memberId =
+          member.userId?._id ||
+          member.userId;
+
+        emitToUser(
+          io,
+          memberId.toString(),
+          'groupUpdated',
+          {
+            groupId:
+              group._id.toString()
+          }
+        );
+      }
+
+      res.status(201).json({
+        ...populated.toObject(),
+
+        members:
+          safeMembers(populated),
+
+        memberCount:
+          populated.members.length,
+
+        keyPackage:
+          populated.keyPackages.find(
+            p =>
+              p.userId.toString() ===
+              req.user.id.toString()
+          )
+      });
+    } catch (e) {
+      console.error(
+        'Group creation error:',
+        e
+      );
+
+      res.status(500).json({
+        error:
+          'Erreur serveur'
+      });
+    }
   }
-});
+);
 
 
 /* =========================
@@ -376,7 +451,8 @@ router.get(
         )
       ) {
         return res.status(400).json({
-          error: 'ID invalide'
+          error:
+            'ID invalide'
         });
       }
 
@@ -390,7 +466,8 @@ router.get(
 
       if (!group) {
         return res.status(404).json({
-          error: 'Groupe introuvable'
+          error:
+            'Groupe introuvable'
         });
       }
 
@@ -430,7 +507,8 @@ router.get(
       console.error(e);
 
       res.status(500).json({
-        error: 'Erreur serveur'
+        error:
+          'Erreur serveur'
       });
     }
   }
@@ -451,7 +529,8 @@ router.get(
         )
       ) {
         return res.status(400).json({
-          error: 'ID invalide'
+          error:
+            'ID invalide'
         });
       }
 
@@ -468,13 +547,15 @@ router.get(
         )
       ) {
         return res.status(403).json({
-          error: 'Accès refusé'
+          error:
+            'Accès refusé'
         });
       }
 
       const messages =
         await GroupMessage.find({
-          group: group._id
+          group:
+            group._id
         })
           .sort({
             createdAt: 1
@@ -490,7 +571,8 @@ router.get(
       console.error(e);
 
       res.status(500).json({
-        error: 'Erreur serveur'
+        error:
+          'Erreur serveur'
       });
     }
   }
@@ -512,7 +594,8 @@ router.patch(
 
       if (!group) {
         return res.status(404).json({
-          error: 'Groupe introuvable'
+          error:
+            'Groupe introuvable'
         });
       }
 
@@ -524,7 +607,8 @@ router.patch(
 
       if (!me) {
         return res.status(403).json({
-          error: 'Accès refusé'
+          error:
+            'Accès refusé'
         });
       }
 
@@ -540,7 +624,8 @@ router.patch(
       console.error(e);
 
       res.status(500).json({
-        error: 'Erreur serveur'
+        error:
+          'Erreur serveur'
       });
     }
   }
@@ -562,7 +647,8 @@ router.patch(
 
       if (!group) {
         return res.status(404).json({
-          error: 'Groupe introuvable'
+          error:
+            'Groupe introuvable'
         });
       }
 
@@ -579,7 +665,8 @@ router.patch(
         )
       ) {
         return res.status(403).json({
-          error: 'Droits insuffisants'
+          error:
+            'Droits insuffisants'
         });
       }
 
@@ -591,12 +678,12 @@ router.patch(
           typeof req.body.name !==
             'string' ||
           !req.body.name.trim() ||
-          req.body.name
-            .trim()
-            .length > 50
+          req.body.name.trim().length >
+            50
         ) {
           return res.status(400).json({
-            error: 'Nom invalide'
+            error:
+              'Nom invalide'
           });
         }
 
@@ -614,7 +701,8 @@ router.patch(
             'string'
         ) {
           return res.status(400).json({
-            error: 'Avatar invalide'
+            error:
+              'Avatar invalide'
           });
         }
 
@@ -640,19 +728,26 @@ router.patch(
         req.app.get('io');
 
       const emitToUser =
-        req.app.get('emitToUser');
+        req.app.get(
+          'emitToUser'
+        );
 
       group.members.forEach(
-        m =>
+        member => {
+          const memberId =
+            member.userId?._id ||
+            member.userId;
+
           emitToUser(
             io,
-            m.userId.toString(),
+            memberId.toString(),
             'groupUpdated',
             {
               groupId:
                 group._id.toString()
             }
-          )
+          );
+        }
       );
 
       res.json({
@@ -662,7 +757,8 @@ router.patch(
       console.error(e);
 
       res.status(500).json({
-        error: 'Erreur serveur'
+        error:
+          'Erreur serveur'
       });
     }
   }
@@ -684,7 +780,8 @@ router.delete(
 
       if (!group) {
         return res.status(404).json({
-          error: 'Groupe introuvable'
+          error:
+            'Groupe introuvable'
         });
       }
 
@@ -699,8 +796,18 @@ router.delete(
       }
 
       await GroupMessage.deleteMany({
-        group: group._id
+        group:
+          group._id
       });
+
+      const memberIds =
+        group.members.map(
+          member =>
+            (
+              member.userId?._id ||
+              member.userId
+            ).toString()
+        );
 
       await group.deleteOne();
 
@@ -708,13 +815,15 @@ router.delete(
         req.app.get('io');
 
       const emitToUser =
-        req.app.get('emitToUser');
+        req.app.get(
+          'emitToUser'
+        );
 
-      group.members.forEach(
-        m =>
+      memberIds.forEach(
+        memberId =>
           emitToUser(
             io,
-            m.userId.toString(),
+            memberId,
             'groupDeleted',
             {
               groupId:
@@ -730,7 +839,8 @@ router.delete(
       console.error(e);
 
       res.status(500).json({
-        error: 'Erreur serveur'
+        error:
+          'Erreur serveur'
       });
     }
   }
@@ -755,7 +865,8 @@ router.post(
 
       if (!group) {
         return res.status(404).json({
-          error: 'Groupe introuvable'
+          error:
+            'Groupe introuvable'
         });
       }
 
@@ -784,17 +895,27 @@ router.post(
 
       const remaining =
         group.members.filter(
-          m =>
-            m.userId._id.toString() !==
-            req.user.id.toString()
+          member => {
+            const memberId =
+              member.userId?._id ||
+              member.userId;
+
+            return (
+              memberId.toString() !==
+              req.user.id.toString()
+            );
+          }
         );
 
       const remainingIds =
         new Set(
-          remaining.map(
-            m =>
-              m.userId._id.toString()
-          )
+          remaining.map(member => {
+            const memberId =
+              member.userId?._id ||
+              member.userId;
+
+            return memberId.toString();
+          })
         );
 
       const nextVersion =
@@ -828,19 +949,26 @@ router.post(
         req.app.get('io');
 
       const emitToUser =
-        req.app.get('emitToUser');
+        req.app.get(
+          'emitToUser'
+        );
 
       remaining.forEach(
-        m =>
+        member => {
+          const memberId =
+            member.userId?._id ||
+            member.userId;
+
           emitToUser(
             io,
-            m.userId._id.toString(),
+            memberId.toString(),
             'groupUpdated',
             {
               groupId:
                 group._id.toString()
             }
-          )
+          );
+        }
       );
 
       emitToUser(
@@ -860,7 +988,8 @@ router.post(
       console.error(e);
 
       res.status(500).json({
-        error: 'Erreur serveur'
+        error:
+          'Erreur serveur'
       });
     }
   }
