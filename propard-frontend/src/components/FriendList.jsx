@@ -5,7 +5,10 @@ import socket from '../socket';
 export default function FriendList({
   token,
   selectedFriend,
+  selectedGroup,
   onSelectFriend,
+  onSelectGroup,
+  onCreateGroup,
   onOpenProfile,
   hideFriendIps,
   setHideFriendIps,
@@ -16,6 +19,7 @@ export default function FriendList({
   const [requests, setRequests] = useState([]);
   const [requestUsers, setRequestUsers] = useState({});
   const [unread, setUnread] = useState({});
+  const [groups, setGroups] = useState([]);
 
   const notificationAudioRef = useRef(null);
 
@@ -48,6 +52,26 @@ export default function FriendList({
           err
         );
       });
+    }
+  };
+
+  const fetchGroups = async () => {
+    try {
+      const res = await axios.get(
+        '/api/groups',
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      setGroups(res.data || []);
+    } catch (err) {
+      console.error(
+        'Erreur récupération groupes:',
+        err
+      );
     }
   };
 
@@ -120,10 +144,12 @@ export default function FriendList({
   useEffect(() => {
     fetchData();
     fetchUnread();
+    fetchGroups();
 
     const interval = setInterval(() => {
       fetchData();
       fetchUnread();
+      fetchGroups();
     }, 5000);
 
     return () => clearInterval(interval);
@@ -181,6 +207,24 @@ export default function FriendList({
       socket.off('newMessage', handleNew);
     };
   }, [selectedFriend, token]);
+
+  useEffect(() => {
+    const refreshGroups = () => {
+      fetchGroups();
+    };
+
+    socket.on('newGroupMessage', refreshGroups);
+    socket.on('groupUpdated', refreshGroups);
+    socket.on('groupDeleted', refreshGroups);
+    socket.on('groupCreated', refreshGroups);
+
+    return () => {
+      socket.off('newGroupMessage', refreshGroups);
+      socket.off('groupUpdated', refreshGroups);
+      socket.off('groupDeleted', refreshGroups);
+      socket.off('groupCreated', refreshGroups);
+    };
+  }, [token]);
 
   const acceptRequest = async (fromUserId) => {
     try {
@@ -349,6 +393,88 @@ export default function FriendList({
             </div>
           ))}
         </div>
+      )}
+
+      <div style={styles.sectionHeader}>
+        <p style={styles.sectionTitle}>
+          Groupes — {groups.length}
+        </p>
+
+        <button
+          style={styles.hideIpBtn}
+          onClick={() => onCreateGroup?.()}
+          title="Créer un groupe"
+          aria-label="Créer un groupe"
+        >
+          +
+        </button>
+      </div>
+
+      {groups.length === 0 ? (
+        <p style={styles.empty}>
+          Crée ton premier groupe !
+        </p>
+      ) : (
+        groups.map(group => {
+          const groupId = group?._id?.toString();
+          const unreadCount = group?.unreadCount || 0;
+
+          return (
+            <div
+              key={groupId}
+              style={{
+                ...styles.friendItem,
+                background:
+                  selectedGroup?._id?.toString() === groupId
+                    ? 'var(--bg-hover)'
+                    : 'transparent'
+              }}
+              onClick={() => {
+                setGroups(prev =>
+                  prev.map(item =>
+                    item._id?.toString() === groupId
+                      ? { ...item, unreadCount: 0 }
+                      : item
+                  )
+                );
+                onSelectGroup?.(group);
+              }}
+            >
+              <div style={styles.avatar}>
+                {group?.avatar ? (
+                  <img
+                    src={group.avatar}
+                    alt=""
+                    style={styles.avatarImg}
+                  />
+                ) : (
+                  (group?.name || 'G')[0].toUpperCase()
+                )}
+              </div>
+
+              <div style={styles.friendInfo}>
+                <p style={styles.friendName}>
+                  {group?.name || 'Groupe'}
+                </p>
+
+                <p style={styles.friendIp}>
+                  {group?.members?.length || 0} membre(s)
+                </p>
+              </div>
+
+              {unreadCount > 0 && (
+                <div style={styles.badge}>
+                  <span style={styles.badgeIcon}>
+                    💬
+                  </span>
+                  <span style={styles.badgeCount}>
+                    {unreadCount}
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })
       )}
 
       <div style={styles.sectionHeader}>
