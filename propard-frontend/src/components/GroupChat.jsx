@@ -66,6 +66,17 @@ export default function GroupChat({
   const [mentionStart, setMentionStart] =
     useState(-1);
 
+  /*
+   * L'ID utilisateur peut être fourni par
+   * AppPage, mais si ce n'est pas le cas,
+   * on le récupère automatiquement via
+   * /api/auth/me.
+   */
+  const [currentUserId, setCurrentUserId] =
+    useState(
+      userId?.toString() || null
+    );
+
   const bottomRef =
     useRef(null);
 
@@ -104,8 +115,90 @@ export default function GroupChat({
     id?.toString();
 
   const myId =
-    normalize(userId);
+    normalize(currentUserId);
 
+  /*
+   * Si AppPage fournit userId, on l'utilise.
+   * Sinon on récupère l'utilisateur courant
+   * depuis l'API.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    if (userId) {
+      setCurrentUserId(
+        userId.toString()
+      );
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (!token) {
+      setCurrentUserId(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const loadCurrentUser = async () => {
+      try {
+        const res =
+          await axios.get(
+            '/api/auth/me',
+            {
+              headers: {
+                Authorization:
+                  `Bearer ${token}`
+              }
+            }
+          );
+
+        if (cancelled) {
+          return;
+        }
+
+        const id =
+          res.data?._id ||
+          res.data?.id ||
+          res.data?.userId;
+
+        if (!id) {
+          throw new Error(
+            'ID utilisateur introuvable.'
+          );
+        }
+
+        setCurrentUserId(
+          id.toString()
+        );
+      } catch (err) {
+        console.error(
+          'Impossible de récupérer l’utilisateur courant:',
+          err
+        );
+
+        if (!cancelled) {
+          setCurrentUserId(null);
+          setLoadError(
+            err.response?.data?.error ||
+            'Impossible de récupérer votre compte.'
+          );
+          setLoading(false);
+        }
+      }
+    };
+
+    loadCurrentUser();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    userId,
+    token
+  ]);
 
   /*
    * Récupération des surnoms d'amis.
@@ -153,7 +246,6 @@ export default function GroupChat({
     };
   }, [token]);
 
-
   /*
    * Nettoyage des timers.
    */
@@ -172,7 +264,6 @@ export default function GroupChat({
       );
     };
   }, []);
-
 
   /*
    * Recharge le groupe.
@@ -217,7 +308,6 @@ export default function GroupChat({
     }
   };
 
-
   /*
    * Charge le groupe et récupère sa clé.
    */
@@ -225,6 +315,11 @@ export default function GroupChat({
     let cancelled = false;
 
     const load = async () => {
+      /*
+       * IMPORTANT :
+       * on attend maintenant que currentUserId
+       * soit récupéré avant de charger la clé.
+       */
       if (
         !initialGroup?._id ||
         !token ||
@@ -449,7 +544,6 @@ export default function GroupChat({
     myId
   ]);
 
-
   /*
    * Messages en temps réel.
    */
@@ -460,7 +554,6 @@ export default function GroupChat({
 
     const groupId =
       initialGroup._id.toString();
-
 
     const handleNewGroupMessage =
       async message => {
@@ -533,7 +626,6 @@ export default function GroupChat({
         }
       };
 
-
     const handleGroupUpdated =
       async data => {
         if (
@@ -543,14 +635,8 @@ export default function GroupChat({
           return;
         }
 
-        /*
-         * Une modification du groupe peut
-         * également signifier une rotation
-         * de clé.
-         */
         await loadGroup();
       };
-
 
     const handleGroupDeleted =
       data => {
@@ -563,7 +649,6 @@ export default function GroupChat({
 
         onDeleted?.();
       };
-
 
     const handleGroupMessageDeleted =
       data => {
@@ -582,7 +667,6 @@ export default function GroupChat({
           )
         );
       };
-
 
     socket.on(
       'newGroupMessage',
@@ -608,7 +692,6 @@ export default function GroupChat({
       'groupMessageDeleted',
       handleGroupMessageDeleted
     );
-
 
     return () => {
       socket.off(
@@ -643,7 +726,6 @@ export default function GroupChat({
     token
   ]);
 
-
   /*
    * Scroll automatique.
    */
@@ -653,18 +735,11 @@ export default function GroupChat({
     });
   }, [messages]);
 
-
   /*
    * Fermer les menus / suggestions.
    */
   useEffect(() => {
-    const close = () => {
-      /*
-       * On ne ferme pas les mentions ici :
-       * elles doivent rester utilisables
-       * pendant la saisie.
-       */
-    };
+    const close = () => {};
 
     window.addEventListener(
       'click',
@@ -679,14 +754,8 @@ export default function GroupChat({
     };
   }, []);
 
-
   /*
    * Retourne le nom affiché d'un membre.
-   *
-   * Priorité :
-   * 1. surnom d'ami
-   * 2. displayName
-   * 3. username
    */
   const getMemberNickname = member => {
     const memberId =
@@ -708,7 +777,6 @@ export default function GroupChat({
       'Membre'
     );
   };
-
 
   /*
    * Liste des membres utilisable
@@ -737,7 +805,6 @@ export default function GroupChat({
       friends,
       myId
     ]);
-
 
   /*
    * Suggestions @mention.
@@ -792,7 +859,6 @@ export default function GroupChat({
       mentionMembers
     ]);
 
-
   /*
    * Analyse du texte pour savoir si
    * le curseur est actuellement après @xxx.
@@ -805,9 +871,6 @@ export default function GroupChat({
           cursorPosition
         );
 
-      /*
-       * Recherche du dernier @.
-       */
       const atIndex =
         beforeCursor.lastIndexOf('@');
 
@@ -817,11 +880,6 @@ export default function GroupChat({
         return;
       }
 
-      /*
-       * Le caractère juste avant @ doit être
-       * un espace, un début de message ou
-       * une ponctuation simple.
-       */
       const previous =
         beforeCursor[
           atIndex - 1
@@ -841,10 +899,6 @@ export default function GroupChat({
           atIndex + 1
         );
 
-      /*
-       * Si on rencontre un espace après @,
-       * la suggestion est terminée.
-       */
       if (
         /\s/.test(query)
       ) {
@@ -853,9 +907,6 @@ export default function GroupChat({
         return;
       }
 
-      /*
-       * Évite les @ trop longs.
-       */
       if (query.length > 40) {
         setMentionQuery(null);
         setMentionStart(-1);
@@ -870,7 +921,6 @@ export default function GroupChat({
         query
       );
     };
-
 
   /*
    * Sélection d'une personne dans
@@ -897,10 +947,6 @@ export default function GroupChat({
           start
         );
 
-      /*
-       * On conserve ce qui se trouve
-       * après le curseur / token actuel.
-       */
       const cursorEnd =
         start +
         1 +
@@ -929,9 +975,6 @@ export default function GroupChat({
         -1
       );
 
-      /*
-       * Replace le curseur après la mention.
-       */
       requestAnimationFrame(() => {
         const inputElement =
           document.querySelector(
@@ -955,7 +998,6 @@ export default function GroupChat({
         );
       });
     };
-
 
   /*
    * Envoi du message.
@@ -1049,9 +1091,8 @@ export default function GroupChat({
       }
     };
 
-
   /*
-   * Format des dates exactement comme Chat.jsx.
+   * Format des dates.
    */
   const formatDateSeparator =
     date => {
@@ -1092,7 +1133,6 @@ export default function GroupChat({
       );
     };
 
-
   const shouldShowDateSeparator =
     (
       messageList,
@@ -1120,9 +1160,8 @@ export default function GroupChat({
       );
     };
 
-
   /*
-   * Double-tap / grab, comme Chat.jsx.
+   * Double-tap / grab.
    */
   const clearGrabHold =
     () => {
@@ -1136,7 +1175,6 @@ export default function GroupChat({
       grabCandidateRef.current =
         null;
     };
-
 
   const handleBubblePointerDown =
     (e, message) => {
@@ -1211,7 +1249,6 @@ export default function GroupChat({
       }
     };
 
-
   const handleBubblePointerMoveGrabCheck =
     e => {
       const candidate =
@@ -1239,12 +1276,10 @@ export default function GroupChat({
       }
     };
 
-
   const handleBubblePointerUpCancel =
     () => {
       clearGrabHold();
     };
-
 
   /*
    * Quitter le groupe / supprimer si propriétaire.
@@ -1385,11 +1420,9 @@ export default function GroupChat({
       }
     };
 
-
   if (!group) {
     return null;
   }
-
 
   /*
    * Profil du groupe.
@@ -1409,7 +1442,6 @@ export default function GroupChat({
       />
     );
   }
-
 
   return (
     <div style={styles.container}>
@@ -1445,7 +1477,6 @@ export default function GroupChat({
           )}
         </div>
 
-
         <div>
           <p
             style={
@@ -1466,7 +1497,6 @@ export default function GroupChat({
             membre(s)
           </p>
         </div>
-
 
         <div
           style={{
@@ -1493,7 +1523,6 @@ export default function GroupChat({
 
       </div>
 
-
       <div
         style={
           styles.messages
@@ -1510,7 +1539,6 @@ export default function GroupChat({
           </p>
         )}
 
-
         {!loading &&
           loadError && (
             <p
@@ -1523,7 +1551,6 @@ export default function GroupChat({
               {loadError}
             </p>
           )}
-
 
         {!loading &&
           !loadError &&
@@ -1568,10 +1595,6 @@ export default function GroupChat({
                     index
                   );
 
-                /*
-                 * Le socket envoie senderInfo
-                 * pour les nouveaux messages.
-                 */
                 const senderInfo =
                   message.senderInfo ||
                   (
@@ -1624,7 +1647,6 @@ export default function GroupChat({
                       </div>
                     )}
 
-
                     <div
                       style={{
                         display: 'flex',
@@ -1674,7 +1696,6 @@ export default function GroupChat({
                           </p>
                         )}
 
-
                         <p
                           style={
                             styles.text
@@ -1682,7 +1703,6 @@ export default function GroupChat({
                         >
                           {content}
                         </p>
-
 
                         <div
                           style={{
@@ -1736,13 +1756,11 @@ export default function GroupChat({
               }
             )}
 
-
         <div
           ref={bottomRef}
         />
 
       </div>
-
 
       {spamWarning && (
         <div
@@ -1753,7 +1771,6 @@ export default function GroupChat({
           ⚠️ Envoie moins vite !
         </div>
       )}
-
 
       <div
         style={
@@ -1828,7 +1845,6 @@ export default function GroupChat({
                           )}
                         </div>
 
-
                         <div
                           style={
                             styles.mentionInfo
@@ -1862,7 +1878,6 @@ export default function GroupChat({
 
               </div>
             )}
-
 
           <input
             data-group-message-input="true"
@@ -1931,7 +1946,6 @@ export default function GroupChat({
 
         </div>
 
-
         <button
           onClick={sendMessage}
           style={
@@ -1950,7 +1964,6 @@ export default function GroupChat({
     </div>
   );
 }
-
 
 const styles = {
   container: {
