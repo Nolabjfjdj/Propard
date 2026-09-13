@@ -11,10 +11,9 @@ import {
   generateGroupKey
 } from '../utils/groupCrypto';
 
-import { 
+import {
   getStoredPrivateKeyJwk
-} from "../utils/crypto";
-
+} from '../utils/crypto';
 
 export default function GroupProfile({
   group: initialGroup,
@@ -53,15 +52,101 @@ export default function GroupProfile({
   const [showAvatarInput, setShowAvatarInput] =
     useState(false);
 
+  /*
+   * L'ID peut être fourni par GroupChat.
+   * Si ce n'est pas le cas, on le récupère
+   * automatiquement via /api/auth/me.
+   */
+  const [currentUserId, setCurrentUserId] =
+    useState(
+      userId?.toString() || null
+    );
 
   const myId =
-    userId?.toString();
-
+    currentUserId;
 
   const isOwner =
     group?.owner?.toString() ===
     myId;
 
+  /*
+   * Récupération de l'utilisateur courant.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    if (userId) {
+      setCurrentUserId(
+        userId.toString()
+      );
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (!token) {
+      setCurrentUserId(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const loadCurrentUser = async () => {
+      try {
+        const res =
+          await axios.get(
+            '/api/auth/me',
+            {
+              headers: {
+                Authorization:
+                  `Bearer ${token}`
+              }
+            }
+          );
+
+        if (cancelled) {
+          return;
+        }
+
+        const id =
+          res.data?._id ||
+          res.data?.id ||
+          res.data?.userId;
+
+        if (!id) {
+          throw new Error(
+            'ID utilisateur introuvable.'
+          );
+        }
+
+        setCurrentUserId(
+          id.toString()
+        );
+      } catch (err) {
+        console.error(
+          'Impossible de récupérer l’utilisateur courant:',
+          err
+        );
+
+        if (!cancelled) {
+          setError(
+            err.response?.data?.error ||
+            'Impossible de récupérer votre compte.'
+          );
+        }
+      }
+    };
+
+    loadCurrentUser();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    userId,
+    token
+  ]);
 
   /*
    * Charge les informations complètes
@@ -111,14 +196,12 @@ export default function GroupProfile({
     }
   };
 
-
   useEffect(() => {
     loadGroup();
   }, [
     initialGroup?._id,
     token
   ]);
-
 
   /*
    * Récupère les relations d'amis afin
@@ -166,10 +249,9 @@ export default function GroupProfile({
     };
   }, [token]);
 
-
   /*
-   * Retourne le surnom affiché par
-   * l'utilisateur pour un membre.
+   * Retourne le surnom affiché
+   * pour un membre.
    */
   const getMemberName =
     member => {
@@ -192,7 +274,6 @@ export default function GroupProfile({
         'Membre'
       );
     };
-
 
   /*
    * Membres triés : propriétaire en premier.
@@ -226,14 +307,8 @@ export default function GroupProfile({
       group
     ]);
 
-
   /*
    * Sélection d'une photo locale.
-   *
-   * On utilise une data URL afin que la photo
-   * puisse être envoyée directement à l'API
-   * sans nécessiter un système de stockage
-   * supplémentaire.
    */
   const handleAvatarFile =
     event => {
@@ -256,10 +331,6 @@ export default function GroupProfile({
         return;
       }
 
-      /*
-       * Limite raisonnable pour éviter
-       * une énorme data URL.
-       */
       if (
         file.size >
         2 * 1024 * 1024
@@ -292,7 +363,6 @@ export default function GroupProfile({
         file
       );
     };
-
 
   /*
    * Enregistrement du nom / avatar.
@@ -378,7 +448,6 @@ export default function GroupProfile({
       }
     };
 
-
   /*
    * Retirer un membre.
    *
@@ -423,10 +492,6 @@ export default function GroupProfile({
 
         setError('');
 
-        /*
-         * Récupération de la clé privée
-         * locale de l'utilisateur.
-         */
         const privateKey =
           getStoredPrivateKeyJwk(
             myId
@@ -438,10 +503,6 @@ export default function GroupProfile({
           );
         }
 
-        /*
-         * Nouvelle clé pour les membres
-         * qui restent dans le groupe.
-         */
         const nextGroupKey =
           await generateGroupKey();
 
@@ -523,10 +584,6 @@ export default function GroupProfile({
             }
           );
 
-        /*
-         * Le backend peut renvoyer le groupe
-         * directement après modification.
-         */
         const updatedGroup =
           res.data?.group ||
           res.data;
@@ -550,10 +607,6 @@ export default function GroupProfile({
           await loadGroup();
         }
 
-        /*
-         * On laisse GroupChat recharger
-         * la nouvelle clé via keyVersion.
-         */
         onUpdated?.(
           updatedGroup
         );
@@ -576,7 +629,6 @@ export default function GroupProfile({
       }
     };
 
-
   if (loading) {
     return (
       <div
@@ -595,15 +647,12 @@ export default function GroupProfile({
     );
   }
 
-
   return (
     <div
       style={
         styles.container
       }
     >
-
-      {/* HEADER */}
 
       <div
         style={
@@ -652,7 +701,6 @@ export default function GroupProfile({
 
       </div>
 
-
       <div
         style={
           styles.content
@@ -668,9 +716,6 @@ export default function GroupProfile({
             {error}
           </div>
         )}
-
-
-        {/* IDENTITÉ DU GROUPE */}
 
         <section
           style={
@@ -706,7 +751,6 @@ export default function GroupProfile({
               )}
 
             </div>
-
 
             {editing &&
               isOwner && (
@@ -773,7 +817,6 @@ export default function GroupProfile({
 
           </div>
 
-
           {editing &&
           isOwner ? (
             <input
@@ -800,7 +843,6 @@ export default function GroupProfile({
             </h1>
           )}
 
-
           <p
             style={
               styles.memberCount
@@ -816,9 +858,6 @@ export default function GroupProfile({
           </p>
 
         </section>
-
-
-        {/* BOUTON ENREGISTRER */}
 
         {editing &&
           isOwner && (
@@ -837,9 +876,6 @@ export default function GroupProfile({
                 : 'Enregistrer les modifications'}
             </button>
           )}
-
-
-        {/* MEMBRES */}
 
         <section
           style={
@@ -869,7 +905,6 @@ export default function GroupProfile({
                 0}
             </span>
           </div>
-
 
           <div
             style={
@@ -927,7 +962,6 @@ export default function GroupProfile({
                       )}
                     </div>
 
-
                     <div
                       style={
                         styles.memberInfo
@@ -958,7 +992,6 @@ export default function GroupProfile({
                         )}
                       </div>
 
-
                       {member.username &&
                         memberName !==
                           member.username && (
@@ -972,7 +1005,6 @@ export default function GroupProfile({
                         )}
 
                     </div>
-
 
                     {isOwner &&
                       !memberIsOwner &&
@@ -1006,9 +1038,6 @@ export default function GroupProfile({
           </div>
 
         </section>
-
-
-        {/* INFORMATIONS */}
 
         <section
           style={
@@ -1049,7 +1078,6 @@ export default function GroupProfile({
             </span>
           </div>
 
-
           <div
             style={
               styles.infoRow
@@ -1080,7 +1108,6 @@ export default function GroupProfile({
     </div>
   );
 }
-
 
 const styles = {
   container: {
