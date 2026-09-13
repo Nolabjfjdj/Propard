@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import socket from '../socket';
 import FriendList from '../components/FriendList';
+import GroupChat from '../components/GroupChat';
+import GroupManager from '../components/GroupManager';
 import Chat from '../components/Chat';
 import AddFriend from '../components/AddFriend';
 import VoiceCall from '../components/VoiceCall';
@@ -17,12 +19,17 @@ import {
 
 export default function AppPage({
   initialFriendId,
-  initialProfileUserId
+  initialProfileUserId,
+  initialGroupId
 }) {
   const { user, token, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   const [selectedFriend, setSelectedFriend] = useState(null);
+
+  const [selectedGroup, setSelectedGroup] = useState(null);
+
+  const [showGroupManager, setShowGroupManager] = useState(false);
 
   const [selectedProfile, setSelectedProfile] = useState(
     initialProfileUserId || null
@@ -104,6 +111,7 @@ export default function AppPage({
 
     if (initialProfileUserId) {
       setSelectedFriend(null);
+      setSelectedGroup(null);
       setFriendNotFound(false);
     }
   }, [initialProfileUserId]);
@@ -144,6 +152,33 @@ export default function AppPage({
   }, [initialFriendId, token]);
 
   useEffect(() => {
+    if (!initialGroupId || !token) return;
+
+    const loadInitialGroup = async () => {
+      try {
+        const res = await axios.get(
+          `/api/groups/${initialGroupId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+
+        setSelectedGroup(res.data);
+        setSelectedFriend(null);
+        setSelectedProfile(null);
+        setFriendNotFound(false);
+      } catch (err) {
+        console.error(err);
+        setSelectedGroup(null);
+      }
+    };
+
+    loadInitialGroup();
+  }, [initialGroupId, token]);
+
+  useEffect(() => {
     socket.on(
       'incomingCall',
       async ({ callerId, offer }) => {
@@ -176,6 +211,7 @@ export default function AppPage({
 
   const handleSelectFriend = friend => {
     setSelectedFriend(friend);
+    setSelectedGroup(null);
     setSelectedProfile(null);
     setFriendNotFound(false);
 
@@ -192,6 +228,7 @@ export default function AppPage({
 
   const handleOpenProfile = userId => {
     setSelectedProfile(userId);
+    setSelectedGroup(null);
     setSelectedFriend(null);
     setFriendNotFound(false);
 
@@ -206,8 +243,47 @@ export default function AppPage({
     }
   };
 
+  const handleSelectGroup = group => {
+    setSelectedGroup(group);
+    setSelectedFriend(null);
+    setSelectedProfile(null);
+    setFriendNotFound(false);
+
+    window.history.pushState(
+      {},
+      '',
+      `/group/${group._id}`
+    );
+
+    if (isMobile) {
+      setShowSidebar(false);
+    }
+
+    axios.patch(
+      `/api/groups/${group._id}/read`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    ).catch(err =>
+      console.error('Erreur marquage groupe comme lu:', err)
+    );
+  };
+
+  const handleGroupDeleted = () => {
+    setSelectedGroup(null);
+    setSelectedFriend(null);
+    setSelectedProfile(null);
+    setFriendNotFound(false);
+    setFriendListRefreshKey(key => key + 1);
+    window.history.pushState({}, '', '/');
+  };
+
   const handleBack = () => {
     setSelectedFriend(null);
+    setSelectedGroup(null);
     setSelectedProfile(null);
     setFriendNotFound(false);
 
@@ -902,7 +978,10 @@ export default function AppPage({
         <FriendList
           token={token}
           selectedFriend={selectedFriend}
+          selectedGroup={selectedGroup}
           onSelectFriend={handleSelectFriend}
+          onSelectGroup={handleSelectGroup}
+          onCreateGroup={() => setShowGroupManager(true)}
           onOpenProfile={handleOpenProfile}
           hideFriendIps={hideFriendIps}
           setHideFriendIps={value => {
@@ -979,6 +1058,7 @@ export default function AppPage({
 
       <div style={styles.main}>
         {!selectedFriend &&
+          !selectedGroup &&
           !selectedProfile &&
           !friendNotFound && (
             <button
@@ -996,6 +1076,7 @@ export default function AppPage({
 
         {isMobile &&
           !selectedFriend &&
+          !selectedGroup &&
           !selectedProfile &&
           !friendNotFound && (
             <div style={styles.mobileHeader}>
@@ -1024,6 +1105,7 @@ export default function AppPage({
 
         {isMobile &&
           (selectedFriend ||
+            selectedGroup ||
             selectedProfile ||
             friendNotFound) && (
             <div style={styles.mobileHeader}>
@@ -1064,6 +1146,13 @@ export default function AppPage({
             onRelationshipChanged={
               handleProfileRelationshipChanged
             }
+          />
+        ) : selectedGroup ? (
+          <GroupChat
+            group={selectedGroup}
+            token={token}
+            onBack={handleBack}
+            onDeleted={handleGroupDeleted}
           />
         ) : selectedFriend ? (
           <Chat
@@ -1128,6 +1217,23 @@ export default function AppPage({
           onClose={() =>
             setShowAddFriend(false)
           }
+        />
+      )}
+
+      {showGroupManager && (
+        <GroupManager
+          token={token}
+          onClose={() => {
+            setShowGroupManager(false);
+            setFriendListRefreshKey(key => key + 1);
+          }}
+          onCreated={group => {
+            setShowGroupManager(false);
+            setFriendListRefreshKey(key => key + 1);
+            if (group) {
+              handleSelectGroup(group);
+            }
+          }}
         />
       )}
 
@@ -1829,4 +1935,4 @@ const styles = {
     fontSize: '13px',
     textAlign: 'center'
   }
-};
+}; " et
