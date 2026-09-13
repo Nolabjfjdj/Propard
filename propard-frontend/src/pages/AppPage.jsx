@@ -1935,4 +1935,4 @@ const styles = {
     fontSize: '13px',
     textAlign: 'center'
   }
-}; " et
+};
