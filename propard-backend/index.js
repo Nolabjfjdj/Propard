@@ -896,6 +896,40 @@ io.on(
 );
 
 // ─────────────────────────────────────────
+ // PAGES JURIDIQUES PRÉ-RENDUES
+ //
+ // Ces pages contiennent directement le texte dans le HTML initial.
+ // Elles restent ainsi lisibles par les robots/crawlers qui ne
+ // exécutent pas JavaScript (moteurs de recherche et IA).
+ // ─────────────────────────────────────────
+
+app.get(
+  ['/terms','/terms/'],
+  (req,res)=>{
+    res.sendFile(
+      path.join(
+        __dirname,
+        'dist',
+        'terms.html'
+      )
+    );
+  }
+);
+
+app.get(
+  ['/privacy','/privacy/'],
+  (req,res)=>{
+    res.sendFile(
+      path.join(
+        __dirname,
+        'dist',
+        'privacy.html'
+      )
+    );
+  }
+);
+
+// ─────────────────────────────────────────
 // FICHIERS STATIQUES
 // ─────────────────────────────────────────
 
