@@ -18,7 +18,31 @@ const reportSchema = new mongoose.Schema({
   messageId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Message',
-    required: true,
+    required: false,
+    default: null,
+    index: true
+  },
+
+  groupMessageId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'GroupMessage',
+    required: false,
+    default: null,
+    index: true
+  },
+
+  messageType: {
+    type: String,
+    enum: ['private', 'group'],
+    default: 'private',
+    index: true
+  },
+
+  groupId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Group',
+    required: false,
+    default: null,
     index: true
   },
 
