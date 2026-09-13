@@ -4,6 +4,8 @@ const mongoose = require('mongoose');
 
 const User = require('../models/User');
 const Message = require('../models/Message');
+const Group = require('../models/Group');
+const GroupMessage = require('../models/GroupMessage');
 const Report = require('../models/Report');
 
 const authMiddleware = require('../middleware/auth');
@@ -20,7 +22,9 @@ router.post('/', authMiddleware, async (req, res) => {
       messageId,
       reportedUserId,
       content,
-      reason
+      reason,
+      groupMessage,
+      groupId
     } = req.body;
 
     // ============================
@@ -38,7 +42,7 @@ router.post('/', authMiddleware, async (req, res) => {
       !mongoose.isValidObjectId(reportedUserId)
     ) {
       return res.status(400).json({
-        error: 'Utilisateur signalé invalide'
+        error: 'Utilisateur signalÃ© invalide'
       });
     }
 
@@ -84,65 +88,157 @@ router.post('/', authMiddleware, async (req, res) => {
     }
 
     // ============================
-    // RÉCUPÉRATION DU MESSAGE
+    // RÃCUPÃRATION DU MESSAGE
     // ============================
 
-    const message = await Message.findById(messageId);
+    let message = null;
+    let group = null;
+    let messageType = 'private';
 
-    if (!message) {
-      return res.status(404).json({
-        error:
-          'Message introuvable (peut-être déjà supprimé)'
-      });
+    if (groupMessage) {
+      messageType = 'group';
+
+      if (
+        !groupId ||
+        !mongoose.isValidObjectId(groupId)
+      ) {
+        return res.status(400).json({
+          error:
+            'Groupe invalide'
+        });
+      }
+
+      group =
+        await Group.findById(
+          groupId
+        ).select('members');
+
+      if (
+        !group ||
+        !group.members.some(member => {
+          const memberId =
+            member.userId?._id ||
+            member.userId;
+
+          return (
+            memberId &&
+            memberId.toString() ===
+              reporterId.toString()
+          );
+        })
+      ) {
+        return res.status(403).json({
+          error:
+            'Signalement non autorisÃ© pour ce groupe'
+        });
+      }
+
+      message =
+        await GroupMessage.findOne({
+          _id:
+            messageId,
+          group:
+            groupId
+        });
+
+      if (!message) {
+        return res.status(404).json({
+          error:
+            'Message introuvable (peut-Ãªtre dÃ©jÃ  supprimÃ©)'
+        });
+      }
+
+      const senderId =
+        message.sender.toString();
+
+      if (
+        senderId !==
+          reportedUserId.toString() ||
+        senderId ===
+          reporterId.toString()
+      ) {
+        return res.status(403).json({
+          error:
+            'Signalement non autorisÃ© pour ce message'
+        });
+      }
+    } else {
+      message =
+        await Message.findById(
+          messageId
+        );
+
+      if (!message) {
+        return res.status(404).json({
+          error:
+            'Message introuvable (peut-Ãªtre dÃ©jÃ  supprimÃ©)'
+        });
+      }
+
+      const senderId =
+        message.sender.toString();
+
+      const receiverId =
+        message.receiver.toString();
+
+      const isParticipant =
+        reporterId === senderId ||
+        reporterId === receiverId;
+
+      const senderMatchesReported =
+        senderId === reportedUserId;
+
+      /*
+       * Le signalement doit :
+       * - venir d'un participant Ã  la conversation
+       * - concerner l'expÃ©diteur du message
+       * - ne pas permettre de signaler son propre message
+       */
+      if (
+        !isParticipant ||
+        !senderMatchesReported ||
+        senderId === reporterId
+      ) {
+        return res.status(403).json({
+          error:
+            'Signalement non autorisÃ© pour ce message'
+        });
+      }
     }
 
-    const senderId = message.sender.toString();
-    const receiverId = message.receiver.toString();
+    // ============================
+    // ÃVITER LES DOUBLONS
+    // ============================
 
-    const isParticipant =
-      reporterId === senderId ||
-      reporterId === receiverId;
+    const existingReportQuery = {
+      reporter:
+        reporterId,
+      status:
+        'new'
+    };
 
-    const senderMatchesReported =
-      senderId === reportedUserId;
-
-    /*
-     * Le signalement doit :
-     * - venir d'un participant à la conversation
-     * - concerner l'expéditeur du message
-     * - ne pas permettre de signaler son propre message
-     */
-
-    if (
-      !isParticipant ||
-      !senderMatchesReported ||
-      senderId === reporterId
-    ) {
-      return res.status(403).json({
-        error:
-          'Signalement non autorisé pour ce message'
-      });
+    if (messageType === 'group') {
+      existingReportQuery.groupMessageId =
+        messageId;
+    } else {
+      existingReportQuery.messageId =
+        messageId;
     }
 
-    // ============================
-    // ÉVITER LES DOUBLONS
-    // ============================
-
-    const existingReport = await Report.findOne({
-      reporter: reporterId,
-      messageId,
-      status: 'new'
-    });
+    const existingReport =
+      await Report.findOne(
+        existingReportQuery
+      );
 
     if (existingReport) {
       return res.status(409).json({
         error:
-          'Ce message a déjà été signalé.'
+          'Ce message a dÃ©jÃ  Ã©tÃ© signalÃ©.'
       });
     }
 
     // ============================
-    // VÉRIFICATION DES UTILISATEURS
+    // VÃRIFICATION DES UTILISATEURS
     // ============================
 
     const [reporter, reportedUser] = await Promise.all([
@@ -158,40 +254,61 @@ router.post('/', authMiddleware, async (req, res) => {
 
     if (!reportedUser) {
       return res.status(404).json({
-        error: 'Utilisateur signalé introuvable'
+        error: 'Utilisateur signalÃ© introuvable'
       });
     }
 
     // ============================
-    // CRÉATION DU SIGNALEMENT
+    // CRÃATION DU SIGNALEMENT
     // ============================
 
-    const report = await Report.create({
-      reporter: reporterId,
-      reportedUser: reportedUserId,
-      messageId,
-      content: content.trim(),
-      reason: reason?.trim() || null,
-      messageCreatedAt: message.createdAt,
-      status: 'new'
-    });
+    const reportData = {
+      reporter:
+        reporterId,
+      reportedUser:
+        reportedUserId,
+      content:
+        content.trim(),
+      reason:
+        reason?.trim() || null,
+      messageCreatedAt:
+        message.createdAt,
+      messageType,
+      status:
+        'new'
+    };
 
-    // Le cooldown n'est activé qu'après
-    // la réussite de l'enregistrement.
+    if (messageType === 'group') {
+      reportData.groupMessageId =
+        messageId;
+      reportData.groupId =
+        groupId;
+    } else {
+      reportData.messageId =
+        messageId;
+    }
+
+    const report =
+      await Report.create(
+        reportData
+      );
+
+    // Le cooldown n'est activÃ© qu'aprÃ¨s
+    // la rÃ©ussite de l'enregistrement.
     lastReportTimes.set(
       reporterId,
       Date.now()
     );
 
     console.log(
-      `🚩 Nouveau signalement ${report._id} : ` +
+      `ð© Nouveau signalement ${report._id} : ` +
       `${reporter.username} -> ${reportedUser.username}`
     );
 
     return res.status(201).json({
       success: true,
       message:
-        'Signalement envoyé, merci.'
+        'Signalement envoyÃ©, merci.'
     });
 
   } catch (err) {
