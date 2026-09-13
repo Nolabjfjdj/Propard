@@ -5,7 +5,7 @@ export default function PrivacyPage() {
         <a href="/help" style={styles.back}>← Retour</a>
 
         <h1 style={styles.title}>Politique de Confidentialité</h1>
-        <p style={styles.date}>En vigueur depuis le 12 septembre 2026</p>
+        <p style={styles.date}>En vigueur depuis le 14 septembre 2026</p>
 
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>1. Responsable du traitement</h2>
@@ -83,7 +83,18 @@ export default function PrivacyPage() {
               cryptographique sur un autre navigateur ou appareil
             </li>
             <li>
-              Les informations nécessaires au fonctionnement de la messagerie
+              Les informations nécessaires au fonctionnement de la messagerie privée
+            </li>
+            <li>
+              Les informations relatives aux groupes, notamment le nom et l'avatar
+              du groupe lorsqu'ils sont utilisés, l'identité des membres, leurs rôles,
+              les dates d'adhésion et de dernière lecture, ainsi que l'identifiant
+              et la version des clés de groupe nécessaires au chiffrement
+            </li>
+            <li>
+              Les contenus des messages de groupe sous forme chiffrée dans le
+              fonctionnement normal du service, ainsi que les informations techniques
+              associées aux messages, notamment leur auteur, leur groupe et leurs dates
             </li>
             <li>
               Les informations relatives à certaines annonces et à leur
@@ -250,13 +261,38 @@ export default function PrivacyPage() {
             fait l'objet d'un audit cryptographique professionnel indépendant.
           </p>
 
+          <h3 style={styles.subsectionTitle}>Messages de groupe et chiffrement</h3>
+
+          <p style={styles.text}>
+            Les groupes disposent également d'un mécanisme de chiffrement côté client.
+            Les clés de groupe sont protégées pour les membres autorisés au moyen de
+            paquets de clés chiffrés. Le serveur conserve les éléments nécessaires au
+            fonctionnement du groupe, notamment sa liste de membres, les rôles, la
+            version de clé et les paquets de clés chiffrés.
+          </p>
+
+          <p style={styles.text}>
+            Dans le fonctionnement normal du service, le contenu des messages de groupe
+            est transmis et stocké sous forme chiffrée. Propard ne reçoit normalement
+            pas le contenu de ces messages en clair. La clé de groupe peut être renouvelée
+            lorsqu'une modification des membres le nécessite, notamment lors du retrait
+            d'un membre.
+          </p>
+
+          <p style={styles.text}>
+            Les messages de groupe peuvent être modifiés ou supprimés selon les
+            fonctionnalités du service. Certaines informations techniques peuvent rester
+            conservées lorsque cela est nécessaire au fonctionnement, à la sécurité,
+            à la gestion des signalements ou au respect d'une obligation légale.
+          </p>
+
           <p style={styles.text}>
             La fonctionnalité « Signaler » constitue une exception volontaire au
-            fonctionnement habituel du chiffrement. Lorsqu'un utilisateur
-            signale un message, les informations nécessaires au traitement du
-            signalement peuvent être transmises à Propard et enregistrées dans
-            son système de gestion des signalements, notamment le contenu du
-            message signalé lorsque cela est nécessaire.
+            fonctionnement habituel du chiffrement. Lorsqu'un utilisateur signale un
+            message privé ou un message de groupe, les informations nécessaires au
+            traitement du signalement peuvent être transmises à Propard et enregistrées
+            dans son système de gestion des signalements, notamment le contenu du message
+            signalé lorsque cela est nécessaire.
           </p>
 
           <p style={styles.text}>
@@ -313,8 +349,8 @@ export default function PrivacyPage() {
           <p style={styles.text}>
             Le contenu transmis dans le cadre d'un signalement constitue une
             exception au fonctionnement habituel du chiffrement de bout en bout :
-            lorsqu'un utilisateur choisit volontairement de signaler un message,
-            le contenu fourni dans le signalement peut être enregistré en clair
+            lorsqu'un utilisateur choisit volontairement de signaler un message privé
+            ou de groupe, le contenu fourni dans le signalement peut être enregistré en clair
             afin de permettre son examen.
           </p>
 
@@ -402,10 +438,12 @@ export default function PrivacyPage() {
               pendant cette période afin de permettre la restauration du compte.
             </li>
             <li>
-              <strong>Messages :</strong> pendant la durée nécessaire au
-              fonctionnement de la messagerie, jusqu'à leur suppression ou
-              jusqu'à la suppression définitive du compte, sous réserve des
-              obligations légales applicables.
+              <strong>Messages privés et messages de groupe :</strong> pendant la durée
+              nécessaire au fonctionnement de la messagerie et des groupes, jusqu'à leur
+              suppression ou jusqu'à la suppression définitive du compte ou du groupe,
+              selon le fonctionnement du service, sous réserve des obligations légales
+              applicables et des informations techniques pouvant rester nécessaires à la
+              sécurité ou au traitement des signalements.
             </li>
             <li>
               <strong>Clé publique et sauvegarde E2EE :</strong> pendant la
@@ -722,6 +760,13 @@ const styles = {
 
   section: {
     marginBottom: '28px'
+  },
+
+  subsectionTitle: {
+    margin: '18px 0 8px',
+    color: 'var(--text-primary)',
+    fontSize: '16px',
+    fontWeight: '700'
   },
 
   sectionTitle: {
