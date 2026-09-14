@@ -532,14 +532,33 @@ io.on('connection',socket=>{
       const existing=groupCalls.get(key);
 
       if(existing){
-        return socket.emit(
-          'groupCallError',
+        const userId=socket.userId.toString();
+
+        // Si un appel est déjà en cours, le bouton d'appel sert aussi
+        // de bouton "Rejoindre" : on ajoute directement l'utilisateur
+        // à l'appel existant au lieu de créer un nouvel appel.
+        existing.members.add(userId);
+
+        socket.emit(
+          'groupCallStarted',
           {
             groupId:key,
             callId:existing.callId,
-            message:'Un appel de groupe est déjà en cours.'
+            joinedExisting:true
           }
         );
+
+        emitToGroupCall(
+          existing,
+          'groupCallParticipants',
+          {
+            groupId:key,
+            callId:existing.callId,
+            participants:[...existing.members]
+          }
+        );
+
+        return;
       }
 
       const call={
