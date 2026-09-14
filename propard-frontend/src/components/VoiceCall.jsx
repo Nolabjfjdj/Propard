@@ -105,6 +105,7 @@ export default function VoiceCall({
   const pendingCandidates = useRef([]);
 
   const timerStartedRef = useRef(false);
+  const callStartedAtRef = useRef(null);
 
   const iceServersRef = useRef([]);
   const turnServersRef = useRef([]);
@@ -470,13 +471,25 @@ export default function VoiceCall({
    * --------------------------------------------------
    */
 
-  const startTimer = () => {
+  const startTimer = (serverStartedAt = null) => {
+    if (serverStartedAt) {
+      const timestamp = Number(serverStartedAt);
+      if (Number.isFinite(timestamp)) {
+        callStartedAtRef.current = timestamp;
+        setDuration(Math.max(0, Math.floor((Date.now() - timestamp) / 1000)));
+      }
+    }
+
     if (timerStartedRef.current) return;
 
     timerStartedRef.current = true;
 
     timerRef.current = setInterval(() => {
-      setDuration(prev => prev + 1);
+      if (callStartedAtRef.current) {
+        setDuration(
+          Math.max(0, Math.floor((Date.now() - callStartedAtRef.current) / 1000))
+        );
+      }
     }, 1000);
   };
 
@@ -952,7 +965,7 @@ export default function VoiceCall({
 
           setStatus('connected');
 
-          startTimer();
+          startTimer(callStartedAtRef.current);
 
           restartAttemptsRef.current = 0;
 
@@ -1205,9 +1218,13 @@ export default function VoiceCall({
 
       await peer.setRemoteDescription(
         new RTCSessionDescription(
-          incomingOffer
+          incomingOffer?.offer || incomingOffer
         )
       );
+
+      if (incomingOffer?.callStartedAt) {
+        callStartedAtRef.current = Number(incomingOffer.callStartedAt);
+      }
 
       await addPendingCandidates(
         peer
@@ -1291,7 +1308,7 @@ export default function VoiceCall({
     closedRef.current = false;
 
     const handleCallAnswered =
-      async ({ answer }) => {
+      async ({ answer, callStartedAt }) => {
         const peer =
           peerRef.current;
 
@@ -1312,6 +1329,10 @@ export default function VoiceCall({
           await addPendingCandidates(
             peer
           );
+
+          if (callStartedAt) {
+            callStartedAtRef.current = Number(callStartedAt);
+          }
 
         } catch (err) {
           console.error(
