@@ -5,15 +5,12 @@ const mongoose=require('mongoose');
 const cors=require('cors');
 const jwt=require('jsonwebtoken');
 const path=require('path');
+const {randomUUID}=require('crypto');
 require('dotenv').config();
 
 const app=express();
 const server=http.createServer(app);
 
-// Nécessaire pour que req.ip reflète la vraie IP du client derrière le
-// proxy de Render — sans ça, le rate limiting par IP verrait toujours
-// la même adresse interne et s'appliquerait globalement au lieu de par
-// utilisateur.
 app.set('trust proxy',1);
 
 const io=new Server(server,{
@@ -29,23 +26,10 @@ app.use(cors({
 
 app.use(express.json());
 
-// Headers de sécurité de base.
 app.use((req,res,next)=>{
-  res.setHeader(
-    'X-Content-Type-Options',
-    'nosniff'
-  );
-
-  res.setHeader(
-    'X-Frame-Options',
-    'DENY'
-  );
-
-  res.setHeader(
-    'Referrer-Policy',
-    'strict-origin-when-cross-origin'
-  );
-
+  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('X-Frame-Options','DENY');
+  res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; " +
@@ -58,850 +42,821 @@ app.use((req,res,next)=>{
     "base-uri 'self'; " +
     "form-action 'self'"
   );
-
   next();
 });
 
 mongoose.connect(process.env.MONGO_URI)
   .then(()=>console.log('✅ MongoDB connecté'))
-  .catch(e=>console.error(
-    '❌ MongoDB error:',
-    e
-  ));
+  .catch(e=>console.error('❌ MongoDB error:',e));
 
-// userId -> Set<socketId>
 const connectedUsers=new Map();
 
-function addConnection(
-  userId,
-  socketId
-){
-  if(
-    !connectedUsers.has(userId)
-  ){
-    connectedUsers.set(
-      userId,
-      new Set()
-    );
+function addConnection(userId,socketId){
+  if(!connectedUsers.has(userId)){
+    connectedUsers.set(userId,new Set());
   }
-
-  connectedUsers
-    .get(userId)
-    .add(socketId);
+  connectedUsers.get(userId).add(socketId);
 }
 
-function removeConnection(
-  userId,
-  socketId
-){
-  const set =
-    connectedUsers.get(userId);
-
+function removeConnection(userId,socketId){
+  const set=connectedUsers.get(userId);
   if(!set) return false;
-
   set.delete(socketId);
-
   if(set.size===0){
     connectedUsers.delete(userId);
-
     return true;
   }
-
   return false;
 }
 
-function emitToUser(
-  ioInstance,
-  userId,
-  event,
-  payload
-){
-  const set =
-    connectedUsers.get(userId);
+function emitToUser(ioInstance,userId,event,payload){
+  const set=connectedUsers.get(userId);
+  if(!set || set.size===0) return false;
 
-  if(
-    !set ||
-    set.size===0
-  ){
-    return false;
-  }
-
-  for(
-    const socketId of set
-  ){
-    ioInstance
-      .to(socketId)
-      .emit(
-        event,
-        payload
-      );
+  for(const socketId of set){
+    ioInstance.to(socketId).emit(event,payload);
   }
 
   return true;
 }
 
-app.set(
-  'io',
-  io
-);
+app.set('io',io);
+app.set('connectedUsers',connectedUsers);
+app.set('emitToUser',emitToUser);
 
-app.set(
-  'connectedUsers',
-  connectedUsers
-);
+app.use('/api/auth',require('./routes/auth'));
+app.use('/api/friends',require('./routes/friends'));
+app.use('/api/admin',require('./routes/admin'));
+app.use('/api/admin/reports',require('./routes/reportsAdmin'));
+app.use('/api/announcements',require('./routes/announcements'));
+app.use('/api',require('./routes/turn'));
+app.use('/api/reports',require('./routes/reports'));
+app.use('/api/groups',require('./routes/groups'));
 
-app.set(
-  'emitToUser',
-  emitToUser
-);
+app.get('/health',(req,res)=>res.status(200).send('OK'));
 
-app.use(
-  '/api/auth',
-  require('./routes/auth')
-);
+const lastMessageTimes=new Map();
 
-app.use(
-  '/api/friends',
-  require('./routes/friends')
-);
+const Message=require('./models/Message');
+const User=require('./models/User');
+const Group=require('./models/Group');
+const GroupMessage=require('./models/GroupMessage');
 
-app.use(
-  '/api/admin',
-  require('./routes/admin')
-);
-
-app.use(
-  '/api/admin/reports',
-  require('./routes/reportsAdmin')
-);
-
-app.use(
-  '/api/announcements',
-  require('./routes/announcements')
-);
-
-app.use(
-  '/api',
-  require('./routes/turn')
-);
-
-app.use(
-  '/api/reports',
-  require('./routes/reports')
-);
-
-app.use(
-  '/api/groups',
-  require('./routes/groups')
-);
-
-app.get(
-  '/health',
-  (req,res)=>
-    res.status(200).send('OK')
-);
-
-const lastMessageTimes =
-  new Map();
-
-const Message =
-  require('./models/Message');
-
-const User =
-  require('./models/User');
-
-const Group =
-  require('./models/Group');
-
-const GroupMessage =
-  require('./models/GroupMessage');
-
-async function areFriends(
-  userId,
-  friendId
-){
-  const user =
-    await User
-      .findById(userId)
-      .select('friends');
+async function areFriends(userId,friendId){
+  const user=await User.findById(userId).select('friends');
 
   return !!user &&
     user.friends.some(
-      f =>
-        f.userId.toString() ===
-        friendId.toString()
+      f=>f.userId.toString()===friendId.toString()
     );
 }
 
-io.on(
-  'connection',
-  socket => {
-
-    console.log(
-      `🔌 Socket connecté: ${socket.id}`
-    );
-
-    // ─────────────────────────────────────
-    // AUTHENTIFICATION SOCKET
-    // ─────────────────────────────────────
-
-    socket.on(
-      'authenticate',
-      async token => {
-        try{
-          const decoded =
-            jwt.verify(
-              token,
-              process.env.JWT_SECRET
-            );
-
-          socket.userId =
-            decoded.id;
-
-          const wasOffline =
-            !connectedUsers.has(
-              decoded.id
-            );
-
-          addConnection(
-            decoded.id,
-            socket.id
-          );
-
-          if(wasOffline){
-            await User.findByIdAndUpdate(
-              decoded.id,
-              {
-                isOnline:true
-              }
-            );
-          }
-
-          socket.emit(
-            'authenticated',
-            true
-          );
-
-        }catch{
-          socket.emit(
-            'authenticated',
-            false
-          );
-        }
-      }
-    );
-
-    // ─────────────────────────────────────
-    // MESSAGES
-    // ─────────────────────────────────────
-
-    socket.on(
-      'sendMessage',
-      async ({
-        receiverId,
-        content
-      })=>{
-        try{
-          if(!socket.userId){
-            return;
-          }
-
-          if(
-            !content ||
-            typeof content !==
-              'string' ||
-            !content.trim()
-          ){
-            return;
-          }
-
-          if(
-            !mongoose.isValidObjectId(
-              receiverId
-            ) ||
-            !(await areFriends(
-              socket.userId,
-              receiverId
-            ))
-          ){
-            return socket.emit(
-              'messageError',
-              {
-                message:
-                  'Destinataire invalide.'
-              }
-            );
-          }
-
-          let p;
-
-          try{
-            p=JSON.parse(content);
-          }catch{
-            return socket.emit(
-              'messageError',
-              {
-                message:
-                  'Message chiffré invalide.'
-              }
-            );
-          }
-
-          if(
-            !p ||
-            p.v!==1 ||
-            typeof p.iv!=='string' ||
-            typeof p.ct!=='string'
-          ){
-            return socket.emit(
-              'messageError',
-              {
-                message:
-                  'Message chiffré invalide.'
-              }
-            );
-          }
-
-          const now=Date.now();
-
-          const last =
-            lastMessageTimes.get(
-              socket.userId
-            ) || 0;
-
-          if(
-            now-last<1000
-          ){
-            return socket.emit(
-              'spamWarning',
-              {
-                message:
-                  'Envoie pas si vite !'
-              }
-            );
-          }
-
-          lastMessageTimes.set(
-            socket.userId,
-            now
-          );
-
-          const message =
-            await Message.create({
-              sender:
-                socket.userId,
-
-              receiver:
-                receiverId,
-
-              content:
-                content.trim(),
-
-              originalContent:
-                null,
-
-              encrypted:
-                true
-            });
-
-          const sender =
-            await User
-              .findById(
-                socket.userId
-              )
-              .select(
-                'username ipAlias'
-              );
-
-          const messageData={
-            _id:
-              message._id.toString(),
-
-            sender:
-              socket.userId,
-
-            senderInfo:
-              sender,
-
-            receiver:
-              receiverId,
-
-            content:
-              message.content,
-
-            encrypted:
-              true,
-
-            createdAt:
-              message.createdAt
-          };
-
-          emitToUser(
-            io,
-            receiverId,
-            'newMessage',
-            messageData
-          );
-
-          socket.emit(
-            'messageSent',
-            messageData
-          );
-
-        }catch(e){
-          console.error(
-            'sendMessage error:',
-            e
-          );
-
-          socket.emit(
-            'messageError',
-            {
-              message:
-                'Impossible d’envoyer le message.'
-            }
-          );
-        }
-      }
-    );
-
-    // ─────────────────────────────────────
-    // MESSAGES DE GROUPE
-    // ─────────────────────────────────────
-
-    socket.on(
-      'sendGroupMessage',
-      async ({
-        groupId,
-        content
-      })=>{
-        try{
-          if(!socket.userId) return;
-
-          if(
-            !mongoose.isValidObjectId(groupId) ||
-            typeof content !== 'string' ||
-            !content.trim()
-          ){
-            return socket.emit(
-              'groupMessageError',
-              {message:'Message de groupe invalide.'}
-            );
-          }
-
-          let encrypted;
-          try {
-            encrypted=JSON.parse(content);
-          } catch {
-            return socket.emit(
-              'groupMessageError',
-              {message:'Message chiffré invalide.'}
-            );
-          }
-
-          if(
-            !encrypted ||
-            encrypted.v!==1 ||
-            typeof encrypted.iv!=='string' ||
-            typeof encrypted.ct!=='string'
-          ){
-            return socket.emit(
-              'groupMessageError',
-              {message:'Message chiffré invalide.'}
-            );
-          }
-
-          const group=await Group.findOne({
-            _id:groupId,
-            'members.userId':socket.userId
-          });
-
-          if(!group){
-            return socket.emit(
-              'groupMessageError',
-              {message:'Tu ne fais pas partie de ce groupe.'}
-            );
-          }
-
-          const now=Date.now();
-          const last=lastMessageTimes.get(socket.userId)||0;
-
-          if(now-last<1000){
-            return socket.emit(
-              'spamWarning',
-              {message:'Envoie pas si vite !'}
-            );
-          }
-
-          lastMessageTimes.set(socket.userId,now);
-
-          const message=await GroupMessage.create({
-            group:groupId,
-            sender:socket.userId,
-            content:content.trim(),
-            encrypted:true
-          });
-
-          group.lastMessageAt=message.createdAt;
-          await group.save();
-
-          const sender=await User.findById(socket.userId)
-            .select('username displayName avatar ipAlias');
-
-          const messageData={
-            _id:message._id.toString(),
-            group:groupId.toString(),
-            sender:socket.userId,
-            senderInfo:sender,
-            content:message.content,
-            encrypted:true,
-            createdAt:message.createdAt
-          };
-
-          for(const member of group.members){
-            emitToUser(
-              io,
-              member.userId.toString(),
-              'newGroupMessage',
-              messageData
-            );
-          }
-
-          socket.emit(
-            'groupMessageSent',
-            messageData
-          );
-        }catch(e){
-          console.error(
-            'sendGroupMessage error:',
-            e
-          );
-
-          socket.emit(
-            'groupMessageError',
-            {
-              message:
-                'Impossible d’envoyer le message de groupe.'
-            }
-          );
-        }
-      }
-    );
-
-    // ─────────────────────────────────────
-    // WEBRTC
-    // ─────────────────────────────────────
-
-    socket.on(
-      'callUser',
-      async ({
-        receiverId,
-        offer
-      })=>{
-        if(!socket.userId){
-          return;
-        }
-
-        if(
-          !mongoose.isValidObjectId(
-            receiverId
-          )
-        ){
-          return;
-        }
-
-        if(
-          !(await areFriends(
-            socket.userId,
-            receiverId
-          ))
-        ){
-          return socket.emit(
-            'callFailed',
-            {
-              message:
-                'Utilisateur non autorisé'
-            }
-          );
-        }
-
-        const delivered =
-          emitToUser(
-            io,
-            receiverId,
-            'incomingCall',
-            {
-              callerId:
-                socket.userId,
-
-              offer
-            }
-          );
-
-        if(!delivered){
-          socket.emit(
-            'callFailed',
-            {
-              message:
-                'Utilisateur non connecté'
-            }
-          );
-        }
-      }
-    );
-
-    // ─────────────────────────────────────
-    // RÉPONSE À L'APPEL INITIAL
-    // ─────────────────────────────────────
-
-    socket.on(
-      'answerCall',
-      async ({
-        callerId,
-        answer
-      })=>{
-        if(!socket.userId){
-          return;
-        }
-
-        if(
-          !mongoose.isValidObjectId(
-            callerId
-          )
-        ){
-          return;
-        }
-
-        if(
-          !(await areFriends(
-            socket.userId,
-            callerId
-          ))
-        ){
-          return;
-        }
-
-        emitToUser(
-          io,
-          callerId,
-          'callAnswered',
-          {
-            answer
-          }
-        );
-      }
-    );
-
-    // ─────────────────────────────────────
-    // ICE CANDIDATES
-    // ─────────────────────────────────────
-
-    socket.on(
-      'iceCandidate',
-      async ({
-        receiverId,
-        candidate
-      })=>{
-        if(!socket.userId){
-          return;
-        }
-
-        if(
-          !mongoose.isValidObjectId(
-            receiverId
-          )
-        ){
-          return;
-        }
-
-        if(
-          !(await areFriends(
-            socket.userId,
-            receiverId
-          ))
-        ){
-          return;
-        }
-
-        emitToUser(
-          io,
-          receiverId,
-          'iceCandidate',
-          {
-            candidate
-          }
-        );
-      }
-    );
-
-    // ─────────────────────────────────────
-    // ICE RESTART
-    //
-    // Utilisé lorsque l'appelant doit changer
-    // de chemin ICE/TURN sans raccrocher.
-    // ─────────────────────────────────────
-
-    socket.on(
-      'iceRestartOffer',
-      async ({
-        receiverId,
-        offer
-      })=>{
-        if(!socket.userId){
-          return;
-        }
-
-        if(
-          !mongoose.isValidObjectId(
-            receiverId
-          )
-        ){
-          return;
-        }
-
-        if(
-          !(await areFriends(
-            socket.userId,
-            receiverId
-          ))
-        ){
-          return;
-        }
-
-        emitToUser(
-          io,
-          receiverId,
-          'iceRestartOffer',
-          {
-            callerId:
-              socket.userId,
-
-            offer
-          }
-        );
-      }
-    );
-
-    // ─────────────────────────────────────
-    // RÉPONSE À L'ICE RESTART
-    // ─────────────────────────────────────
-
-    socket.on(
-      'iceRestartAnswer',
-      async ({
-        callerId,
-        answer
-      })=>{
-        if(!socket.userId){
-          return;
-        }
-
-        if(
-          !mongoose.isValidObjectId(
-            callerId
-          )
-        ){
-          return;
-        }
-
-        if(
-          !(await areFriends(
-            socket.userId,
-            callerId
-          ))
-        ){
-          return;
-        }
-
-        emitToUser(
-          io,
-          callerId,
-          'iceRestartAnswer',
-          {
-            answer
-          }
-        );
-      }
-    );
-
-    // ─────────────────────────────────────
-    // FIN D'APPEL
-    // ─────────────────────────────────────
-
-    socket.on(
-      'endCall',
-      async ({
-        receiverId
-      })=>{
-        if(!socket.userId){
-          return;
-        }
-
-        if(
-          !mongoose.isValidObjectId(
-            receiverId
-          )
-        ){
-          return;
-        }
-
-        if(
-          !(await areFriends(
-            socket.userId,
-            receiverId
-          ))
-        ){
-          return;
-        }
-
-        emitToUser(
-          io,
-          receiverId,
-          'callEnded'
-        );
-      }
-    );
-
-    // ─────────────────────────────────────
-    // DÉCONNEXION
-    // ─────────────────────────────────────
-
-    socket.on(
-      'disconnect',
-      async ()=>{
-        if(socket.userId){
-
-          const becameOffline =
-            removeConnection(
-              socket.userId,
-              socket.id
-            );
-
-          lastMessageTimes.delete(
-            socket.userId
-          );
-
-          if(becameOffline){
-            await User.findByIdAndUpdate(
-              socket.userId,
-              {
-                isOnline:false
-              }
-            );
-          }
-        }
-      }
+/*
+ * ─────────────────────────────────────
+ * APPELS DE GROUPE
+ *
+ * État conservé uniquement en mémoire :
+ * aucune donnée audio/vidéo n'est stockée par le serveur.
+ * Le serveur ne fait que relayer la signalisation WebRTC.
+ * ─────────────────────────────────────
+ */
+
+const groupCalls=new Map();
+
+function getGroupCall(groupId){
+  return groupCalls.get(groupId.toString());
+}
+
+async function getGroupForMember(groupId,userId){
+  if(!mongoose.isValidObjectId(groupId) ||
+     !mongoose.isValidObjectId(userId)){
+    return null;
+  }
+
+  return Group.findOne({
+    _id:groupId,
+    'members.userId':userId
+  }).select('_id members name avatar');
+}
+
+function emitToGroupCall(call,event,payload){
+  for(const memberId of call.members){
+    emitToUser(
+      io,
+      memberId,
+      event,
+      payload
     );
   }
-);
+}
+
+function isCallMember(call,userId){
+  return !!call &&
+    call.members.has(userId.toString());
+}
+
+io.on('connection',socket=>{
+
+  console.log(`🔌 Socket connecté: ${socket.id}`);
+
+  socket.on('authenticate',async token=>{
+    try{
+      const decoded=jwt.verify(
+        token,
+        process.env.JWT_SECRET
+      );
+
+      socket.userId=decoded.id;
+
+      const wasOffline=!connectedUsers.has(decoded.id);
+
+      addConnection(
+        decoded.id,
+        socket.id
+      );
+
+      if(wasOffline){
+        await User.findByIdAndUpdate(
+          decoded.id,
+          {isOnline:true}
+        );
+      }
+
+      socket.emit('authenticated',true);
+
+    }catch{
+      socket.emit('authenticated',false);
+    }
+  });
+
+  // ─────────────────────────────────────
+  // MESSAGES
+  // ─────────────────────────────────────
+
+  socket.on('sendMessage',async({receiverId,content})=>{
+    try{
+      if(!socket.userId) return;
+
+      if(
+        !content ||
+        typeof content!=='string' ||
+        !content.trim()
+      ){
+        return;
+      }
+
+      if(
+        !mongoose.isValidObjectId(receiverId) ||
+        !(await areFriends(socket.userId,receiverId))
+      ){
+        return socket.emit(
+          'messageError',
+          {message:'Destinataire invalide.'}
+        );
+      }
+
+      let p;
+
+      try{
+        p=JSON.parse(content);
+      }catch{
+        return socket.emit(
+          'messageError',
+          {message:'Message chiffré invalide.'}
+        );
+      }
+
+      if(
+        !p ||
+        p.v!==1 ||
+        typeof p.iv!=='string' ||
+        typeof p.ct!=='string'
+      ){
+        return socket.emit(
+          'messageError',
+          {message:'Message chiffré invalide.'}
+        );
+      }
+
+      const now=Date.now();
+      const last=lastMessageTimes.get(socket.userId)||0;
+
+      if(now-last<1000){
+        return socket.emit(
+          'spamWarning',
+          {message:'Envoie pas si vite !'}
+        );
+      }
+
+      lastMessageTimes.set(socket.userId,now);
+
+      const message=await Message.create({
+        sender:socket.userId,
+        receiver:receiverId,
+        content:content.trim(),
+        originalContent:null,
+        encrypted:true
+      });
+
+      const sender=await User
+        .findById(socket.userId)
+        .select('username ipAlias');
+
+      const messageData={
+        _id:message._id.toString(),
+        sender:socket.userId,
+        senderInfo:sender,
+        receiver:receiverId,
+        content:message.content,
+        encrypted:true,
+        createdAt:message.createdAt
+      };
+
+      emitToUser(
+        io,
+        receiverId,
+        'newMessage',
+        messageData
+      );
+
+      socket.emit('messageSent',messageData);
+
+    }catch(e){
+      console.error('sendMessage error:',e);
+
+      socket.emit(
+        'messageError',
+        {message:'Impossible d’envoyer le message.'}
+      );
+    }
+  });
+
+  // ─────────────────────────────────────
+  // MESSAGES DE GROUPE
+  // ─────────────────────────────────────
+
+  socket.on('sendGroupMessage',async({groupId,content})=>{
+    try{
+      if(!socket.userId) return;
+
+      if(
+        !mongoose.isValidObjectId(groupId) ||
+        typeof content!=='string' ||
+        !content.trim()
+      ){
+        return socket.emit(
+          'groupMessageError',
+          {message:'Message de groupe invalide.'}
+        );
+      }
+
+      let encrypted;
+
+      try{
+        encrypted=JSON.parse(content);
+      }catch{
+        return socket.emit(
+          'groupMessageError',
+          {message:'Message chiffré invalide.'}
+        );
+      }
+
+      if(
+        !encrypted ||
+        encrypted.v!==1 ||
+        typeof encrypted.iv!=='string' ||
+        typeof encrypted.ct!=='string'
+      ){
+        return socket.emit(
+          'groupMessageError',
+          {message:'Message chiffré invalide.'}
+        );
+      }
+
+      const group=await Group.findOne({
+        _id:groupId,
+        'members.userId':socket.userId
+      });
+
+      if(!group){
+        return socket.emit(
+          'groupMessageError',
+          {message:'Tu ne fais pas partie de ce groupe.'}
+        );
+      }
+
+      const now=Date.now();
+      const last=lastMessageTimes.get(socket.userId)||0;
+
+      if(now-last<1000){
+        return socket.emit(
+          'spamWarning',
+          {message:'Envoie pas si vite !'}
+        );
+      }
+
+      lastMessageTimes.set(socket.userId,now);
+
+      const message=await GroupMessage.create({
+        group:groupId,
+        sender:socket.userId,
+        content:content.trim(),
+        encrypted:true
+      });
+
+      group.lastMessageAt=message.createdAt;
+      await group.save();
+
+      const sender=await User.findById(socket.userId)
+        .select('username displayName avatar ipAlias');
+
+      const messageData={
+        _id:message._id.toString(),
+        group:groupId.toString(),
+        sender:socket.userId,
+        senderInfo:sender,
+        content:message.content,
+        encrypted:true,
+        createdAt:message.createdAt
+      };
+
+      for(const member of group.members){
+        emitToUser(
+          io,
+          member.userId.toString(),
+          'newGroupMessage',
+          messageData
+        );
+      }
+
+      socket.emit('groupMessageSent',messageData);
+
+    }catch(e){
+      console.error('sendGroupMessage error:',e);
+
+      socket.emit(
+        'groupMessageError',
+        {message:'Impossible d’envoyer le message de groupe.'}
+      );
+    }
+  });
+
+  // ─────────────────────────────────────
+  // WEBRTC PRIVÉ
+  // ─────────────────────────────────────
+
+  socket.on('callUser',async({receiverId,offer})=>{
+    if(!socket.userId) return;
+
+    if(!mongoose.isValidObjectId(receiverId)) return;
+
+    if(!(await areFriends(socket.userId,receiverId))){
+      return socket.emit(
+        'callFailed',
+        {message:'Utilisateur non autorisé'}
+      );
+    }
+
+    const delivered=emitToUser(
+      io,
+      receiverId,
+      'incomingCall',
+      {
+        callerId:socket.userId,
+        offer
+      }
+    );
+
+    if(!delivered){
+      socket.emit(
+        'callFailed',
+        {message:'Utilisateur non connecté'}
+      );
+    }
+  });
+
+  socket.on('answerCall',async({callerId,answer})=>{
+    if(!socket.userId) return;
+
+    if(!mongoose.isValidObjectId(callerId)) return;
+
+    if(!(await areFriends(socket.userId,callerId))) return;
+
+    emitToUser(
+      io,
+      callerId,
+      'callAnswered',
+      {answer}
+    );
+  });
+
+  socket.on('iceCandidate',async({receiverId,candidate})=>{
+    if(!socket.userId) return;
+
+    if(!mongoose.isValidObjectId(receiverId)) return;
+
+    if(!(await areFriends(socket.userId,receiverId))) return;
+
+    emitToUser(
+      io,
+      receiverId,
+      'iceCandidate',
+      {candidate}
+    );
+  });
+
+  socket.on('iceRestartOffer',async({receiverId,offer})=>{
+    if(!socket.userId) return;
+
+    if(!mongoose.isValidObjectId(receiverId)) return;
+
+    if(!(await areFriends(socket.userId,receiverId))) return;
+
+    emitToUser(
+      io,
+      receiverId,
+      'iceRestartOffer',
+      {
+        callerId:socket.userId,
+        offer
+      }
+    );
+  });
+
+  socket.on('iceRestartAnswer',async({callerId,answer})=>{
+    if(!socket.userId) return;
+
+    if(!mongoose.isValidObjectId(callerId)) return;
+
+    if(!(await areFriends(socket.userId,callerId))) return;
+
+    emitToUser(
+      io,
+      callerId,
+      'iceRestartAnswer',
+      {answer}
+    );
+  });
+
+  socket.on('endCall',async({receiverId})=>{
+    if(!socket.userId) return;
+
+    if(!mongoose.isValidObjectId(receiverId)) return;
+
+    if(!(await areFriends(socket.userId,receiverId))) return;
+
+    emitToUser(io,receiverId,'callEnded');
+  });
+
+  // ─────────────────────────────────────
+  // APPELS DE GROUPE — SIGNALISATION
+  // ─────────────────────────────────────
+
+  socket.on('groupCallStart',async({groupId})=>{
+    try{
+      if(!socket.userId) return;
+
+      const group=await getGroupForMember(
+        groupId,
+        socket.userId
+      );
+
+      if(!group){
+        return socket.emit(
+          'groupCallError',
+          {groupId,message:'Tu ne fais pas partie de ce groupe.'}
+        );
+      }
+
+      const key=group._id.toString();
+      const existing=groupCalls.get(key);
+
+      if(existing){
+        return socket.emit(
+          'groupCallError',
+          {
+            groupId:key,
+            callId:existing.callId,
+            message:'Un appel de groupe est déjà en cours.'
+          }
+        );
+      }
+
+      const call={
+        callId:randomUUID(),
+        groupId:key,
+        callerId:socket.userId.toString(),
+        members:new Set([socket.userId.toString()])
+      };
+
+      groupCalls.set(key,call);
+
+      socket.emit(
+        'groupCallStarted',
+        {
+          groupId:key,
+          callId:call.callId
+        }
+      );
+
+      for(const member of group.members){
+        const memberId=member.userId.toString();
+
+        if(memberId===socket.userId.toString()) continue;
+
+        emitToUser(
+          io,
+          memberId,
+          'groupCallInvite',
+          {
+            groupId:key,
+            callId:call.callId,
+            callerId:socket.userId.toString()
+          }
+        );
+      }
+
+    }catch(e){
+      console.error('groupCallStart error:',e);
+
+      socket.emit(
+        'groupCallError',
+        {
+          groupId,
+          message:'Impossible de démarrer l’appel de groupe.'
+        }
+      );
+    }
+  });
+
+  socket.on('groupCallJoin',async({groupId,callId})=>{
+    try{
+      if(!socket.userId) return;
+
+      const group=await getGroupForMember(
+        groupId,
+        socket.userId
+      );
+
+      if(!group){
+        return socket.emit(
+          'groupCallError',
+          {groupId,message:'Tu ne fais pas partie de ce groupe.'}
+        );
+      }
+
+      const key=group._id.toString();
+      const call=groupCalls.get(key);
+
+      if(!call || call.callId!==callId){
+        return socket.emit(
+          'groupCallError',
+          {groupId:key,callId,message:'Cet appel n’existe plus.'}
+        );
+      }
+
+      call.members.add(socket.userId.toString());
+
+      emitToGroupCall(
+        call,
+        'groupCallParticipants',
+        {
+          groupId:key,
+          callId:call.callId,
+          participants:[...call.members]
+        }
+      );
+
+    }catch(e){
+      console.error('groupCallJoin error:',e);
+      socket.emit(
+        'groupCallError',
+        {groupId,callId,message:'Impossible de rejoindre l’appel.'}
+      );
+    }
+  });
+
+  const relayGroupCallEvent=async(
+    eventName,
+    {
+      groupId,
+      callId,
+      receiverId,
+      callerId,
+      offer,
+      answer,
+      candidate
+    }
+  )=>{
+    if(!socket.userId) return;
+
+    const key=groupId?.toString();
+    const call=groupCalls.get(key);
+
+    if(
+      !call ||
+      call.callId!==callId ||
+      !isCallMember(call,socket.userId)
+    ){
+      return;
+    }
+
+    const targetId=(
+      receiverId ||
+      callerId
+    )?.toString();
+
+    if(
+      !targetId ||
+      targetId===socket.userId.toString() ||
+      !isCallMember(call,targetId)
+    ){
+      return;
+    }
+
+    const payload={
+      groupId:key,
+      callId:call.callId,
+      senderId:socket.userId.toString()
+    };
+
+    if(offer) payload.offer=offer;
+    if(answer) payload.answer=answer;
+    if(candidate) payload.candidate=candidate;
+
+    emitToUser(
+      io,
+      targetId,
+      eventName,
+      payload
+    );
+  };
+
+  socket.on(
+    'groupCallOffer',
+    payload=>relayGroupCallEvent(
+      'groupCallOffer',
+      payload || {}
+    )
+  );
+
+  socket.on(
+    'groupCallAnswer',
+    payload=>relayGroupCallEvent(
+      'groupCallAnswer',
+      payload || {}
+    )
+  );
+
+  socket.on(
+    'groupCallIceCandidate',
+    payload=>relayGroupCallEvent(
+      'groupCallIceCandidate',
+      payload || {}
+    )
+  );
+
+  socket.on(
+    'groupCallIceRestartOffer',
+    payload=>relayGroupCallEvent(
+      'groupCallIceRestartOffer',
+      payload || {}
+    )
+  );
+
+  socket.on(
+    'groupCallIceRestartAnswer',
+    payload=>relayGroupCallEvent(
+      'groupCallIceRestartAnswer',
+      payload || {}
+    )
+  );
+
+  socket.on('groupCallLeave',async({groupId,callId})=>{
+    try{
+      if(!socket.userId) return;
+
+      const key=groupId?.toString();
+      const call=groupCalls.get(key);
+
+      if(
+        !call ||
+        call.callId!==callId ||
+        !isCallMember(call,socket.userId)
+      ){
+        return;
+      }
+
+      const leavingId=socket.userId.toString();
+
+      /*
+       * Le créateur quitte => l'appel entier se termine.
+       * Un membre normal quitte => les autres continuent.
+       */
+      if(leavingId===call.callerId){
+        emitToGroupCall(
+          call,
+          'groupCallEnded',
+          {
+            groupId:key,
+            callId:call.callId
+          }
+        );
+
+        groupCalls.delete(key);
+        return;
+      }
+
+      call.members.delete(leavingId);
+
+      emitToGroupCall(
+        call,
+        'groupCallMemberLeft',
+        {
+          groupId:key,
+          callId:call.callId,
+          userId:leavingId
+        }
+      );
+
+      if(call.members.size===0){
+        groupCalls.delete(key);
+      }
+
+    }catch(e){
+      console.error('groupCallLeave error:',e);
+    }
+  });
+
+  // ─────────────────────────────────────
+  // DÉCONNEXION
+  // ─────────────────────────────────────
+
+  socket.on('disconnect',async()=>{
+    if(socket.userId){
+
+      /*
+       * Retire cet utilisateur de tous les appels
+       * où il était présent.
+       */
+      const disconnectedUserId=socket.userId.toString();
+
+      for(const [key,call] of groupCalls.entries()){
+        if(!call.members.has(disconnectedUserId)) continue;
+
+        if(call.callerId===disconnectedUserId){
+          emitToGroupCall(
+            call,
+            'groupCallEnded',
+            {
+              groupId:key,
+              callId:call.callId
+            }
+          );
+
+          groupCalls.delete(key);
+          continue;
+        }
+
+        call.members.delete(disconnectedUserId);
+
+        emitToGroupCall(
+          call,
+          'groupCallMemberLeft',
+          {
+            groupId:key,
+            callId:call.callId,
+            userId:disconnectedUserId
+          }
+        );
+
+        if(call.members.size===0){
+          groupCalls.delete(key);
+        }
+      }
+
+      const becameOffline=removeConnection(
+        socket.userId,
+        socket.id
+      );
+
+      lastMessageTimes.delete(
+        socket.userId
+      );
+
+      if(becameOffline){
+        await User.findByIdAndUpdate(
+          socket.userId,
+          {isOnline:false}
+        );
+      }
+    }
+  });
+});
 
 // ─────────────────────────────────────────
- // PAGES JURIDIQUES PRÉ-RENDUES
- //
- // Ces pages contiennent directement le texte dans le HTML initial.
- // Elles restent ainsi lisibles par les robots/crawlers qui ne
- // exécutent pas JavaScript (moteurs de recherche et IA).
- // ─────────────────────────────────────────
+// PAGES JURIDIQUES PRÉ-RENDUES
+// ─────────────────────────────────────────
 
 app.get(
   ['/terms','/terms/'],
@@ -945,9 +900,7 @@ app.use(
 app.get(
   '/sitemap.xml',
   (req,res)=>{
-    res.type(
-      'application/xml'
-    );
+    res.type('application/xml');
 
     res.sendFile(
       path.join(
@@ -968,15 +921,10 @@ app.get(
         'dist',
         'index.html'
       )
-    )
+  )
 );
 
-// ─────────────────────────────────────────
-// SERVEUR
-// ─────────────────────────────────────────
-
-const PORT =
-  process.env.PORT || 3000;
+const PORT=process.env.PORT || 3000;
 
 server.listen(
   PORT,
