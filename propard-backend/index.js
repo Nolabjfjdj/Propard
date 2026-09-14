@@ -122,6 +122,9 @@ async function areFriends(userId,friendId){
  */
 
 const groupCalls=new Map();
+const privateCalls=new Map();
+
+const getPrivateCallKey=(a,b)=>[a.toString(),b.toString()].sort().join(':');
 
 function getGroupCall(groupId){
   return groupCalls.get(groupId.toString());
@@ -417,13 +420,26 @@ io.on('connection',socket=>{
       );
     }
 
+    const key=getPrivateCallKey(socket.userId,receiverId);
+    let call=privateCalls.get(key);
+
+    if(!call){
+      call={
+        callerId:socket.userId.toString(),
+        receiverId:receiverId.toString(),
+        startedAt:Date.now()
+      };
+      privateCalls.set(key,call);
+    }
+
     const delivered=emitToUser(
       io,
       receiverId,
       'incomingCall',
       {
         callerId:socket.userId,
-        offer
+        offer:{...offer,callStartedAt:call.startedAt},
+        callStartedAt:call.startedAt
       }
     );
 
@@ -442,11 +458,26 @@ io.on('connection',socket=>{
 
     if(!(await areFriends(socket.userId,callerId))) return;
 
+    const key=getPrivateCallKey(socket.userId,callerId);
+    let call=privateCalls.get(key);
+
+    if(!call){
+      call={
+        callerId:callerId.toString(),
+        receiverId:socket.userId.toString(),
+        startedAt:Date.now()
+      };
+      privateCalls.set(key,call);
+    }
+
     emitToUser(
       io,
       callerId,
       'callAnswered',
-      {answer}
+      {
+        answer,
+        callStartedAt:call.startedAt
+      }
     );
   });
 
@@ -505,6 +536,10 @@ io.on('connection',socket=>{
 
     if(!(await areFriends(socket.userId,receiverId))) return;
 
+    privateCalls.delete(
+      getPrivateCallKey(socket.userId,receiverId)
+    );
+
     emitToUser(io,receiverId,'callEnded');
   });
 
@@ -544,6 +579,7 @@ io.on('connection',socket=>{
           {
             groupId:key,
             callId:existing.callId,
+            callStartedAt:existing.startedAt,
             joinedExisting:true
           }
         );
@@ -554,6 +590,7 @@ io.on('connection',socket=>{
           {
             groupId:key,
             callId:existing.callId,
+            callStartedAt:existing.startedAt,
             participants:[...existing.members]
           }
         );
@@ -565,6 +602,7 @@ io.on('connection',socket=>{
         callId:randomUUID(),
         groupId:key,
         callerId:socket.userId.toString(),
+        startedAt:Date.now(),
         members:new Set([socket.userId.toString()])
       };
 
@@ -590,6 +628,7 @@ io.on('connection',socket=>{
           {
             groupId:key,
             callId:call.callId,
+            callStartedAt:call.startedAt,
             callerId:socket.userId.toString()
           }
         );
@@ -642,6 +681,7 @@ io.on('connection',socket=>{
         {
           groupId:key,
           callId:call.callId,
+          callStartedAt:call.startedAt,
           participants:[...call.members]
         }
       );
@@ -851,6 +891,21 @@ io.on('connection',socket=>{
 
         if(call.members.size===0){
           groupCalls.delete(key);
+        }
+      }
+
+      for(const [key,call] of privateCalls.entries()){
+        if(
+          call.callerId===disconnectedUserId ||
+          call.receiverId===disconnectedUserId
+        ){
+          const otherId=
+            call.callerId===disconnectedUserId
+              ? call.receiverId
+              : call.callerId;
+
+          emitToUser(io,otherId,'callEnded');
+          privateCalls.delete(key);
         }
       }
 
