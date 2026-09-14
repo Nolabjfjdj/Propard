@@ -9,6 +9,7 @@ import axios from 'axios';
 import socket from '../socket';
 
 import GroupProfile from './GroupProfile';
+import GroupVoiceCall from './GroupVoiceCall';
 
 import {
   getStoredPrivateKeyJwk,
@@ -56,6 +57,9 @@ export default function GroupChat({
 
   const [showProfile, setShowProfile] =
     useState(false);
+
+  const [groupCall, setGroupCall] =
+    useState(null);
 
   const [friends, setFriends] =
     useState([]);
@@ -222,6 +226,50 @@ export default function GroupChat({
   }, [
     userId,
     token
+  ]);
+
+  /*
+   * Appels de groupe entrants.
+   *
+   * L'invitation est uniquement acceptée pour un groupe
+   * que l'utilisateur est déjà en train de consulter.
+   */
+  useEffect(() => {
+    const groupId = initialGroup?._id?.toString();
+    if (!groupId || !myId) {
+      return;
+    }
+
+    const handleGroupCallInvite = payload => {
+      if (
+        payload?.groupId?.toString() !== groupId ||
+        payload?.callerId?.toString() === myId ||
+        !payload?.callId
+      ) {
+        return;
+      }
+
+      setGroupCall({
+        incoming: true,
+        callId: payload.callId,
+        callerId: payload.callerId?.toString()
+      });
+    };
+
+    socket.on(
+      'groupCallInvite',
+      handleGroupCallInvite
+    );
+
+    return () => {
+      socket.off(
+        'groupCallInvite',
+        handleGroupCallInvite
+      );
+    };
+  }, [
+    initialGroup?._id,
+    myId
   ]);
 
   /*
@@ -1970,6 +2018,25 @@ export default function GroupChat({
         >
           <button
             style={
+              styles.callBtn
+            }
+            title="Appeler le groupe"
+            onClick={e => {
+              e.stopPropagation();
+
+              if (!groupCall) {
+                setGroupCall({
+                  incoming: false,
+                  callId: null
+                });
+              }
+            }}
+          >
+            📞
+          </button>
+
+          <button
+            style={
               styles.leaveBtn
             }
             onClick={e => {
@@ -2734,6 +2801,17 @@ export default function GroupChat({
 
       </div>
 
+      {groupCall && (
+        <GroupVoiceCall
+          group={group}
+          userId={myId}
+          token={token}
+          incomingCall={groupCall.incoming}
+          callId={groupCall.callId}
+          onClose={() => setGroupCall(null)}
+        />
+      )}
+
     </div>
   );
 }
@@ -2801,6 +2879,17 @@ const styles = {
     fontFamily:
       'var(--font-mono)',
     margin: 0
+  },
+
+  callBtn: {
+    background:
+      'var(--bg-tertiary)',
+    border:
+      '1px solid var(--border)',
+    borderRadius: '8px',
+    padding: '6px 10px',
+    fontSize: '16px',
+    cursor: 'pointer'
   },
 
   leaveBtn: {
