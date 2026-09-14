@@ -66,6 +66,7 @@ export default function GroupVoiceCall({
   const remoteAudioRef = useRef(new Map());
   const timerRef = useRef(null);
   const timerStartedRef = useRef(false);
+  const callStartedAtRef = useRef(null);
   const closedRef = useRef(false);
   const callIdRef = useRef(initialCallId);
   const acceptedRef = useRef(!incomingCall);
@@ -108,13 +109,24 @@ export default function GroupVoiceCall({
       .map(member => normalizeId(member?._id || member?.userId))
       .filter(Boolean);
 
-  const startTimer = () => {
+  const startTimer = (serverStartedAt = null) => {
+    if (serverStartedAt) {
+      const timestamp = Number(serverStartedAt);
+      if (Number.isFinite(timestamp)) {
+        callStartedAtRef.current = timestamp;
+        setDuration(Math.max(0, Math.floor((Date.now() - timestamp) / 1000)));
+      }
+    }
+
     if (timerStartedRef.current) return;
     timerStartedRef.current = true;
-    timerRef.current = setInterval(
-      () => setDuration(prev => prev + 1),
-      1000
-    );
+    timerRef.current = setInterval(() => {
+      if (callStartedAtRef.current) {
+        setDuration(
+          Math.max(0, Math.floor((Date.now() - callStartedAtRef.current) / 1000))
+        );
+      }
+    }, 1000);
   };
 
   const formatDuration = seconds => {
@@ -326,7 +338,7 @@ export default function GroupVoiceCall({
       const state = peer.iceConnectionState;
 
       if (state === 'connected' || state === 'completed') {
-        startTimer();
+        startTimer(callStartedAtRef.current);
         setStatus('connected');
       }
 
@@ -542,6 +554,13 @@ export default function GroupVoiceCall({
       if (payload?.callId) {
         callIdRef.current = payload.callId;
 
+        if (payload.callStartedAt) {
+          callStartedAtRef.current = Number(payload.callStartedAt);
+          if (acceptedRef.current) {
+            startTimer(payload.callStartedAt);
+          }
+        }
+
         if (acceptedRef.current && localReadyRef.current && !joinedRef.current) {
           socket.emit('groupCallJoin', {
             groupId,
@@ -575,6 +594,11 @@ export default function GroupVoiceCall({
         closedRef.current
       ) {
         return;
+      }
+
+      if (payload.callStartedAt) {
+        callStartedAtRef.current = Number(payload.callStartedAt);
+        startTimer(payload.callStartedAt);
       }
 
       const ids = Array.isArray(payload.participants)
@@ -617,7 +641,7 @@ export default function GroupVoiceCall({
         });
 
         setStatus('connected');
-        startTimer();
+        startTimer(callStartedAtRef.current);
       } catch (err) {
         console.error('groupCallOffer:', err);
       }
@@ -643,7 +667,7 @@ export default function GroupVoiceCall({
         );
         await addPendingCandidates(senderId, peer);
         setStatus('connected');
-        startTimer();
+        startTimer(callStartedAtRef.current);
       } catch (err) {
         console.error('groupCallAnswer:', err);
       }
