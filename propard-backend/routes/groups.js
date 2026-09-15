@@ -862,9 +862,9 @@ router.delete(
       message.deleted =
         true;
 
-      message.content =
-        '';
-
+      // Le champ `content` est required dans le schéma et contient
+      // le contenu chiffré du message. On le conserve donc en base
+      // et on utilise `deleted` comme marqueur de suppression logique.
       await message.save();
 
       emitGroupEvent(
