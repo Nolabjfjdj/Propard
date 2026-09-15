@@ -1,4 +1,4 @@
-const CACHE_NAME = 'propard-offline-v1';
+const CACHE_NAME = 'propard-offline-v2';
 
 const APP_SHELL = [
   '/',
@@ -160,4 +160,79 @@ self.addEventListener('fetch', event => {
       })
     );
   }
+});
+
+self.addEventListener('push', event => {
+  event.waitUntil((async () => {
+    // Si une fenêtre Propard est actuellement visible, Socket.IO s'en charge.
+    // Cela évite une double notification lorsque l'utilisateur est déjà devant le chat.
+    const clients = await self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    });
+
+    const hasVisibleClient = clients.some(client => {
+      return client.visibilityState === 'visible';
+    });
+
+    if (hasVisibleClient) return;
+
+    let data = {};
+
+    try {
+      data = event.data ? event.data.json() : {};
+    } catch {
+      data = {
+        title: 'Propard',
+        body: 'Nouvelle notification'
+      };
+    }
+
+    const title = data.title || 'Propard';
+    const options = {
+      body: data.body || 'Nouvelle notification',
+      icon: data.icon || '/propard.png',
+      badge: data.badge || '/propard.png',
+      tag: data.tag || 'propard-message',
+      renotify: true,
+      data: {
+        url: data.url || '/',
+        ...(data.data || {})
+      }
+    };
+
+    await self.registration.showNotification(title, options);
+  })());
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+
+  event.waitUntil((async () => {
+    const targetUrl = new URL(
+      event.notification.data?.url || '/',
+      self.location.origin
+    ).href;
+
+    const clients = await self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    });
+
+    for (const client of clients) {
+      if ('focus' in client) {
+        await client.focus();
+      }
+
+      if ('navigate' in client && client.url !== targetUrl) {
+        await client.navigate(targetUrl).catch(() => {});
+      }
+
+      return;
+    }
+
+    if (self.clients.openWindow) {
+      await self.clients.openWindow(targetUrl);
+    }
+  })());
 });
