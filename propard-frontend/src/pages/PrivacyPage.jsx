@@ -74,6 +74,11 @@ export default function PrivacyPage() {
               Les surnoms éventuellement associés aux relations d'amis
             </li>
             <li>
+              Lorsque les notifications Push sont activées, les informations
+              techniques de l'abonnement Push (notamment son endpoint et les
+              clés nécessaires au fonctionnement du service Push)
+            </li>
+            <li>
               Une clé publique cryptographique utilisée pour permettre le
               chiffrement de bout en bout des communications
             </li>
@@ -444,6 +449,12 @@ export default function PrivacyPage() {
               selon le fonctionnement du service, sous réserve des obligations légales
               applicables et des informations techniques pouvant rester nécessaires à la
               sécurité ou au traitement des signalements.
+            </li>
+            <li>
+              <strong>Abonnements aux notifications Push :</strong> tant que
+              les notifications sont activées sur l'appareil concerné. Ils
+              peuvent être supprimés lorsque l'utilisateur désactive les
+              notifications ou lorsque l'abonnement devient invalide.
             </li>
             <li>
               <strong>Clé publique et sauvegarde E2EE :</strong> pendant la
