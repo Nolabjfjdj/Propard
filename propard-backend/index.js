@@ -92,6 +92,7 @@ app.use('/api/announcements',require('./routes/announcements'));
 app.use('/api',require('./routes/turn'));
 app.use('/api/reports',require('./routes/reports'));
 app.use('/api/groups',require('./routes/groups'));
+app.use('/api/push',require('./routes/push'));
 
 app.get('/health',(req,res)=>res.status(200).send('OK'));
 
@@ -101,6 +102,7 @@ const Message=require('./models/Message');
 const User=require('./models/User');
 const Group=require('./models/Group');
 const GroupMessage=require('./models/GroupMessage');
+const {sendPushNotification}=require('./services/push');
 
 async function areFriends(userId,friendId){
   const user=await User.findById(userId).select('friends');
@@ -282,6 +284,17 @@ io.on('connection',socket=>{
         messageData
       );
 
+      void sendPushNotification(receiverId, {
+        title: sender?.username ? `@${sender.username}` : 'Propard',
+        body: 'Nouveau message',
+        url: '/',
+        tag: `private-${socket.userId}`,
+        data: {
+          type: 'private-message',
+          senderId: socket.userId.toString()
+        }
+      });
+
       socket.emit('messageSent',messageData);
 
     }catch(e){
@@ -384,12 +397,30 @@ io.on('connection',socket=>{
       };
 
       for(const member of group.members){
+        const memberId=member.userId.toString();
+
         emitToUser(
           io,
-          member.userId.toString(),
+          memberId,
           'newGroupMessage',
           messageData
         );
+
+        if(memberId!==socket.userId.toString()){
+          void sendPushNotification(memberId, {
+            title: group.name || 'Propard',
+            body: sender?.username
+              ? `@${sender.username} a envoyé un message`
+              : 'Nouveau message de groupe',
+            url: '/',
+            tag: `group-${groupId.toString()}`,
+            data: {
+              type: 'group-message',
+              groupId: groupId.toString(),
+              senderId: socket.userId.toString()
+            }
+          });
+        }
       }
 
       socket.emit('groupMessageSent',messageData);
