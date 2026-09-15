@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { enablePushNotifications, disablePushNotifications } from '../utils/pushNotifications';
 
 export default function ProfilePage({
   userId,
@@ -34,6 +35,9 @@ export default function ProfilePage({
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushMessage, setPushMessage] = useState('');
 
   const fileInputRef = useRef(null);
 
@@ -75,6 +79,34 @@ export default function ProfilePage({
     setConfirmAction(null);
     setEditingNickname(false);
   }, [userId, token]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkPush = async () => {
+      if (!profile?.isOwnProfile || !('serviceWorker' in navigator)) {
+        return;
+      }
+
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription =
+          await registration.pushManager?.getSubscription();
+
+        if (!cancelled) {
+          setPushEnabled(Boolean(subscription));
+        }
+      } catch {
+        if (!cancelled) setPushEnabled(false);
+      }
+    };
+
+    checkPush();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.isOwnProfile]);
 
   useEffect(() => {
     const close = () => setMenuOpen(false);
@@ -205,6 +237,44 @@ export default function ProfilePage({
     };
 
     reader.readAsDataURL(file);
+  };
+
+  const handleEnablePush = async () => {
+    setPushLoading(true);
+    setPushMessage('');
+
+    try {
+      await enablePushNotifications(token);
+      setPushEnabled(true);
+      setPushMessage('✓ Notifications activées sur cet appareil.');
+    } catch (err) {
+      setPushMessage(
+        err.response?.data?.error ||
+        err.message ||
+        'Impossible d’activer les notifications.'
+      );
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
+  const handleDisablePush = async () => {
+    setPushLoading(true);
+    setPushMessage('');
+
+    try {
+      await disablePushNotifications(token);
+      setPushEnabled(false);
+      setPushMessage('Notifications désactivées sur cet appareil.');
+    } catch (err) {
+      setPushMessage(
+        err.response?.data?.error ||
+        err.message ||
+        'Impossible de désactiver les notifications.'
+      );
+    } finally {
+      setPushLoading(false);
+    }
   };
 
   const saveProfile = async () => {
@@ -594,6 +664,33 @@ export default function ProfilePage({
           <p style={styles.errorText}>
             {actionError}
           </p>
+        )}
+
+        {profile.isOwnProfile && (
+          <div style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              style={styles.secondaryBtn}
+              onClick={
+                pushEnabled
+                  ? handleDisablePush
+                  : handleEnablePush
+              }
+              disabled={pushLoading}
+            >
+              {pushLoading
+                ? '...'
+                : pushEnabled
+                  ? 'Désactiver les notifications'
+                  : '🔔 Activer les notifications'}
+            </button>
+
+            {pushMessage && (
+              <p style={styles.infoText}>
+                {pushMessage}
+              </p>
+            )}
+          </div>
         )}
 
         {isEditing ? (
