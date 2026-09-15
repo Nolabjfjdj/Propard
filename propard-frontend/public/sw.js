@@ -164,19 +164,6 @@ self.addEventListener('fetch', event => {
 
 self.addEventListener('push', event => {
   event.waitUntil((async () => {
-    // Si une fenêtre Propard est actuellement visible, Socket.IO s'en charge.
-    // Cela évite une double notification lorsque l'utilisateur est déjà devant le chat.
-    const clients = await self.clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true
-    });
-
-    const hasVisibleClient = clients.some(client => {
-      return client.visibilityState === 'visible';
-    });
-
-    if (hasVisibleClient) return;
-
     let data = {};
 
     try {
@@ -187,6 +174,63 @@ self.addEventListener('push', event => {
         body: 'Nouvelle notification'
       };
     }
+
+    // On regarde les fenêtres Propard actuellement visibles.
+    // Pour un message privé ou de groupe, on ne supprime la notification
+    // que si la conversation concernée est réellement ouverte.
+    // Ainsi, un message reçu dans une autre conversation continue de
+    // générer une notification même si Propard est affiché à l'écran.
+    const clients = await self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    });
+
+    const notificationType = data.data?.type;
+    const conversationId =
+      notificationType === 'private-message'
+        ? data.data?.senderId?.toString()
+        : notificationType === 'group-message'
+          ? data.data?.groupId?.toString()
+          : null;
+
+    const hasMatchingVisibleConversation = clients.some(client => {
+      if (client.visibilityState !== 'visible') {
+        return false;
+      }
+
+      // Les anciennes notifications sans type gardent le comportement
+      // précédent : pas de doublon lorsqu'une fenêtre Propard est visible.
+      if (!notificationType || !conversationId) {
+        return true;
+      }
+
+      try {
+        const url = new URL(client.url);
+        const parts = url.pathname.split('/').filter(Boolean);
+
+        if (notificationType === 'private-message') {
+          return (
+            parts.length === 2 &&
+            parts[0] === 'chat' &&
+            parts[1] === conversationId
+          );
+        }
+
+        if (notificationType === 'group-message') {
+          return (
+            parts.length === 2 &&
+            parts[0] === 'group' &&
+            parts[1] === conversationId
+          );
+        }
+      } catch {
+        return false;
+      }
+
+      return false;
+    });
+
+    if (hasMatchingVisibleConversation) return;
 
     const title = data.title || 'Propard';
     const options = {
