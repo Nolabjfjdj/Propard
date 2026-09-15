@@ -38,6 +38,35 @@ const userSchema = new mongoose.Schema({
     default: null
   },
 
+  pushSubscriptions: {
+    type: [
+      {
+        endpoint: {
+          type: String,
+          required: true,
+          maxlength: 2048
+        },
+        keys: {
+          p256dh: {
+            type: String,
+            required: true,
+            maxlength: 256
+          },
+          auth: {
+            type: String,
+            required: true,
+            maxlength: 256
+          }
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now
+        }
+      }
+    ],
+    default: []
+  },
+
   e2eeKeyBackup: {
     type: mongoose.Schema.Types.Mixed,
     default: null
