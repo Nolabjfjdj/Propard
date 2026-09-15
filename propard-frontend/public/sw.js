@@ -1,4 +1,4 @@
-const CACHE_NAME = 'propard-offline-v2';
+const CACHE_NAME = 'propard-offline-v3';
 
 const APP_SHELL = [
   '/',
@@ -169,68 +169,64 @@ self.addEventListener('push', event => {
     try {
       data = event.data ? event.data.json() : {};
     } catch {
-      data = {
-        title: 'Propard',
-        body: 'Nouvelle notification'
-      };
+      data = {};
     }
 
-    // On regarde les fenêtres Propard actuellement visibles.
-    // Pour un message privé ou de groupe, on ne supprime la notification
-    // que si la conversation concernée est réellement ouverte.
-    // Ainsi, un message reçu dans une autre conversation continue de
-    // générer une notification même si Propard est affiché à l'écran.
+    const notificationData = data.data || {};
+
+    /*
+     * Une notification Push ne doit être masquée que si la conversation
+     * concernée est réellement ouverte dans une fenêtre Propard visible.
+     *
+     * Avant, on masquait la notification dès qu'une fenêtre Propard était
+     * visible. Cela supprimait donc aussi les notifications provenant
+     * d'autres conversations/groupes.
+     */
     const clients = await self.clients.matchAll({
       type: 'window',
       includeUncontrolled: true
     });
 
-    const notificationType = data.data?.type;
-    const conversationId =
-      notificationType === 'private-message'
-        ? data.data?.senderId?.toString()
-        : notificationType === 'group-message'
-          ? data.data?.groupId?.toString()
-          : null;
+    const normalize = value =>
+      value === undefined || value === null
+        ? ''
+        : String(value);
 
-    const hasMatchingVisibleConversation = clients.some(client => {
-      if (client.visibilityState !== 'visible') {
-        return false;
-      }
+    const senderId = normalize(notificationData.senderId);
+    const groupId = normalize(notificationData.groupId);
+    const type = normalize(notificationData.type);
 
-      // Les anciennes notifications sans type gardent le comportement
-      // précédent : pas de doublon lorsqu'une fenêtre Propard est visible.
-      if (!notificationType || !conversationId) {
-        return true;
-      }
+    const isSameOpenConversation = clients.some(client => {
+      if (client.visibilityState !== 'visible') return false;
+
+      let url;
 
       try {
-        const url = new URL(client.url);
-        const parts = url.pathname.split('/').filter(Boolean);
-
-        if (notificationType === 'private-message') {
-          return (
-            parts.length === 2 &&
-            parts[0] === 'chat' &&
-            parts[1] === conversationId
-          );
-        }
-
-        if (notificationType === 'group-message') {
-          return (
-            parts.length === 2 &&
-            parts[0] === 'group' &&
-            parts[1] === conversationId
-          );
-        }
+        url = new URL(client.url);
       } catch {
         return false;
+      }
+
+      const parts = url.pathname
+        .split('/')
+        .filter(Boolean);
+
+      if (type === 'private-message' && senderId) {
+        return parts.length === 2 &&
+          parts[0] === 'chat' &&
+          parts[1] === senderId;
+      }
+
+      if (type === 'group-message' && groupId) {
+        return parts.length === 2 &&
+          parts[0] === 'group' &&
+          parts[1] === groupId;
       }
 
       return false;
     });
 
-    if (hasMatchingVisibleConversation) return;
+    if (isSameOpenConversation) return;
 
     const title = data.title || 'Propard';
     const options = {
@@ -241,7 +237,7 @@ self.addEventListener('push', event => {
       renotify: true,
       data: {
         url: data.url || '/',
-        ...(data.data || {})
+        ...notificationData
       }
     };
 
