@@ -1,435 +1,493 @@
 # Propard
 
-> **Propard** est une plateforme web de communication et d'interaction française entre utilisateurs, développée avec **React**, **Node.js**, **Express**, **MongoDB** et **Socket.IO**.
+Propard est une plateforme web française de communication développée avec React, Node.js, Express, MongoDB et Socket.IO.
 
-[![Website](https://img.shields.io/badge/Website-propard.site-blue?style=flat-square)](https://propard.site)
-[![GitHub](https://img.shields.io/badge/GitHub-Repository-black?style=flat-square&logo=github)](https://github.com/Nolabjfjdj/Propard)
-[![License](https://img.shields.io/badge/License-Proprietary-red?style=flat-square)](./LICENSE)
+## Fonctionnalités
 
----
+- Inscription et connexion avec JWT
+- Protection des mots de passe avec bcryptjs
+- Profils utilisateurs, avatars, surnoms et blocage
+- Système d'amis
+- Messagerie privée en temps réel
+- Chiffrement de bout en bout des messages privés
+- Sauvegarde chiffrée de la clé privée E2EE
+- Système de groupes
+- Messagerie de groupe en temps réel
+- Chiffrement des messages de groupe
+- Gestion des membres et rôles de groupe
+- Appels audio privés avec WebRTC
+- Appels audio de groupe avec WebRTC
+- Serveurs STUN/TURN et ICE restart
+- Support de plusieurs serveurs Metered
+- Notifications Web Push
+- Service Worker
+- Fonctionnalités hors ligne
+- Mini-jeu hors ligne
+- Annonces globales
+- Système de signalement
+- Gestion administrative des signalements
+- Pages d'aide, CGU et politique de confidentialité
+- Suppression de compte avec traitement côté serveur
 
-## 📖 Présentation
+## Architecture
 
-**Propard** est un projet indépendant français regroupant différentes fonctionnalités de communication et d'interaction entre utilisateurs.
+```text
+Navigateur
+├── React / Vite
+├── Socket.IO Client
+├── Web Crypto API
+├── WebRTC
+├── Web Push
+└── Service Worker
+        │
+        │ HTTP / WebSocket
+        ▼
+Backend
+├── Node.js
+├── Express
+├── JWT / bcryptjs
+├── Socket.IO
+├── Web Push
+└── WebRTC / TURN
+        │
+        │ Mongoose
+        ▼
+MongoDB
+├── Users
+├── Messages
+├── Groups
+├── GroupMessages
+├── Reports
+└── Announcements
+```
 
-L'application est composée de deux parties principales :
+## Structure
 
-- **Frontend** — interface utilisateur développée avec React et Vite.
-- **Backend** — serveur Node.js / Express fournissant l'API et les fonctionnalités temps réel.
-
-Les données sont stockées avec **MongoDB** via **Mongoose**, tandis que **Socket.IO** est utilisé pour les communications en temps réel.
-
----
-
-## ✨ Fonctionnalités
-
-| Fonctionnalité | Description |
-|---|---|
-| 👤 Comptes | Création et authentification des utilisateurs |
-| 🔐 Authentification | JWT et mots de passe protégés avec bcrypt |
-| 👥 Amis | Demandes, acceptation, suppression, blocage et surnoms |
-| 💬 Messagerie | Messages privés entre utilisateurs |
-| 🔒 Chiffrement | Chiffrement côté client des messages |
-| ⚡ Temps réel | Communications via Socket.IO |
-| 📢 Annonces | Système d'annonces |
-| 🚨 Signalements | Signalement et gestion des messages signalés |
-| 🛡️ Administration | Fonctions d'administration protégées |
-| 📞 WebRTC | Signalisation et infrastructure STUN/TURN |
-| 🗄️ Base de données | MongoDB avec Mongoose |
-| 🗑️ Suppression de compte | Gestion de la suppression et de la restauration temporaire |
-
----
-
-## 🧱 Architecture
-
-<pre>
-┌───────────────────────────────┐
-│           UTILISATEUR         │
-│          Navigateur           │
-└───────────────┬───────────────┘
-                │
-                │ HTTPS
-                ▼
-┌───────────────────────────────┐
-│           FRONTEND            │
-│                               │
-│       React + Vite            │
-│                               │
-│     Socket.IO Client          │
-└───────────────┬───────────────┘
-                │
-                │ HTTP / Socket.IO
-                ▼
-┌───────────────────────────────┐
-│            BACKEND            │
-│                               │
-│      Node.js + Express        │
-│                               │
-│  ├── Authentication           │
-│  ├── Friends                  │
-│  ├── Messages                 │
-│  ├── Announcements            │
-│  ├── Reports                  │
-│  ├── Administration           │
-│  └── TURN                     │
-└───────────────┬───────────────┘
-                │
-                ▼
-┌───────────────────────────────┐
-│            MongoDB            │
-│                               │
-│  ├── Users                    │
-│  ├── Messages                 │
-│  ├── Reports                  │
-│  └── Announcements            │
-└───────────────────────────────┘
-</pre>
-
----
-
-## 📁 Structure du projet
-
-<pre>
+```text
 Propard/
-│
 ├── propard-backend/
 │   ├── middleware/
-│   │   ├── auth.js
-│   │   └── rateLimit.js
-│   │
 │   ├── models/
-│   │   ├── Announcement.js
-│   │   ├── Message.js
-│   │   ├── Report.js
-│   │   └── User.js
-│   │
 │   ├── routes/
-│   │   ├── admin.js
-│   │   ├── announcements.js
-│   │   ├── auth.js
-│   │   ├── friends.js
-│   │   ├── reports.js
-│   │   ├── reportsAdmin.js
-│   │   └── turn.js
-│   │
+│   ├── services/
 │   ├── index.js
-│   ├── package.json
-│   └── package-lock.json
+│   └── package.json
 │
 ├── propard-frontend/
 │   ├── public/
+│   │   ├── sw.js
+│   │   ├── notification.wav
+│   │   ├── privacy.html
+│   │   ├── terms.html
+│   │   ├── robots.txt
+│   │   └── sitemap.xml
 │   ├── src/
-│   ├── index.html
-│   ├── package.json
-│   └── vite.config.js
+│   │   ├── components/
+│   │   │   ├── Chat.jsx
+│   │   │   ├── FriendList.jsx
+│   │   │   ├── GroupChat.jsx
+│   │   │   ├── GroupManager.jsx
+│   │   │   ├── GroupProfile.jsx
+│   │   │   ├── GroupVoiceCall.jsx
+│   │   │   ├── OfflineGame.jsx
+│   │   │   └── VoiceCall.jsx
+│   │   └── utils/
+│   │       ├── crypto.js
+│   │       ├── groupCrypto.js
+│   │       └── pushNotifications.js
+│   └── package.json
 │
-├── .gitignore
-├── LICENSE
 └── README.md
-</pre>
+```
 
----
+## Technologies
 
-## 🖥️ Frontend
+### Frontend
 
-Le frontend est développé avec **React** et construit avec **Vite**.
+- React
+- React Router
+- Axios
+- Socket.IO Client
+- Vite
+- ESLint
+- Web Crypto API
+- WebRTC
+- Service Worker
+- Web Push
 
-### Technologies
+### Backend
 
-- ⚛️ React
-- 🧭 React Router
-- 🌐 Axios
-- ⚡ Socket.IO Client
-- ⚡ Vite
-- 🧹 ESLint
+- Node.js
+- Express
+- MongoDB
+- Mongoose
+- JSON Web Tokens
+- bcryptjs
+- Socket.IO
+- web-push
+- Nodemailer
+- dotenv
+- CORS
 
----
+## Authentification
 
-## ⚙️ Backend
+Les routes protégées utilisent un token JWT envoyé avec :
 
-Le backend repose sur :
+```http
+Authorization: Bearer <token>
+```
 
-- 🟢 Node.js
-- 🚂 Express
-- 🍃 Mongoose
-- 🗄️ MongoDB
-- 🔐 JSON Web Token
-- 🔑 bcryptjs
-- ⚡ Socket.IO
-- 📧 Nodemailer
-- 🔧 dotenv
-- 🌐 CORS
+Les mots de passe sont protégés avec `bcryptjs`.
 
-Le serveur peut également servir le frontend compilé en production.
+Le middleware d'authentification se trouve dans :
 
----
+```text
+propard-backend/middleware/auth.js
+```
+
+## Messagerie privée
 
-## 🔑 Authentification
+Les conversations privées utilisent Socket.IO pour le temps réel.
 
-Propard utilise **JWT** pour l'authentification et **bcryptjs** pour le traitement des mots de passe.
+Les messages sont chiffrés côté client avec :
 
-Les inscriptions appliquent notamment des règles sur :
+```text
+ECDH P-256
+    ↓
+clé partagée
+    ↓
+AES-256-GCM
+    ↓
+message chiffré
+```
+
+Le serveur ne reçoit pas le message privé en clair lorsqu'il est envoyé sous forme chiffrée.
+
+Le payload de message utilise une version et contient notamment :
+
+```json
+{
+  "v": 1,
+  "iv": "...",
+  "ct": "..."
+}
+```
+
+## Sauvegarde E2EE
+
+La clé privée peut être sauvegardée sous une forme chiffrée afin de permettre sa récupération sur un autre appareil.
+
+Le mécanisme utilise :
+
+```text
+PBKDF2-SHA-256
+600 000 itérations
+        ↓
+AES-256-GCM
+```
+
+Le mot de passe et la clé privée en clair ne sont pas envoyés au serveur dans ce processus.
+
+## Groupes
+
+Le système de groupes est notamment composé de :
+
+```text
+propard-backend/models/Group.js
+propard-backend/models/GroupMessage.js
+propard-backend/routes/groups.js
 
-- le format du nom d'utilisateur ;
-- sa longueur ;
-- son unicité ;
-- la longueur minimale du mot de passe.
+propard-frontend/src/components/GroupChat.jsx
+propard-frontend/src/components/GroupManager.jsx
+propard-frontend/src/components/GroupProfile.jsx
+propard-frontend/src/components/GroupVoiceCall.jsx
+propard-frontend/src/utils/groupCrypto.js
+```
+
+Les groupes prennent en charge :
+
+- création de groupes
+- membres
+- rôles `owner`, `admin` et `member`
+- gestion des membres
+- départ et suppression
+- messages
+- modification et suppression des messages
+- lecture et messages non lus
+- appels audio de groupe
+
+Les messages de groupe sont également chiffrés côté client.
+
+## Socket.IO
+
+Socket.IO est utilisé pour la messagerie, la présence et les appels.
+
+### Messages privés
+
+```text
+sendMessage
+newMessage
+messageSent
+messageError
+```
 
-Les routes nécessitant une authentification utilisent le middleware dédié.
+### Appels privés
 
----
+```text
+callUser
+incomingCall
+answerCall
+callAnswered
+iceCandidate
+iceRestartOffer
+iceRestartAnswer
+endCall
+callEnded
+```
 
-## 👥 Système d'amis
+### Groupes et appels de groupe
 
-Le système d'amis permet notamment :
+```text
+sendGroupMessage
+newGroupMessage
+groupMessageSent
+groupMessageError
 
-- ➕ d'envoyer une demande ;
-- ✅ d'accepter une demande ;
-- ❌ de refuser ou supprimer une relation ;
-- ✏️ de définir un surnom ;
-- 🚫 de bloquer un utilisateur ;
-- 🔓 de débloquer un utilisateur.
+groupCallStart
+groupCallStarted
+groupCallInvite
+groupCallJoin
+groupCallParticipants
+groupCallOffer
+groupCallAnswer
+groupCallIceCandidate
+groupCallIceRestartOffer
+groupCallIceRestartAnswer
+groupCallLeave
+groupCallMemberLeft
+groupCallEnded
+groupCallError
+```
 
-L'ajout d'un utilisateur peut notamment utiliser son **ID** ou son **IP alias**.
+## WebRTC et TURN
 
----
+Les informations ICE/TURN sont fournies par :
 
-## 💬 Messagerie
+```http
+GET /api/turn-credentials
+```
 
-Les utilisateurs peuvent échanger des messages avec leurs amis.
+La route est protégée par authentification et limitée à 10 demandes par minute et par utilisateur.
 
-La messagerie prend notamment en charge :
+Le backend peut utiliser plusieurs serveurs Metered :
 
-- 💬 envoi de messages ;
-- ✏️ modification ;
-- 🗑️ suppression ;
-- 👀 lecture des messages ;
-- 🔔 messages non lus ;
-- ⚡ réception en temps réel.
+```env
+METERED_DOMAIN=
+METERED_SECRET_KEY=
 
-Les messages utilisant le système cryptographique prévu par le client sont transmis au backend sous forme chiffrée.
+METERED1_DOMAIN=
+METERED1_SECRET_KEY=
 
----
+# ...
 
-## 🔐 Chiffrement
+METERED20_DOMAIN=
+METERED20_SECRET_KEY=
+```
 
-Propard utilise un système de **chiffrement côté client**.
+Les serveurs configurés sont interrogés en parallèle et les entrées ICE sont regroupées puis mélangées.
 
-Le backend reçoit notamment des données contenant :
+## Notifications Push
 
-- une version du format ;
-- un vecteur d'initialisation (`iv`) ;
-- le contenu chiffré (`ct`).
+Propard utilise Web Push avec :
 
-Les clés publiques sont enregistrées côté serveur afin de permettre au client d'utiliser le système cryptographique prévu par l'application.
+```text
+propard-backend/routes/push.js
+propard-backend/services/push.js
+propard-frontend/src/utils/pushNotifications.js
+propard-frontend/public/sw.js
+```
 
----
+Les notifications prennent notamment en charge :
 
-## ⚡ Temps réel
+- messages privés
+- messages de groupe
+- abonnements par appareil/navigateur
+- suppression des abonnements invalides
+- réception en arrière-plan
+- ouverture de la conversation concernée
 
-**Socket.IO** est utilisé pour plusieurs fonctionnalités temps réel.
+Lorsqu'une conversation pertinente est déjà ouverte, le client peut éviter d'afficher une notification inutile.
 
-Le serveur gère notamment :
+## Service Worker et hors ligne
 
-- `authenticate`
-- `sendMessage`
-- `callUser`
-- `answerCall`
-- `iceCandidate`
-- `iceRestartOffer`
-- `iceRestartAnswer`
-- `endCall`
+Le Service Worker se trouve ici :
 
-Le système permet également de suivre la présence des utilisateurs connectés.
+```text
+propard-frontend/public/sw.js
+```
 
----
+Il est utilisé pour les notifications Push et les fonctionnalités liées au fonctionnement hors ligne.
 
-## 📢 Annonces
+Le projet contient également :
 
-Propard possède un système d'annonces permettant à l'administration de publier une annonce active.
+```text
+OfflineGame.jsx
+```
 
-Les utilisateurs peuvent :
+pour le mini-jeu hors ligne.
 
-- 📢 recevoir une annonce ;
-- 👀 la consulter ;
-- ✅ l'accepter.
+## Annonces
 
-Les annonces acceptées sont enregistrées pour chaque compte.
+Les annonces globales sont gérées par le backend et affichées côté client, notamment avec :
 
----
+```text
+GlobalAnnouncement.jsx
+```
 
-## 🚨 Signalements
+## Signalements et administration
 
-Les utilisateurs peuvent signaler un message.
+Les signalements utilisent notamment :
 
-Un signalement contient notamment :
+```text
+propard-backend/routes/reports.js
+propard-backend/routes/reportsAdmin.js
+propard-backend/routes/admin.js
+propard-backend/models/Report.js
+```
 
-- 👤 le signalant ;
-- 👤 l'utilisateur signalé ;
-- 💬 le message concerné ;
-- 📝 le contenu du message ;
-- 📌 un motif facultatif ;
-- 📊 son statut.
+## Modèles MongoDB
 
-Les statuts disponibles sont :
+Les principaux modèles sont :
 
-- `new`
-- `processed`
-- `rejected`
+```text
+User
+Message
+Group
+GroupMessage
+Report
+Announcement
+```
 
-Les signalements disposent également de limitations afin de réduire les abus.
+## Variables d'environnement
 
----
+### Base
 
-## 🛡️ Administration
+```env
+MONGO_URI=
+JWT_SECRET=
+FRONTEND_ORIGIN=
+PORT=
+```
 
-Le backend possède plusieurs fonctionnalités d'administration protégées par des clés secrètes configurées dans les variables d'environnement.
+### Administration
 
-Elles permettent notamment de gérer :
+```env
+ADMIN_KEY=
+ADMIN_KEY_ANNOUNCEMENT=
+```
 
-- 🔑 certains comptes ;
-- 📢 les annonces ;
-- 🚨 les signalements.
+### Metered / TURN
 
-La gestion des signalements utilise notamment :
+```env
+METERED_DOMAIN=
+METERED_SECRET_KEY=
 
-`/api/admin/reports`
+METERED1_DOMAIN=
+METERED1_SECRET_KEY=
+# ...
+METERED20_DOMAIN=
+METERED20_SECRET_KEY=
+```
 
----
+### Web Push
 
-## 📞 WebRTC & TURN
+```env
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=
+```
 
-Propard possède une infrastructure de signalisation permettant d'utiliser **WebRTC**.
+Les secrets ne doivent jamais être commités dans le dépôt.
 
-Le backend fournit les informations ICE via :
-
-`/api/turn-credentials`
-
-La configuration peut utiliser plusieurs serveurs **STUN/TURN**, récupérés en parallèle puis regroupés côté serveur.
-
----
-
-## 🗄️ Base de données
-
-Propard utilise **MongoDB** avec **Mongoose**.
-
-| Modèle | Utilisation |
-|---|---|
-| `User` | Comptes et relations entre utilisateurs |
-| `Message` | Messages privés |
-| `Report` | Signalements |
-| `Announcement` | Annonces |
-
----
-
-## 🛡️ Sécurité
-
-Le backend utilise notamment :
-
-- 🔐 JWT ;
-- 🔑 bcrypt ;
-- 🛡️ middleware d'authentification ;
-- 🚦 limitations de requêtes ;
-- 🔒 headers de sécurité HTTP ;
-- 🌐 configuration CORS ;
-- 🔐 variables d'environnement pour les secrets ;
-- 🕵️ IP aliases ;
-- 🔒 chiffrement côté client.
-
-Les limitations de requêtes actuelles utilisent un stockage en mémoire du processus Node.js.
-
----
-
-## 📥 Installation
+## Installation
 
 ### Cloner le dépôt
 
-    git clone https://github.com/Nolabjfjdj/Propard.git
-    cd Propard
+```bash
+git clone https://github.com/Nolabjfjdj/Propard.git
+cd Propard
+```
 
 ### Backend
 
-    cd propard-backend
-    npm install
+```bash
+cd propard-backend
+npm install
+npm start
+```
+
+Développement :
+
+```bash
+npm run dev
+```
 
 ### Frontend
 
-    cd ../propard-frontend
-    npm install
+Dans un autre terminal :
 
----
+```bash
+cd propard-frontend
+npm install
+npm run dev
+```
 
-## ▶️ Développement
+Build :
 
-### Backend
+```bash
+npm run build
+```
 
-    cd propard-backend
-    npm run dev
+## Scripts frontend
 
-### Frontend
+```bash
+npm run dev
+npm run build
+npm run lint
+npm run preview
+```
 
-    cd propard-frontend
-    npm run dev
+## Scripts backend
 
----
+```bash
+npm start
+npm run dev
+```
 
-## 🏗️ Production
+## Pages et documents
 
-Construire le frontend :
+Le projet contient notamment :
 
-    cd propard-frontend
-    npm run build
+- page d'aide
+- page de contact
+- conditions générales d'utilisation
+- politique de confidentialité
+- pages d'administration
+- `terms.html`
+- `privacy.html`
 
-Le backend peut ensuite servir le dossier `dist` généré par le frontend.
+Ces documents doivent être mis à jour lorsque les fonctionnalités ou le traitement des données évoluent.
 
----
+## Projet
 
-## 🔐 Variables d'environnement
+**Propard** est développé indépendamment par **BananeVR**.
 
-Le backend utilise `dotenv` pour sa configuration.
+Site : https://propard.site
 
-Les secrets et paramètres sensibles doivent être définis dans les variables d'environnement et ne doivent pas être commités dans le dépôt.
+Dépôt : https://github.com/Nolabjfjdj/Propard.git
 
-Les principales configurations concernent notamment :
+## Licence
 
-- 🗄️ MongoDB
-- 🔑 JWT
-- 🛡️ clés d'administration
-- 🌐 origine du frontend
-- 📞 serveurs TURN
+Le backend utilise actuellement la licence `ISC` indiquée dans son `package.json`.
 
----
-
-## ❤️ Health Check
-
-Le backend possède une route de vérification :
-
-`GET /health`
-
-Elle permet notamment de vérifier que le serveur répond correctement.
-
----
-
-## 📜 Licence
-
-Le projet est distribué sous une **licence propriétaire**.
-
-Consultez [`LICENSE`](./LICENSE) pour connaître les conditions complètes d'utilisation.
-
----
-
-## 🔗 Liens
-
-🌐 **Site officiel :** https://propard.site
-
-💻 **GitHub :** https://github.com/Nolabjfjdj/Propard
-
----
-
-## 👨‍💻 Projet
-
-**Propard** — Projet indépendant français 🇫🇷
-
-Développé par **BananeVR**.
-
-> **Propard — Communication, simplicité et sécurité.**
+Les dépendances tierces restent soumises à leurs propres licences.
