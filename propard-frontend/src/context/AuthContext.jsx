@@ -42,7 +42,7 @@ const uploadKeyBackup = async (authToken, privateKeyJwk, password) => {
     password
   );
 
-  await axios.post(
+  await api.post(
     '/api/auth/keybackup',
     { backup },
     {
@@ -105,7 +105,7 @@ const ensureEncryptionKeys = async (
           !serverPub ||
           !samePublicKey(restoredPublicKey, serverPub)
         ) {
-          await axios.patch(
+          await api.patch(
             '/api/auth/publickey',
             {
               publicKey: JSON.stringify(restoredPublicKey)
@@ -138,7 +138,7 @@ const ensureEncryptionKeys = async (
           !serverPub ||
           !samePublicKey(derivedPublicKeyJwk, serverPub)
         ) {
-          await axios.patch(
+          await api.patch(
             '/api/auth/publickey',
             {
               publicKey: JSON.stringify(derivedPublicKeyJwk)
@@ -195,7 +195,7 @@ const ensureEncryptionKeys = async (
       privateKeyJwk
     } = await generateKeyPair();
 
-    await axios.patch(
+    await api.patch(
       '/api/auth/publickey',
       {
         publicKey: JSON.stringify(publicKeyJwk)
@@ -381,7 +381,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const interceptor =
-      axios.interceptors.response.use(
+      api.interceptors.response.use(
         response => response,
 
         error => {
@@ -402,7 +402,7 @@ export function AuthProvider({ children }) {
       );
 
     return () =>
-      axios.interceptors.response.eject(
+      api.interceptors.response.eject(
         interceptor
       );
   }, []);
