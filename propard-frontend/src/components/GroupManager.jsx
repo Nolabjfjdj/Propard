@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { getStoredPrivateKeyJwk } from '../utils/crypto';
 import {
   generateGroupKey,
@@ -59,7 +59,7 @@ export default function GroupManager({
     setError('');
 
     try {
-      const meRes = await axios.get('/api/auth/me', {
+      const meRes = await api.get('/api/auth/me', {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -130,7 +130,7 @@ export default function GroupManager({
         });
       }
 
-      const res = await axios.post(
+      const res = await api.post(
         '/api/groups/create',
         {
           name: clean,
