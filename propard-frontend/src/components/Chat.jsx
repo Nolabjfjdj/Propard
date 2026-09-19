@@ -37,7 +37,6 @@ export default function Chat({
   const [reportSuccess, setReportSuccess] = useState(false);
 
   const bottomRef = useRef(null);
-  const lastMessageTime = useRef(0);
   const messageCount = useRef(0);
   const messageCountTimer = useRef(null);
   const longPressTimer = useRef(null);
@@ -49,7 +48,6 @@ export default function Chat({
   const HOLD_TO_GRAB_MS = 180;
   const MOVE_CANCEL_PX = 12;
 
-  const SPAM_DELAY = 1000;
   const SPAM_LIMIT = 15;
 
   const normalize = id => id?.toString();
@@ -507,16 +505,15 @@ export default function Chat({
       return;
     }
 
-    const now = Date.now();
+    if (messageCount.current >= SPAM_LIMIT) {
+      setSpamWarning(true);
 
-    if (
-      now - lastMessageTime.current <
-      SPAM_DELAY
-    ) {
+      setTimeout(() => {
+        setSpamWarning(false);
+      }, 3000);
+
       return;
     }
-
-    lastMessageTime.current = now;
 
     messageCount.current += 1;
 
@@ -528,19 +525,6 @@ export default function Chat({
       setTimeout(() => {
         messageCount.current = 0;
       }, 10000);
-
-    if (
-      messageCount.current >
-      SPAM_LIMIT
-    ) {
-      setSpamWarning(true);
-
-      setTimeout(() => {
-        setSpamWarning(false);
-      }, 3000);
-
-      return;
-    }
 
     try {
       const encryptedContent =
