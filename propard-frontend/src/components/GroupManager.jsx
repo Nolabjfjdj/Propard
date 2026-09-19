@@ -17,24 +17,24 @@ export default function GroupManager({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    axios
-      .get('/api/auth/me', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
-      .then(res => {
-        setFriends(
-          (res.data.friends || []).filter(
-            friend => friend.userId
-          )
-        );
-      })
-      .catch(() => {
-        setError('Impossible de charger tes amis.');
-      });
-  }, [token]);
+useEffect(() => {
+  api
+    .get('/api/auth/me', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+    .then(res => {
+      setFriends(
+        (res.data.friends || []).filter(
+          friend => friend.userId
+        )
+      );
+    })
+    .catch(() => {
+      setError('Impossible de charger tes amis.');
+    });
+}, [token]);
 
   const toggle = id => {
     setSelected(prev =>
