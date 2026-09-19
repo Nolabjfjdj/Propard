@@ -1576,7 +1576,7 @@ const styles = {
 
   gameBtn: {
     position: 'absolute',
-    top: '14px',
+    top: 'calc(env(safe-area-inset-top) + 14px)',
     right: '14px',
     width: '30px',
     height: '30px',
