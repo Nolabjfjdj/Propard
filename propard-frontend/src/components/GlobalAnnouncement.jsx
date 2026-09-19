@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 
 export default function GlobalAnnouncement() {
@@ -20,7 +20,7 @@ export default function GlobalAnnouncement() {
       setLoading(true);
       setError('');
 
-      const response = await axios.get(
+      const response = await api.get(
         '/api/announcements/active',
         {
           headers: {
@@ -79,7 +79,7 @@ export default function GlobalAnnouncement() {
       setAccepting(true);
       setError('');
 
-      await axios.post(
+      await api.post(
         `/api/announcements/${announcement._id}/accept`,
         {},
         {
