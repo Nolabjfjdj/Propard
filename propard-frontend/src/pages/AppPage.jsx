@@ -1516,7 +1516,8 @@ export default function AppPage({
 const styles = {
   layout: {
     display: 'flex',
-    height: '100vh',
+    height: '100dvh',
+    minHeight: '100vh',
     background: 'var(--bg-primary)',
     overflow: 'hidden'
   },
@@ -1534,7 +1535,7 @@ const styles = {
     zIndex: 100,
     display: 'flex',
     flexDirection: 'column',
-    padding: '16px',
+    padding: 'max(16px, env(safe-area-inset-top)) 16px 16px',
     gap: '12px',
     overflowY: 'auto',
     background: 'var(--bg-secondary)',
@@ -1770,7 +1771,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '12px 16px',
+    padding: 'max(12px, env(safe-area-inset-top)) 16px 12px',
     background: 'var(--bg-secondary)',
     borderBottom: '1px solid var(--border)'
   },
