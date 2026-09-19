@@ -120,21 +120,17 @@ jobs:
       - name: Construire Propard
         run: npm run build
 
-      - name: Ajouter iOS
-        run: npx cap add ios
+      - name: Ajouter iOS avec Swift Package Manager
+        run: npx cap add ios --packagemanager SPM
 
       - name: Synchroniser iOS
         run: npx cap sync ios
-
-      - name: Installer les dépendances CocoaPods
-        working-directory: propard-frontend/ios/App
-        run: pod install --repo-update
 
       - name: Compiler l'application iOS
         working-directory: propard-frontend/ios/App
         run: |
           xcodebuild \
-            -workspace App.xcworkspace \
+            -project App.xcodeproj \
             -scheme App \
             -sdk iphonesimulator \
             -configuration Debug \
