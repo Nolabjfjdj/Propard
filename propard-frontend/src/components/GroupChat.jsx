@@ -3250,7 +3250,7 @@ const styles = {
       'var(--bg-tertiary)',
     color:
       'var(--text-primary)',
-    fontSize: '14px',
+    fontSize: '16px',
     outline: 'none'
   },
 
