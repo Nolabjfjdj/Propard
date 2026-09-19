@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
@@ -45,7 +45,7 @@ export default function AuthPage({ mode }) {
           ? '/api/auth/login'
           : '/api/auth/register';
 
-      const res = await axios.post(route, {
+      const res = await api.post(route, {
         username,
         password
       });
