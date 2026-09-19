@@ -249,8 +249,32 @@ self.addEventListener('notificationclick', event => {
   event.notification.close();
 
   event.waitUntil((async () => {
+    const notificationData =
+      event.notification.data || {};
+
+    let targetPath =
+      notificationData.url || '';
+
+    if (
+      (!targetPath || targetPath === '/') &&
+      notificationData.type === 'private-message' &&
+      notificationData.senderId
+    ) {
+      targetPath =
+        `/chat/${notificationData.senderId}`;
+    }
+
+    if (
+      (!targetPath || targetPath === '/') &&
+      notificationData.type === 'group-message' &&
+      notificationData.groupId
+    ) {
+      targetPath =
+        `/group/${notificationData.groupId}`;
+    }
+
     const targetUrl = new URL(
-      event.notification.data?.url || '/',
+      targetPath || '/',
       self.location.origin
     ).href;
 
@@ -275,4 +299,33 @@ self.addEventListener('notificationclick', event => {
       await self.clients.openWindow(targetUrl);
     }
   })());
-});
+});     const notificationData =
+       event.notification.data || {};
+
+     let targetPath =
+       notificationData.url || '';
+
+     if (
+       (!targetPath || targetPath === '/') &&
+       notificationData.type === 'private-message' &&
+       notificationData.senderId
+     ) {
+       targetPath =
+         `/chat/${notificationData.senderId}`;
+     }
+
+     if (
+       (!targetPath || targetPath === '/') &&
+       notificationData.type === 'group-message' &&
+       notificationData.groupId
+     ) {
+       targetPath =
+         `/group/${notificationData.groupId}`;
+     }
+
+     const targetUrl = new URL(
+       targetPath || '/',
+       self.location.origin
+     ).href;
+
+
