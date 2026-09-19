@@ -1,5 +1,6 @@
 const webpush = require('web-push');
 const User = require('../models/User');
+const { configured: apnsConfigured, sendApnsNotification } = require('./apns');
 
 const publicKey = process.env.VAPID_PUBLIC_KEY;
 const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -17,11 +18,8 @@ function getPublicKey() {
   return publicKey || null;
 }
 
-async function sendPushNotification(userId, payload) {
-  if (!pushConfigured || !userId) return;
-
-  const user = await User.findById(userId).select('pushSubscriptions');
-  if (!user?.pushSubscriptions?.length) return;
+async function sendWebPush(user, payload) {
+  if (!pushConfigured || !user?.pushSubscriptions?.length) return;
 
   const body = JSON.stringify({
     title: payload.title || 'Propard',
@@ -44,9 +42,7 @@ async function sendPushNotification(userId, payload) {
             keys: subscription.keys
           },
           body,
-          {
-            TTL: 60 * 60
-          }
+          { TTL: 60 * 60 }
         );
       } catch (error) {
         if (error.statusCode === 404 || error.statusCode === 410) {
@@ -61,7 +57,7 @@ async function sendPushNotification(userId, payload) {
 
   if (staleEndpoints.length) {
     await User.updateOne(
-      { _id: userId },
+      { _id: user._id },
       {
         $pull: {
           pushSubscriptions: {
@@ -71,6 +67,56 @@ async function sendPushNotification(userId, payload) {
       }
     );
   }
+}
+
+async function sendApnsPush(user, payload) {
+  if (!apnsConfigured || !user?.apnsTokens?.length) return;
+
+  const staleTokens = [];
+
+  await Promise.all(
+    user.apnsTokens.map(async subscription => {
+      try {
+        const result = await sendApnsNotification(subscription.token, payload);
+
+        if (!result.ok) {
+          if (result.status === 400 || result.status === 410 || result.reason === 'BadDeviceToken' || result.reason === 'Unregistered') {
+            staleTokens.push(subscription.token);
+            return;
+          }
+
+          console.error('🔔 APNs error:', result.status || result.reason);
+        }
+      } catch (error) {
+        console.error('🔔 APNs request error:', error.message);
+      }
+    })
+  );
+
+  if (staleTokens.length) {
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $pull: {
+          apnsTokens: {
+            token: { $in: staleTokens }
+          }
+        }
+      }
+    );
+  }
+}
+
+async function sendPushNotification(userId, payload) {
+  if (!userId) return;
+
+  const user = await User.findById(userId).select('pushSubscriptions apnsTokens');
+  if (!user) return;
+
+  await Promise.all([
+    sendWebPush(user, payload),
+    sendApnsPush(user, payload)
+  ]);
 }
 
 module.exports = {
