@@ -1,0 +1,36 @@
+name: Propard Mobile
+
+on:
+  workflow_dispatch:
+
+jobs:
+  prepare:
+    name: Préparer Capacitor
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: propard-frontend
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: propard-frontend/package-lock.json
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Installer Capacitor
+        run: npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
+
+      - name: Construire Propard
+        run: npm run build
+
+      - name: Afficher la version de Capacitor
+        run: npx cap --version
