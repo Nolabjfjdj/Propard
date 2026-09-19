@@ -9,6 +9,7 @@ import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import GlobalAnnouncement from './components/GlobalAnnouncement';
 import OfflineGame from './components/OfflineGame';
+import api from './utils/api';
 
 async function checkPropardServer() {
   if (!navigator.onLine) {
@@ -16,9 +17,8 @@ async function checkPropardServer() {
   }
 
   try {
-    const response = await fetch('/api/auth/me', {
-      method: 'GET',
-      cache: 'no-store',
+    const response = await api.get('/api/auth/me', {
+      validateStatus: () => true,
       headers: {
         'Cache-Control': 'no-cache'
       }
