@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import {
   generateKeyPair,
   storePrivateKey,
@@ -74,7 +74,7 @@ const ensureEncryptionKeys = async (
      * on restaure la clé canonique avant toute synchronisation de publicKey.
      */
     if (password) {
-      const backupResponse = await axios.get(
+      const backupResponse = await api.get(
         '/api/auth/keybackup',
         {
           headers: {
@@ -278,7 +278,7 @@ export function AuthProvider({ children }) {
 
     const verify = async () => {
       try {
-        const response = await axios.get(
+        const response = await api.get(
           '/api/auth/me',
           {
             headers: {
@@ -346,7 +346,7 @@ export function AuthProvider({ children }) {
 
     const interval = setInterval(async () => {
       try {
-        await axios.get(
+        await api.get(
           '/api/auth/me',
           {
             headers: {
