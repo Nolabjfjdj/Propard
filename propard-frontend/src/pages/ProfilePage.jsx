@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
-import { enablePushNotifications, disablePushNotifications } from '../utils/pushNotifications';
+import { enablePushNotifications, disablePushNotifications, isPushEnabled } from '../utils/pushNotifications';
 
 export default function ProfilePage({
   userId,
@@ -84,17 +84,13 @@ export default function ProfilePage({
     let cancelled = false;
 
     const checkPush = async () => {
-      if (!profile?.isOwnProfile || !('serviceWorker' in navigator)) {
-        return;
-      }
+      if (!profile?.isOwnProfile) return;
 
       try {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription =
-          await registration.pushManager?.getSubscription();
+        const enabled = await isPushEnabled();
 
         if (!cancelled) {
-          setPushEnabled(Boolean(subscription));
+          setPushEnabled(enabled);
         }
       } catch {
         if (!cancelled) setPushEnabled(false);
