@@ -123,10 +123,9 @@ jobs:
       - name: Ajouter iOS avec Swift Package Manager
         run: npx cap add ios --packagemanager SPM
 
-      - name: Autoriser le microphone sur iOS
+      - name: Configurer l'audio iOS pour les appels en arrière-plan
         working-directory: propard-frontend
-        run: |
-          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string Propard a besoin du microphone pour les appels vocaux." ios/App/App/Info.plist
+        run: python3 scripts/configure_ios_audio.py
 
       - name: Synchroniser iOS
         run: npx cap sync ios
