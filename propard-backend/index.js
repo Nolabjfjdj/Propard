@@ -287,7 +287,7 @@ io.on('connection',socket=>{
       void sendPushNotification(receiverId, {
         title: sender?.username ? `@${sender.username}` : 'Propard',
         body: 'Nouveau message',
-        url: '/',
+        url: `/chat/${socket.userId.toString()}`,
         tag: `private-${socket.userId}`,
         data: {
           type: 'private-message',
@@ -412,7 +412,7 @@ io.on('connection',socket=>{
             body: sender?.username
               ? `@${sender.username} a envoyé un message`
               : 'Nouveau message de groupe',
-            url: '/',
+            url: `/group/${groupId.toString()}`,
             tag: `group-${groupId.toString()}`,
             data: {
               type: 'group-message',
