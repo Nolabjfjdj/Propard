@@ -2,10 +2,16 @@ name: Propard Mobile
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
-  prepare:
-    name: Préparer Capacitor
+  android:
+    name: Android
     runs-on: ubuntu-latest
 
     defaults:
@@ -29,8 +35,117 @@ jobs:
       - name: Installer Capacitor
         run: npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
 
+      - name: Initialiser Capacitor
+        run: |
+          if [ ! -f capacitor.config.ts ] && [ ! -f capacitor.config.json ]; then
+            npx cap init Propard site.propard --web-dir dist --npm-client npm
+          fi
+
       - name: Construire Propard
         run: npm run build
 
-      - name: Afficher la version de Capacitor
-        run: npx cap --version
+      - name: Ajouter Android
+        run: |
+          if [ ! -d ../android ]; then
+            npx cap add android
+          fi
+
+      - name: Synchroniser Android
+        run: npx cap sync android
+
+      - name: Donner les permissions Gradle
+        working-directory: android
+        run: chmod +x gradlew
+
+      - name: Compiler l'APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Publier l'APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: propard-android-debug
+          path: propard-frontend/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Publier le projet Android
+        uses: actions/upload-artifact@v4
+        with:
+          name: propard-android-project
+          path: propard-frontend/android
+          if-no-files-found: error
+
+
+  ios:
+    name: iOS
+    runs-on: macos-latest
+
+    defaults:
+      run:
+        working-directory: propard-frontend
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: propard-frontend/package-lock.json
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Installer Capacitor
+        run: npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
+
+      - name: Initialiser Capacitor
+        run: |
+          if [ ! -f capacitor.config.ts ] && [ ! -f capacitor.config.json ]; then
+            npx cap init Propard site.propard --web-dir dist --npm-client npm
+          fi
+
+      - name: Construire Propard
+        run: npm run build
+
+      - name: Ajouter iOS
+        run: |
+          if [ ! -d ../ios ]; then
+            npx cap add ios
+          fi
+
+      - name: Synchroniser iOS
+        run: npx cap sync ios
+
+      - name: Installer les dépendances CocoaPods
+        working-directory: propard-frontend/ios/App
+        run: pod install
+
+      - name: Compiler pour le simulateur iOS
+        working-directory: propard-frontend/ios/App
+        run: |
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -derivedDataPath "$RUNNER_TEMP/PropardDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Publier le projet iOS
+        uses: actions/upload-artifact@v4
+        with:
+          name: propard-ios-project
+          path: propard-frontend/ios
+          if-no-files-found: error
+
+      - name: Publier l'application iOS Simulator
+        uses: actions/upload-artifact@v4
+        with:
+          name: propard-ios-simulator
+          path: ${{ runner.temp }}/PropardDerivedData/Build/Products/Debug-iphonesimulator/*.app
+          if-no-files-found: error
