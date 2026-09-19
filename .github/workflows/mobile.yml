@@ -126,29 +126,37 @@ jobs:
       - name: Synchroniser iOS
         run: npx cap sync ios
 
-      - name: Compiler l'application iOS
+      - name: Compiler pour iPhone
         working-directory: propard-frontend/ios/App
         run: |
           xcodebuild \
             -project App.xcodeproj \
             -scheme App \
-            -sdk iphonesimulator \
-            -configuration Debug \
+            -sdk iphoneos \
+            -configuration Release \
             -derivedDataPath "$RUNNER_TEMP/PropardDerivedData" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             build
+
+      - name: Créer l'IPA non signée
+        working-directory: propard-frontend
+        run: |
+          mkdir -p ipa/Payload
+          cp -R "$RUNNER_TEMP/PropardDerivedData/Build/Products/Release-iphoneos/App.app" ipa/Payload/Propard.app
+          cd ipa
+          zip -r ../Propard-unsigned.ipa Payload
+
+      - name: Publier l'IPA non signée
+        uses: actions/upload-artifact@v4
+        with:
+          name: propard-ios-unsigned-ipa
+          path: propard-frontend/Propard-unsigned.ipa
+          if-no-files-found: error
 
       - name: Publier le projet iOS
         uses: actions/upload-artifact@v4
         with:
           name: propard-ios-project
           path: propard-frontend/ios
-          if-no-files-found: error
-
-      - name: Publier l'application iOS Simulator
-        uses: actions/upload-artifact@v4
-        with:
-          name: propard-ios-simulator
-          path: ${{ runner.temp }}/PropardDerivedData/Build/Products/Debug-iphonesimulator/*.app
           if-no-files-found: error
