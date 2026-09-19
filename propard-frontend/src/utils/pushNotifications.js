@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core';
+import { PushNotifications } from '@capacitor/push-notifications';
 import api from './api';
 
 function urlBase64ToUint8Array(base64String) {
@@ -10,7 +12,95 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
 }
 
+async function enableNativePushNotifications(token) {
+  if (!token) {
+    throw new Error('Session Propard invalide.');
+  }
+
+  const permission = await PushNotifications.requestPermissions();
+
+  if (permission.receive !== 'granted') {
+    throw new Error('Permission de notification refusée.');
+  }
+
+  await PushNotifications.addListener('registrationError', error => {
+    console.error('Propard APNs registration error:', error);
+  });
+
+  const registrationPromise = new Promise((resolve, reject) => {
+    let settled = false;
+
+    const finish = value => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    const fail = error => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+
+    PushNotifications.addListener('registration', tokenData => {
+      finish(tokenData.value);
+    }).catch(fail);
+
+    PushNotifications.addListener('registrationError', error => {
+      fail(new Error(error?.error || 'Impossible d’enregistrer les notifications.'));
+    }).catch(fail);
+  });
+
+  await PushNotifications.register();
+
+  const nativeToken = await Promise.race([
+    registrationPromise,
+    new Promise((_, reject) => {
+      window.setTimeout(
+        () => reject(new Error('Délai dépassé lors de l’enregistrement des notifications.')),
+        15000
+      );
+    })
+  ]);
+
+  await api.post(
+    '/api/push/native/subscribe',
+    {
+      platform: Capacitor.getPlatform(),
+      token: nativeToken
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  );
+
+  return true;
+}
+
+async function disableNativePushNotifications(token) {
+  if (!token) return;
+
+  try {
+    await PushNotifications.unregister();
+  } finally {
+    await api.delete('/api/push/native/subscribe', {
+      data: {
+        platform: Capacitor.getPlatform()
+      },
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+  }
+}
+
 export async function enablePushNotifications(token) {
+  if (Capacitor.isNativePlatform()) {
+    return enableNativePushNotifications(token);
+  }
+
   if (!token || !('serviceWorker' in navigator) || !('PushManager' in window)) {
     throw new Error('Les notifications Push ne sont pas disponibles sur cet appareil.');
   }
@@ -55,6 +145,10 @@ export async function enablePushNotifications(token) {
 }
 
 export async function disablePushNotifications(token) {
+  if (Capacitor.isNativePlatform()) {
+    return disableNativePushNotifications(token);
+  }
+
   if (!token || !('serviceWorker' in navigator)) return;
 
   const registration = await navigator.serviceWorker.ready;
@@ -71,5 +165,22 @@ export async function disablePushNotifications(token) {
     });
   } finally {
     await subscription.unsubscribe().catch(() => {});
+  }
+}
+
+export async function isPushEnabled() {
+  if (Capacitor.isNativePlatform()) {
+    const permissions = await PushNotifications.checkPermissions();
+    return permissions.receive === 'granted';
+  }
+
+  if (!('serviceWorker' in navigator)) return false;
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager?.getSubscription();
+    return Boolean(subscription);
+  } catch {
+    return false;
   }
 }
