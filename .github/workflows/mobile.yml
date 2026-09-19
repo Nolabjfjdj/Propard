@@ -30,11 +30,10 @@ jobs:
           cache-dependency-path: propard-frontend/package-lock.json
 
       - name: Installer Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
-          cache: gradle
 
       - name: Installer les dépendances du frontend
         run: npm ci
@@ -83,7 +82,6 @@ jobs:
           path: propard-frontend/android
           if-no-files-found: error
 
-
   ios:
     name: iOS
     runs-on: macos-latest
@@ -130,7 +128,7 @@ jobs:
 
       - name: Installer les dépendances CocoaPods
         working-directory: propard-frontend/ios/App
-        run: pod install
+        run: pod install --repo-update
 
       - name: Compiler l'application iOS
         working-directory: propard-frontend/ios/App
