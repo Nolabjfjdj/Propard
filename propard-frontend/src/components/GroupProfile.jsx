@@ -4,7 +4,7 @@ import React, {
   useState
 } from 'react';
 
-import axios from 'axios';
+import api from '../utils/api';
 
 import {
   encryptGroupKeyForMember,
@@ -95,7 +95,7 @@ export default function GroupProfile({
     const loadCurrentUser = async () => {
       try {
         const res =
-          await axios.get(
+          await api.get(
             '/api/auth/me',
             {
               headers: {
@@ -162,7 +162,7 @@ export default function GroupProfile({
       setError('');
 
       const res =
-        await axios.get(
+        await api.get(
           `/api/groups/${initialGroup._id}`,
           {
             headers: {
@@ -213,7 +213,7 @@ export default function GroupProfile({
     const loadFriends = async () => {
       try {
         const res =
-          await axios.get(
+          await api.get(
             '/api/auth/me',
             {
               headers: {
@@ -395,7 +395,7 @@ export default function GroupProfile({
         setError('');
 
         const res =
-          await axios.patch(
+          await api.patch(
             `/api/groups/${group._id}`,
             {
               name:
@@ -570,7 +570,7 @@ export default function GroupProfile({
         }
 
         const res =
-          await axios.delete(
+          await api.delete(
             `/api/groups/${group._id}/members/${memberId}`,
             {
               headers: {
