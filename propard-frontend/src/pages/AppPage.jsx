@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import socket from '../socket';
@@ -121,7 +121,7 @@ export default function AppPage({
 
     const loadInitialFriend = async () => {
       try {
-        const res = await axios.get('/api/auth/me', {
+        const res = await api.get('/api/auth/me', {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -156,7 +156,7 @@ export default function AppPage({
 
     const loadInitialGroup = async () => {
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `/api/groups/${initialGroupId}`,
           {
             headers: {
@@ -183,7 +183,7 @@ export default function AppPage({
       'incomingCall',
       async ({ callerId, offer }) => {
         try {
-          const res = await axios.get(
+          const res = await api.get(
             `/api/auth/user/${callerId}`,
             {
               headers: {
@@ -259,7 +259,7 @@ export default function AppPage({
       setShowSidebar(false);
     }
 
-    axios.patch(
+    api.patch(
       `/api/groups/${group._id}/read`,
       {},
       {
@@ -331,7 +331,7 @@ export default function AppPage({
         action === 'unblocked'
       ) {
         try {
-          const res = await axios.get('/api/auth/me', {
+          const res = await api.get('/api/auth/me', {
             headers: {
               Authorization: `Bearer ${token}`
             }
@@ -373,7 +373,7 @@ export default function AppPage({
     setDeleteError('');
 
     try {
-      await axios.delete('/api/auth/anonymize', {
+      await api.delete('/api/auth/anonymize', {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -395,7 +395,7 @@ export default function AppPage({
     setDeleteError('');
 
     try {
-      await axios.delete('/api/auth/delete', {
+      await api.delete('/api/auth/delete', {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -417,7 +417,7 @@ export default function AppPage({
     setCancelError('');
 
     try {
-      await axios.post(
+      await api.post(
         '/api/auth/cancel-deletion',
         {},
         {
@@ -498,7 +498,7 @@ export default function AppPage({
     targetId
   ) => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `/api/auth/user/${targetId}`,
         {
           headers: {
