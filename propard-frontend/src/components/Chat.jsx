@@ -1683,7 +1683,7 @@ const styles = {
     background:
       'var(--bg-tertiary)',
     color: 'var(--text-primary)',
-    fontSize: '14px'
+    fontSize: '16px'
   },
 
   btn: {
