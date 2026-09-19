@@ -68,6 +68,74 @@ router.post('/subscribe', authMiddleware, async (req, res) => {
   }
 });
 
+
+router.post('/native/subscribe', authMiddleware, async (req, res) => {
+  try {
+    const platform = req.body?.platform;
+    const token = req.body?.token;
+
+    if (platform !== 'ios' || typeof token !== 'string' || !token || token.length > 512) {
+      return res.status(400).json({
+        error: 'Token de notification natif invalide.'
+      });
+    }
+
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        error: 'Utilisateur introuvable.'
+      });
+    }
+
+    user.apnsTokens = (user.apnsTokens || []).filter(
+      item => item.token !== token
+    );
+
+    user.apnsTokens.push({
+      token,
+      platform: 'ios'
+    });
+
+    if (user.apnsTokens.length > 20) {
+      user.apnsTokens = user.apnsTokens.slice(-20);
+    }
+
+    await user.save();
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Native push subscribe error:', error);
+    res.status(500).json({
+      error: 'Impossible d’enregistrer les notifications natives.'
+    });
+  }
+});
+
+router.delete('/native/subscribe', authMiddleware, async (req, res) => {
+  try {
+    const platform = req.body?.platform;
+
+    if (platform !== 'ios') {
+      return res.status(400).json({
+        error: 'Plateforme de notification native invalide.'
+      });
+    }
+
+    await User.updateOne(
+      { _id: req.user.id },
+      { $set: { apnsTokens: [] } }
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Native push unsubscribe error:', error);
+    res.status(500).json({
+      error: 'Impossible de désactiver les notifications natives.'
+    });
+  }
+});
+
 router.delete('/subscribe', authMiddleware, async (req, res) => {
   try {
     const endpoint = req.body?.endpoint;
