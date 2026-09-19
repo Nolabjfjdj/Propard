@@ -136,7 +136,6 @@ export default function GroupChat({
   const HOLD_TO_GRAB_MS = 180;
   const MOVE_CANCEL_PX = 12;
 
-  const SPAM_DELAY = 1000;
   const SPAM_LIMIT = 15;
 
   const normalize = id =>
@@ -1533,20 +1532,6 @@ export default function GroupChat({
 
         return;
       }
-
-      const now =
-        Date.now();
-
-      if (
-        now -
-          lastMessageTime.current <
-        SPAM_DELAY
-      ) {
-        return;
-      }
-
-      lastMessageTime.current =
-        now;
 
       messageCount.current +=
         1;
