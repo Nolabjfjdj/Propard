@@ -169,6 +169,21 @@ export default function AppPage({
         setSelectedFriend(null);
         setSelectedProfile(null);
         setFriendNotFound(false);
+
+        await api.patch(
+          `/api/groups/${initialGroupId}/read`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        ).catch(err =>
+          console.error(
+            'Erreur marquage groupe comme lu:',
+            err
+          )
+        );
       } catch (err) {
         console.error(err);
         setSelectedGroup(null);
