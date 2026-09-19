@@ -38,6 +38,28 @@ const userSchema = new mongoose.Schema({
     default: null
   },
 
+  apnsTokens: {
+    type: [
+      {
+        token: {
+          type: String,
+          required: true,
+          maxlength: 512
+        },
+        platform: {
+          type: String,
+          enum: ['ios'],
+          required: true
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now
+        }
+      }
+    ],
+    default: []
+  },
+
   pushSubscriptions: {
     type: [
       {
