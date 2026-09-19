@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import socket from '../socket';
 import VoiceCall from './VoiceCall';
 import {
@@ -80,7 +80,7 @@ export default function Chat({
         let publicKey = friend.publicKey;
 
         if (!publicKey) {
-          const res = await axios.get(
+          const res = await api.get(
             `/api/auth/user/${friend._id}`,
             {
               headers: {
@@ -218,7 +218,7 @@ export default function Chat({
       setLoadError(null);
 
       try {
-        const res = await axios.get(
+        const res = await api.get(
           `/api/friends/messages/${friend._id}`,
           {
             headers: {
@@ -242,7 +242,7 @@ export default function Chat({
           setMessages(decrypted);
         }
 
-        await axios.patch(
+        await api.patch(
           `/api/friends/messages/read/${friend._id}`,
           {},
           {
@@ -338,7 +338,7 @@ export default function Chat({
         receiverId === myId
       ) {
         try {
-          await axios.patch(
+          await api.patch(
             `/api/friends/messages/read/${friendId}`,
             {},
             {
@@ -572,7 +572,7 @@ export default function Chat({
     setContextMenu(null);
 
     try {
-      await axios.delete(
+      await api.delete(
         `/api/friends/messages/${msgId}`,
         {
           headers: {
@@ -612,7 +612,7 @@ export default function Chat({
           plaintext
         );
 
-      await axios.patch(
+      await api.patch(
         `/api/friends/messages/${msgId}`,
         {
           content: encryptedContent
@@ -673,7 +673,7 @@ export default function Chat({
     setReportError('');
 
     try {
-      await axios.post(
+      await api.post(
         '/api/reports',
         {
           messageId: reportTarget._id,
