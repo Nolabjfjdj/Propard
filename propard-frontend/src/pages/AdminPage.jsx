@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 export default function AdminPage() {
   // ============================
@@ -61,7 +61,7 @@ export default function AdminPage() {
     setPasswordLoading(true);
 
     try {
-      const res = await axios.post(
+      const res = await api.post(
         '/api/admin/reset-password',
         {
           adminKey,
@@ -109,7 +109,7 @@ export default function AdminPage() {
     setAnnouncementLoading(true);
 
     try {
-      const res = await axios.post(
+      const res = await api.post(
         '/api/admin/announcement/create',
         {
           announcementKey,
@@ -153,7 +153,7 @@ export default function AdminPage() {
     setAnnouncementLoading(true);
 
     try {
-      const res = await axios.post(
+      const res = await api.post(
         '/api/admin/announcement/delete',
         {
           announcementKey
@@ -192,7 +192,7 @@ export default function AdminPage() {
     setReportsLoading(true);
 
     try {
-      const res = await axios.post(
+      const res = await api.post(
         '/api/admin/reports/list',
         {
           reportKey
@@ -245,7 +245,7 @@ export default function AdminPage() {
     setReportsResult('');
 
     try {
-      await axios.post(
+      await api.post(
         `/api/admin/reports/${reportId}/status`,
         {
           reportKey,
@@ -342,7 +342,7 @@ export default function AdminPage() {
     setReportsResult('');
 
     try {
-      await axios.post(
+      await api.post(
         `/api/admin/reports/${reportId}/delete`,
         {
           reportKey
