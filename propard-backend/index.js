@@ -97,6 +97,7 @@ app.use('/api/push',require('./routes/push'));
 app.get('/health',(req,res)=>res.status(200).send('OK'));
 
 const lastMessageTimes=new Map();
+const privateMessageSpam=new Map();
 
 const Message=require('./models/Message');
 const User=require('./models/User');
@@ -244,16 +245,23 @@ io.on('connection',socket=>{
       }
 
       const now=Date.now();
-      const last=lastMessageTimes.get(socket.userId)||0;
+      const spamState=privateMessageSpam.get(socket.userId)||{count:0,resetAt:now+10000};
 
-      if(now-last<1000){
+      if(now>=spamState.resetAt){
+        spamState.count=0;
+        spamState.resetAt=now+10000;
+      }
+
+      if(spamState.count>=15){
+        privateMessageSpam.set(socket.userId,spamState);
         return socket.emit(
           'spamWarning',
-          {message:'Envoie pas si vite !'}
+          {message:'Envoie moins vite !'}
         );
       }
 
-      lastMessageTimes.set(socket.userId,now);
+      spamState.count+=1;
+      privateMessageSpam.set(socket.userId,spamState);
 
       const message=await Message.create({
         sender:socket.userId,
@@ -287,7 +295,7 @@ io.on('connection',socket=>{
       void sendPushNotification(receiverId, {
         title: sender?.username ? `@${sender.username}` : 'Propard',
         body: 'Nouveau message',
-        url: `/chat/${socket.userId.toString()}`,
+        url: '/',
         tag: `private-${socket.userId}`,
         data: {
           type: 'private-message',
@@ -412,7 +420,7 @@ io.on('connection',socket=>{
             body: sender?.username
               ? `@${sender.username} a envoyé un message`
               : 'Nouveau message de groupe',
-            url: `/group/${groupId.toString()}`,
+            url: '/',
             tag: `group-${groupId.toString()}`,
             data: {
               type: 'group-message',
@@ -946,6 +954,10 @@ io.on('connection',socket=>{
       );
 
       lastMessageTimes.delete(
+        socket.userId
+      );
+
+      privateMessageSpam.delete(
         socket.userId
       );
 
