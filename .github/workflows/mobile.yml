@@ -29,36 +29,44 @@ jobs:
           cache: npm
           cache-dependency-path: propard-frontend/package-lock.json
 
-      - name: Installer les dépendances
+      - name: Installer Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Installer les dépendances du frontend
         run: npm ci
 
       - name: Installer Capacitor
         run: npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
 
-      - name: Initialiser Capacitor
+      - name: Créer la configuration Capacitor
         run: |
-          if [ ! -f capacitor.config.ts ] && [ ! -f capacitor.config.json ]; then
-            npx cap init Propard site.propard --web-dir dist --npm-client npm
-          fi
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "site.propard",
+            "appName": "Propard",
+            "webDir": "dist"
+          }
+          EOF
 
       - name: Construire Propard
         run: npm run build
 
       - name: Ajouter Android
-        run: |
-          if [ ! -d ../android ]; then
-            npx cap add android
-          fi
+        run: npx cap add android
 
       - name: Synchroniser Android
         run: npx cap sync android
 
-      - name: Donner les permissions Gradle
-        working-directory: android
+      - name: Donner les permissions à Gradle
+        working-directory: propard-frontend/android
         run: chmod +x gradlew
 
       - name: Compiler l'APK
-        working-directory: android
+        working-directory: propard-frontend/android
         run: ./gradlew assembleDebug
 
       - name: Publier l'APK
@@ -95,26 +103,27 @@ jobs:
           cache: npm
           cache-dependency-path: propard-frontend/package-lock.json
 
-      - name: Installer les dépendances
+      - name: Installer les dépendances du frontend
         run: npm ci
 
       - name: Installer Capacitor
         run: npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
 
-      - name: Initialiser Capacitor
+      - name: Créer la configuration Capacitor
         run: |
-          if [ ! -f capacitor.config.ts ] && [ ! -f capacitor.config.json ]; then
-            npx cap init Propard site.propard --web-dir dist --npm-client npm
-          fi
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "site.propard",
+            "appName": "Propard",
+            "webDir": "dist"
+          }
+          EOF
 
       - name: Construire Propard
         run: npm run build
 
       - name: Ajouter iOS
-        run: |
-          if [ ! -d ../ios ]; then
-            npx cap add ios
-          fi
+        run: npx cap add ios
 
       - name: Synchroniser iOS
         run: npx cap sync ios
@@ -123,7 +132,7 @@ jobs:
         working-directory: propard-frontend/ios/App
         run: pod install
 
-      - name: Compiler pour le simulateur iOS
+      - name: Compiler l'application iOS
         working-directory: propard-frontend/ios/App
         run: |
           xcodebuild \
