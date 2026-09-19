@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { enablePushNotifications, disablePushNotifications } from '../utils/pushNotifications';
 
@@ -46,7 +46,7 @@ export default function ProfilePage({
     setError('');
 
     try {
-      const res = await axios.get(
+      const res = await api.get(
         `/api/auth/user/${userId}`,
         {
           headers: {
@@ -290,7 +290,7 @@ export default function ProfilePage({
         body.avatar = editAvatarData;
       }
 
-      const res = await axios.patch(
+      const res = await api.patch(
         '/api/auth/me',
         body,
         {
@@ -329,7 +329,7 @@ export default function ProfilePage({
       const nickname =
         nicknameValue.trim() || null;
 
-      await axios.patch(
+      await api.patch(
         '/api/friends/nickname',
         {
           friendId: userId,
@@ -386,7 +386,7 @@ export default function ProfilePage({
     setActionError('');
 
     try {
-      await axios.post(
+      await api.post(
         '/api/friends/add',
         { userId },
         {
@@ -417,7 +417,7 @@ export default function ProfilePage({
     setActionError('');
 
     try {
-      await axios.post(
+      await api.post(
         `/api/friends/${
           accept ? 'accept' : 'decline'
         }`,
@@ -452,7 +452,7 @@ export default function ProfilePage({
     setActionError('');
 
     try {
-      await axios.delete(
+      await api.delete(
         `/api/friends/${userId}`,
         {
           headers: {
@@ -484,7 +484,7 @@ export default function ProfilePage({
     setActionError('');
 
     try {
-      await axios.post(
+      await api.post(
         `/api/friends/block/${userId}`,
         {},
         {
@@ -517,7 +517,7 @@ export default function ProfilePage({
     setActionError('');
 
     try {
-      await axios.post(
+      await api.post(
         `/api/friends/unblock/${userId}`,
         {},
         {
