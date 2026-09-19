@@ -4,6 +4,11 @@ import './index.css';
 import { AppWithOfflineGate } from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
+import { setupNotificationNavigation } from './utils/pushNotifications.js';
+
+setupNotificationNavigation().catch(error => {
+  console.error('❌ Impossible d’initialiser les actions de notifications:', error);
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
