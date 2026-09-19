@@ -5,7 +5,7 @@ import React, {
   useMemo
 } from 'react';
 
-import axios from 'axios';
+import api from '../utils/api';
 import socket from '../socket';
 
 import GroupProfile from './GroupProfile';
@@ -173,7 +173,7 @@ export default function GroupChat({
     const loadCurrentUser = async () => {
       try {
         const res =
-          await axios.get(
+          await api.get(
             '/api/auth/me',
             {
               headers: {
@@ -284,7 +284,7 @@ export default function GroupChat({
     const loadFriends = async () => {
       try {
         const res =
-          await axios.get(
+          await api.get(
             '/api/auth/me',
             {
               headers: {
@@ -350,7 +350,7 @@ export default function GroupChat({
       setLoadError(null);
 
       const res =
-        await axios.get(
+        await api.get(
           `/api/groups/${initialGroup._id}`,
           {
             headers: {
@@ -405,7 +405,7 @@ export default function GroupChat({
         setLoadError(null);
 
         const res =
-          await axios.get(
+          await api.get(
             `/api/groups/${initialGroup._id}`,
             {
               headers: {
@@ -511,7 +511,7 @@ export default function GroupChat({
         setKey(groupKey);
 
         const messagesRes =
-          await axios.get(
+          await api.get(
             `/api/groups/${loadedGroup._id}/messages`,
             {
               headers: {
@@ -574,7 +574,7 @@ export default function GroupChat({
           );
         }
 
-        await axios.patch(
+        await api.patch(
           `/api/groups/${loadedGroup._id}/read`,
           {},
           {
@@ -685,7 +685,7 @@ export default function GroupChat({
           senderId &&
           senderId !== myId
         ) {
-          await axios.patch(
+          await api.patch(
             `/api/groups/${groupId}/read`,
             {},
             {
@@ -1253,7 +1253,7 @@ export default function GroupChat({
             plaintext
           );
 
-        await axios.patch(
+        await api.patch(
           `/api/groups/${group._id}/messages/${messageId}`,
           {
             content:
@@ -1313,7 +1313,7 @@ export default function GroupChat({
       );
 
       try {
-        await axios.delete(
+        await api.delete(
           `/api/groups/${group._id}/messages/${messageId}`,
           {
             headers: {
@@ -1416,7 +1416,7 @@ export default function GroupChat({
       setReportError('');
 
       try {
-        await axios.post(
+        await api.post(
           '/api/reports',
           {
             messageId:
@@ -1815,7 +1815,7 @@ export default function GroupChat({
         }
 
         try {
-          await axios.delete(
+          await api.delete(
             `/api/groups/${group._id}`,
             {
               headers: {
@@ -1901,7 +1901,7 @@ export default function GroupChat({
           });
         }
 
-        await axios.post(
+        await api.post(
           `/api/groups/${group._id}/leave`,
           {
             keyPackages
