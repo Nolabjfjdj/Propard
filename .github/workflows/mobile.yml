@@ -36,10 +36,10 @@ jobs:
           java-version: '21'
 
       - name: Installer les dépendances du frontend
-        run: npm ci
+        run: npm install
 
       - name: Installer Capacitor
-        run: npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
+        run: npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios @capacitor/push-notifications@8.1.2
 
       - name: Créer la configuration Capacitor
         run: |
@@ -47,7 +47,12 @@ jobs:
           {
             "appId": "site.propard",
             "appName": "Propard",
-            "webDir": "dist"
+            "webDir": "dist",
+            "plugins": {
+              "PushNotifications": {
+                "presentationOptions": ["badge", "sound", "banner", "list"]
+              }
+            }
           }
           EOF
 
@@ -102,10 +107,10 @@ jobs:
           cache-dependency-path: propard-frontend/package-lock.json
 
       - name: Installer les dépendances du frontend
-        run: npm ci
+        run: npm install
 
       - name: Installer Capacitor
-        run: npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
+        run: npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios @capacitor/push-notifications@8.1.2
 
       - name: Créer la configuration Capacitor
         run: |
@@ -113,7 +118,12 @@ jobs:
           {
             "appId": "site.propard",
             "appName": "Propard",
-            "webDir": "dist"
+            "webDir": "dist",
+            "plugins": {
+              "PushNotifications": {
+                "presentationOptions": ["badge", "sound", "banner", "list"]
+              }
+            }
           }
           EOF
 
@@ -129,6 +139,10 @@ jobs:
 
       - name: Synchroniser iOS
         run: npx cap sync ios
+
+      - name: Configurer les notifications Push iOS
+        working-directory: propard-frontend
+        run: python3 scripts/configure_ios_push.py
 
       - name: Compiler pour iPhone
         working-directory: propard-frontend/ios/App
