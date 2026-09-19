@@ -2,6 +2,43 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import api from './api';
 
+
+let nativeNotificationActionListener = null;
+
+export async function setupNotificationNavigation() {
+  if (!Capacitor.isNativePlatform()) return;
+  if (nativeNotificationActionListener) return;
+
+  nativeNotificationActionListener = await PushNotifications.addListener(
+    'pushNotificationActionPerformed',
+    action => {
+      const data = action?.notification?.data || {};
+      let target = data.url;
+
+      if (!target) {
+        if (data.type === 'private-message' && data.senderId) {
+          target = `/chat/${data.senderId}`;
+        } else if (data.type === 'group-message' && data.groupId) {
+          target = `/group/${data.groupId}`;
+        }
+      }
+
+      if (typeof target !== 'string' || !target.startsWith('/')) {
+        target = '/';
+      }
+
+      const currentPath = `${window.location.pathname}${window.location.search}`;
+
+      if (currentPath === target) {
+        window.dispatchEvent(new PopStateEvent('popstate'));
+        return;
+      }
+
+      window.location.assign(target);
+    }
+  );
+}
+
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding)
