@@ -213,34 +213,49 @@ router.get(
           );
 
       const result =
-        groups.map(group => {
-          const me =
-            memberOf(
-              group,
-              req.user.id
-            );
+        await Promise.all(
+          groups.map(async group => {
+            const me =
+              memberOf(
+                group,
+                req.user.id
+              );
 
-          const obj =
-            group.toObject();
+            const obj =
+              group.toObject();
 
-          obj.members =
-            safeMembers(group);
+            obj.members =
+              safeMembers(group);
 
-          obj.memberCount =
-            group.members.length;
+            obj.memberCount =
+              group.members.length;
 
-          obj.unreadCount =
-            me?.lastReadAt &&
-            group.lastMessageAt &&
-            group.lastMessageAt >
-              me.lastReadAt
-              ? 1
-              : 0;
+            const unreadFilter = {
+              group: group._id,
+              sender: {
+                $ne: req.user.id
+              },
+              deleted: {
+                $ne: true
+              }
+            };
 
-          delete obj.keyPackages;
+            if (me?.lastReadAt) {
+              unreadFilter.createdAt = {
+                $gt: me.lastReadAt
+              };
+            }
 
-          return obj;
-        });
+            obj.unreadCount =
+              await GroupMessage.countDocuments(
+                unreadFilter
+              );
+
+            delete obj.keyPackages;
+
+            return obj;
+          })
+        );
 
       res.json(result);
     } catch (e) {
