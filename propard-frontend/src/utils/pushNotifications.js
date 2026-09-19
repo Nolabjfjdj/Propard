@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from './api';
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -26,7 +26,7 @@ export async function enablePushNotifications(token) {
   }
 
   const registration = await navigator.serviceWorker.ready;
-  const { data } = await axios.get('/api/push/public-key');
+  const { data } = await api.get('/api/push/public-key');
 
   if (!data?.publicKey) {
     throw new Error('Le serveur de notifications n’est pas configuré.');
@@ -41,7 +41,7 @@ export async function enablePushNotifications(token) {
     });
   }
 
-  await axios.post(
+  await api.post(
     '/api/push/subscribe',
     { subscription: subscription.toJSON() },
     {
@@ -63,7 +63,7 @@ export async function disablePushNotifications(token) {
   if (!subscription) return;
 
   try {
-    await axios.delete('/api/push/subscribe', {
+    await api.delete('/api/push/subscribe', {
       data: { endpoint: subscription.endpoint },
       headers: {
         Authorization: `Bearer ${token}`
