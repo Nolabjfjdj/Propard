@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import socket from '../socket';
 
 export default function FriendList({
@@ -57,7 +57,7 @@ export default function FriendList({
 
   const fetchGroups = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         '/api/groups',
         {
           headers: {
@@ -77,7 +77,7 @@ export default function FriendList({
 
   const fetchUnread = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         '/api/friends/unread',
         {
           headers: {
@@ -97,7 +97,7 @@ export default function FriendList({
 
   const fetchData = async () => {
     try {
-      const res = await axios.get(
+      const res = await api.get(
         '/api/auth/me',
         {
           headers: {
@@ -116,7 +116,7 @@ export default function FriendList({
 
       for (const req of requestsList) {
         try {
-          const userRes = await axios.get(
+          const userRes = await api.get(
             `/api/auth/user/${req.from}`,
             {
               headers: {
@@ -174,7 +174,7 @@ export default function FriendList({
         }));
 
         try {
-          await axios.patch(
+          await api.patch(
             `/api/friends/messages/read/${senderId}`,
             {},
             {
@@ -228,7 +228,7 @@ export default function FriendList({
 
   const acceptRequest = async (fromUserId) => {
     try {
-      await axios.post(
+      await api.post(
         '/api/friends/accept',
         { fromUserId },
         {
@@ -249,7 +249,7 @@ export default function FriendList({
 
   const declineRequest = async (fromUserId) => {
     try {
-      await axios.post(
+      await api.post(
         '/api/friends/decline',
         { fromUserId },
         {
@@ -279,7 +279,7 @@ export default function FriendList({
     }));
 
     try {
-      await axios.patch(
+      await api.patch(
         `/api/friends/messages/read/${friendId}`,
         {},
         {
