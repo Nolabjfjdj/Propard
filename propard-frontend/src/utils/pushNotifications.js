@@ -12,29 +12,56 @@ export async function setupNotificationNavigation() {
   nativeNotificationActionListener = await PushNotifications.addListener(
     'pushNotificationActionPerformed',
     action => {
-      const data = action?.notification?.data || {};
-      let target = data.url;
+      const data =
+        action?.notification?.data || {};
 
-      if (!target) {
-        if (data.type === 'private-message' && data.senderId) {
-          target = `/chat/${data.senderId}`;
-        } else if (data.type === 'group-message' && data.groupId) {
-          target = `/group/${data.groupId}`;
-        }
+      let target =
+        typeof data.url === 'string'
+          ? data.url
+          : '';
+
+      if (
+        (!target || target === '/') &&
+        data.type === 'private-message' &&
+        data.senderId
+      ) {
+        target =
+          `/chat/${data.senderId}`;
+      } else if (
+        (!target || target === '/') &&
+        data.type === 'group-message' &&
+        data.groupId
+      ) {
+        target =
+          `/group/${data.groupId}`;
       }
 
-      if (typeof target !== 'string' || !target.startsWith('/')) {
+      if (
+        typeof target !== 'string' ||
+        !target.startsWith('/')
+      ) {
         target = '/';
       }
 
-      const currentPath = `${window.location.pathname}${window.location.search}`;
+      const currentPath =
+        `${window.location.pathname}${window.location.search}`;
 
       if (currentPath === target) {
-        window.dispatchEvent(new PopStateEvent('popstate'));
+        window.dispatchEvent(
+          new PopStateEvent('popstate')
+        );
         return;
       }
 
-      window.location.assign(target);
+      window.history.pushState(
+        {},
+        '',
+        target
+      );
+
+      window.dispatchEvent(
+        new PopStateEvent('popstate')
+      );
     }
   );
 }
