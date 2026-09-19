@@ -77,3 +77,4 @@ if marker not in text:
 app_delegate.write_text(text)
 print(f"Audio iOS configuré: {info}")
 print(f"Session audio configurée: {app_delegate}")
+
