@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import socket from '../socket';
+import { API_URL } from '../utils/api';
 
 const POSITION_STORAGE_KEY = 'propard_group_voice_call_position';
 
 const getIceServers = async (token) => {
-  const endpoint = '/api/turn-credentials';
+  const endpoint = `${API_URL}/api/turn-credentials`;
 
   const stunServers = [
     { urls: 'stun:stun.l.google.com:19302' },
