@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 export default function AddFriend({ token, onClose }) {
   const [ipAlias, setIpAlias] = useState('');
@@ -10,7 +10,7 @@ export default function AddFriend({ token, onClose }) {
     if (!ipAlias.trim()) return;
     setError(''); setStatus('');
     try {
-      await axios.post('/api/friends/add',
+      await api.post('/api/friends/add',
         { ipAlias: ipAlias.trim() }, { headers: { Authorization: `Bearer ${token}` } });
       setStatus('Demande envoyée !');
       setIpAlias('');
