@@ -11,9 +11,21 @@ const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { MAX_AVATAR_LENGTH } = require('../utils/inputValidation');
 
-const PSEUDOS_INTERDITS = ['owner','admin','administrator','superadmin','sysadmin','moderator','mod','comod','staff','team','crew','support','helpdesk','official','propard','propardbot','propardteam','propardstaff','propardadmin','propardsupport','propardofficial','everyone','nigger','nigga','faggot','retard','whore','bitch','salope','pute','connard','connasse','batard','batarde','enculé','encule','fdp','ntm','tg','pd','discord','telegram','whatsapp','snapchat','instagram','facebook','twitter','tiktok','youtube','google','microsoft','apple','amazon','netflix','spotify','twitch','reddit','github','anthropic','openai','chatgpt','claude','malware','virus','phishing','scam','billing','privacy','terms','rules','guidelines','policy'];
+const PSEUDOS_INTERDITS = ['owner','admin','administrator','superadmin','sysadmin','moderator','mod','comod','staff','team','crew','support','helpdesk','official','propard','propardbot','propardteam','propardstaff','propardadmin','propardsupport','propardofficial','everyone','nigger','nigga','faggot','retard','whore','bitch','salope','pute','connard','connasse','batard','batarde','enculé','encule','fdp','ntm','tg','pd','discord','telegram','whatsapp','snapchat','instagram','kkk','facebook','twitter','tiktok','youtube','google','microsoft','apple','amazon','netflix','spotify','twitch','reddit','github','anthropic','openai','chatgpt','claude','malware','virus','phishing','scam','billing','privacy','terms','rules','guidelines','policy'];
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+function signToken(user) {
+  return jwt.sign(
+    {
+      id: user._id,
+      username: user.username,
+      sessionVersion: user.sessionVersion || 0
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '30d' }
+  );
+}
 
 const escapeRegExp = value =>
   value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -110,16 +122,7 @@ router.post('/register', registerRateLimiter, async (req, res) => {
 
     await user.save();
 
-    const token = jwt.sign(
-      {
-        id: user._id,
-        username: user.username
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: '30d'
-      }
-    );
+    const token = signToken(user);
 
     res.status(201).json({
       message: 'Compte créé avec succès',
@@ -166,16 +169,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
       });
     }
 
-    const token = jwt.sign(
-      {
-        id: user._id,
-        username: user.username
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: '30d'
-      }
-    );
+    const token = signToken(user);
 
     const deletionExpiresAt = user.pendingDeletionAt
       ? new Date(user.pendingDeletionAt.getTime() + THIRTY_DAYS_MS)
@@ -195,6 +189,26 @@ router.post('/login', loginRateLimiter, async (req, res) => {
         deletionExpiresAt
       }
     });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+
+router.post('/logout-all', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { $inc: { sessionVersion: 1 } },
+      { new: true, select: '_id sessionVersion' }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'Utilisateur introuvable' });
+    }
+
+    res.json({ success: true });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erreur serveur' });
