@@ -465,7 +465,7 @@ export default function GroupChat({
           }
 
           const privateKey =
-            getStoredPrivateKeyJwk(
+            await getStoredPrivateKeyJwk(
               myId
             );
 
@@ -1825,7 +1825,7 @@ export default function GroupChat({
 
       try {
         const privateKey =
-          getStoredPrivateKeyJwk(
+          await getStoredPrivateKeyJwk(
             myId
           );
 
