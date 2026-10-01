@@ -9,15 +9,19 @@ const Group = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
 const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { MAX_AVATAR_LENGTH } = require('../utils/inputValidation');
 
 const PSEUDOS_INTERDITS = ['owner','admin','administrator','superadmin','sysadmin','moderator','mod','comod','staff','team','crew','support','helpdesk','official','propard','propardbot','propardteam','propardstaff','propardadmin','propardsupport','propardofficial','everyone','nigger','nigga','faggot','retard','whore','bitch','salope','pute','connard','connasse','batard','batarde','enculé','encule','fdp','ntm','tg','pd','discord','telegram','whatsapp','snapchat','instagram','facebook','twitter','tiktok','youtube','google','microsoft','apple','amazon','netflix','spotify','twitch','reddit','github','anthropic','openai','chatgpt','claude','malware','virus','phishing','scam','billing','privacy','terms','rules','guidelines','policy'];
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
+const escapeRegExp = value =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const loginRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  keyFn: (req) => `${req.ip}:${(req.body?.username || '').toLowerCase()}`,
+  keyFn: (req) => `${req.ip}:${typeof req.body?.username === 'string' ? req.body.username.toLowerCase() : ''}`,
   message: 'Trop de tentatives de connexion, réessaie dans quelques minutes.'
 });
 
@@ -49,7 +53,7 @@ router.post('/register', registerRateLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    if (!username || !password) {
+    if (typeof username !== 'string' || typeof password !== 'string') {
       return res.status(400).json({ error: 'Username et mot de passe requis' });
     }
 
@@ -58,6 +62,7 @@ router.post('/register', registerRateLimiter, async (req, res) => {
     }
 
     const lower = username.toLowerCase();
+    const usernamePattern = escapeRegExp(username);
 
     if (
       PSEUDOS_INTERDITS.includes(lower) ||
@@ -78,16 +83,16 @@ router.post('/register', registerRateLimiter, async (req, res) => {
       });
     }
 
-    if (password.length < 8) {
+    if (password.length < 8 || password.length > 128) {
       return res.status(400).json({
-        error: 'Mot de passe minimum 8 caractères'
+        error: 'Mot de passe entre 8 et 128 caractères'
       });
     }
 
     const existing = await User.findOne({
       $or: [
-        { username: { $regex: new RegExp(`^${username}$`, 'i') } },
-        { realUsername: { $regex: new RegExp(`^${username}$`, 'i') } }
+        { username: { $regex: new RegExp(`^${usernamePattern}$`, 'i') } },
+        { realUsername: { $regex: new RegExp(`^${usernamePattern}$`, 'i') } }
       ]
     });
 
@@ -140,10 +145,18 @@ router.post('/login', loginRateLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
 
+    if (typeof username !== 'string' || typeof password !== 'string' || username.length > 64 || password.length > 128) {
+      return res.status(400).json({
+        error: 'Identifiants invalides'
+      });
+    }
+
+    const usernamePattern = escapeRegExp(username);
+
     const user = await User.findOne({
       $or: [
-        { username: { $regex: new RegExp(`^${username}$`, 'i') } },
-        { realUsername: { $regex: new RegExp(`^${username}$`, 'i') } }
+        { username: { $regex: new RegExp(`^${usernamePattern}$`, 'i') } },
+        { realUsername: { $regex: new RegExp(`^${usernamePattern}$`, 'i') } }
       ]
     });
 
@@ -258,7 +271,7 @@ router.patch('/me', authMiddleware, async (req, res) => {
 
       if (
         typeof avatar === 'string' &&
-        avatar.length > 1000000
+        avatar.length > MAX_AVATAR_LENGTH
       ) {
         return res.status(400).json({
           error: 'Avatar trop volumineux'
