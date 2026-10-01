@@ -23,19 +23,94 @@ export async function generateKeyPair() {
 }
 
 const privKeyStorageKey = (userId) => `propard_privkey_${userId}`;
+const PRIVATE_KEY_DB = 'propard-secure-storage';
+const PRIVATE_KEY_STORE = 'private-keys';
 
-export function storePrivateKey(userId, privateKeyJwk) {
-  localStorage.setItem(privKeyStorageKey(userId), JSON.stringify(privateKeyJwk));
+function openPrivateKeyDb() {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('IndexedDB indisponible'));
+      return;
+    }
+
+    const request = indexedDB.open(PRIVATE_KEY_DB, 1);
+
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(PRIVATE_KEY_STORE)) {
+        request.result.createObjectStore(PRIVATE_KEY_STORE);
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('Impossible d’ouvrir le stockage sécurisé'));
+  });
 }
 
-export function getStoredPrivateKeyJwk(userId) {
+export async function storePrivateKey(userId, privateKeyJwk) {
+  if (!userId || !privateKeyJwk) return;
+
+  try {
+    const db = await openPrivateKeyDb();
+
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(PRIVATE_KEY_STORE, 'readwrite');
+      transaction.objectStore(PRIVATE_KEY_STORE).put(
+        privateKeyJwk,
+        String(userId)
+      );
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error || new Error('Stockage de clé interrompu'));
+    });
+
+    db.close();
+    localStorage.removeItem(privKeyStorageKey(userId));
+  } catch (error) {
+    try {
+      localStorage.setItem(
+        privKeyStorageKey(userId),
+        JSON.stringify(privateKeyJwk)
+      );
+    } catch {
+      throw error;
+    }
+  }
+}
+
+export async function getStoredPrivateKeyJwk(userId) {
   if (!userId) return null;
+
+  try {
+    const db = await openPrivateKeyDb();
+    const value = await new Promise((resolve, reject) => {
+      const transaction = db.transaction(PRIVATE_KEY_STORE, 'readonly');
+      const request = transaction.objectStore(PRIVATE_KEY_STORE).get(String(userId));
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+
+    db.close();
+
+    if (value) return value;
+  } catch {
+    // Fallback de compatibilité pour les navigateurs sans IndexedDB fonctionnel.
+  }
+
   const raw = localStorage.getItem(privKeyStorageKey(userId));
-  return raw ? JSON.parse(raw) : null;
+
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    await storePrivateKey(userId, parsed);
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
-export function hasStoredPrivateKey(userId) {
-  return !!userId && !!localStorage.getItem(privKeyStorageKey(userId));
+export async function hasStoredPrivateKey(userId) {
+  return !!(await getStoredPrivateKeyJwk(userId));
 }
 
 // Une clé privée JWK contient déjà x/y (les composantes publiques) en plus
