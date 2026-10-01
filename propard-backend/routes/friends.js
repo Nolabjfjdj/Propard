@@ -586,6 +586,11 @@ router.delete('/:friendId', async (req, res) => {
     const io = req.app.get('io');
     const emitToUser = req.app.get('emitToUser');
 
+    req.app.get('callState')?.endPrivateCall(
+      req.user.id,
+      friendId
+    );
+
     if (io && emitToUser) {
       emitToUser(
         io,
@@ -683,6 +688,11 @@ router.post('/block/:userId', async (req, res) => {
 
     await currentUser.save();
     await targetUser.save();
+
+    req.app.get('callState')?.endPrivateCall(
+      req.user.id,
+      userId
+    );
 
     if (wereFriends) {
       const io = req.app.get('io');
