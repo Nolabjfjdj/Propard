@@ -4,6 +4,7 @@ const router = express.Router();
 const User = require('../models/User');
 const Announcement = require('../models/Announcement');
 const authMiddleware = require('../middleware/auth');
+const mongoose = require('mongoose');
 
 
 /*
@@ -80,7 +81,7 @@ router.post('/:announcementId/accept', authMiddleware, async (req, res) => {
       announcementId
     } = req.params;
 
-    if (!announcementId) {
+    if (!mongoose.isValidObjectId(announcementId)) {
       return res.status(400).json({
         error: 'Annonce invalide'
       });
