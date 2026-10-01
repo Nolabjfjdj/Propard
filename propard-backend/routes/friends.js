@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Message = require('../models/Message');
 const authMiddleware = require('../middleware/auth');
+const { isEncryptedMessagePayload } = require('../utils/inputValidation');
 
 router.use(authMiddleware);
 
@@ -347,6 +348,9 @@ router.get('/unread', async (req, res) => {
 
 router.patch('/messages/read/:friendId', async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.friendId)) {
+      return res.status(400).json({ error: 'ID invalide' });
+    }
     if (!await areFriends(req.user.id, req.params.friendId)) {
       return res.status(403).json({
         error: "Vous n'êtes pas amis avec cet utilisateur"
@@ -377,6 +381,9 @@ router.patch('/messages/read/:friendId', async (req, res) => {
 
 router.get('/messages/:friendId', async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.friendId)) {
+      return res.status(400).json({ error: 'ID invalide' });
+    }
     const { friendId } = req.params;
 
     if (!await areFriends(req.user.id, friendId)) {
@@ -416,6 +423,9 @@ router.get('/messages/:friendId', async (req, res) => {
 
 router.delete('/messages/:messageId', async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.messageId)) {
+      return res.status(400).json({ error: 'ID invalide' });
+    }
     const message = await Message.findById(
       req.params.messageId
     );
@@ -468,12 +478,16 @@ router.delete('/messages/:messageId', async (req, res) => {
 
 router.patch('/messages/:messageId', async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.messageId)) {
+      return res.status(400).json({ error: 'ID invalide' });
+    }
     const { content } = req.body;
 
     if (
       !content ||
       typeof content !== 'string' ||
-      !content.trim()
+      !content.trim() ||
+      !isEncryptedMessagePayload(content)
     ) {
       return res.status(400).json({
         error: 'Contenu requis'
