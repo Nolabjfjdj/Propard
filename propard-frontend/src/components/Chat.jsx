@@ -136,7 +136,7 @@ export default function Chat({
 
       try {
         const privateKeyJwk =
-          getStoredPrivateKeyJwk(userId);
+          await getStoredPrivateKeyJwk(userId);
 
         if (!privateKeyJwk) {
           throw new Error(
