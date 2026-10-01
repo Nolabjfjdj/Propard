@@ -286,6 +286,7 @@ router.post(
   async (req, res) => {
     try {
       const {
+  parseMessagePagination,
         name,
         avatar = null,
         memberIds = [],
@@ -633,19 +634,82 @@ router.get(
         });
       }
 
-      const messages =
-        await GroupMessage.find({
-          group:
-            group._id
-        })
-          .sort({
-            createdAt: 1
-          })
-          .limit(100)
+      const pagination =
+        parseMessagePagination(req.query);
+
+      if (!pagination) {
+        return res.status(400).json({
+          error:
+            'Paramètres de pagination invalides'
+        });
+      }
+
+      const filter = {
+        group:
+          group._id
+      };
+
+      if (pagination.before) {
+        filter.createdAt = {
+          $lt: pagination.before
+        };
+      }
+
+      let query =
+        GroupMessage.find(filter)
           .populate(
             'sender',
             'username displayName avatar ipAlias'
           );
+
+      if (pagination.enabled) {
+        query = query
+          .sort({
+            createdAt: -1,
+            _id: -1
+          })
+          .limit(
+            pagination.limit + 1
+          );
+      } else {
+        query = query
+          .sort({
+            createdAt: 1
+          })
+          .limit(100);
+      }
+
+      let messages = await query;
+
+      if (pagination.enabled) {
+        const hasMore =
+          messages.length >
+          pagination.limit;
+
+        if (hasMore) {
+          messages = messages.slice(
+            0,
+            pagination.limit
+          );
+        }
+
+        messages.reverse();
+
+        res.set(
+          'X-Has-More',
+          String(hasMore)
+        );
+
+        if (
+          hasMore &&
+          messages.length > 0
+        ) {
+          res.set(
+            'X-Next-Before',
+            messages[0].createdAt.toISOString()
+          );
+        }
+      }
 
       res.json(messages);
     } catch (e) {
