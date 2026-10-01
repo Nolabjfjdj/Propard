@@ -392,7 +392,15 @@ router.get('/messages/:friendId', async (req, res) => {
       });
     }
 
-    const messages = await Message.find({
+    const pagination = parseMessagePagination(req.query);
+
+    if (!pagination) {
+      return res.status(400).json({
+        error: 'Paramètres de pagination invalides'
+      });
+    }
+
+    const filter = {
       $or: [
         {
           sender: req.user.id,
@@ -404,13 +412,48 @@ router.get('/messages/:friendId', async (req, res) => {
         }
       ],
       deleted: { $ne: true }
-    })
-      .sort({ createdAt: 1 })
-      .limit(50)
+    };
+
+    if (pagination.before) {
+      filter.createdAt = { $lt: pagination.before };
+    }
+
+    let query = Message.find(filter)
       .populate(
         'sender',
         'username displayName avatar ipAlias'
       );
+
+    if (pagination.enabled) {
+      query = query
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(pagination.limit + 1);
+    } else {
+      query = query
+        .sort({ createdAt: 1 })
+        .limit(50);
+    }
+
+    let messages = await query;
+
+    if (pagination.enabled) {
+      const hasMore = messages.length > pagination.limit;
+
+      if (hasMore) {
+        messages = messages.slice(0, pagination.limit);
+      }
+
+      messages.reverse();
+
+      res.set('X-Has-More', String(hasMore));
+
+      if (hasMore && messages.length > 0) {
+        res.set(
+          'X-Next-Before',
+          messages[0].createdAt.toISOString()
+        );
+      }
+    }
 
     res.json(messages);
   } catch (e) {
