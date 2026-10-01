@@ -1,19 +1,33 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
-module.exports = function(req, res, next) {
-  // Récupère le token dans le header de la requête
-  const token = req.header('Authorization')?.replace('Bearer ', '');
+module.exports = async function(req, res, next) {
+  const token = req.header('Authorization')?.replace(/^Bearer\s+/i, '');
 
   if (!token) {
     return res.status(401).json({ error: 'Accès refusé, token manquant' });
   }
 
   try {
-    // Vérifie que le token est valide
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // Ajoute les infos de l'utilisateur à la requête
+
+    if (!decoded?.id) {
+      return res.status(401).json({ error: 'Token invalide' });
+    }
+
+    const tokenSessionVersion = Number.isInteger(decoded.sessionVersion)
+      ? decoded.sessionVersion
+      : 0;
+
+    const user = await User.findById(decoded.id).select('_id sessionVersion');
+
+    if (!user || user.sessionVersion !== tokenSessionVersion) {
+      return res.status(401).json({ error: 'Session expirée' });
+    }
+
+    req.user = decoded;
     next();
   } catch (err) {
-    res.status(401).json({ error: 'Token invalide' });
+    return res.status(401).json({ error: 'Token invalide' });
   }
 };
