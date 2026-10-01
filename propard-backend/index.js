@@ -183,10 +183,28 @@ io.on('connection',socket=>{
 
   socket.on('authenticate',async token=>{
     try{
+      if(typeof token!=='string' || !token.trim()){
+        throw new Error('Token manquant');
+      }
+
       const decoded=jwt.verify(
         token,
         process.env.JWT_SECRET
       );
+
+      if(!decoded?.id){
+        throw new Error('Session invalide');
+      }
+
+      const tokenSessionVersion=Number.isInteger(decoded.sessionVersion)
+        ? decoded.sessionVersion
+        : 0;
+
+      const authenticatedUser=await User.findById(decoded.id).select('_id sessionVersion');
+
+      if(!authenticatedUser || authenticatedUser.sessionVersion!==tokenSessionVersion){
+        throw new Error('Session expirée');
+      }
 
       socket.userId=decoded.id;
 
@@ -215,7 +233,7 @@ io.on('connection',socket=>{
   // MESSAGES
   // ─────────────────────────────────────
 
-  socket.on('sendMessage',async({receiverId,content})=>{
+  socket.on('sendMessage',async({receiverId,content}={})=>{
     try{
       if(!socket.userId) return;
 
@@ -319,7 +337,7 @@ io.on('connection',socket=>{
   // MESSAGES DE GROUPE
   // ─────────────────────────────────────
 
-  socket.on('sendGroupMessage',async({groupId,content})=>{
+  socket.on('sendGroupMessage',async({groupId,content}={})=>{
     try{
       if(!socket.userId) return;
 
@@ -559,7 +577,7 @@ io.on('connection',socket=>{
     );
   });
 
-  socket.on('endCall',async({receiverId})=>{
+  socket.on('endCall',async({receiverId}={})=>{
     if(!socket.userId) return;
 
     if(!mongoose.isValidObjectId(receiverId)) return;
@@ -576,7 +594,7 @@ io.on('connection',socket=>{
   // APPELS DE GROUPE — SIGNALISATION
   // ─────────────────────────────────────
 
-  socket.on('groupCallStart',async({groupId})=>{
+  socket.on('groupCallStart',async({groupId}={})=>{
     try{
       if(!socket.userId) return;
 
@@ -676,7 +694,7 @@ io.on('connection',socket=>{
     }
   });
 
-  socket.on('groupCallJoin',async({groupId,callId})=>{
+  socket.on('groupCallJoin',async({groupId,callId}={})=>{
     try{
       if(!socket.userId) return;
 
@@ -841,7 +859,7 @@ io.on('connection',socket=>{
     )
   );
 
-  socket.on('groupCallLeave',async({groupId,callId})=>{
+  socket.on('groupCallLeave',async({groupId,callId}={})=>{
     try{
       if(!socket.userId) return;
 
