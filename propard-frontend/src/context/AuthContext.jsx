@@ -64,7 +64,7 @@ const ensureEncryptionKeys = async (
   if (!userId || !authToken) return;
 
   try {
-    const existingPriv = getStoredPrivateKeyJwk(userId);
+    const existingPriv = await getStoredPrivateKeyJwk(userId);
     const serverPub = parsePublicKey(serverPublicKey);
 
     /*
@@ -99,7 +99,7 @@ const ensureEncryptionKeys = async (
          * La clé privée restaurée est canonique. On la stocke avant de
          * synchroniser le serveur, puis on remet exactement sa clé publique.
          */
-        storePrivateKey(userId, restoredPrivateKey);
+        await storePrivateKey(userId, restoredPrivateKey);
 
         if (
           !serverPub ||
@@ -207,7 +207,7 @@ const ensureEncryptionKeys = async (
       }
     );
 
-    storePrivateKey(
+    await storePrivateKey(
       userId,
       privateKeyJwk
     );
