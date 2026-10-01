@@ -493,7 +493,7 @@ export default function GroupProfile({
         setError('');
 
         const privateKey =
-          getStoredPrivateKeyJwk(
+          await getStoredPrivateKeyJwk(
             myId
           );
 
