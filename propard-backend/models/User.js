@@ -27,6 +27,11 @@ const userSchema = new mongoose.Schema({
     required: true
   },
 
+  sessionVersion: {
+    type: Number,
+    default: 0
+  },
+
   ipAlias: {
     type: String,
     required: true,
