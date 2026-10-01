@@ -69,7 +69,7 @@ useEffect(() => {
       const meId = (me._id || me.id).toString();
 
       const privateKey =
-        getStoredPrivateKeyJwk(meId);
+        await getStoredPrivateKeyJwk(meId);
 
       if (!privateKey) {
         throw new Error(
