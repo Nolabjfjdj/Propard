@@ -6,6 +6,12 @@ const cors=require('cors');
 const jwt=require('jsonwebtoken');
 const path=require('path');
 const {randomUUID}=require('crypto');
+const {createCallStateManager}=require('./services/callState');
+const {
+  isEncryptedMessagePayload,
+  isSessionDescription,
+  isIceCandidate
+}=require('./utils/inputValidation');
 require('dotenv').config();
 
 const app=express();
@@ -24,7 +30,7 @@ app.use(cors({
   origin:process.env.FRONTEND_ORIGIN || '*'
 }));
 
-app.use(express.json());
+app.use(express.json({limit:'1.5mb'}));
 
 app.use((req,res,next)=>{
   res.setHeader('X-Content-Type-Options','nosniff');
@@ -127,7 +133,17 @@ async function areFriends(userId,friendId){
 const groupCalls=new Map();
 const privateCalls=new Map();
 
-const getPrivateCallKey=(a,b)=>[a.toString(),b.toString()].sort().join(':');
+const callState=createCallStateManager({
+  groupCalls,
+  privateCalls,
+  emitToUser:(userId,event,payload)=>{
+    emitToUser(io,userId,event,payload);
+  }
+});
+
+const getPrivateCallKey=callState.getPrivateCallKey;
+
+app.set('callState',callState);
 
 function getGroupCall(groupId){
   return groupCalls.get(groupId.toString());
@@ -221,26 +237,10 @@ io.on('connection',socket=>{
         );
       }
 
-      let p;
-
-      try{
-        p=JSON.parse(content);
-      }catch{
+      if(!isEncryptedMessagePayload(content)){
         return socket.emit(
           'messageError',
-          {message:'Message chiffré invalide.'}
-        );
-      }
-
-      if(
-        !p ||
-        p.v!==1 ||
-        typeof p.iv!=='string' ||
-        typeof p.ct!=='string'
-      ){
-        return socket.emit(
-          'messageError',
-          {message:'Message chiffré invalide.'}
+          {message:'Message chiffré invalide ou trop volumineux.'}
         );
       }
 
@@ -334,26 +334,10 @@ io.on('connection',socket=>{
         );
       }
 
-      let encrypted;
-
-      try{
-        encrypted=JSON.parse(content);
-      }catch{
+      if(!isEncryptedMessagePayload(content)){
         return socket.emit(
           'groupMessageError',
-          {message:'Message chiffré invalide.'}
-        );
-      }
-
-      if(
-        !encrypted ||
-        encrypted.v!==1 ||
-        typeof encrypted.iv!=='string' ||
-        typeof encrypted.ct!=='string'
-      ){
-        return socket.emit(
-          'groupMessageError',
-          {message:'Message chiffré invalide.'}
+          {message:'Message chiffré invalide ou trop volumineux.'}
         );
       }
 
@@ -454,10 +438,10 @@ io.on('connection',socket=>{
   // WEBRTC PRIVÉ
   // ─────────────────────────────────────
 
-  socket.on('callUser',async({receiverId,offer})=>{
+  socket.on('callUser',async({receiverId,offer}={})=>{
     if(!socket.userId) return;
 
-    if(!mongoose.isValidObjectId(receiverId)) return;
+    if(!mongoose.isValidObjectId(receiverId) || !isSessionDescription(offer,'offer')) return;
 
     if(!(await areFriends(socket.userId,receiverId))){
       return socket.emit(
@@ -497,10 +481,10 @@ io.on('connection',socket=>{
     }
   });
 
-  socket.on('answerCall',async({callerId,answer})=>{
+  socket.on('answerCall',async({callerId,answer}={})=>{
     if(!socket.userId) return;
 
-    if(!mongoose.isValidObjectId(callerId)) return;
+    if(!mongoose.isValidObjectId(callerId) || !isSessionDescription(answer,'answer')) return;
 
     if(!(await areFriends(socket.userId,callerId))) return;
 
@@ -527,10 +511,10 @@ io.on('connection',socket=>{
     );
   });
 
-  socket.on('iceCandidate',async({receiverId,candidate})=>{
+  socket.on('iceCandidate',async({receiverId,candidate}={})=>{
     if(!socket.userId) return;
 
-    if(!mongoose.isValidObjectId(receiverId)) return;
+    if(!mongoose.isValidObjectId(receiverId) || !isIceCandidate(candidate)) return;
 
     if(!(await areFriends(socket.userId,receiverId))) return;
 
@@ -542,10 +526,10 @@ io.on('connection',socket=>{
     );
   });
 
-  socket.on('iceRestartOffer',async({receiverId,offer})=>{
+  socket.on('iceRestartOffer',async({receiverId,offer}={})=>{
     if(!socket.userId) return;
 
-    if(!mongoose.isValidObjectId(receiverId)) return;
+    if(!mongoose.isValidObjectId(receiverId) || !isSessionDescription(offer,'offer')) return;
 
     if(!(await areFriends(socket.userId,receiverId))) return;
 
@@ -560,10 +544,10 @@ io.on('connection',socket=>{
     );
   });
 
-  socket.on('iceRestartAnswer',async({callerId,answer})=>{
+  socket.on('iceRestartAnswer',async({callerId,answer}={})=>{
     if(!socket.userId) return;
 
-    if(!mongoose.isValidObjectId(callerId)) return;
+    if(!mongoose.isValidObjectId(callerId) || !isSessionDescription(answer,'answer')) return;
 
     if(!(await areFriends(socket.userId,callerId))) return;
 
@@ -582,11 +566,10 @@ io.on('connection',socket=>{
 
     if(!(await areFriends(socket.userId,receiverId))) return;
 
-    privateCalls.delete(
-      getPrivateCallKey(socket.userId,receiverId)
+    callState.endPrivateCall(
+      socket.userId,
+      receiverId
     );
-
-    emitToUser(io,receiverId,'callEnded');
   });
 
   // ─────────────────────────────────────
@@ -766,6 +749,27 @@ io.on('connection',socket=>{
       return;
     }
 
+    if(
+      (eventName==='groupCallOffer' || eventName==='groupCallIceRestartOffer') &&
+      !isSessionDescription(offer,'offer')
+    ){
+      return;
+    }
+
+    if(
+      (eventName==='groupCallAnswer' || eventName==='groupCallIceRestartAnswer') &&
+      !isSessionDescription(answer,'answer')
+    ){
+      return;
+    }
+
+    if(
+      eventName==='groupCallIceCandidate' &&
+      !isIceCandidate(candidate)
+    ){
+      return;
+    }
+
     const targetId=(
       receiverId ||
       callerId
@@ -852,41 +856,10 @@ io.on('connection',socket=>{
         return;
       }
 
-      const leavingId=socket.userId.toString();
-
-      /*
-       * Le créateur quitte => l'appel entier se termine.
-       * Un membre normal quitte => les autres continuent.
-       */
-      if(leavingId===call.callerId){
-        emitToGroupCall(
-          call,
-          'groupCallEnded',
-          {
-            groupId:key,
-            callId:call.callId
-          }
-        );
-
-        groupCalls.delete(key);
-        return;
-      }
-
-      call.members.delete(leavingId);
-
-      emitToGroupCall(
-        call,
-        'groupCallMemberLeft',
-        {
-          groupId:key,
-          callId:call.callId,
-          userId:leavingId
-        }
+      callState.removeUserFromGroupCall(
+        key,
+        socket.userId
       );
-
-      if(call.members.size===0){
-        groupCalls.delete(key);
-      }
 
     }catch(e){
       console.error('groupCallLeave error:',e);
@@ -899,62 +872,6 @@ io.on('connection',socket=>{
 
   socket.on('disconnect',async()=>{
     if(socket.userId){
-
-      /*
-       * Retire cet utilisateur de tous les appels
-       * où il était présent.
-       */
-      const disconnectedUserId=socket.userId.toString();
-
-      for(const [key,call] of groupCalls.entries()){
-        if(!call.members.has(disconnectedUserId)) continue;
-
-        if(call.callerId===disconnectedUserId){
-          emitToGroupCall(
-            call,
-            'groupCallEnded',
-            {
-              groupId:key,
-              callId:call.callId
-            }
-          );
-
-          groupCalls.delete(key);
-          continue;
-        }
-
-        call.members.delete(disconnectedUserId);
-
-        emitToGroupCall(
-          call,
-          'groupCallMemberLeft',
-          {
-            groupId:key,
-            callId:call.callId,
-            userId:disconnectedUserId
-          }
-        );
-
-        if(call.members.size===0){
-          groupCalls.delete(key);
-        }
-      }
-
-      for(const [key,call] of privateCalls.entries()){
-        if(
-          call.callerId===disconnectedUserId ||
-          call.receiverId===disconnectedUserId
-        ){
-          const otherId=
-            call.callerId===disconnectedUserId
-              ? call.receiverId
-              : call.callerId;
-
-          emitToUser(io,otherId,'callEnded');
-          privateCalls.delete(key);
-        }
-      }
-
       const becameOffline=removeConnection(
         socket.userId,
         socket.id
@@ -969,6 +886,10 @@ io.on('connection',socket=>{
       );
 
       if(becameOffline){
+        callState.removeUserFromAllCalls(
+          socket.userId
+        );
+
         await User.findByIdAndUpdate(
           socket.userId,
           {isOnline:false}
