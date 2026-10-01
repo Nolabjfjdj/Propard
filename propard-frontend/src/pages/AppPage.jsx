@@ -537,7 +537,7 @@ export default function AppPage({
           : rawPublicKey;
 
       const myPrivateKeyJwk =
-        getStoredPrivateKeyJwk(user?.id);
+        await getStoredPrivateKeyJwk(user?.id);
 
       if (!myPrivateKeyJwk) {
         throw new Error(
