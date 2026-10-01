@@ -6,6 +6,7 @@ const Group = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
+const { MAX_AVATAR_LENGTH, MAX_GROUP_NAME_LENGTH } = require('../utils/inputValidation');
 
 router.use(authMiddleware);
 
@@ -152,6 +153,9 @@ const getIo = req =>
 const getEmitToUser = req =>
   req.app.get('emitToUser');
 
+const getCallState = req =>
+  req.app.get('callState');
+
 
 const emitGroupEvent = (
   req,
@@ -295,11 +299,22 @@ router.post(
 
       if (
         !cleanName ||
-        cleanName.length > 50
+        cleanName.length > MAX_GROUP_NAME_LENGTH
       ) {
         return res.status(400).json({
           error:
             'Nom de groupe invalide'
+        });
+      }
+
+      if (
+        avatar !== null &&
+        avatar !== undefined &&
+        (typeof avatar !== 'string' || avatar.length > MAX_AVATAR_LENGTH)
+      ) {
+        return res.status(400).json({
+          error:
+            'Avatar invalide ou trop volumineux'
         });
       }
 
@@ -419,7 +434,14 @@ router.post(
       const group =
         await Group.create({
           name: cleanName,
-          avatar: avatar || null,
+          avatar: (
+            avatar === null ||
+            avatar === undefined
+              ? null
+              : typeof avatar === 'string'
+                ? avatar
+                : null
+          ),
           owner: req.user.id,
 
           members:
@@ -1044,7 +1066,7 @@ router.patch(
 
         if (
           !cleanName ||
-          cleanName.length > 50
+          cleanName.length > MAX_GROUP_NAME_LENGTH
         ) {
           return res.status(400).json({
             error:
@@ -1075,7 +1097,7 @@ router.patch(
           typeof req.body.avatar ===
             'string' &&
           req.body.avatar.length >
-            1000000
+            MAX_AVATAR_LENGTH
         ) {
           return res.status(400).json({
             error:
@@ -1315,6 +1337,11 @@ router.delete(
 
       await group.save();
 
+      getCallState(req)?.removeUserFromGroupCall(
+        group._id.toString(),
+        memberId
+      );
+
       /*
        * Les membres restants rechargent
        * le groupe et sa nouvelle clÃ©.
@@ -1470,6 +1497,10 @@ router.delete(
 
       await group.deleteOne();
 
+      getCallState(req)?.endGroupCall(
+        groupId
+      );
+
       const io =
         getIo(req);
 
@@ -1622,6 +1653,11 @@ router.post(
         req.body.keyPackages;
 
       await group.save();
+
+      getCallState(req)?.removeUserFromGroupCall(
+        group._id.toString(),
+        req.user.id
+      );
 
       emitGroupEvent(
         req,
