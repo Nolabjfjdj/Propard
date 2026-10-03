@@ -220,6 +220,8 @@ export default function AppPage({
       }
     );
 
+    socket.emit('requestPendingCalls');
+
     return () =>
       socket.off('incomingCall');
   }, [token]);
