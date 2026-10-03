@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Message = require('../models/Message');
 const authMiddleware = require('../middleware/auth');
 const { isEncryptedMessagePayload } = require('../utils/inputValidation');
+const { parseMessagePagination } = require('../utils/messagePagination');
 
 router.use(authMiddleware);
 
