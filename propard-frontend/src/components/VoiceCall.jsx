@@ -1217,6 +1217,16 @@ export default function VoiceCall({
           )
         );
 
+      const storedIceCandidates = Array.isArray(
+        incomingOffer?.iceCandidates
+      )
+        ? incomingOffer.iceCandidates
+        : [];
+
+      pendingCandidates.current.push(
+        ...storedIceCandidates
+      );
+
       await peer.setRemoteDescription(
         new RTCSessionDescription(
           incomingOffer?.offer || incomingOffer
