@@ -26,6 +26,31 @@ function createCallStateManager({
     return true;
   };
 
+  const markPrivateCallAnswered = (callerId, receiverId) => {
+    const key = getPrivateCallKey(callerId, receiverId);
+    const call = privateCalls.get(key);
+
+    if (!call) return false;
+
+    call.answered = true;
+    return true;
+  };
+
+  const getPendingPrivateCall = userId => {
+    const userKey = userId.toString();
+
+    for (const call of privateCalls.values()) {
+      if (
+        call.receiverId === userKey &&
+        !call.answered
+      ) {
+        return call;
+      }
+    }
+
+    return null;
+  };
+
   const endGroupCall = groupId => {
     const key = groupId.toString();
     const call = groupCalls.get(key);
@@ -41,6 +66,17 @@ function createCallStateManager({
       }
     );
 
+    for (const userId of call.pendingInvites || []) {
+      emitToUser(
+        userId,
+        'groupCallEnded',
+        {
+          groupId: key,
+          callId: call.callId
+        }
+      );
+    }
+
     groupCalls.delete(key);
     return true;
   };
@@ -50,7 +86,14 @@ function createCallStateManager({
     const userKey = userId.toString();
     const call = groupCalls.get(key);
 
-    if (!call || !call.members.has(userKey)) return false;
+    if (!call) return false;
+
+    if (call.pendingInvites?.has(userKey)) {
+      call.pendingInvites.delete(userKey);
+      return true;
+    }
+
+    if (!call.members.has(userKey)) return false;
 
     if (call.callerId === userKey) {
       return endGroupCall(key);
@@ -84,31 +127,62 @@ function createCallStateManager({
     return true;
   };
 
+  const getPendingGroupCalls = userId => {
+    const userKey = userId.toString();
+    const pending = [];
+
+    for (const call of groupCalls.values()) {
+      if (call.pendingInvites?.has(userKey)) {
+        pending.push(call);
+      }
+    }
+
+    return pending;
+  };
+
+  const acceptGroupCall = (groupId, userId) => {
+    const key = groupId.toString();
+    const userKey = userId.toString();
+    const call = groupCalls.get(key);
+
+    if (!call) return false;
+
+    call.pendingInvites?.delete(userKey);
+    call.members.add(userKey);
+    return true;
+  };
+
   const removeUserFromAllCalls = userId => {
     const userKey = userId.toString();
     let changed = false;
 
     for (const [key, call] of groupCalls.entries()) {
-      if (!call.members.has(userKey)) continue;
-      changed = removeUserFromGroupCall(key, userKey) || changed;
-    }
-
-    for (const [key, call] of privateCalls.entries()) {
-      if (
-        call.callerId !== userKey &&
-        call.receiverId !== userKey
-      ) {
+      if (call.callerId === userKey) {
+        changed = endGroupCall(key) || changed;
         continue;
       }
 
-      const otherId =
-        call.callerId === userKey
-          ? call.receiverId
-          : call.callerId;
+      if (call.members.has(userKey)) {
+        changed = removeUserFromGroupCall(key, userKey) || changed;
+      }
+    }
 
-      privateCalls.delete(key);
-      emitToUser(otherId, 'callEnded');
-      changed = true;
+    for (const [key, call] of privateCalls.entries()) {
+      if (call.callerId === userKey) {
+        privateCalls.delete(key);
+        emitToUser(call.receiverId, 'callEnded');
+        changed = true;
+        continue;
+      }
+
+      if (
+        call.receiverId === userKey &&
+        call.answered
+      ) {
+        privateCalls.delete(key);
+        emitToUser(call.callerId, 'callEnded');
+        changed = true;
+      }
     }
 
     return changed;
@@ -117,11 +191,14 @@ function createCallStateManager({
   return {
     getPrivateCallKey,
     endPrivateCall,
+    markPrivateCallAnswered,
+    getPendingPrivateCall,
     endGroupCall,
     removeUserFromGroupCall,
+    getPendingGroupCalls,
+    acceptGroupCall,
     removeUserFromAllCalls
   };
 }
 
 module.exports = { createCallStateManager };
-
