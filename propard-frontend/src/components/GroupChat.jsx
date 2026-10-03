@@ -260,6 +260,8 @@ export default function GroupChat({
       handleGroupCallInvite
     );
 
+    socket.emit('requestPendingCalls');
+
     return () => {
       socket.off(
         'groupCallInvite',
