@@ -1,4 +1,4 @@
-const CACHE_NAME = 'propard-offline-v3';
+const CACHE_NAME = 'propard-offline-v4';
 
 const APP_SHELL = [
   '/',
@@ -299,33 +299,4 @@ self.addEventListener('notificationclick', event => {
       await self.clients.openWindow(targetUrl);
     }
   })());
-});     const notificationData =
-       event.notification.data || {};
-
-     let targetPath =
-       notificationData.url || '';
-
-     if (
-       (!targetPath || targetPath === '/') &&
-       notificationData.type === 'private-message' &&
-       notificationData.senderId
-     ) {
-       targetPath =
-         `/chat/${notificationData.senderId}`;
-     }
-
-     if (
-       (!targetPath || targetPath === '/') &&
-       notificationData.type === 'group-message' &&
-       notificationData.groupId
-     ) {
-       targetPath =
-         `/group/${notificationData.groupId}`;
-     }
-
-     const targetUrl = new URL(
-       targetPath || '/',
-       self.location.origin
-     ).href;
-
-
+});
