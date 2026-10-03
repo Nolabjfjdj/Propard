@@ -229,6 +229,43 @@ io.on('connection',socket=>{
     }
   });
 
+  socket.on('requestPendingCalls',()=>{
+    if(!socket.userId) return;
+
+    const pendingPrivateCall = callState.getPendingPrivateCall(socket.userId);
+
+    if(pendingPrivateCall){
+      emitToUser(
+        io,
+        socket.userId,
+        'incomingCall',
+        {
+          callerId: pendingPrivateCall.callerId,
+          offer: {
+            ...pendingPrivateCall.offer,
+            callStartedAt: pendingPrivateCall.startedAt,
+            iceCandidates: pendingPrivateCall.pendingIceCandidates || []
+          },
+          callStartedAt: pendingPrivateCall.startedAt
+        }
+      );
+    }
+
+    for(const call of callState.getPendingGroupCalls(socket.userId)){
+      emitToUser(
+        io,
+        socket.userId,
+        'groupCallInvite',
+        {
+          groupId: call.groupId,
+          callId: call.callId,
+          callStartedAt: call.startedAt,
+          callerId: call.callerId
+        }
+      );
+    }
+  });
+
   // ─────────────────────────────────────
   // MESSAGES
   // ─────────────────────────────────────
@@ -475,7 +512,9 @@ io.on('connection',socket=>{
       call={
         callerId:socket.userId.toString(),
         receiverId:receiverId.toString(),
-        startedAt:Date.now()
+        startedAt:Date.now(),
+        offer,
+        pendingIceCandidates:[]
       };
       privateCalls.set(key,call);
     }
@@ -492,10 +531,16 @@ io.on('connection',socket=>{
     );
 
     if(!delivered){
-      socket.emit(
-        'callFailed',
-        {message:'Utilisateur non connecté'}
-      );
+      void sendPushNotification(receiverId, {
+        title: 'Appel entrant',
+        body: 'Quelqu’un t’appelle sur Propard',
+        url: `/chat/${socket.userId.toString()}`,
+        tag: `call-${socket.userId.toString()}`,
+        data: {
+          type: 'incoming-call',
+          callerId: socket.userId.toString()
+        }
+      });
     }
   });
 
@@ -513,9 +558,27 @@ io.on('connection',socket=>{
       call={
         callerId:callerId.toString(),
         receiverId:socket.userId.toString(),
-        startedAt:Date.now()
+        startedAt:Date.now(),
+        answered:true,
+        pendingIceCandidates:[]
       };
       privateCalls.set(key,call);
+    }else{
+      callState.markPrivateCallAnswered(
+        callerId,
+        socket.userId
+      );
+
+      for(const candidate of call.pendingIceCandidates || []){
+        emitToUser(
+          io,
+          socket.userId,
+          'iceCandidate',
+          {candidate}
+        );
+      }
+
+      call.pendingIceCandidates=[];
     }
 
     emitToUser(
@@ -536,12 +599,21 @@ io.on('connection',socket=>{
 
     if(!(await areFriends(socket.userId,receiverId))) return;
 
-    emitToUser(
+    const key=getPrivateCallKey(socket.userId,receiverId);
+    const call=privateCalls.get(key);
+    const delivered=emitToUser(
       io,
       receiverId,
       'iceCandidate',
       {candidate}
     );
+
+    if(!delivered && call){
+      call.pendingIceCandidates=call.pendingIceCandidates || [];
+      if(call.pendingIceCandidates.length < 100){
+        call.pendingIceCandidates.push(candidate);
+      }
+    }
   });
 
   socket.on('iceRestartOffer',async({receiverId,offer}={})=>{
@@ -645,12 +717,27 @@ io.on('connection',socket=>{
         return;
       }
 
+      const callerId=socket.userId.toString();
+      const pendingInvites=new Set();
+
+      for(const member of group.members){
+        const memberId=member.userId.toString();
+
+        if(
+          memberId!==callerId &&
+          !connectedUsers.has(memberId)
+        ){
+          pendingInvites.add(memberId);
+        }
+      }
+
       const call={
         callId:randomUUID(),
         groupId:key,
-        callerId:socket.userId.toString(),
+        callerId,
         startedAt:Date.now(),
-        members:new Set([socket.userId.toString()])
+        members:new Set([callerId]),
+        pendingInvites
       };
 
       groupCalls.set(key,call);
@@ -668,7 +755,7 @@ io.on('connection',socket=>{
 
         if(memberId===socket.userId.toString()) continue;
 
-        emitToUser(
+        const delivered=emitToUser(
           io,
           memberId,
           'groupCallInvite',
@@ -679,6 +766,20 @@ io.on('connection',socket=>{
             callerId:socket.userId.toString()
           }
         );
+
+        if(!delivered){
+          void sendPushNotification(memberId, {
+            title: group.name || 'Appel de groupe',
+            body: `Appel de groupe sur ${group.name || 'Propard'}`,
+            url: `/group/${key}`,
+            tag: `group-call-${key}`,
+            data: {
+              type: 'group-call',
+              groupId: key,
+              callerId: socket.userId.toString()
+            }
+          });
+        }
       }
 
     }catch(e){
@@ -720,7 +821,10 @@ io.on('connection',socket=>{
         );
       }
 
-      call.members.add(socket.userId.toString());
+      callState.acceptGroupCall(
+        key,
+        socket.userId
+      );
 
       emitToGroupCall(
         call,
