@@ -7,6 +7,7 @@ const GroupMessage = require('../models/GroupMessage');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 const { MAX_AVATAR_LENGTH, MAX_GROUP_NAME_LENGTH } = require('../utils/inputValidation');
+const { parseMessagePagination } = require('../utils/messagePagination');
 
 router.use(authMiddleware);
 
@@ -286,7 +287,6 @@ router.post(
   async (req, res) => {
     try {
       const {
-  parseMessagePagination,
         name,
         avatar = null,
         memberIds = [],
