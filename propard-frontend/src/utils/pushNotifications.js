@@ -76,68 +76,156 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
 }
 
+function withTimeout(promise, timeoutMs, message) {
+  let timeoutId;
+
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    window.clearTimeout(timeoutId);
+  });
+}
+
+async function getWebServiceWorkerRegistration() {
+  if (!('serviceWorker' in navigator)) {
+    throw new Error('Les notifications Push ne sont pas disponibles sur cet appareil.');
+  }
+
+  let registration;
+
+  try {
+    registration = await withTimeout(
+      navigator.serviceWorker.register('/sw.js', {
+        scope: '/'
+      }),
+      10000,
+      'Le Service Worker de Propard ne répond pas. Recharge la page puis réessaie.'
+    );
+  } catch (error) {
+    if (error?.name === 'SecurityError') {
+      throw new Error('Les notifications Push nécessitent une connexion HTTPS.');
+    }
+
+    throw error;
+  }
+
+  if (registration.active) {
+    return registration;
+  }
+
+  return withTimeout(
+    navigator.serviceWorker.ready,
+    10000,
+    'Le Service Worker de Propard n’a pas pu démarrer. Recharge la page puis réessaie.'
+  );
+}
+
+function isIosBrowserOutsideStandaloneMode() {
+  const userAgent = navigator.userAgent || '';
+  const isIos =
+    /iPad|iPhone|iPod/.test(userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  if (!isIos) return false;
+
+  const standalone =
+    navigator.standalone === true ||
+    window.matchMedia?.('(display-mode: standalone)').matches;
+
+  return !standalone;
+}
+
 async function enableNativePushNotifications(token) {
   if (!token) {
     throw new Error('Session Propard invalide.');
   }
 
-  const permission = await PushNotifications.requestPermissions();
+  const permission = await withTimeout(
+    PushNotifications.requestPermissions(),
+    15000,
+    'Délai dépassé lors de la demande de permission de notification.'
+  );
 
   if (permission.receive !== 'granted') {
     throw new Error('Permission de notification refusée.');
   }
 
-  await PushNotifications.addListener('registrationError', error => {
-    console.error('Propard APNs registration error:', error);
-  });
-
   const registrationPromise = new Promise((resolve, reject) => {
     let settled = false;
+    let registrationListener;
+    let registrationErrorListener;
 
-    const finish = value => {
+    const cleanup = async () => {
+      try {
+        await registrationListener?.remove();
+      } catch {}
+
+      try {
+        await registrationErrorListener?.remove();
+      } catch {}
+    };
+
+    const finish = async value => {
       if (settled) return;
       settled = true;
+      await cleanup();
       resolve(value);
     };
 
-    const fail = error => {
+    const fail = async error => {
       if (settled) return;
       settled = true;
+      await cleanup();
       reject(error);
     };
 
-    PushNotifications.addListener('registration', tokenData => {
-      finish(tokenData.value);
-    }).catch(fail);
-
-    PushNotifications.addListener('registrationError', error => {
-      fail(new Error(error?.error || 'Impossible d’enregistrer les notifications.'));
-    }).catch(fail);
+    Promise.all([
+      PushNotifications.addListener('registration', tokenData => {
+        finish(tokenData.value);
+      }),
+      PushNotifications.addListener('registrationError', error => {
+        fail(new Error(error?.error || 'Impossible d’enregistrer les notifications.'));
+      })
+    ])
+      .then(([registrationHandle, registrationErrorHandle]) => {
+        registrationListener = registrationHandle;
+        registrationErrorListener = registrationErrorHandle;
+      })
+      .catch(fail);
   });
 
-  await PushNotifications.register();
+  await withTimeout(
+    PushNotifications.register(),
+    15000,
+    'Délai dépassé lors du démarrage des notifications.'
+  );
 
-  const nativeToken = await Promise.race([
+  const nativeToken = await withTimeout(
     registrationPromise,
-    new Promise((_, reject) => {
-      window.setTimeout(
-        () => reject(new Error('Délai dépassé lors de l’enregistrement des notifications.')),
-        15000
-      );
-    })
-  ]);
+    15000,
+    'Délai dépassé lors de l’enregistrement des notifications.'
+  );
 
-  await api.post(
-    '/api/push/native/subscribe',
-    {
-      platform: Capacitor.getPlatform(),
-      token: nativeToken
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${token}`
+  await withTimeout(
+    api.post(
+      '/api/push/native/subscribe',
+      {
+        platform: Capacitor.getPlatform(),
+        token: nativeToken
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        timeout: 15000
       }
-    }
+    ),
+    15000,
+    'Le serveur Propard ne répond pas pour l’enregistrement des notifications.'
   );
 
   return true;
@@ -147,16 +235,25 @@ async function disableNativePushNotifications(token) {
   if (!token) return;
 
   try {
-    await PushNotifications.unregister();
+    await withTimeout(
+      PushNotifications.unregister(),
+      10000,
+      'Délai dépassé lors de la désactivation des notifications.'
+    );
   } finally {
-    await api.delete('/api/push/native/subscribe', {
-      data: {
-        platform: Capacitor.getPlatform()
-      },
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
+    await withTimeout(
+      api.delete('/api/push/native/subscribe', {
+        data: {
+          platform: Capacitor.getPlatform()
+        },
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        timeout: 10000
+      }),
+      10000,
+      'Le serveur Propard ne répond pas pour la désactivation des notifications.'
+    );
   }
 }
 
@@ -165,7 +262,11 @@ export async function enablePushNotifications(token) {
     return enableNativePushNotifications(token);
   }
 
-  if (!token || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+  if (!token) {
+    throw new Error('Session Propard invalide.');
+  }
+
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     throw new Error('Les notifications Push ne sont pas disponibles sur cet appareil.');
   }
 
@@ -173,36 +274,79 @@ export async function enablePushNotifications(token) {
     throw new Error('Les notifications ne sont pas disponibles dans ce navigateur.');
   }
 
-  const permission = await Notification.requestPermission();
+  if (isIosBrowserOutsideStandaloneMode()) {
+    throw new Error('Sur iPhone ou iPad, ajoute Propard à l’écran d’accueil puis ouvre-le depuis son icône pour activer les notifications.');
+  }
+
+  const permission = await withTimeout(
+    Notification.requestPermission(),
+    15000,
+    'Délai dépassé lors de la demande de permission de notification.'
+  );
 
   if (permission !== 'granted') {
     throw new Error('Permission de notification refusée.');
   }
 
-  const registration = await navigator.serviceWorker.ready;
-  const { data } = await api.get('/api/push/public-key');
+  const registration = await getWebServiceWorkerRegistration();
+
+  let data;
+
+  try {
+    const response = await withTimeout(
+      api.get('/api/push/public-key', {
+        headers: {
+          'Cache-Control': 'no-cache'
+        },
+        timeout: 15000
+      }),
+      15000,
+      'Le serveur Propard ne répond pas pour la configuration des notifications.'
+    );
+
+    data = response.data;
+  } catch (error) {
+    if (error?.response?.status === 503) {
+      throw new Error('Les notifications Push ne sont pas configurées sur le serveur Propard.');
+    }
+
+    throw error;
+  }
 
   if (!data?.publicKey) {
     throw new Error('Le serveur de notifications n’est pas configuré.');
   }
 
-  let subscription = await registration.pushManager.getSubscription();
+  let subscription = await withTimeout(
+    registration.pushManager.getSubscription(),
+    10000,
+    'Impossible de vérifier l’abonnement aux notifications.'
+  );
 
   if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(data.publicKey)
-    });
+    subscription = await withTimeout(
+      registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(data.publicKey)
+      }),
+      15000,
+      'Le navigateur n’a pas pu créer l’abonnement aux notifications.'
+    );
   }
 
-  await api.post(
-    '/api/push/subscribe',
-    { subscription: subscription.toJSON() },
-    {
-      headers: {
-        Authorization: `Bearer ${token}`
+  await withTimeout(
+    api.post(
+      '/api/push/subscribe',
+      { subscription: subscription.toJSON() },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        timeout: 15000
       }
-    }
+    ),
+    15000,
+    'Le serveur Propard ne répond pas pour l’enregistrement des notifications.'
   );
 
   return true;
@@ -215,34 +359,63 @@ export async function disablePushNotifications(token) {
 
   if (!token || !('serviceWorker' in navigator)) return;
 
-  const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.getSubscription();
+  const registration = await getWebServiceWorkerRegistration();
+  const subscription = await withTimeout(
+    registration.pushManager?.getSubscription(),
+    10000,
+    'Impossible de vérifier l’abonnement aux notifications.'
+  );
 
   if (!subscription) return;
 
   try {
-    await api.delete('/api/push/subscribe', {
-      data: { endpoint: subscription.endpoint },
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
+    await withTimeout(
+      api.delete('/api/push/subscribe', {
+        data: { endpoint: subscription.endpoint },
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        timeout: 10000
+      }),
+      10000,
+      'Le serveur Propard ne répond pas pour la désactivation des notifications.'
+    );
   } finally {
-    await subscription.unsubscribe().catch(() => {});
+    await withTimeout(
+      subscription.unsubscribe(),
+      10000,
+      'Le navigateur n’a pas pu désactiver les notifications.'
+    ).catch(() => {});
   }
 }
 
 export async function isPushEnabled() {
   if (Capacitor.isNativePlatform()) {
-    const permissions = await PushNotifications.checkPermissions();
-    return permissions.receive === 'granted';
+    try {
+      const permissions = await withTimeout(
+        PushNotifications.checkPermissions(),
+        5000,
+        'Délai dépassé lors de la vérification des notifications.'
+      );
+
+      return permissions.receive === 'granted';
+    } catch {
+      return false;
+    }
   }
 
-  if (!('serviceWorker' in navigator)) return false;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return false;
+  }
 
   try {
-    const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager?.getSubscription();
+    const registration = await getWebServiceWorkerRegistration();
+    const subscription = await withTimeout(
+      registration.pushManager?.getSubscription(),
+      5000,
+      'Délai dépassé lors de la vérification des notifications.'
+    );
+
     return Boolean(subscription);
   } catch {
     return false;
