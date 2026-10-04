@@ -488,6 +488,12 @@ Dépôt : https://github.com/Nolabjfjdj/Propard.git
 
 ## Licence
 
-Le backend utilise actuellement la licence `ISC` indiquée dans son `package.json`.
+Propard est un logiciel propriétaire.
+
+Le code source est rendu public afin de permettre la transparence, l’inspection technique et l’analyse du projet, mais cette publication ne constitue pas une licence open source et n’accorde pas automatiquement le droit de copier, modifier, redistribuer ou exploiter le logiciel.
+
+Tous droits réservés à **BananeVR**, sous réserve des droits de tiers et des dépendances utilisées par le projet.
 
 Les dépendances tierces restent soumises à leurs propres licences.
+
+Pour toute utilisation, reproduction, modification, redistribution ou exploitation du code de Propard qui n’est pas expressément autorisée par la licence du projet, une autorisation écrite préalable du titulaire des droits est requise.
