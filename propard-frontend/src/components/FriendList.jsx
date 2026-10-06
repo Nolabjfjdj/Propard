@@ -156,6 +156,19 @@ export default function FriendList({
   }, [token, refreshKey]);
 
   useEffect(() => {
+    const handleFriendRequest = () => {
+      fetchData();
+      playNotificationSound();
+    };
+
+    socket.on('friendRequestReceived', handleFriendRequest);
+
+    return () => {
+      socket.off('friendRequestReceived', handleFriendRequest);
+    };
+  }, [token]);
+
+  useEffect(() => {
     const handleNew = async (msg) => {
       const senderId = (
         msg.sender?._id ||
