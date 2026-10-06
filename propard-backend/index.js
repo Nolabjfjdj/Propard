@@ -56,6 +56,7 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(e=>console.error('❌ MongoDB error:',e));
 
 const connectedUsers=new Map();
+const activeConversations=new Map();
 
 function addConnection(userId,socketId){
   if(!connectedUsers.has(userId)){
@@ -73,6 +74,70 @@ function removeConnection(userId,socketId){
     return true;
   }
   return false;
+}
+
+function setActiveConversation(userId,socketId,conversation){
+  if(!userId || !socketId) return;
+
+  if(!conversation?.active){
+    const userConversations=activeConversations.get(userId.toString());
+    if(!userConversations) return;
+
+    userConversations.delete(socketId);
+    if(userConversations.size===0){
+      activeConversations.delete(userId.toString());
+    }
+    return;
+  }
+
+  const type=conversation.type;
+  const conversationId=conversation.id?.toString();
+
+  if(
+    (type!=='private' && type!=='group') ||
+    !mongoose.isValidObjectId(conversationId)
+  ){
+    return;
+  }
+
+  let userConversations=activeConversations.get(userId.toString());
+  if(!userConversations){
+    userConversations=new Map();
+    activeConversations.set(userId.toString(),userConversations);
+  }
+
+  userConversations.set(socketId,{
+    type,
+    id:conversationId
+  });
+}
+
+function isConversationActive(userId,type,conversationId){
+  const userConversations=activeConversations.get(userId.toString());
+  if(!userConversations) return false;
+
+  const normalizedId=conversationId?.toString();
+
+  for(const conversation of userConversations.values()){
+    if(
+      conversation.type===type &&
+      conversation.id===normalizedId
+    ){
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function removeActiveConversation(userId,socketId){
+  const userConversations=activeConversations.get(userId.toString());
+  if(!userConversations) return;
+
+  userConversations.delete(socketId);
+  if(userConversations.size===0){
+    activeConversations.delete(userId.toString());
+  }
 }
 
 function emitToUser(ioInstance,userId,event,payload){
@@ -270,6 +335,16 @@ io.on('connection',socket=>{
   // MESSAGES
   // ─────────────────────────────────────
 
+  socket.on('setActiveConversation',({type,id,active=true}={})=>{
+    if(!socket.userId) return;
+
+    setActiveConversation(
+      socket.userId,
+      socket.id,
+      {type,id,active}
+    );
+  });
+
   socket.on('sendMessage',async({receiverId,content}={})=>{
     try{
       if(!socket.userId) return;
@@ -347,16 +422,22 @@ io.on('connection',socket=>{
         messageData
       );
 
-      void sendPushNotification(receiverId, {
-        title: sender?.username ? `@${sender.username}` : 'Propard',
-        body: 'Nouveau message',
-         url: `/chat/${socket.userId.toString()}`,
-        tag: `private-${socket.userId}`,
-        data: {
-          type: 'private-message',
-          senderId: socket.userId.toString()
-        }
-      });
+      if(!isConversationActive(
+        receiverId,
+        'private',
+        socket.userId
+      )){
+        void sendPushNotification(receiverId, {
+          title: sender?.username ? `@${sender.username}` : 'Propard',
+          body: 'Nouveau message',
+          url: `/chat/${socket.userId.toString()}`,
+          tag: `private-${socket.userId}`,
+          data: {
+            type: 'private-message',
+            senderId: socket.userId.toString()
+          }
+        });
+      }
 
       socket.emit('messageSent',messageData);
 
@@ -460,13 +541,20 @@ io.on('connection',socket=>{
           messageData
         );
 
-        if(memberId!==socket.userId.toString()){
+        if(
+          memberId!==socket.userId.toString() &&
+          !isConversationActive(
+            memberId,
+            'group',
+            groupId
+          )
+        ){
           void sendPushNotification(memberId, {
             title: group.name || 'Propard',
             body: sender?.username
               ? `@${sender.username} a envoyé un message`
               : 'Nouveau message de groupe',
-             url: `/group/${groupId.toString()}`,
+            url: `/group/${groupId.toString()}`,
             tag: `group-${groupId.toString()}`,
             data: {
               type: 'group-message',
@@ -1000,6 +1088,10 @@ io.on('connection',socket=>{
 
   socket.on('disconnect',async()=>{
     if(socket.userId){
+      removeActiveConversation(
+        socket.userId,
+        socket.id
+      );
       const becameOffline=removeConnection(
         socket.userId,
         socket.id
