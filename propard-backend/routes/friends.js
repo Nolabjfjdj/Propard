@@ -106,6 +106,32 @@ router.post('/add', async (req, res) => {
 
     await targetUser.save();
 
+    const io = req.app.get('io');
+    const emitToUser = req.app.get('emitToUser');
+    const { sendPushNotification } = require('../services/push');
+
+    if (io && emitToUser) {
+      emitToUser(
+        io,
+        targetUser._id.toString(),
+        'friendRequestReceived',
+        {
+          fromUserId: req.user.id.toString()
+        }
+      );
+    }
+
+    void sendPushNotification(targetUser._id.toString(), {
+      title: 'Nouvelle demande d’ami',
+      body: `${currentUser.displayName || currentUser.username} t’a envoyé une demande d’ami`,
+      url: '/',
+      tag: `friend-request-${req.user.id.toString()}`,
+      data: {
+        type: 'friend-request',
+        fromUserId: req.user.id.toString()
+      }
+    });
+
     res.json({
       message: "Demande d'ami envoyée"
     });
