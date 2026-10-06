@@ -621,6 +621,38 @@ export default function GroupChat({
    * Messages en temps réel.
    */
   useEffect(() => {
+    if(!initialGroup?._id) return;
+
+    const groupId=initialGroup._id.toString();
+
+    const setActive = active => {
+      socket.emit('setActiveConversation', {
+        type: 'group',
+        id: groupId,
+        active
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      setActive(document.visibilityState === 'visible');
+    };
+
+    setActive(document.visibilityState === 'visible');
+    document.addEventListener(
+      'visibilitychange',
+      handleVisibilityChange
+    );
+
+    return () => {
+      document.removeEventListener(
+        'visibilitychange',
+        handleVisibilityChange
+      );
+      setActive(false);
+    };
+  }, [initialGroup?._id]);
+
+  useEffect(() => {
     if (!initialGroup?._id) {
       return;
     }
