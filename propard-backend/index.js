@@ -531,9 +531,12 @@ io.on('connection',socket=>{
     );
 
     if(!delivered){
+      const caller = await User.findById(socket.userId).select('displayName username');
+      const callerName = caller?.displayName || caller?.username || 'Quelqu’un';
+
       void sendPushNotification(receiverId, {
-        title: 'Appel entrant',
-        body: 'Quelqu’un t’appelle sur Propard',
+        title: `${callerName} t’appelle`,
+        body: `${callerName} t’appelle sur Propard`,
         url: `/chat/${socket.userId.toString()}`,
         tag: `call-${socket.userId.toString()}`,
         data: {
@@ -768,9 +771,12 @@ io.on('connection',socket=>{
         );
 
         if(!delivered){
+          const caller = await User.findById(socket.userId).select('displayName username');
+          const callerName = caller?.displayName || caller?.username || 'Quelqu’un';
+
           void sendPushNotification(memberId, {
-            title: group.name || 'Appel de groupe',
-            body: `Appel de groupe sur ${group.name || 'Propard'}`,
+            title: `${callerName} t’appelle`,
+            body: `${callerName} t’appelle dans ${group.name || 'un groupe'}`,
             url: `/group/${key}`,
             tag: `group-call-${key}`,
             data: {
