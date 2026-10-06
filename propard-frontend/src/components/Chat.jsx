@@ -272,6 +272,37 @@ export default function Chat({
   }, [friend._id, token, sharedKey]);
 
   useEffect(() => {
+    const conversationId = friend?._id?.toString();
+    if(!conversationId) return;
+
+    const setActive = active => {
+      socket.emit('setActiveConversation', {
+        type: 'private',
+        id: conversationId,
+        active
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      setActive(document.visibilityState === 'visible');
+    };
+
+    setActive(document.visibilityState === 'visible');
+    document.addEventListener(
+      'visibilitychange',
+      handleVisibilityChange
+    );
+
+    return () => {
+      document.removeEventListener(
+        'visibilitychange',
+        handleVisibilityChange
+      );
+      setActive(false);
+    };
+  }, [friend?._id]);
+
+  useEffect(() => {
     const handleNewMessage = async msg => {
       const senderId = (
         msg.sender?._id ||
