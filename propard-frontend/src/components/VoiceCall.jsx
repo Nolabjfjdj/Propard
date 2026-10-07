@@ -86,6 +86,7 @@ export default function VoiceCall({
 
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
+  const [cameraEnabled, setCameraEnabled] = useState(true);
 
   /*
    * Position de la fenêtre flottante.
@@ -100,6 +101,8 @@ export default function VoiceCall({
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
   const remoteAudioRef = useRef(null);
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
   const timerRef = useRef(null);
 
   const hasInitiatedRef = useRef(false);
@@ -548,6 +551,14 @@ export default function VoiceCall({
       remoteAudioRef.current = null;
     }
 
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+    }
+
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+
     pendingCandidates.current = [];
 
     iceServersRef.current = [];
@@ -920,28 +931,15 @@ export default function VoiceCall({
         return;
       }
 
-      if (!remoteAudioRef.current) {
-        remoteAudioRef.current =
-          new Audio();
+      const stream = e.streams?.[0];
+      if (!stream) return;
 
-        remoteAudioRef.current.autoplay =
-          true;
-
-        remoteAudioRef.current.playsInline =
-          true;
-      }
-
-      remoteAudioRef.current.srcObject =
-        e.streams[0];
-
-      remoteAudioRef.current
-        .play()
-        .catch(err =>
-          console.error(
-            'Impossible de lire le flux audio:',
-            err
-          )
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = stream;
+        remoteVideoRef.current.play().catch(err =>
+          console.error('Impossible de lire le flux vidéo distant:', err)
         );
+      }
     };
 
     peer.oniceconnectionstatechange =
@@ -1093,7 +1091,8 @@ export default function VoiceCall({
       const stream =
         await navigator.mediaDevices
           .getUserMedia({
-            audio: true
+            audio: true,
+            video: true
           });
 
       if (closedRef.current) {
@@ -1108,6 +1107,10 @@ export default function VoiceCall({
 
       localStreamRef.current =
         stream;
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
 
       const peer =
         await createPeer();
@@ -1174,7 +1177,8 @@ export default function VoiceCall({
       const stream =
         await navigator.mediaDevices
           .getUserMedia({
-            audio: true
+            audio: true,
+            video: true
           });
 
       if (closedRef.current) {
@@ -1296,6 +1300,21 @@ export default function VoiceCall({
 
     cleanup();
     onClose();
+  };
+
+  const toggleCamera = () => {
+    const stream = localStreamRef.current;
+    if (!stream) return;
+
+    const tracks = stream.getVideoTracks();
+    if (!tracks.length) return;
+
+    const nextEnabled = !cameraEnabled;
+    tracks.forEach(track => {
+      track.enabled = nextEnabled;
+    });
+
+    setCameraEnabled(nextEnabled);
   };
 
   const toggleMute = () => {
@@ -1657,10 +1676,28 @@ export default function VoiceCall({
                 '❌ Appel échoué'}
 
               {status === 'error' &&
-                '❌ Micro inaccessible'}
+                '❌ Caméra ou micro inaccessible'}
             </p>
           </div>
         </div>
+
+        {(status === 'connected' || status === 'calling') && (
+          <div style={styles.videoArea}>
+            <video
+              ref={localVideoRef}
+              autoPlay
+              muted
+              playsInline
+              style={styles.localVideo}
+            />
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              style={styles.remoteVideo}
+            />
+          </div>
+        )}
 
         <div style={styles.buttons}>
           {status === 'incoming' ? (
@@ -1684,24 +1721,32 @@ export default function VoiceCall({
           ) : (
             <>
               {status === 'connected' && (
-                <button
-                  style={{
-                    ...styles.muteBtn,
-                    background: muted
-                      ? 'var(--danger)'
-                      : 'var(--bg-hover)'
-                  }}
-                  onClick={toggleMute}
-                  aria-label={
-                    muted
-                      ? 'Réactiver le micro'
-                      : 'Couper le micro'
-                  }
-                >
-                  {muted
-                    ? '🔇'
-                    : '🎤'}
-                </button>
+                <>
+                  <button
+                    style={{
+                      ...styles.muteBtn,
+                      background: muted
+                        ? 'var(--danger)'
+                        : 'var(--bg-hover)'
+                    }}
+                    onClick={toggleMute}
+                    aria-label={muted ? 'Réactiver le micro' : 'Couper le micro'}
+                  >
+                    {muted ? '🔇' : '🎤'}
+                  </button>
+                  <button
+                    style={{
+                      ...styles.muteBtn,
+                      background: cameraEnabled
+                        ? 'var(--bg-hover)'
+                        : 'var(--danger)'
+                    }}
+                    onClick={toggleCamera}
+                    aria-label={cameraEnabled ? 'Couper la caméra' : 'Réactiver la caméra'}
+                  >
+                    {cameraEnabled ? '📹' : '🚫'}
+                  </button>
+                </>
               )}
 
               <button
@@ -1839,6 +1884,35 @@ const styles = {
     fontSize: '20px',
     cursor: 'pointer',
     touchAction: 'manipulation'
+  },
+
+  videoArea: {
+    position: 'relative',
+    width: '100%',
+    aspectRatio: '16 / 9',
+    borderRadius: '12px',
+    overflow: 'hidden',
+    background: '#000'
+  },
+
+  localVideo: {
+    position: 'absolute',
+    right: '8px',
+    bottom: '8px',
+    width: '92px',
+    aspectRatio: '16 / 9',
+    objectFit: 'cover',
+    borderRadius: '8px',
+    border: '2px solid rgba(255,255,255,0.75)',
+    background: '#111',
+    zIndex: 2
+  },
+
+  remoteVideo: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    background: '#111'
   },
 
   muteBtn: {
