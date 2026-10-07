@@ -122,6 +122,12 @@ router.post('/register', registerRateLimiter, async (req, res) => {
 
     await user.save();
 
+    if (user.bannedAt) {
+      return res.status(403).json({
+        error: 'Ce compte a été banni de Propard.'
+      });
+    }
+
     const token = signToken(user);
 
     res.status(201).json({
