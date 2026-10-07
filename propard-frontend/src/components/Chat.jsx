@@ -26,7 +26,7 @@ export default function Chat({
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState('');
   const [contextMenu, setContextMenu] = useState(null);
-  const [inCall, setInCall] = useState(false);
+  const [inCall, setInCall] = useState(null);
   const [friendPublicKey, setFriendPublicKey] = useState(null);
   const [sharedKey, setSharedKey] = useState(null);
 
@@ -981,14 +981,24 @@ export default function Chat({
             gap: '10px'
           }}
         >
-          <button
-            style={styles.callBtn}
-            onClick={() =>
-              setInCall(true)
-            }
-          >
-            📞
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              style={styles.callBtn}
+              title="Appel vocal"
+              aria-label="Appel vocal"
+              onClick={() => setInCall({ video: false })}
+            >
+              📞
+            </button>
+            <button
+              style={styles.callBtn}
+              title="Appel vidéo"
+              aria-label="Appel vidéo"
+              onClick={() => setInCall({ video: true })}
+            >
+              📹
+            </button>
+          </div>
 
           <div
             style={{
@@ -1467,8 +1477,9 @@ export default function Chat({
           userId={userId}
           token={token}
           onClose={() =>
-            setInCall(false)
+            setInCall(null)
           }
+          videoCall={inCall.video}
           incomingOffer={null}
         />
       )}
