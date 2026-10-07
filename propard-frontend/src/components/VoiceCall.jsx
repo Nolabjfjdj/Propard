@@ -934,6 +934,17 @@ export default function VoiceCall({
       const stream = e.streams?.[0];
       if (!stream) return;
 
+      if (!remoteAudioRef.current) {
+        remoteAudioRef.current = new Audio();
+        remoteAudioRef.current.autoplay = true;
+        remoteAudioRef.current.playsInline = true;
+      }
+
+      remoteAudioRef.current.srcObject = stream;
+      remoteAudioRef.current.play().catch(err =>
+        console.error('Impossible de lire le flux audio distant:', err)
+      );
+
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = stream;
         remoteVideoRef.current.play().catch(err =>
