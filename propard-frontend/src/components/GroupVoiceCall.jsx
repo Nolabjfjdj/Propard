@@ -261,6 +261,11 @@ export default function GroupVoiceCall({
     }
 
     localStreamRef.current = stream;
+
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = stream;
+    }
+
     return stream;
   };
 
