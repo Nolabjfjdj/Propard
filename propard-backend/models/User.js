@@ -114,6 +114,11 @@ const userSchema = new mongoose.Schema({
     default: null
   },
 
+  banExpiresAt: {
+    type: Date,
+    default: null
+  },
+
   banReason: {
     type: String,
     default: null,
