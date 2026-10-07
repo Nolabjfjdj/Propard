@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import { markdownToHtml } from '../utils/markdown';
 
 export default function GlobalAnnouncement() {
   const { user, token } = useAuth();
@@ -129,7 +130,11 @@ export default function GlobalAnnouncement() {
         </h2>
 
         <div style={styles.message}>
-          {announcement.message}
+          <div
+            dangerouslySetInnerHTML={{
+              __html: markdownToHtml(announcement.message)
+            }}
+          />
         </div>
 
         {error && (
@@ -201,6 +206,10 @@ const styles = {
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
     marginBottom: '24px'
+  },
+
+  markdown: {
+    color: 'var(--text-secondary)'
   },
 
   error: {
