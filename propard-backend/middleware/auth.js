@@ -19,13 +19,21 @@ module.exports = async function(req, res, next) {
       ? decoded.sessionVersion
       : 0;
 
-    const user = await User.findById(decoded.id).select('_id sessionVersion bannedAt');
+    const user = await User.findById(decoded.id).select(
+      '_id sessionVersion bannedAt banExpiresAt banReason'
+    );
 
     if (!user || user.sessionVersion !== tokenSessionVersion) {
       return res.status(401).json({ error: 'Session expirée' });
     }
 
-    if (user.bannedAt) {
+    if (user.bannedAt && user.banExpiresAt && user.banExpiresAt <= new Date()) {
+      user.bannedAt = null;
+      user.banExpiresAt = null;
+      user.banReason = null;
+      user.sessionVersion += 1;
+      await user.save();
+    } else if (user.bannedAt) {
       return res.status(403).json({ error: 'Compte banni' });
     }
 
