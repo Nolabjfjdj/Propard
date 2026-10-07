@@ -581,7 +581,7 @@ io.on('connection',socket=>{
   // WEBRTC PRIVÉ
   // ─────────────────────────────────────
 
-  socket.on('callUser',async({receiverId,offer}={})=>{
+  socket.on('callUser',async({receiverId,offer,videoCall=false}={})=>{
     if(!socket.userId) return;
 
     if(!mongoose.isValidObjectId(receiverId) || !isSessionDescription(offer,'offer')) return;
@@ -602,6 +602,7 @@ io.on('connection',socket=>{
         receiverId:receiverId.toString(),
         startedAt:Date.now(),
         offer,
+        videoCall:Boolean(videoCall),
         pendingIceCandidates:[]
       };
       privateCalls.set(key,call);
@@ -614,7 +615,8 @@ io.on('connection',socket=>{
       {
         callerId:socket.userId,
         offer:{...offer,callStartedAt:call.startedAt},
-        callStartedAt:call.startedAt
+        callStartedAt:call.startedAt,
+        videoCall:Boolean(call.videoCall)
       }
     );
 
@@ -757,7 +759,7 @@ io.on('connection',socket=>{
   // APPELS DE GROUPE — SIGNALISATION
   // ─────────────────────────────────────
 
-  socket.on('groupCallStart',async({groupId}={})=>{
+  socket.on('groupCallStart',async({groupId,videoCall=false}={})=>{
     try{
       if(!socket.userId) return;
 
@@ -790,7 +792,8 @@ io.on('connection',socket=>{
             groupId:key,
             callId:existing.callId,
             callStartedAt:existing.startedAt,
-            joinedExisting:true
+            joinedExisting:true,
+            videoCall:Boolean(existing.videoCall)
           }
         );
 
@@ -828,7 +831,8 @@ io.on('connection',socket=>{
         callerId,
         startedAt:Date.now(),
         members:new Set([callerId]),
-        pendingInvites
+        pendingInvites,
+        videoCall:Boolean(videoCall)
       };
 
       groupCalls.set(key,call);
@@ -854,7 +858,8 @@ io.on('connection',socket=>{
             groupId:key,
             callId:call.callId,
             callStartedAt:call.startedAt,
-            callerId:socket.userId.toString()
+            callerId:socket.userId.toString(),
+            videoCall:Boolean(call.videoCall)
           }
         );
 
