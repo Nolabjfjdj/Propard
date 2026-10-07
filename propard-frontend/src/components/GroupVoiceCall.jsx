@@ -46,7 +46,8 @@ export default function GroupVoiceCall({
   token,
   onClose,
   incomingCall = false,
-  callId: initialCallId = null
+  callId: initialCallId = null,
+  videoCall = false
 }) {
   const myId = normalizeId(userId);
   const groupId = normalizeId(group?._id);
@@ -56,7 +57,7 @@ export default function GroupVoiceCall({
   );
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
-  const [cameraEnabled, setCameraEnabled] = useState(true);
+  const [cameraEnabled, setCameraEnabled] = useState(videoCall);
   const [remoteStreams, setRemoteStreams] = useState(new Map());
   const [participants, setParticipants] = useState([]);
   const [windowPosition, setWindowPosition] = useState(null);
@@ -251,7 +252,7 @@ export default function GroupVoiceCall({
 
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
-      video: true
+      video: videoCall
     });
 
     if (closedRef.current) {
@@ -876,7 +877,8 @@ export default function GroupVoiceCall({
           if (closedRef.current) return;
 
           socket.emit('groupCallStart', {
-            groupId
+            groupId,
+            videoCall
           });
         })
         .catch(err => {
@@ -954,7 +956,7 @@ export default function GroupVoiceCall({
           </div>
         </div>
 
-        {(status === 'connected' || status === 'calling') && (
+        {videoCall && (status === 'connected' || status === 'calling') && (
           <div style={styles.videoGrid}>
             <div style={styles.videoTile}>
               <video
@@ -1051,16 +1053,18 @@ export default function GroupVoiceCall({
                   >
                     {muted ? '🔇' : '🎤'}
                   </button>
-                  <button
-                    style={{
-                      ...styles.muteBtn,
-                      background: cameraEnabled ? 'var(--bg-hover)' : 'var(--danger)'
-                    }}
-                    onClick={toggleCamera}
-                    aria-label={cameraEnabled ? 'Couper la caméra' : 'Réactiver la caméra'}
-                  >
-                    {cameraEnabled ? '📹' : '🚫'}
-                  </button>
+                  {videoCall && (
+                    <button
+                      style={{
+                        ...styles.muteBtn,
+                        background: cameraEnabled ? 'var(--bg-hover)' : 'var(--danger)'
+                      }}
+                      onClick={toggleCamera}
+                      aria-label={cameraEnabled ? 'Couper la caméra' : 'Réactiver la caméra'}
+                    >
+                      {cameraEnabled ? '📹' : '🚫'}
+                    </button>
+                  )}
                 </>
               )}
 
