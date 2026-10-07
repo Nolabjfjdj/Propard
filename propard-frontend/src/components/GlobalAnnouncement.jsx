@@ -131,6 +131,7 @@ export default function GlobalAnnouncement() {
 
         <div style={styles.message}>
           <div
+            style={styles.markdown}
             dangerouslySetInnerHTML={{
               __html: markdownToHtml(announcement.message)
             }}
