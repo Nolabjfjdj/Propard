@@ -67,6 +67,7 @@ export default function GroupVoiceCall({
   const pendingCandidatesRef = useRef(new Map());
   const localStreamRef = useRef(null);
   const localVideoRef = useRef(null);
+  const remoteAudioRef = useRef(new Map());
   const timerRef = useRef(null);
   const timerStartedRef = useRef(false);
   const callStartedAtRef = useRef(null);
@@ -295,6 +296,17 @@ export default function GroupVoiceCall({
     const id = normalizeId(peerId);
     if (!id || !stream) return;
 
+    let audio = remoteAudioRef.current.get(id);
+    if (!audio) {
+      audio = new Audio();
+      audio.autoplay = true;
+      audio.playsInline = true;
+      remoteAudioRef.current.set(id, audio);
+    }
+
+    audio.srcObject = stream;
+    audio.play().catch(() => {});
+
     setRemoteStreams(prev => {
       const next = new Map(prev);
       next.set(id, stream);
@@ -474,6 +486,11 @@ export default function GroupVoiceCall({
       localStreamRef.current = null;
     }
 
+    for (const audio of remoteAudioRef.current.values()) {
+      try { audio.pause(); } catch {}
+      audio.srcObject = null;
+    }
+    remoteAudioRef.current.clear();
     setRemoteStreams(new Map());
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = null;
@@ -789,6 +806,13 @@ export default function GroupVoiceCall({
       if (peer) {
         try { peer.close(); } catch {}
         peersRef.current.delete(id);
+      }
+
+      const audio = remoteAudioRef.current.get(id);
+      if (audio) {
+        try { audio.pause(); } catch {}
+        audio.srcObject = null;
+        remoteAudioRef.current.delete(id);
       }
 
       setRemoteStreams(prev => {
