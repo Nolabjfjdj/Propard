@@ -1360,6 +1360,25 @@ export default function GroupChat({
       }
     };
 
+  const copyMessage = async message => {
+    if (
+      !message ||
+      message.deleted ||
+      message.decryptionError ||
+      typeof message.content !== 'string'
+    ) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(message.content);
+    } catch (err) {
+      console.error('Erreur copie du message:', err);
+    }
+
+    setContextMenu(null);
+  };
+
   const deleteGroupMessage =
     async messageId => {
       setContextMenu(
@@ -2470,6 +2489,16 @@ export default function GroupChat({
             e.stopPropagation()
           }
         >
+          <button
+            type="button"
+            style={styles.contextItem}
+            onClick={() =>
+              copyMessage(contextMenu.message)
+            }
+          >
+            📋 Copier
+          </button>
+
           {isOwnGroupMessage(
             contextMenu.message
           ) ? (
