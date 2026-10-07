@@ -1167,7 +1167,8 @@ export default function VoiceCall({
         'callUser',
         {
           receiverId: friend._id,
-          offer
+          offer,
+          videoCall
         }
       );
 
@@ -1206,6 +1207,10 @@ export default function VoiceCall({
 
       localStreamRef.current =
         stream;
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
 
       const peer =
         await createPeer();
