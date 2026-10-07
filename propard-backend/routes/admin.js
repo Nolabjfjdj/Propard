@@ -339,7 +339,7 @@ router.post('/bans/list', adminSensitiveLimiter, async (req, res) => {
     const users = await User.find({
       bannedAt: { $ne: null }
     })
-      .select('username displayName avatar ipAlias bannedAt banReason createdAt')
+      .select('username displayName avatar ipAlias bannedAt banExpiresAt banReason createdAt')
       .sort({ bannedAt: -1 })
       .limit(200)
       .lean();
@@ -356,7 +356,7 @@ router.post('/bans/list', adminSensitiveLimiter, async (req, res) => {
 
 router.post('/bans/ban', adminSensitiveLimiter, async (req, res) => {
   try {
-    const { banKey, username, reason } = req.body;
+    const { banKey, username, reason, duration, customDuration, customUnit } = req.body;
 
     if (!checkKey(banKey, process.env.ADMIN_KEY_BANS)) {
       return res.status(403).json({ error: 'Clé des bannissements incorrecte' });
@@ -373,6 +373,45 @@ router.post('/bans/ban', adminSensitiveLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Motif invalide' });
     }
 
+    const quickDurations = {
+      '1h': 60 * 60 * 1000,
+      '6h': 6 * 60 * 60 * 1000,
+      '12h': 12 * 60 * 60 * 1000,
+      '24h': 24 * 60 * 60 * 1000,
+      '3d': 3 * 24 * 60 * 60 * 1000,
+      '7d': 7 * 24 * 60 * 60 * 1000,
+      '30d': 30 * 24 * 60 * 60 * 1000,
+      'permanent': null
+    };
+
+    let durationMs = null;
+
+    if (duration === 'custom') {
+      const units = {
+        minutes: 60 * 1000,
+        hours: 60 * 60 * 1000,
+        days: 24 * 60 * 60 * 1000,
+        weeks: 7 * 24 * 60 * 60 * 1000,
+        months: 30 * 24 * 60 * 60 * 1000,
+        years: 365 * 24 * 60 * 60 * 1000
+      };
+
+      if (
+        !Number.isInteger(customDuration) ||
+        customDuration < 1 ||
+        customDuration > 36500 ||
+        !Object.prototype.hasOwnProperty.call(units, customUnit)
+      ) {
+        return res.status(400).json({ error: 'Durée personnalisée invalide' });
+      }
+
+      durationMs = customDuration * units[customUnit];
+    } else if (Object.prototype.hasOwnProperty.call(quickDurations, duration)) {
+      durationMs = quickDurations[duration];
+    } else {
+      return res.status(400).json({ error: 'Durée de bannissement invalide' });
+    }
+
     const safeUsername = escapeRegex(username.trim());
 
     const user = await User.findOne({
@@ -386,6 +425,9 @@ router.post('/bans/ban', adminSensitiveLimiter, async (req, res) => {
     }
 
     user.bannedAt = new Date();
+    user.banExpiresAt = durationMs === null
+      ? null
+      : new Date(Date.now() + durationMs);
     user.banReason = reason?.trim() || null;
     user.sessionVersion = (user.sessionVersion || 0) + 1;
     user.isOnline = false;
@@ -407,13 +449,16 @@ router.post('/bans/ban', adminSensitiveLimiter, async (req, res) => {
 
     return res.json({
       success: true,
-      message: `Utilisateur ${user.username} banni.`,
+      message: durationMs === null
+        ? `Utilisateur ${user.username} banni définitivement.`
+        : `Utilisateur ${user.username} banni jusqu'au ${user.banExpiresAt.toISOString()}.`,
       user: {
         _id: user._id,
         username: user.username,
         displayName: user.displayName,
         avatar: user.avatar,
         bannedAt: user.bannedAt,
+        banExpiresAt: user.banExpiresAt,
         banReason: user.banReason
       }
     });
@@ -452,6 +497,7 @@ router.post('/bans/unban', adminSensitiveLimiter, async (req, res) => {
     }
 
     user.bannedAt = null;
+    user.banExpiresAt = null;
     user.banReason = null;
     user.sessionVersion = (user.sessionVersion || 0) + 1;
 
