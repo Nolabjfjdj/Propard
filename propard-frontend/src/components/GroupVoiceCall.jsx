@@ -45,6 +45,7 @@ export default function GroupVoiceCall({
   userId,
   token,
   onClose,
+  friendNicknames = new Map(),
   incomingCall = false,
   callId: initialCallId = null,
   videoCall = false
@@ -100,6 +101,7 @@ export default function GroupVoiceCall({
   const getMemberName = id => {
     const member = getMember(id);
     return (
+      friendNicknames.get(normalizeId(id))?.trim() ||
       member?.nickname?.trim() ||
       member?.displayName?.trim() ||
       member?.username ||
@@ -575,6 +577,15 @@ export default function GroupVoiceCall({
       setTimeout(() => restartingRef.current.delete(id), 5000);
     }
   };
+
+  useEffect(() => {
+    if (!videoCall) return;
+
+    if (localVideoRef.current && localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+      localVideoRef.current.play().catch(() => {});
+    }
+  }, [videoCall, status]);
 
   useEffect(() => {
     closedRef.current = false;
