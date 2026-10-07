@@ -122,12 +122,6 @@ router.post('/register', registerRateLimiter, async (req, res) => {
 
     await user.save();
 
-    if (user.bannedAt) {
-      return res.status(403).json({
-        error: 'Ce compte a été banni de Propard.'
-      });
-    }
-
     const token = signToken(user);
 
     res.status(201).json({
@@ -172,6 +166,12 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(400).json({
         error: 'Pseudo ou mot de passe incorrect'
+      });
+    }
+
+    if (user.bannedAt) {
+      return res.status(403).json({
+        error: 'Ce compte a été banni de Propard.'
       });
     }
 
