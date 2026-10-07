@@ -95,10 +95,6 @@ function createCallStateManager({
 
     if (!call.members.has(userKey)) return false;
 
-    if (call.callerId === userKey) {
-      return endGroupCall(key);
-    }
-
     call.members.delete(userKey);
 
     emitGroupCall(
@@ -110,6 +106,27 @@ function createCallStateManager({
         userId: userKey
       }
     );
+
+    if (call.members.size === 0) {
+      groupCalls.delete(key);
+
+      for (const pendingUserId of call.pendingInvites || []) {
+        emitToUser(
+          pendingUserId,
+          'groupCallEnded',
+          {
+            groupId: key,
+            callId: call.callId
+          }
+        );
+      }
+
+      return true;
+    }
+
+    if (call.callerId === userKey) {
+      call.callerId = [...call.members][0];
+    }
 
     emitToUser(
       userKey,
