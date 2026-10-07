@@ -7,6 +7,7 @@ const jwt=require('jsonwebtoken');
 const path=require('path');
 const {randomUUID}=require('crypto');
 const {createCallStateManager}=require('./services/callState');
+const {connectShards}=require('./db/shards');
 const {
   isEncryptedMessagePayload,
   isSessionDescription,
@@ -51,9 +52,7 @@ app.use((req,res,next)=>{
   next();
 });
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(()=>console.log('✅ MongoDB connecté'))
-  .catch(e=>console.error('❌ MongoDB error:',e));
+const databaseReady=connectShards();
 
 const connectedUsers=new Map();
 const activeConversations=new Map();
@@ -1235,10 +1234,17 @@ app.get(
 
 const PORT=process.env.PORT || 3000;
 
-server.listen(
-  PORT,
-  '0.0.0.0',
-  ()=>console.log(
-    `🚀 Serveur lancé sur le port ${PORT}`
-  )
-);
+databaseReady
+  .then(()=>{
+    server.listen(
+      PORT,
+      '0.0.0.0',
+      ()=>console.log(
+        `🚀 Serveur lancé sur le port ${PORT}`
+      )
+    );
+  })
+  .catch(error=>{
+    console.error('❌ Impossible de démarrer MongoDB:',error);
+    process.exit(1);
+  });
