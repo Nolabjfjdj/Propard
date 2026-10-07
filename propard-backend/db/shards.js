@@ -103,19 +103,22 @@ function getValue(object, path) {
   return values;
 }
 
-function setValue(object, path, replacements) {
-  const parts = path.split('.');
-  function apply(target, index) {
-    if (Array.isArray(target)) return target.forEach(item => apply(item, index));
-    if (!target) return;
-    const key = parts[index];
-    if (index === parts.length - 1) {
-      target[key] = Array.isArray(target[key]) ? replacements : (replacements[0] ?? null);
-      return;
-    }
-    apply(target[key], index + 1);
+function replaceRefs(target, parts, byId) {
+  if (target == null) return;
+  if (Array.isArray(target)) {
+    target.forEach(item => replaceRefs(item, parts, byId));
+    return;
   }
-  apply(object, 0);
+  const key = parts[0];
+  if (parts.length === 1) {
+    if (Array.isArray(target[key])) {
+      target[key] = target[key].map(value => byId.get(value?.toString()) || null);
+    } else if (target[key] != null) {
+      target[key] = byId.get(target[key].toString()) || null;
+    }
+    return;
+  }
+  replaceRefs(target[key], parts.slice(1), byId);
 }
 
 const refs = {
@@ -145,7 +148,7 @@ async function populateDocs(docs, sourceName, options) {
 
     for (const doc of list) {
       const values = getValue(doc, option.path);
-      setValue(doc, option.path, values.map(value => byId.get(value?.toString()) || null));
+      replaceRefs(doc, option.path.split('.'), byId);
     }
 
     if (option.populate && target.length) await populateDocs(target, targetName, option.populate);
@@ -184,15 +187,17 @@ class MultiQuery {
   populate(path, select) { this.populates.push(...normalizePopulate(path, select)); return this; }
   async exec() {
     let result = await execute(this.name, this.operation, this.args, this.options);
-    if (this.operation === 'find' && this.options.sort) {
-      const keys = Object.entries(this.options.sort);
-      result.sort((a, b) => {
-        for (const [key, direction] of keys) {
-          if (a[key] < b[key]) return -direction;
-          if (a[key] > b[key]) return direction;
-        }
-        return 0;
-      });
+    if (this.operation === 'find') {
+      if (this.options.sort) {
+        const keys = Object.entries(this.options.sort);
+        result.sort((a, b) => {
+          for (const [key, direction] of keys) {
+            if (a[key] < b[key]) return -direction;
+            if (a[key] > b[key]) return direction;
+          }
+          return 0;
+        });
+      }
       const skip = this.options.skip || 0;
       result = result.slice(skip, this.options.limit == null ? undefined : skip + this.options.limit);
     }
