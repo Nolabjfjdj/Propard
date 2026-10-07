@@ -144,6 +144,26 @@ export default function GroupChat({
   const myId =
     normalize(currentUserId);
 
+  const friendNicknames = useMemo(() => {
+    const map = new Map();
+
+    for (const friend of friends) {
+      const friendId =
+        friend?.userId?._id ||
+        friend?.userId ||
+        friend?._id;
+
+      if (!friendId) continue;
+
+      const nickname = friend?.nickname?.trim();
+      if (nickname) {
+        map.set(friendId.toString(), nickname);
+      }
+    }
+
+    return map;
+  }, [friends]);
+
   /*
    * Si AppPage fournit userId, on l'utilise.
    * Sinon on récupère l'utilisateur courant
@@ -2846,6 +2866,7 @@ export default function GroupChat({
           group={group}
           userId={myId}
           token={token}
+          friendNicknames={friendNicknames}
           incomingCall={groupCall.incoming}
           callId={groupCall.callId}
           videoCall={groupCall.video}
