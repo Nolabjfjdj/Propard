@@ -19,10 +19,14 @@ module.exports = async function(req, res, next) {
       ? decoded.sessionVersion
       : 0;
 
-    const user = await User.findById(decoded.id).select('_id sessionVersion');
+    const user = await User.findById(decoded.id).select('_id sessionVersion bannedAt');
 
     if (!user || user.sessionVersion !== tokenSessionVersion) {
       return res.status(401).json({ error: 'Session expirée' });
+    }
+
+    if (user.bannedAt) {
+      return res.status(403).json({ error: 'Compte banni' });
     }
 
     req.user = decoded;
