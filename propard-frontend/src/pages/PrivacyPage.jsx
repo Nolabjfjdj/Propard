@@ -5,7 +5,7 @@ export default function PrivacyPage() {
         <a href="/help" style={styles.back}>← Retour</a>
 
         <h1 style={styles.title}>Politique de Confidentialité</h1>
-        <p style={styles.date}>En vigueur depuis le 14 septembre 2026</p>
+        <p style={styles.date}>En vigueur depuis le 7 octobre 2026</p>
 
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>1. Responsable du traitement</h2>
@@ -314,6 +314,69 @@ export default function PrivacyPage() {
           </p>
         </div>
 
+
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>5. Appels audio et vidéo</h2>
+
+          <p style={styles.text}>
+            Lorsque vous utilisez les appels audio et vidéo, Propard traite les
+            données techniques nécessaires à l'établissement et au maintien de
+            la communication en temps réel.
+          </p>
+
+          <p style={styles.text}>
+            Les appels audio utilisent le microphone et les appels vidéo peuvent
+            utiliser la caméra, uniquement lorsque vous activez ces fonctionnalités
+            et accordez les autorisations nécessaires à votre appareil.
+          </p>
+
+          <p style={styles.text}>
+            Les communications en temps réel utilisent WebRTC. Selon les conditions
+            réseau, des serveurs STUN ou TURN peuvent être utilisés pour permettre
+            l'établissement ou le relais de la communication. Certains services
+            techniques de relais peuvent être fournis par Metered.
+          </p>
+
+          <p style={styles.text}>
+            Propard ne décrit pas les appels comme faisant partie du système E2EE
+            des messages privés. Les flux audio et vidéo sont protégés par les
+            mécanismes de sécurité du protocole WebRTC et de la connexion en temps réel,
+            sans que cela signifie que Propard possède les mêmes garanties cryptographiques
+            que le chiffrement E2EE des messages.
+          </p>
+
+          <p style={styles.text}>
+            Propard ne prévoit pas de fonctionnalité d'enregistrement des appels dans
+            le service. Les utilisateurs restent toutefois responsables des contenus
+            qu'ils diffusent et des éventuels enregistrements réalisés par des moyens
+            externes au service.
+          </p>
+        </div>
+
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>6. Modération, bannissements et sécurité des comptes</h2>
+
+          <p style={styles.text}>
+            Pour assurer la sécurité du service et faire respecter les CGU, Propard
+            peut traiter des informations de modération liées à un compte, notamment
+            son statut de bannissement, la date du bannissement, sa date d'expiration
+            lorsqu'il s'agit d'un bannissement temporaire, ainsi que le motif associé
+            lorsqu'il est renseigné.
+          </p>
+
+          <p style={styles.text}>
+            Lorsqu'un bannissement est appliqué, la session du compte peut être
+            invalidée et les connexions actives peuvent être interrompues. Ces mesures
+            sont nécessaires à la prévention des abus et à la protection du service.
+          </p>
+
+          <p style={styles.text}>
+            Les informations de bannissement sont conservées pendant la durée nécessaire
+            à la gestion de la mesure, à la sécurité du service, au traitement d'une
+            contestation éventuelle ou au respect d'une obligation légale.
+          </p>
+        </div>
+
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>
             5. Signalements et destinataires
@@ -420,7 +483,7 @@ export default function PrivacyPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>7. Durées de conservation</h2>
+          <h2 style={styles.sectionTitle}>8. Durées de conservation</h2>
 
           <p style={styles.text}>
             Propard ne conserve pas les données personnelles plus longtemps que
@@ -489,7 +552,7 @@ export default function PrivacyPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>8. Suppression du compte</h2>
+          <h2 style={styles.sectionTitle}>9. Suppression du compte</h2>
 
           <p style={styles.text}>
             L'utilisateur peut demander la suppression de son compte selon les
@@ -514,7 +577,7 @@ export default function PrivacyPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>9. Mineurs</h2>
+          <h2 style={styles.sectionTitle}>10. Mineurs</h2>
 
           <p style={styles.text}>
             Propard peut être utilisé par des personnes mineures dans les limites
@@ -540,7 +603,7 @@ export default function PrivacyPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>10. Vos droits au titre du RGPD</h2>
+          <h2 style={styles.sectionTitle}>11. Vos droits au titre du RGPD</h2>
 
           <p style={styles.text}>
             Conformément au RGPD et dans les conditions prévues par celui-ci,
@@ -603,7 +666,7 @@ export default function PrivacyPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>11. Cookies et stockage local</h2>
+          <h2 style={styles.sectionTitle}>12. Cookies et stockage local</h2>
 
           <p style={styles.text}>
             Propard n'utilise pas de cookies publicitaires ou de cookies de
@@ -645,7 +708,7 @@ export default function PrivacyPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>12. Décisions automatisées et profilage</h2>
+          <h2 style={styles.sectionTitle}>13. Décisions automatisées et profilage</h2>
 
           <p style={styles.text}>
             Propard ne met pas en œuvre de décision automatisée produisant des
@@ -660,7 +723,7 @@ export default function PrivacyPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>13. Sécurité</h2>
+          <h2 style={styles.sectionTitle}>14. Sécurité</h2>
 
           <p style={styles.text}>
             Propard met en œuvre des mesures techniques destinées à protéger les
@@ -695,7 +758,7 @@ export default function PrivacyPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>14. Mise à jour de cette politique</h2>
+          <h2 style={styles.sectionTitle}>15. Mise à jour de cette politique</h2>
 
           <p style={styles.text}>
             Cette politique peut être mise à jour lorsque le fonctionnement de
@@ -710,7 +773,7 @@ export default function PrivacyPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>15. Contact</h2>
+          <h2 style={styles.sectionTitle}>16. Contact</h2>
 
           <p style={styles.text}>
             Pour toute question concernant cette politique, le traitement de vos
