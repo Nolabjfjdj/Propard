@@ -104,6 +104,7 @@ export default function VoiceCall({
   const remoteAudioRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const remoteStreamRef = useRef(null);
   const timerRef = useRef(null);
 
   const hasInitiatedRef = useRef(false);
@@ -560,6 +561,8 @@ export default function VoiceCall({
       remoteVideoRef.current.srcObject = null;
     }
 
+    remoteStreamRef.current = null;
+
     pendingCandidates.current = [];
 
     iceServersRef.current = [];
@@ -947,6 +950,8 @@ export default function VoiceCall({
         console.error('Impossible de lire le flux audio distant:', err)
       );
 
+      remoteStreamRef.current = stream;
+
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = stream;
         remoteVideoRef.current.play().catch(err =>
@@ -1098,6 +1103,17 @@ export default function VoiceCall({
       }
     }
   };
+
+  useEffect(() => {
+    if (!videoCall || !remoteVideoRef.current || !remoteStreamRef.current) {
+      return;
+    }
+
+    remoteVideoRef.current.srcObject = remoteStreamRef.current;
+    remoteVideoRef.current.play().catch(err =>
+      console.error('Impossible de lire le flux vidéo distant:', err)
+    );
+  }, [videoCall, status]);
 
   const startCall = async () => {
     try {
