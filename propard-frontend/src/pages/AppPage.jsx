@@ -196,7 +196,7 @@ export default function AppPage({
   useEffect(() => {
     socket.on(
       'incomingCall',
-      async ({ callerId, offer }) => {
+      async ({ callerId, offer, videoCall = false }) => {
         try {
           const res = await api.get(
             `/api/auth/user/${callerId}`,
@@ -212,7 +212,8 @@ export default function AppPage({
               ...res.data,
               _id: callerId
             },
-            offer
+            offer,
+            videoCall
           });
         } catch (err) {
           console.error(err);
