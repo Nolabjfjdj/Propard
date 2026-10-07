@@ -41,6 +41,132 @@ export default function AdminPage() {
   const [reportActionLoading, setReportActionLoading] = useState(null);
 
   // ============================
+  // BANNISSEMENTS
+  // ============================
+
+  const [banKey, setBanKey] = useState('');
+  const [banUsername, setBanUsername] = useState('');
+  const [banReason, setBanReason] = useState('');
+  const [bannedUsers, setBannedUsers] = useState([]);
+  const [bansError, setBansError] = useState('');
+  const [bansResult, setBansResult] = useState('');
+  const [bansLoading, setBansLoading] = useState(false);
+  const [banActionLoading, setBanActionLoading] = useState(null);
+
+
+  // ============================
+  // CHARGER LES BANNIS
+  // ============================
+
+  const loadBannedUsers = async () => {
+    if (!banKey) {
+      setBansError('Entre la clé des bannissements');
+      return;
+    }
+
+    setBansError('');
+    setBansResult('');
+    setBansLoading(true);
+
+    try {
+      const res = await api.post(
+        '/api/admin/bans/list',
+        { banKey }
+      );
+
+      setBannedUsers(res.data.users || []);
+      setBansResult(
+        `${res.data.users?.length || 0} compte(s) banni(s) chargé(s).`
+      );
+    } catch (err) {
+      setBansError(
+        err.response?.data?.error ||
+        'Erreur lors du chargement des bannis'
+      );
+      setBannedUsers([]);
+    } finally {
+      setBansLoading(false);
+    }
+  };
+
+  const banUser = async () => {
+    if (!banKey || !banUsername.trim()) {
+      setBansError('Entre la clé et le username à bannir');
+      return;
+    }
+
+    if (!window.confirm(
+      `Bannir définitivement le compte « ${banUsername.trim()} » ?`
+    )) {
+      return;
+    }
+
+    setBansError('');
+    setBansResult('');
+    setBanActionLoading(banUsername.trim());
+
+    try {
+      const res = await api.post(
+        '/api/admin/bans/ban',
+        {
+          banKey,
+          username: banUsername.trim(),
+          reason: banReason.trim()
+        }
+      );
+
+      setBansResult(res.data.message);
+      setBanUsername('');
+      setBanReason('');
+      await loadBannedUsers();
+    } catch (err) {
+      setBansError(
+        err.response?.data?.error ||
+        'Erreur lors du bannissement'
+      );
+    } finally {
+      setBanActionLoading(null);
+    }
+  };
+
+  const unbanUser = async username => {
+    if (!banKey) {
+      setBansError('Entre d’abord la clé des bannissements');
+      return;
+    }
+
+    if (!window.confirm(
+      `Débannir le compte « ${username} » ?`
+    )) {
+      return;
+    }
+
+    setBansError('');
+    setBansResult('');
+    setBanActionLoading(username);
+
+    try {
+      const res = await api.post(
+        '/api/admin/bans/unban',
+        {
+          banKey,
+          username
+        }
+      );
+
+      setBansResult(res.data.message);
+      await loadBannedUsers();
+    } catch (err) {
+      setBansError(
+        err.response?.data?.error ||
+        'Erreur lors du débannissement'
+      );
+    } finally {
+      setBanActionLoading(null);
+    }
+  };
+
+  // ============================
   // RESET PASSWORD
   // ============================
 
@@ -662,6 +788,194 @@ export default function AdminPage() {
           </div>
         </section>
 
+
+        {/* ========================================
+            BANNISSEMENTS
+        ======================================== */}
+
+        <section style={styles.card}>
+          <div style={styles.reportHeader}>
+            <div>
+              <h2 style={styles.sectionTitle}>
+                🚫 Bannissements
+              </h2>
+
+              <p style={styles.description}>
+                Bannis ou débannis des comptes depuis le panneau
+                d’administration. Le bannissement invalide les sessions
+                actives et empêche toute nouvelle connexion.
+              </p>
+            </div>
+
+            {bannedUsers.length > 0 && (
+              <div style={styles.newBadge}>
+                {bannedUsers.length} banni
+                {bannedUsers.length > 1 ? 's' : ''}
+              </div>
+            )}
+          </div>
+
+          <div style={styles.form}>
+            <label style={styles.label}>
+              Clé des bannissements
+            </label>
+
+            <input
+              style={styles.input}
+              type="password"
+              placeholder="ADMIN_KEY_BANS"
+              value={banKey}
+              onChange={e => setBanKey(e.target.value)}
+              autoComplete="off"
+            />
+
+            <label style={styles.label}>
+              Username à bannir
+            </label>
+
+            <input
+              style={styles.input}
+              type="text"
+              placeholder="Ex: utilisateur123"
+              value={banUsername}
+              onChange={e => setBanUsername(e.target.value)}
+              autoComplete="off"
+              maxLength={20}
+            />
+
+            <label style={styles.label}>
+              Motif du bannissement
+            </label>
+
+            <textarea
+              style={styles.textarea}
+              placeholder="Motif interne du bannissement..."
+              value={banReason}
+              onChange={e => setBanReason(e.target.value)}
+              maxLength={500}
+            />
+
+            {bansError && (
+              <p style={styles.error}>
+                {bansError}
+              </p>
+            )}
+
+            {bansResult && (
+              <p style={styles.success}>
+                ✅ {bansResult}
+              </p>
+            )}
+
+            <button
+              style={{
+                ...styles.btn,
+                opacity: banActionLoading ? 0.7 : 1
+              }}
+              onClick={banUser}
+              disabled={!!banActionLoading}
+            >
+              {banActionLoading ? '...' : '🚫 Bannir le compte'}
+            </button>
+
+            <button
+              style={{
+                ...styles.reopenBtn,
+                width: '100%',
+                marginTop: '4px',
+                opacity: bansLoading ? 0.7 : 1
+              }}
+              onClick={loadBannedUsers}
+              disabled={bansLoading || !!banActionLoading}
+            >
+              {bansLoading
+                ? 'Chargement...'
+                : '🔄 Actualiser les comptes bannis'}
+            </button>
+          </div>
+
+          {bannedUsers.length > 0 ? (
+            <div style={styles.bannedList}>
+              {bannedUsers.map(user => (
+                <div
+                  key={user._id}
+                  style={styles.bannedCard}
+                >
+                  <div style={styles.reportTop}>
+                    <div>
+                      <strong style={styles.bannedUsername}>
+                        {user.username}
+                      </strong>
+
+                      {user.displayName && (
+                        <span style={styles.bannedDisplayName}>
+                          {user.displayName}
+                        </span>
+                      )}
+                    </div>
+
+                    <span style={styles.status}>
+                      Banni
+                    </span>
+                  </div>
+
+                  <div style={styles.reportInfo}>
+                    <div>
+                      <span style={styles.infoLabel}>
+                        Date
+                      </span>
+
+                      <span style={styles.infoValue}>
+                        {formatDate(user.bannedAt)}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span style={styles.infoLabel}>
+                        IP alias
+                      </span>
+
+                      <span style={styles.infoValue}>
+                        {user.ipAlias || '?'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {user.banReason && (
+                    <div style={styles.reportBlock}>
+                      <div style={styles.infoLabel}>
+                        Motif
+                      </div>
+
+                      <div style={styles.reason}>
+                        {user.banReason}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={styles.reportActions}>
+                    <button
+                      style={styles.reopenBtn}
+                      onClick={() => unbanUser(user.username)}
+                      disabled={
+                        banActionLoading === user.username
+                      }
+                    >
+                      {banActionLoading === user.username
+                        ? '...'
+                        : '✅ Débannir'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={styles.emptyReports}>
+              Aucun compte banni chargé.
+            </div>
+          )}
+        </section>
+
         {/* ========================================
             SIGNALEMENTS
         ======================================== */}
@@ -1257,6 +1571,35 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
     marginLeft: 'auto'
+  },
+
+
+  bannedList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '14px',
+    marginTop: '25px'
+  },
+
+  bannedCard: {
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: '10px',
+    padding: '18px'
+  },
+
+  bannedUsername: {
+    display: 'block',
+    color: 'var(--text-primary)',
+    fontSize: '15px',
+    wordBreak: 'break-word'
+  },
+
+  bannedDisplayName: {
+    display: 'block',
+    color: 'var(--text-secondary)',
+    fontSize: '12px',
+    marginTop: '3px'
   },
 
   emptyReports: {
