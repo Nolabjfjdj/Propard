@@ -251,7 +251,8 @@ export default function GroupChat({
       setGroupCall({
         incoming: true,
         callId: payload.callId,
-        callerId: payload.callerId?.toString()
+          callerId: payload.callerId?.toString(),
+          video: Boolean(payload.videoCall)
       });
     };
 
@@ -2035,24 +2036,44 @@ export default function GroupChat({
             alignItems: 'center'
           }}
         >
-          <button
-            style={
-              styles.callBtn
-            }
-            title="Appeler le groupe"
-            onClick={e => {
-              e.stopPropagation();
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              style={styles.callBtn}
+              title="Appel vocal du groupe"
+              aria-label="Appel vocal du groupe"
+              onClick={e => {
+                e.stopPropagation();
 
-              if (!groupCall) {
-                setGroupCall({
-                  incoming: false,
-                  callId: null
-                });
-              }
-            }}
-          >
-            📞
-          </button>
+                if (!groupCall) {
+                  setGroupCall({
+                    incoming: false,
+                    callId: null,
+                    video: false
+                  });
+                }
+              }}
+            >
+              📞
+            </button>
+            <button
+              style={styles.callBtn}
+              title="Appel vidéo du groupe"
+              aria-label="Appel vidéo du groupe"
+              onClick={e => {
+                e.stopPropagation();
+
+                if (!groupCall) {
+                  setGroupCall({
+                    incoming: false,
+                    callId: null,
+                    video: true
+                  });
+                }
+              }}
+            >
+              📹
+            </button>
+          </div>
 
           <button
             style={
@@ -2827,6 +2848,7 @@ export default function GroupChat({
           token={token}
           incomingCall={groupCall.incoming}
           callId={groupCall.callId}
+          videoCall={groupCall.video}
           onClose={() => setGroupCall(null)}
         />
       )}
