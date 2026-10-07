@@ -5,7 +5,7 @@ export default function TermsPage() {
         <a href="/help" style={styles.back}>← Retour</a>
 
         <h1 style={styles.title}>Conditions Générales d'Utilisation</h1>
-        <p style={styles.date}>En vigueur depuis le 14 septembre 2026</p>
+        <p style={styles.date}>En vigueur depuis le 7 octobre 2026</p>
 
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>1. Présentation du service</h2>
@@ -195,6 +195,74 @@ export default function TermsPage() {
           </p>
         </div>
 
+
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>7. Appels audio et vidéo</h2>
+
+          <p style={styles.text}>
+            Propard permet aux utilisateurs d'effectuer ou de recevoir des appels
+            audio et vidéo privés ainsi que des appels audio et vidéo de groupe,
+            selon les fonctionnalités disponibles.
+          </p>
+
+          <p style={styles.text}>
+            Ces fonctionnalités peuvent utiliser le microphone et, pour les appels
+            vidéo, la caméra de l'appareil. L'utilisateur doit disposer des
+            autorisations nécessaires sur son appareil et utiliser ces fonctionnalités
+            conformément aux présentes CGU.
+          </p>
+
+          <p style={styles.text}>
+            Les communications en temps réel reposent sur des technologies WebRTC.
+            Selon les conditions réseau, certains flux peuvent utiliser des serveurs
+            de relais techniques nécessaires à l'établissement ou au maintien de la
+            communication.
+          </p>
+
+          <p style={styles.text}>
+            Les utilisateurs doivent respecter les mêmes règles de comportement
+            pendant les appels que dans les autres fonctionnalités de Propard.
+            Il est notamment interdit d'utiliser les appels pour harceler, menacer,
+            diffuser des contenus interdits ou porter atteinte aux droits ou à la
+            sécurité d'autrui.
+          </p>
+
+          <p style={styles.text}>
+            Propard ne garantit pas que tous les appels puissent être établis ou
+            maintenus dans toutes les conditions techniques ou réseaux.
+          </p>
+        </div>
+
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>8. Modération et sanctions</h2>
+
+          <p style={styles.text}>
+            En cas de non-respect des présentes CGU, Propard peut prendre des mesures
+            adaptées à la situation, notamment une restriction de fonctionnalités,
+            une suspension temporaire ou un bannissement permanent du compte.
+          </p>
+
+          <p style={styles.text}>
+            Un bannissement peut être assorti d'une durée déterminée ou être permanent.
+            La durée d'une mesure est déterminée en fonction de la nature et de la
+            gravité des faits, de leur répétition, du contexte et des impératifs
+            de sécurité du service. Les durées disponibles techniquement peuvent
+            évoluer et ne constituent pas une liste exhaustive dans les présentes CGU.
+          </p>
+
+          <p style={styles.text}>
+            Lorsqu'un compte est banni, l'accès au service peut être bloqué et les
+            sessions actives peuvent être invalidées. Un bannissement peut également
+            entraîner la déconnexion des connexions en cours.
+          </p>
+
+          <p style={styles.text}>
+            Une mesure de modération peut être prise notamment à la suite d'un
+            signalement, lorsqu'une violation est constatée ou lorsqu'elle est
+            nécessaire à la sécurité du service.
+          </p>
+        </div>
+
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>
             7. Contenus des utilisateurs et mesures
@@ -233,7 +301,7 @@ export default function TermsPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>8. Propriété intellectuelle</h2>
+          <h2 style={styles.sectionTitle}>9. Propriété intellectuelle</h2>
 
           <p style={styles.text}>
             Le nom "Propard", le logo et le code source de la plateforme sont la propriété
@@ -249,7 +317,7 @@ export default function TermsPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>9. Disponibilité du service</h2>
+          <h2 style={styles.sectionTitle}>10. Disponibilité du service</h2>
 
           <p style={styles.text}>
             Propard est fourni sans garantie de disponibilité continue. Des interruptions
@@ -265,7 +333,7 @@ export default function TermsPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>10. Modification des CGU</h2>
+          <h2 style={styles.sectionTitle}>11. Modification des CGU</h2>
 
           <p style={styles.text}>
             Propard se réserve le droit de modifier les présentes CGU afin notamment de
@@ -282,7 +350,7 @@ export default function TermsPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>11. Droit applicable</h2>
+          <h2 style={styles.sectionTitle}>12. Droit applicable</h2>
 
           <p style={styles.text}>
             Les présentes CGU sont soumises au droit français, sous réserve des dispositions
@@ -297,7 +365,7 @@ export default function TermsPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>12. Contact</h2>
+          <h2 style={styles.sectionTitle}>13. Contact</h2>
 
           <p style={styles.text}>
             Pour toute question relative aux présentes CGU :
