@@ -1266,6 +1266,7 @@ export default function AppPage({
           incomingOffer={
             incomingCall.offer
           }
+          videoCall={incomingCall.videoCall}
         />
       )}
 
