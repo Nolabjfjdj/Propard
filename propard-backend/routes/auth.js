@@ -169,7 +169,13 @@ router.post('/login', loginRateLimiter, async (req, res) => {
       });
     }
 
-    if (user.bannedAt) {
+    if (user.bannedAt && user.banExpiresAt && user.banExpiresAt <= new Date()) {
+      user.bannedAt = null;
+      user.banExpiresAt = null;
+      user.banReason = null;
+      user.sessionVersion += 1;
+      await user.save();
+    } else if (user.bannedAt) {
       return res.status(403).json({
         error: 'Ce compte a été banni de Propard.'
       });
