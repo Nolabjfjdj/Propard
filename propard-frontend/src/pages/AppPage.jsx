@@ -1169,8 +1169,18 @@ export default function AppPage({
           <GroupChat
             group={selectedGroup}
             token={token}
+            userId={user?.id}
             onBack={handleBack}
             onDeleted={handleGroupDeleted}
+            onGrabStart={payload =>
+              handleGrabStart(
+                payload,
+                null
+              )
+            }
+            grabbedMessageId={
+              grabVisual?.msgId || null
+            }
           />
         ) : selectedFriend ? (
           <Chat
