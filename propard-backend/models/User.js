@@ -1,186 +1,28 @@
 const mongoose = require('mongoose');
+const { registerModel } = require('../db/shards');
 
 const userSchema = new mongoose.Schema({
-  username: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    minlength: 3,
-    maxlength: 20
-  },
-
-  displayName: {
-    type: String,
-    default: null,
-    trim: true,
-    maxlength: 32
-  },
-
-  avatar: {
-    type: String,
-    default: null
-  },
-
-  password: {
-    type: String,
-    required: true
-  },
-
-  sessionVersion: {
-    type: Number,
-    default: 0
-  },
-
-  ipAlias: {
-    type: String,
-    required: true,
-    unique: true
-  },
-
-  publicKey: {
-    type: String,
-    default: null
-  },
-
-  apnsTokens: {
-    type: [
-      {
-        token: {
-          type: String,
-          required: true,
-          maxlength: 512
-        },
-        platform: {
-          type: String,
-          enum: ['ios'],
-          required: true
-        },
-        createdAt: {
-          type: Date,
-          default: Date.now
-        }
-      }
-    ],
-    default: []
-  },
-
-  pushSubscriptions: {
-    type: [
-      {
-        endpoint: {
-          type: String,
-          required: true,
-          maxlength: 2048
-        },
-        keys: {
-          p256dh: {
-            type: String,
-            required: true,
-            maxlength: 256
-          },
-          auth: {
-            type: String,
-            required: true,
-            maxlength: 256
-          }
-        },
-        createdAt: {
-          type: Date,
-          default: Date.now
-        }
-      }
-    ],
-    default: []
-  },
-
-  e2eeKeyBackup: {
-    type: mongoose.Schema.Types.Mixed,
-    default: null
-  },
-
-  realUsername: {
-    type: String,
-    default: null
-  },
-
-  pendingDeletionAt: {
-    type: Date,
-    default: null
-  },
-
-  bannedAt: {
-    type: Date,
-    default: null
-  },
-
-  banExpiresAt: {
-    type: Date,
-    default: null
-  },
-
-  banReason: {
-    type: String,
-    default: null,
-    maxlength: 500
-  },
-
-  friends: [
-    {
-      userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-      },
-      nickname: {
-        type: String,
-        default: null,
-        maxlength: 32
-      }
-    }
-  ],
-
-  friendRequests: [
-    {
-      from: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-      },
-      createdAt: {
-        type: Date,
-        default: Date.now
-      }
-    }
-  ],
-
-  blockedUsers: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    }
-  ],
-
-  isOnline: {
-    type: Boolean,
-    default: false
-  },
-
-  acceptedAnnouncements: [
-    {
-      announcementId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Announcement'
-      },
-      acceptedAt: {
-        type: Date,
-        default: Date.now
-      }
-    }
-  ],
-
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
+  username:{type:String,required:true,unique:true,trim:true,minlength:3,maxlength:20},
+  displayName:{type:String,default:null,trim:true,maxlength:32},
+  avatar:{type:String,default:null},
+  password:{type:String,required:true},
+  sessionVersion:{type:Number,default:0},
+  ipAlias:{type:String,required:true,unique:true},
+  publicKey:{type:String,default:null},
+  apnsTokens:[{token:{type:String,required:true,maxlength:512},platform:{type:String,enum:['ios'],required:true},createdAt:{type:Date,default:Date.now}}],
+  pushSubscriptions:[{endpoint:{type:String,required:true,maxlength:2048},keys:{p256dh:{type:String,required:true,maxlength:256},auth:{type:String,required:true,maxlength:256}},createdAt:{type:Date,default:Date.now}}],
+  e2eeKeyBackup:{type:mongoose.Schema.Types.Mixed,default:null},
+  realUsername:{type:String,default:null},
+  pendingDeletionAt:{type:Date,default:null},
+  bannedAt:{type:Date,default:null},
+  banExpiresAt:{type:Date,default:null},
+  banReason:{type:String,default:null,maxlength:500},
+  friends:[{userId:{type:mongoose.Schema.Types.ObjectId,ref:'User'},nickname:{type:String,default:null,maxlength:32}}],
+  friendRequests:[{from:{type:mongoose.Schema.Types.ObjectId,ref:'User'},createdAt:{type:Date,default:Date.now}}],
+  blockedUsers:[{type:mongoose.Schema.Types.ObjectId,ref:'User'}],
+  isOnline:{type:Boolean,default:false},
+  acceptedAnnouncements:[{announcementId:{type:mongoose.Schema.Types.ObjectId,ref:'Announcement'},acceptedAt:{type:Date,default:Date.now}}],
+  createdAt:{type:Date,default:Date.now}
 });
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = registerModel('User', userSchema);
