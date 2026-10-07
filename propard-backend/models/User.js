@@ -109,6 +109,17 @@ const userSchema = new mongoose.Schema({
     default: null
   },
 
+  bannedAt: {
+    type: Date,
+    default: null
+  },
+
+  banReason: {
+    type: String,
+    default: null,
+    maxlength: 500
+  },
+
   friends: [
     {
       userId: {
