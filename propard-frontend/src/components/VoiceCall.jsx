@@ -78,7 +78,8 @@ export default function VoiceCall({
   userId,
   token,
   onClose,
-  incomingOffer
+  incomingOffer,
+  videoCall = false
 }) {
   const [status, setStatus] = useState(
     incomingOffer ? 'incoming' : 'calling'
@@ -86,7 +87,7 @@ export default function VoiceCall({
 
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
-  const [cameraEnabled, setCameraEnabled] = useState(true);
+  const [cameraEnabled, setCameraEnabled] = useState(videoCall);
 
   /*
    * Position de la fenêtre flottante.
@@ -838,7 +839,8 @@ export default function VoiceCall({
         'iceRestartOffer',
         {
           receiverId: friend._id,
-          offer
+          offer,
+          videoCall
         }
       );
 
@@ -1102,9 +1104,9 @@ export default function VoiceCall({
       const stream =
         await navigator.mediaDevices
           .getUserMedia({
-            audio: true,
-            video: true
-          });
+          audio: true,
+          video: videoCall
+        });
 
       if (closedRef.current) {
         stream
@@ -1188,9 +1190,9 @@ export default function VoiceCall({
       const stream =
         await navigator.mediaDevices
           .getUserMedia({
-            audio: true,
-            video: true
-          });
+          audio: true,
+          video: videoCall
+        });
 
       if (closedRef.current) {
         stream
@@ -1692,7 +1694,7 @@ export default function VoiceCall({
           </div>
         </div>
 
-        {(status === 'connected' || status === 'calling') && (
+        {videoCall && (status === 'connected' || status === 'calling') && (
           <div style={styles.videoArea}>
             <video
               ref={localVideoRef}
@@ -1745,18 +1747,20 @@ export default function VoiceCall({
                   >
                     {muted ? '🔇' : '🎤'}
                   </button>
-                  <button
-                    style={{
-                      ...styles.muteBtn,
-                      background: cameraEnabled
-                        ? 'var(--bg-hover)'
-                        : 'var(--danger)'
-                    }}
-                    onClick={toggleCamera}
-                    aria-label={cameraEnabled ? 'Couper la caméra' : 'Réactiver la caméra'}
-                  >
-                    {cameraEnabled ? '📹' : '🚫'}
-                  </button>
+                  {videoCall && (
+                    <button
+                      style={{
+                        ...styles.muteBtn,
+                        background: cameraEnabled
+                          ? 'var(--bg-hover)'
+                          : 'var(--danger)'
+                      }}
+                      onClick={toggleCamera}
+                      aria-label={cameraEnabled ? 'Couper la caméra' : 'Réactiver la caméra'}
+                    >
+                      {cameraEnabled ? '📹' : '🚫'}
+                    </button>
+                  )}
                 </>
               )}
 
