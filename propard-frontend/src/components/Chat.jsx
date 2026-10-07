@@ -579,6 +579,25 @@ export default function Chat({
     }
   };
 
+  const copyMessage = async msg => {
+    if (
+      !msg ||
+      msg.deleted ||
+      msg.decryptionError ||
+      typeof msg.content !== 'string'
+    ) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(msg.content);
+    } catch (err) {
+      console.error('Erreur copie du message:', err);
+    }
+
+    setContextMenu(null);
+  };
+
   const deleteMessage = async msgId => {
     setMessages(prev =>
       prev.filter(m => m._id !== msgId)
@@ -1303,6 +1322,15 @@ export default function Chat({
             onClick={e => e.stopPropagation()}
             onTouchStart={e => e.stopPropagation()}
           >
+            <button
+              style={styles.contextItem}
+              onClick={() =>
+                copyMessage(contextMenu.msg)
+              }
+            >
+              📋 Copier
+            </button>
+
             {isMe ? (
               <>
                 <button
