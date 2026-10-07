@@ -1105,14 +1105,23 @@ export default function VoiceCall({
   };
 
   useEffect(() => {
-    if (!videoCall || !remoteVideoRef.current || !remoteStreamRef.current) {
+    if (!videoCall) {
       return;
     }
 
-    remoteVideoRef.current.srcObject = remoteStreamRef.current;
-    remoteVideoRef.current.play().catch(err =>
-      console.error('Impossible de lire le flux vidéo distant:', err)
-    );
+    if (localVideoRef.current && localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+      localVideoRef.current.play().catch(err =>
+        console.error('Impossible de lire le flux vidéo local:', err)
+      );
+    }
+
+    if (remoteVideoRef.current && remoteStreamRef.current) {
+      remoteVideoRef.current.srcObject = remoteStreamRef.current;
+      remoteVideoRef.current.play().catch(err =>
+        console.error('Impossible de lire le flux vidéo distant:', err)
+      );
+    }
   }, [videoCall, status]);
 
   const startCall = async () => {
