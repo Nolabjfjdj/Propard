@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import api from '../utils/api';
+import { markdownToHtml } from '../utils/markdown';
 
 export default function AdminPage() {
   // ============================
@@ -756,6 +757,25 @@ export default function AdminPage() {
               maxLength={5000}
             />
 
+            <div style={styles.markdownHint}>
+              Markdown : **gras**, *italique*, ## titres, - listes, `code`,
+              [liens](https://example.com) et blocs de code avec trois accents graves.
+            </div>
+
+            {announcementMessage.trim() && (
+              <div style={styles.markdownPreview}>
+                <div style={styles.markdownPreviewTitle}>
+                  Aperçu
+                </div>
+                <div
+                  style={styles.markdownContent}
+                  dangerouslySetInnerHTML={{
+                    __html: markdownToHtml(announcementMessage)
+                  }}
+                />
+              </div>
+            )}
+
             {announcementError && (
               <p style={styles.error}>
                 {announcementError}
@@ -1416,6 +1436,35 @@ const styles = {
     outline: 'none',
     boxSizing: 'border-box',
     width: '100%'
+  },
+
+  markdownHint: {
+    color: 'var(--text-muted)',
+    fontSize: '12px',
+    lineHeight: '1.5'
+  },
+
+  markdownPreview: {
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: '8px',
+    padding: '14px',
+    marginTop: '4px'
+  },
+
+  markdownPreviewTitle: {
+    color: 'var(--text-muted)',
+    fontSize: '10px',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    marginBottom: '10px'
+  },
+
+  markdownContent: {
+    color: 'var(--text-secondary)',
+    fontSize: '14px',
+    lineHeight: '1.6',
+    wordBreak: 'break-word'
   },
 
   textarea: {
