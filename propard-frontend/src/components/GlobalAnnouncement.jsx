@@ -179,13 +179,15 @@ const styles = {
     width: '100%',
     maxWidth: '520px',
     maxHeight: '80vh',
-    overflowY: 'auto',
     background: 'var(--bg-secondary)',
     border: '1px solid var(--border)',
     borderRadius: 'var(--radius)',
     padding: '32px',
     boxSizing: 'border-box',
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.45)'
+    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.45)',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden'
   },
 
   icon: {
@@ -206,7 +208,11 @@ const styles = {
     lineHeight: '1.6',
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
-    marginBottom: '24px'
+    marginBottom: '24px',
+    minHeight: 0,
+    overflowY: 'auto',
+    overscrollBehavior: 'contain',
+    WebkitOverflowScrolling: 'touch'
   },
 
   markdown: {
@@ -221,6 +227,7 @@ const styles = {
 
   button: {
     width: '100%',
+    flexShrink: 0,
     border: 'none',
     borderRadius: '8px',
     padding: '13px 16px',
