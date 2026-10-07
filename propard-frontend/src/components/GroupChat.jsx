@@ -2213,7 +2213,7 @@ export default function GroupChat({
                       : null
                   );
 
-                const senderId =
+                const senderInfoId =
                   (
                     senderInfo?._id ||
                     senderInfo?.id ||
@@ -2221,7 +2221,7 @@ export default function GroupChat({
                   )?.toString();
 
                 const senderName =
-                  friendNicknames.get(senderId)?.trim() ||
+                  friendNicknames.get(senderInfoId)?.trim() ||
                   senderInfo?.displayName ||
                   senderInfo?.username ||
                   'Membre';
