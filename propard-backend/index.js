@@ -185,6 +185,18 @@ async function areFriends(userId,friendId){
     );
 }
 
+async function getFriendNickname(viewerId, friendId){
+  const user=await User.findById(viewerId).select('friends');
+
+  if(!user) return null;
+
+  const friendship=user.friends.find(
+    f=>f.userId?.toString()===friendId.toString()
+  );
+
+  return friendship?.nickname?.trim() || null;
+}
+
 /*
  * ─────────────────────────────────────
  * APPELS DE GROUPE
@@ -427,8 +439,18 @@ io.on('connection',socket=>{
         'private',
         socket.userId
       )){
+        const receiverNickname =
+          await getFriendNickname(
+            receiverId,
+            socket.userId
+          );
+
         void sendPushNotification(receiverId, {
-          title: sender?.username ? `@${sender.username}` : 'Propard',
+          title: receiverNickname
+            ? receiverNickname
+            : sender?.username
+              ? `@${sender.username}`
+              : 'Propard',
           body: 'Nouveau message',
           url: `/chat/${socket.userId.toString()}`,
           tag: `private-${socket.userId}`,
@@ -549,11 +571,19 @@ io.on('connection',socket=>{
             groupId
           )
         ){
+          const memberNickname =
+            await getFriendNickname(
+              memberId,
+              socket.userId
+            );
+
           void sendPushNotification(memberId, {
             title: group.name || 'Propard',
-            body: sender?.username
-              ? `@${sender.username} a envoyé un message`
-              : 'Nouveau message de groupe',
+            body: memberNickname
+              ? `${memberNickname} a envoyé un message`
+              : sender?.username
+                ? `@${sender.username} a envoyé un message`
+                : 'Nouveau message de groupe',
             url: `/group/${groupId.toString()}`,
             tag: `group-${groupId.toString()}`,
             data: {
@@ -622,7 +652,16 @@ io.on('connection',socket=>{
 
     if(!delivered){
       const caller = await User.findById(socket.userId).select('displayName username');
-      const callerName = caller?.displayName || caller?.username || 'Quelqu’un';
+      const receiverNickname =
+        await getFriendNickname(
+          receiverId,
+          socket.userId
+        );
+      const callerName =
+        receiverNickname ||
+        caller?.displayName ||
+        caller?.username ||
+        'Quelqu’un';
 
       void sendPushNotification(receiverId, {
         title: `${callerName} t’appelle`,
