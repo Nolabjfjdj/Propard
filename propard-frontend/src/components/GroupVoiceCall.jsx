@@ -56,6 +56,8 @@ export default function GroupVoiceCall({
   );
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
+  const [cameraEnabled, setCameraEnabled] = useState(true);
+  const [remoteStreams, setRemoteStreams] = useState(new Map());
   const [participants, setParticipants] = useState([]);
   const [windowPosition, setWindowPosition] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -64,7 +66,7 @@ export default function GroupVoiceCall({
   const peersRef = useRef(new Map());
   const pendingCandidatesRef = useRef(new Map());
   const localStreamRef = useRef(null);
-  const remoteAudioRef = useRef(new Map());
+  const localVideoRef = useRef(null);
   const timerRef = useRef(null);
   const timerStartedRef = useRef(false);
   const callStartedAtRef = useRef(null);
@@ -247,7 +249,8 @@ export default function GroupVoiceCall({
     if (localStreamRef.current) return localStreamRef.current;
 
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true
+      audio: true,
+      video: true
     });
 
     if (closedRef.current) {
@@ -288,19 +291,15 @@ export default function GroupVoiceCall({
     clearPending(id);
   };
 
-  const attachRemoteAudio = (peerId, stream) => {
+  const attachRemoteStream = (peerId, stream) => {
     const id = normalizeId(peerId);
-    let audio = remoteAudioRef.current.get(id);
+    if (!id || !stream) return;
 
-    if (!audio) {
-      audio = new Audio();
-      audio.autoplay = true;
-      audio.playsInline = true;
-      remoteAudioRef.current.set(id, audio);
-    }
-
-    audio.srcObject = stream;
-    audio.play().catch(() => {});
+    setRemoteStreams(prev => {
+      const next = new Map(prev);
+      next.set(id, stream);
+      return next;
+    });
   };
 
   const createPeer = async peerId => {
@@ -332,7 +331,7 @@ export default function GroupVoiceCall({
     peer.ontrack = event => {
       if (closedRef.current) return;
       const stream = event.streams?.[0];
-      if (stream) attachRemoteAudio(id, stream);
+      if (stream) attachRemoteStream(id, stream);
     };
 
     peer.oniceconnectionstatechange = () => {
@@ -475,12 +474,10 @@ export default function GroupVoiceCall({
       localStreamRef.current = null;
     }
 
-    for (const audio of remoteAudioRef.current.values()) {
-      try { audio.pause(); } catch {}
-      audio.srcObject = null;
+    setRemoteStreams(new Map());
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
     }
-
-    remoteAudioRef.current.clear();
   };
 
   const hangUp = () => {
@@ -492,6 +489,21 @@ export default function GroupVoiceCall({
     }
     cleanup();
     onClose();
+  };
+
+  const toggleCamera = () => {
+    const stream = localStreamRef.current;
+    if (!stream) return;
+
+    const tracks = stream.getVideoTracks();
+    if (!tracks.length) return;
+
+    const nextEnabled = !cameraEnabled;
+    tracks.forEach(track => {
+      track.enabled = nextEnabled;
+    });
+
+    setCameraEnabled(nextEnabled);
   };
 
   const toggleMute = () => {
@@ -779,12 +791,11 @@ export default function GroupVoiceCall({
         peersRef.current.delete(id);
       }
 
-      const audio = remoteAudioRef.current.get(id);
-      if (audio) {
-        try { audio.pause(); } catch {}
-        audio.srcObject = null;
-        remoteAudioRef.current.delete(id);
-      }
+      setRemoteStreams(prev => {
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
 
       setParticipants(prev =>
         prev.filter(item => normalizeId(item) !== id)
@@ -919,6 +930,37 @@ export default function GroupVoiceCall({
           </div>
         </div>
 
+        {(status === 'connected' || status === 'calling') && (
+          <div style={styles.videoGrid}>
+            <div style={styles.videoTile}>
+              <video
+                ref={localVideoRef}
+                autoPlay
+                muted
+                playsInline
+                style={styles.videoElement}
+              />
+              <span style={styles.videoLabel}>Vous</span>
+            </div>
+            {[...remoteStreams.entries()].map(([id, stream]) => (
+              <div key={id} style={styles.videoTile}>
+                <video
+                  autoPlay
+                  playsInline
+                  ref={element => {
+                    if (element && element.srcObject !== stream) {
+                      element.srcObject = stream;
+                      element.play().catch(() => {});
+                    }
+                  }}
+                  style={styles.videoElement}
+                />
+                <span style={styles.videoLabel}>{getMemberName(id)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div style={styles.participants}>
           {visibleParticipants.length === 0 ? (
             <span style={styles.waiting}>
@@ -974,18 +1016,28 @@ export default function GroupVoiceCall({
           ) : (
             <>
               {(status === 'connected' || status === 'calling') && (
-                <button
-                  style={{
-                    ...styles.muteBtn,
-                    background: muted
-                      ? 'var(--danger)'
-                      : 'var(--bg-hover)'
-                  }}
-                  onClick={toggleMute}
-                  aria-label={muted ? 'Réactiver le micro' : 'Couper le micro'}
-                >
-                  {muted ? '🔇' : '🎤'}
-                </button>
+                <>
+                  <button
+                    style={{
+                      ...styles.muteBtn,
+                      background: muted ? 'var(--danger)' : 'var(--bg-hover)'
+                    }}
+                    onClick={toggleMute}
+                    aria-label={muted ? 'Réactiver le micro' : 'Couper le micro'}
+                  >
+                    {muted ? '🔇' : '🎤'}
+                  </button>
+                  <button
+                    style={{
+                      ...styles.muteBtn,
+                      background: cameraEnabled ? 'var(--bg-hover)' : 'var(--danger)'
+                    }}
+                    onClick={toggleCamera}
+                    aria-label={cameraEnabled ? 'Couper la caméra' : 'Réactiver la caméra'}
+                  >
+                    {cameraEnabled ? '📹' : '🚫'}
+                  </button>
+                </>
               )}
 
               <button
@@ -1082,6 +1134,45 @@ const styles = {
     fontSize: '12px',
     color: 'var(--text-secondary)',
     pointerEvents: 'none'
+  },
+
+  videoGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: '8px',
+    maxHeight: '260px',
+    overflowY: 'auto'
+  },
+
+  videoTile: {
+    position: 'relative',
+    minWidth: 0,
+    aspectRatio: '16 / 9',
+    borderRadius: '10px',
+    overflow: 'hidden',
+    background: '#111'
+  },
+
+  videoElement: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    display: 'block'
+  },
+
+  videoLabel: {
+    position: 'absolute',
+    left: '6px',
+    bottom: '6px',
+    maxWidth: 'calc(100% - 12px)',
+    padding: '2px 6px',
+    borderRadius: '6px',
+    background: 'rgba(0,0,0,0.6)',
+    color: '#fff',
+    fontSize: '11px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
   },
 
   participants: {
