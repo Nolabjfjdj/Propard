@@ -47,6 +47,9 @@ export default function AdminPage() {
   const [banKey, setBanKey] = useState('');
   const [banUsername, setBanUsername] = useState('');
   const [banReason, setBanReason] = useState('');
+  const [banDuration, setBanDuration] = useState('permanent');
+  const [customDuration, setCustomDuration] = useState(1);
+  const [customUnit, setCustomUnit] = useState('minutes');
   const [bannedUsers, setBannedUsers] = useState([]);
   const [bansError, setBansError] = useState('');
   const [bansResult, setBansResult] = useState('');
@@ -95,8 +98,19 @@ export default function AdminPage() {
       return;
     }
 
+    const durationLabels = {
+      '1h': '1 heure', '6h': '6 heures', '12h': '12 heures', '24h': '24 heures',
+      '3d': '3 jours', '7d': '7 jours', '30d': '30 jours',
+      permanent: 'définitivement', custom: `${customDuration} ${customUnit}`
+    };
+
+    if (banDuration === 'custom' && (!Number.isInteger(Number(customDuration)) || Number(customDuration) < 1 || Number(customDuration) > 36500)) {
+      setBansError('La durée personnalisée doit être un nombre entier entre 1 et 36500.');
+      return;
+    }
+
     if (!window.confirm(
-      `Bannir définitivement le compte « ${banUsername.trim()} » ?`
+      `Bannir ${banDuration === 'permanent' ? 'définitivement' : 'pour ' + durationLabels[banDuration]} le compte « ${banUsername.trim()} » ?`
     )) {
       return;
     }
@@ -111,13 +125,20 @@ export default function AdminPage() {
         {
           banKey,
           username: banUsername.trim(),
-          reason: banReason.trim()
+          reason: banReason.trim(),
+          duration: banDuration,
+          ...(banDuration === 'custom'
+            ? { customDuration: Number(customDuration), customUnit }
+            : {})
         }
       );
 
       setBansResult(res.data.message);
       setBanUsername('');
       setBanReason('');
+      setBanDuration('permanent');
+      setCustomDuration(1);
+      setCustomUnit('minutes');
       await loadBannedUsers();
     } catch (err) {
       setBansError(
@@ -844,6 +865,54 @@ export default function AdminPage() {
             />
 
             <label style={styles.label}>
+              Durée du bannissement
+            </label>
+
+            <select
+              style={styles.input}
+              value={banDuration}
+              onChange={e => setBanDuration(e.target.value)}
+            >
+              <option value="1h">1 heure</option>
+              <option value="6h">6 heures</option>
+              <option value="12h">12 heures</option>
+              <option value="24h">24 heures</option>
+              <option value="3d">3 jours</option>
+              <option value="7d">7 jours</option>
+              <option value="30d">30 jours</option>
+              <option value="permanent">Permanent</option>
+              <option value="custom">Personnalisé</option>
+            </select>
+
+            {banDuration === 'custom' && (
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <input
+                  style={{ ...styles.input, flex: 1 }}
+                  type="number"
+                  min="1"
+                  max="36500"
+                  step="1"
+                  value={customDuration}
+                  onChange={e => setCustomDuration(e.target.value)}
+                  placeholder="Durée"
+                />
+
+                <select
+                  style={{ ...styles.input, flex: 1 }}
+                  value={customUnit}
+                  onChange={e => setCustomUnit(e.target.value)}
+                >
+                  <option value="minutes">Minutes</option>
+                  <option value="hours">Heures</option>
+                  <option value="days">Jours</option>
+                  <option value="weeks">Semaines</option>
+                  <option value="months">Mois</option>
+                  <option value="years">Années</option>
+                </select>
+              </div>
+            )}
+
+            <label style={styles.label}>
               Motif du bannissement
             </label>
 
@@ -927,6 +996,16 @@ export default function AdminPage() {
 
                       <span style={styles.infoValue}>
                         {formatDate(user.bannedAt)}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span style={styles.infoLabel}>
+                        Fin
+                      </span>
+
+                      <span style={styles.infoValue}>
+                        {user.banExpiresAt ? formatDate(user.banExpiresAt) : 'Permanent'}
                       </span>
                     </div>
 
