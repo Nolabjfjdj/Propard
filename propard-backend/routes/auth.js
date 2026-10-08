@@ -34,7 +34,8 @@ const loginRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
   keyFn: (req) => `${req.ip}:${typeof req.body?.username === 'string' ? req.body.username.toLowerCase() : ''}`,
-  message: 'Trop de tentatives de connexion, réessaie dans quelques minutes.'
+  message: 'Trop de tentatives de connexion, réessaie dans quelques minutes.',
+  captcha: true
 });
 
 const registerRateLimiter = createRateLimiter({
