@@ -4,6 +4,7 @@ import api from './api';
 
 
 let nativeNotificationActionListener = null;
+const NATIVE_PUSH_TOKEN_STORAGE_KEY = 'propard_native_push_token';
 
 export async function setupNotificationNavigation() {
   if (!Capacitor.isNativePlatform()) return;
@@ -228,23 +229,34 @@ async function enableNativePushNotifications(token) {
     'Le serveur Propard ne répond pas pour l’enregistrement des notifications.'
   );
 
+  try {
+    localStorage.setItem(
+      NATIVE_PUSH_TOKEN_STORAGE_KEY,
+      nativeToken
+    );
+  } catch {}
+
   return true;
 }
 
 async function disableNativePushNotifications(token) {
   if (!token) return;
 
+  let nativeToken = '';
+
   try {
-    await withTimeout(
-      PushNotifications.unregister(),
-      10000,
-      'Délai dépassé lors de la désactivation des notifications.'
-    );
-  } finally {
+    nativeToken =
+      localStorage.getItem(
+        NATIVE_PUSH_TOKEN_STORAGE_KEY
+      ) || '';
+  } catch {}
+
+  try {
     await withTimeout(
       api.delete('/api/push/native/subscribe', {
         data: {
-          platform: Capacitor.getPlatform()
+          platform: Capacitor.getPlatform(),
+          token: nativeToken
         },
         headers: {
           Authorization: `Bearer ${token}`
