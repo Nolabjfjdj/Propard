@@ -5,7 +5,7 @@ export default function PrivacyPage() {
         <a href="/help" style={styles.back}>← Retour</a>
 
         <h1 style={styles.title}>Politique de Confidentialité</h1>
-        <p style={styles.date}>En vigueur depuis le 7 octobre 2026</p>
+        <p style={styles.date}>En vigueur depuis le 9 octobre 2026</p>
 
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>1. Responsable du traitement</h2>
@@ -112,7 +112,13 @@ export default function PrivacyPage() {
             </li>
             <li>
               Certaines données techniques nécessaires à la sécurité et au
-              fonctionnement du service
+              fonctionnement du service, notamment les compteurs temporaires de
+              limitation des requêtes et les résultats des vérifications anti-robot
+            </li>
+            <li>
+              Lorsqu'une vérification anti-robot est déclenchée, le jeton CAPTCHA
+              et les informations techniques nécessaires à sa validation par Cloudflare
+              Turnstile
             </li>
           </ul>
 
@@ -294,11 +300,13 @@ export default function PrivacyPage() {
           <p style={styles.text}>
             La fonctionnalité « Signaler » constitue une exception volontaire au
             fonctionnement habituel du chiffrement. Lorsqu'un utilisateur signale un
-            message privé, un message de groupe ou une conversation entière, les messages
-            déchiffrés présents dans l'historique chargé (jusqu'à 2 000 messages) peuvent
-            être transmis à Propard et enregistrés avec le signalement, y compris les
-            messages envoyés par la personne qui signale. Ces éléments peuvent être
-            consultés par l'équipe de modération pour examiner le signalement.
+            message privé, un message de groupe ou une conversation entière, jusqu'à
+            2 000 messages présents dans l'historique chargé au moment du signalement
+            peuvent être transmis à Propard et enregistrés avec le signalement. Pour
+            un signalement de conversation entière, cela inclut les messages envoyés
+            par la personne qui signale et ceux des autres participants. Les éléments
+            transmis peuvent être consultés par l'équipe de modération afin d'examiner
+            le signalement.
           </p>
 
           <p style={styles.text}>
@@ -451,7 +459,11 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong>Metered</strong> pour certains services techniques liés
-              au relais TURN utilisé lors des communications en temps réel.
+              au relais TURN utilisé lors des communications en temps réel ;
+            </li>
+            <li>
+              <strong>Cloudflare</strong> pour la vérification anti-robot via Turnstile
+              lorsque cette vérification est déclenchée.
             </li>
           </ul>
 
@@ -459,6 +471,16 @@ export default function PrivacyPage() {
             Les sauvegardes chiffrées de clés E2EE sont stockées dans la base de
             données de Propard lorsqu'elles sont utilisées par le service. Elles
             sont transmises sous une forme chiffrée depuis le client.
+          </p>
+
+          <p style={styles.text}>
+            Lorsqu'une vérification anti-robot est nécessaire, le navigateur charge
+            le service Cloudflare Turnstile et Propard transmet le jeton de vérification
+            au service de validation de Cloudflare. Cloudflare peut traiter les données
+            techniques nécessaires à cette vérification conformément à ses propres
+            conditions et à sa politique de confidentialité. Turnstile n'est pas
+            déclenché pour chaque action et intervient uniquement sur certaines
+            fonctionnalités ou lorsque des limites sont atteintes.
           </p>
 
           <p style={styles.text}>
@@ -738,6 +760,14 @@ export default function PrivacyPage() {
             cryptographique des sauvegardes de clés E2EE, des contrôles d'accès,
             des mécanismes de limitation des requêtes et différentes mesures de
             sécurité applicative.
+          </p>
+
+          <p style={styles.text}>
+            Certaines actions font l'objet de limites temporaires afin de réduire
+            le spam et les abus. Selon la fonctionnalité et le nombre de tentatives,
+            une vérification Cloudflare Turnstile peut être demandée. Les compteurs
+            de limitation sont des données techniques de sécurité et leur fonctionnement
+            peut être réinitialisé ou modifié pour protéger le service.
           </p>
 
           <p style={styles.text}>
