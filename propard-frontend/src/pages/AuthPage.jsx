@@ -117,6 +117,10 @@ export default function AuthPage({ mode }) {
       const requiresCaptcha = mode === 'login' && err.response?.data?.captchaRequired === true;
       if (requiresCaptcha) {
         setCaptchaRequired(true);
+      }
+      // Les jetons Turnstile sont à usage unique : réinitialise le widget après
+      // toute tentative échouée afin qu'il ne reste pas bloqué sur « succès ».
+      if (captchaRequired || requiresCaptcha) {
         setCaptchaToken('');
         if (captchaWidgetRef.current !== null && window.turnstile) {
           window.turnstile.reset(captchaWidgetRef.current);
