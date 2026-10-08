@@ -39,8 +39,8 @@ router.post('/conversation', authMiddleware, reportRateLimiter, async (req, res)
         !mongoose.isValidObjectId(conversationId) ||
         !Array.isArray(conversationSnapshot) ||
         conversationSnapshot.length < 1 ||
-        conversationSnapshot.length > 100) {
-      return res.status(400).json({ error: 'Conversation ou historique invalide (100 messages maximum).' });
+        conversationSnapshot.length > 2000) {
+      return res.status(400).json({ error: 'Conversation ou historique invalide (2000 messages maximum).' });
     }
 
     if (reason !== undefined && (typeof reason !== 'string' || reason.length > 500)) {
@@ -88,11 +88,11 @@ router.post('/conversation', authMiddleware, reportRateLimiter, async (req, res)
       if (!item || typeof item.content !== 'string' ||
           typeof item.senderId !== 'string' ||
           !participants.includes(item.senderId) ||
-          item.content.length > 5000) {
+          item.content.length > 20000) {
         return res.status(400).json({ error: 'Historique de conversation invalide' });
       }
       totalChars += item.content.length;
-      if (totalChars > 100000) {
+      if (totalChars > 1000000) {
         return res.status(400).json({ error: 'Historique trop volumineux' });
       }
       snapshot.push({
@@ -110,7 +110,7 @@ router.post('/conversation', authMiddleware, reportRateLimiter, async (req, res)
     const report = await Report.create({
       reporter: reporterId,
       reportedUser: conversationType === 'private' ? reportedUserId : null,
-      content: snapshot.map(item => `[${item.createdAt ? item.createdAt.toISOString() : 'date inconnue'}] ${item.senderName}: ${item.content}`).join('\n').slice(0, 100000),
+      content: snapshot.map(item => `[${item.createdAt ? item.createdAt.toISOString() : 'date inconnue'}] ${item.senderName}: ${item.content}`).join('\n').slice(0, 1000000),
       reason: reason?.trim() || null,
       messageType,
       reportScope: 'conversation',
