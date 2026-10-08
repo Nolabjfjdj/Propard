@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import api from '../utils/api';
+import { disablePushNotifications } from '../utils/pushNotifications';
 import {
   generateKeyPair,
   storePrivateKey,
@@ -460,7 +461,22 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    const currentToken = token;
+
+    if (currentToken) {
+      try {
+        await disablePushNotifications(
+          currentToken
+        );
+      } catch (error) {
+        console.error(
+          'Notification cleanup on logout failed:',
+          error
+        );
+      }
+    }
+
     setUser(null);
     setToken(null);
 
