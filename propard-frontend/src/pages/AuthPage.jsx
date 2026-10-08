@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -11,9 +11,56 @@ export default function AuthPage({ mode }) {
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [captchaRequired, setCaptchaRequired] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captchaRef = useRef(null);
+  const captchaWidgetRef = useRef(null);
 
   const { login } = useAuth();
   const { theme, toggleTheme } = useTheme();
+
+  useEffect(() => {
+    if (mode !== 'login' || !captchaRequired) return;
+    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+    if (!siteKey) {
+      setError('La protection anti-bot n’est pas configurée.');
+      return;
+    }
+    const renderCaptcha = () => {
+      if (!captchaRef.current || !window.turnstile || captchaWidgetRef.current !== null) return;
+      captchaWidgetRef.current = window.turnstile.render(captchaRef.current, {
+        sitekey: siteKey,
+        callback: token => setCaptchaToken(token),
+        'expired-callback': () => setCaptchaToken(''),
+        'error-callback': () => {
+          setCaptchaToken('');
+          setError('La vérification anti-bot a échoué. Réessaie.');
+        }
+      });
+    };
+    if (window.turnstile) {
+      renderCaptcha();
+      return;
+    }
+    const existingScript = document.querySelector('script[data-propard-turnstile]');
+    if (existingScript) {
+      existingScript.addEventListener('load', renderCaptcha, { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    script.async = true;
+    script.defer = true;
+    script.dataset.propardTurnstile = 'true';
+    script.addEventListener('load', renderCaptcha, { once: true });
+    document.head.appendChild(script);
+    return () => {
+      if (captchaWidgetRef.current !== null && window.turnstile) {
+        window.turnstile.remove(captchaWidgetRef.current);
+      }
+      captchaWidgetRef.current = null;
+    };
+  }, [captchaRequired, mode]);
 
   const switchMode = (newMode) => {
     setError('');
@@ -36,6 +83,10 @@ export default function AuthPage({ mode }) {
       );
     }
 
+    if (mode === 'login' && captchaRequired && !captchaToken) {
+      return setError('Valide le CAPTCHA avant de continuer.');
+    }
+
     setError('');
     setLoading(true);
 
@@ -47,7 +98,8 @@ export default function AuthPage({ mode }) {
 
       const res = await api.post(route, {
         username,
-        password
+        password,
+        ...(mode === 'login' && captchaToken ? { captchaToken } : {})
       });
 
       await login(
@@ -62,9 +114,15 @@ export default function AuthPage({ mode }) {
 
       window.location.href = '/';
     } catch (err) {
-      setError(
-        err.response?.data?.error || 'Erreur serveur'
-      );
+      const requiresCaptcha = mode === 'login' && err.response?.data?.captchaRequired === true;
+      if (requiresCaptcha) {
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) {
+          window.turnstile.reset(captchaWidgetRef.current);
+        }
+      }
+      setError(err.response?.data?.error || 'Erreur serveur');
     } finally {
       setLoading(false);
     }
@@ -187,6 +245,13 @@ export default function AuthPage({ mode }) {
                 </span>
               </label>
             </div>
+          )}
+
+          {captchaRequired && mode === 'login' && (
+            <div
+              ref={captchaRef}
+              style={{ display: 'flex', justifyContent: 'center' }}
+            />
           )}
 
           {error && (
