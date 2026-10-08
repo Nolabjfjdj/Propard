@@ -1205,19 +1205,22 @@ export default function AdminPage() {
                       </span>
 
                       <span style={styles.infoValue}>
-                        {report.reportedUser?.username ||
-                          'Compte supprimé'}
+                        {report.reportScope === 'conversation' && report.messageType === 'group'
+                          ? 'Conversation de groupe'
+                          : report.reportedUser?.username || 'Compte supprimé'}
                       </span>
                     </div>
 
                     <div>
                       <span style={styles.infoLabel}>
-                        Date du message
+                        {report.reportScope === 'conversation' ? 'Date du signalement' : 'Date du message'}
                       </span>
 
                       <span style={styles.infoValue}>
                         {formatDate(
-                          report.messageCreatedAt
+                          report.reportScope === 'conversation'
+                            ? report.createdAt
+                            : report.messageCreatedAt
                         )}
                       </span>
                     </div>
