@@ -1237,7 +1237,7 @@ export default function AdminPage() {
 
                   <div style={styles.reportBlock}>
                     <div style={styles.infoLabel}>
-                      Message signalé
+                      {report.reportScope === 'conversation' ? 'Conversation signalée' : 'Message signalé'}
                     </div>
 
                     <div style={styles.messageContent}>
@@ -1245,15 +1245,16 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  <div style={styles.reportBlock}>
-                    <div style={styles.infoLabel}>
-                      Message ID
+                  {report.reportScope !== 'conversation' && (
+                    <div style={styles.reportBlock}>
+                      <div style={styles.infoLabel}>
+                        Message ID
+                      </div>
+                      <code style={styles.messageId}>
+                        {report.messageId}
+                      </code>
                     </div>
-
-                    <code style={styles.messageId}>
-                      {report.messageId}
-                    </code>
-                  </div>
+                  )}
 
                   <div style={styles.reportActions}>
 
