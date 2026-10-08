@@ -20,6 +20,11 @@ export default function FriendList({
   const [requestUsers, setRequestUsers] = useState({});
   const [unread, setUnread] = useState({});
   const [groups, setGroups] = useState([]);
+  const [captchaRequired, setCaptchaRequired] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [requestActionError, setRequestActionError] = useState('');
+  const captchaRef = useRef(null);
+  const captchaWidgetRef = useRef(null);
 
   const notificationAudioRef = useRef(null);
 
@@ -142,6 +147,49 @@ export default function FriendList({
   };
 
   useEffect(() => {
+    if (!captchaRequired) return;
+    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+    if (!siteKey) {
+      setRequestActionError('La protection anti-bot n’est pas configurée.');
+      return;
+    }
+    const renderCaptcha = () => {
+      if (!captchaRef.current || !window.turnstile || captchaWidgetRef.current !== null) return;
+      captchaWidgetRef.current = window.turnstile.render(captchaRef.current, {
+        sitekey: siteKey,
+        callback: value => setCaptchaToken(value),
+        'expired-callback': () => setCaptchaToken(''),
+        'error-callback': () => {
+          setCaptchaToken('');
+          setRequestActionError('La vérification anti-bot a échoué. Réessaie.');
+        }
+      });
+    };
+    if (window.turnstile) {
+      renderCaptcha();
+    } else {
+      const existingScript = document.querySelector('script[data-propard-turnstile]');
+      if (existingScript) {
+        existingScript.addEventListener('load', renderCaptcha, { once: true });
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.async = true;
+        script.defer = true;
+        script.dataset.propardTurnstile = 'true';
+        script.addEventListener('load', renderCaptcha, { once: true });
+        document.head.appendChild(script);
+      }
+    }
+    return () => {
+      if (captchaWidgetRef.current !== null && window.turnstile) {
+        window.turnstile.remove(captchaWidgetRef.current);
+      }
+      captchaWidgetRef.current = null;
+    };
+  }, [captchaRequired]);
+
+  useEffect(() => {
     fetchData();
     fetchUnread();
     fetchGroups();
@@ -240,44 +288,54 @@ export default function FriendList({
   }, [token]);
 
   const acceptRequest = async (fromUserId) => {
+    if (captchaRequired && !captchaToken) {
+      setRequestActionError('Valide le CAPTCHA avant de continuer.');
+      return;
+    }
+    setRequestActionError('');
     try {
       await api.post(
         '/api/friends/accept',
-        { fromUserId },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
+        { fromUserId, ...(captchaToken ? { captchaToken } : {}) },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-
+      setCaptchaRequired(false);
+      setCaptchaToken('');
       await fetchData();
     } catch (err) {
-      console.error(
-        'Erreur acceptation demande:',
-        err
-      );
+      if (err.response?.data?.captchaRequired) {
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) window.turnstile.reset(captchaWidgetRef.current);
+      }
+      setRequestActionError(err.response?.data?.error || 'Impossible de traiter la demande.');
+      console.error('Erreur acceptation demande:', err);
     }
   };
 
   const declineRequest = async (fromUserId) => {
+    if (captchaRequired && !captchaToken) {
+      setRequestActionError('Valide le CAPTCHA avant de continuer.');
+      return;
+    }
+    setRequestActionError('');
     try {
       await api.post(
         '/api/friends/decline',
-        { fromUserId },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
+        { fromUserId, ...(captchaToken ? { captchaToken } : {}) },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-
+      setCaptchaRequired(false);
+      setCaptchaToken('');
       await fetchData();
     } catch (err) {
-      console.error(
-        'Erreur refus demande:',
-        err
-      );
+      if (err.response?.data?.captchaRequired) {
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) window.turnstile.reset(captchaWidgetRef.current);
+      }
+      setRequestActionError(err.response?.data?.error || 'Impossible de traiter la demande.');
+      console.error('Erreur refus demande:', err);
     }
   };
 
@@ -406,6 +464,20 @@ export default function FriendList({
             </div>
           ))}
         </div>
+      )}
+
+      {captchaRequired && (
+        <div style={{ padding: '8px 12px' }}>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+            Vérification anti-bot requise pour continuer.
+          </p>
+          <div ref={captchaRef} />
+        </div>
+      )}
+      {requestActionError && (
+        <p style={{ padding: '0 12px', fontSize: '12px', color: 'var(--danger)' }}>
+          {requestActionError}
+        </p>
       )}
 
       <div style={styles.sectionHeader}>
