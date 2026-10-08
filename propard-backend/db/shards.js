@@ -227,8 +227,11 @@ function facade(name) {
         return total;
       };
       if (property === 'create') return async (...args) => {
-        const values = args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
-        return write(name, model => model.create(values));
+        const multipleDocuments = args.length === 1 && Array.isArray(args[0]);
+        if (multipleDocuments) {
+          return write(name, model => model.create(args[0]));
+        }
+        return write(name, model => model.create(...args));
       };
       if (property === 'updateMany') return async (...args) => {
         let matchedCount = 0, modifiedCount = 0;
