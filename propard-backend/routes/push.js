@@ -117,28 +117,40 @@ router.delete('/native/subscribe', authMiddleware, async (req, res) => {
     const platform = req.body?.platform;
     const token = req.body?.token;
 
-    if (
-      platform !== 'ios' ||
+    if (platform !== 'ios') {
+      return res.status(400).json({
+        error: 'Plateforme de notification native invalide.'
+      });
+    }
+
+    if (token !== undefined && (
       typeof token !== 'string' ||
       !token ||
       token.length > 512
-    ) {
+    )) {
       return res.status(400).json({
         error: 'Token de notification native invalide.'
       });
     }
 
-    await User.updateOne(
-      { _id: req.user.id },
-      {
-        $pull: {
-          apnsTokens: {
-            token,
-            platform: 'ios'
+    if (token) {
+      await User.updateOne(
+        { _id: req.user.id },
+        {
+          $pull: {
+            apnsTokens: {
+              token,
+              platform: 'ios'
+            }
           }
         }
-      }
-    );
+      );
+    } else {
+      await User.updateOne(
+        { _id: req.user.id },
+        { $set: { apnsTokens: [] } }
+      );
+    }
 
     res.json({ success: true });
   } catch (error) {
