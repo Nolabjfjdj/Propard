@@ -472,6 +472,10 @@ export default function ProfilePage({
   };
 
   const respondRequest = async (accept) => {
+    if (captchaRequired && !captchaToken) {
+      setActionError('Valide le CAPTCHA avant de continuer.');
+      return;
+    }
     setActionLoading(true);
     setActionError('');
 
@@ -481,7 +485,8 @@ export default function ProfilePage({
           accept ? 'accept' : 'decline'
         }`,
         {
-          fromUserId: userId
+          fromUserId: userId,
+          ...(captchaToken ? { captchaToken } : {})
         },
         {
           headers: {
@@ -490,6 +495,8 @@ export default function ProfilePage({
         }
       );
 
+      setCaptchaRequired(false);
+      setCaptchaToken('');
       await fetchProfile();
 
       onRelationshipChanged?.(
@@ -497,6 +504,13 @@ export default function ProfilePage({
         userId
       );
     } catch (err) {
+      if (err.response?.data?.captchaRequired) {
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) {
+          window.turnstile.reset(captchaWidgetRef.current);
+        }
+      }
       setActionError(
         err.response?.data?.error ||
         'Erreur serveur'
@@ -507,6 +521,10 @@ export default function ProfilePage({
   };
 
   const removeFriend = async () => {
+    if (captchaRequired && !captchaToken) {
+      setActionError('Valide le CAPTCHA avant de continuer.');
+      return;
+    }
     setActionLoading(true);
     setActionError('');
 
@@ -514,12 +532,15 @@ export default function ProfilePage({
       await api.delete(
         `/api/friends/${userId}`,
         {
+          data: { ...(captchaToken ? { captchaToken } : {}) },
           headers: {
             Authorization: `Bearer ${token}`
           }
         }
       );
 
+      setCaptchaRequired(false);
+      setCaptchaToken('');
       setConfirmAction(null);
 
       await fetchProfile();
@@ -529,6 +550,13 @@ export default function ProfilePage({
         userId
       );
     } catch (err) {
+      if (err.response?.data?.captchaRequired) {
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) {
+          window.turnstile.reset(captchaWidgetRef.current);
+        }
+      }
       setActionError(
         err.response?.data?.error ||
         'Erreur serveur'
