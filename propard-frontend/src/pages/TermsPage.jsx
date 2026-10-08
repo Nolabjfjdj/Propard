@@ -5,7 +5,7 @@ export default function TermsPage() {
         <a href="/help" style={styles.back}>← Retour</a>
 
         <h1 style={styles.title}>Conditions Générales d'Utilisation</h1>
-        <p style={styles.date}>En vigueur depuis le 7 octobre 2026</p>
+        <p style={styles.date}>En vigueur depuis le 9 octobre 2026</p>
 
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>1. Présentation du service</h2>
@@ -175,11 +175,14 @@ export default function TermsPage() {
           </p>
 
           <p style={styles.text}>
-            Lorsqu'un utilisateur signale un message privé, les informations nécessaires
-            au traitement du signalement peuvent être transmises à Propard et enregistrées
-            dans son système de gestion des signalements, notamment le contenu du message
-            signalé lorsque cela est nécessaire. Cette transmission intervient à la suite
-            de l'action volontaire de l'utilisateur qui effectue le signalement.
+            Lorsqu'un utilisateur signale un message privé, un message de groupe ou une
+            conversation entière depuis son en-tête, les informations transmises à Propard
+            peuvent inclure jusqu'à 2 000 messages présents dans l'historique chargé au
+            moment du signalement. Pour une conversation entière, cela peut inclure les
+            messages envoyés par la personne qui effectue le signalement ainsi que ceux
+            des autres participants. Le contenu et les informations associées sont
+            enregistrés avec le signalement afin de permettre son examen par la modération.
+            Cette transmission intervient à la suite de l'action volontaire de l'utilisateur.
           </p>
 
           <p style={styles.text}>
@@ -260,6 +263,15 @@ export default function TermsPage() {
             Une mesure de modération peut être prise notamment à la suite d'un
             signalement, lorsqu'une violation est constatée ou lorsqu'elle est
             nécessaire à la sécurité du service.
+          </p>
+
+          <p style={styles.text}>
+            Pour prévenir le spam, les abus et les actions automatisées, Propard peut
+            appliquer des limites temporaires à certaines actions, notamment les demandes
+            d'amis, la gestion des groupes, les signalements et certaines opérations de
+            compte. Lorsqu'une limite est atteinte, une vérification anti-robot (CAPTCHA)
+            peut être demandée. Le contournement de ces protections ou leur utilisation
+            abusive est interdit.
           </p>
         </div>
 
