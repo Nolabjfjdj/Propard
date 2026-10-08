@@ -294,10 +294,11 @@ export default function PrivacyPage() {
           <p style={styles.text}>
             La fonctionnalité « Signaler » constitue une exception volontaire au
             fonctionnement habituel du chiffrement. Lorsqu'un utilisateur signale un
-            message privé ou un message de groupe, les informations nécessaires au
-            traitement du signalement peuvent être transmises à Propard et enregistrées
-            dans son système de gestion des signalements, notamment le contenu du message
-            signalé lorsque cela est nécessaire.
+            message privé, un message de groupe ou une conversation entière, les messages
+            déchiffrés présents dans l'historique chargé (jusqu'à 2 000 messages) peuvent
+            être transmis à Propard et enregistrés avec le signalement, y compris les
+            messages envoyés par la personne qui signale. Ces éléments peuvent être
+            consultés par l'équipe de modération pour examiner le signalement.
           </p>
 
           <p style={styles.text}>
