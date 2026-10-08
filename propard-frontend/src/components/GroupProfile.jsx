@@ -109,7 +109,7 @@ export default function GroupProfile({
         script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
         script.async = true;
         script.defer = true;
-        script.dataset.propradTurnstile = 'true';
+        script.dataset.propardTurnstile = 'true';
         script.addEventListener('load', renderCaptcha, { once: true });
         document.head.appendChild(script);
       }
