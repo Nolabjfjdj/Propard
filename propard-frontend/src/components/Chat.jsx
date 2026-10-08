@@ -1044,7 +1044,7 @@ export default function Chat({
             title="Signaler toute la conversation"
             aria-label="Signaler toute la conversation"
           >
-            🚩 Signaler
+            Signaler
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
