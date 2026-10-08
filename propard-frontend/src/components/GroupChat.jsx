@@ -46,6 +46,15 @@ export default function GroupChat({
   const [loadError, setLoadError] =
     useState(null);
 
+  const [captchaRequired, setCaptchaRequired] =
+    useState(false);
+
+  const [captchaToken, setCaptchaToken] =
+    useState('');
+
+  const captchaRef = useRef(null);
+  const captchaWidgetRef = useRef(null);
+
   const [input, setInput] =
     useState('');
 
@@ -1854,6 +1863,58 @@ export default function GroupChat({
   /*
    * Quitter le groupe / supprimer si propriétaire.
    */
+  useEffect(() => {
+    if (!captchaRequired) return;
+    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+    if (!siteKey) {
+      setLoadError('La protection anti-bot n’est pas configurée.');
+      return;
+    }
+    const renderCaptcha = () => {
+      if (!captchaRef.current || !window.turnstile || captchaWidgetRef.current !== null) return;
+      captchaWidgetRef.current = window.turnstile.render(captchaRef.current, {
+        sitekey: siteKey,
+        callback: value => setCaptchaToken(value),
+        'expired-callback': () => setCaptchaToken(''),
+        'error-callback': () => {
+          setCaptchaToken('');
+          setLoadError('La vérification anti-bot a échoué. Réessaie.');
+        }
+      });
+    };
+    if (window.turnstile) {
+      renderCaptcha();
+    } else {
+      const existingScript = document.querySelector('script[data-propard-turnstile]');
+      if (existingScript) {
+        existingScript.addEventListener('load', renderCaptcha, { once: true });
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.async = true;
+        script.defer = true;
+        script.dataset.propardTurnstile = 'true';
+        script.addEventListener('load', renderCaptcha, { once: true });
+        document.head.appendChild(script);
+      }
+    }
+    return () => {
+      if (captchaWidgetRef.current !== null && window.turnstile) {
+        window.turnstile.remove(captchaWidgetRef.current);
+      }
+      captchaWidgetRef.current = null;
+    };
+  }, [captchaRequired]);
+
+  const handleCaptchaError = err => {
+    if (!err.response?.data?.captchaRequired) return;
+    setCaptchaRequired(true);
+    setCaptchaToken('');
+    if (captchaWidgetRef.current !== null && window.turnstile) {
+      window.turnstile.reset(captchaWidgetRef.current);
+    }
+  };
+
   const leaveGroup =
     async () => {
       if (!group) {
@@ -1877,6 +1938,7 @@ export default function GroupChat({
           await api.delete(
             `/api/groups/${group._id}`,
             {
+              data: { ...(captchaToken ? { captchaToken } : {}) },
               headers: {
                 Authorization:
                   `Bearer ${token}`
@@ -1884,8 +1946,11 @@ export default function GroupChat({
             }
           );
 
+          setCaptchaRequired(false);
+          setCaptchaToken('');
           onDeleted?.();
         } catch (err) {
+          handleCaptchaError(err);
           console.error(err);
 
           setLoadError(
@@ -1963,7 +2028,8 @@ export default function GroupChat({
         await api.post(
           `/api/groups/${group._id}/leave`,
           {
-            keyPackages
+            keyPackages,
+            ...(captchaToken ? { captchaToken } : {})
           },
           {
             headers: {
@@ -1973,6 +2039,9 @@ export default function GroupChat({
           }
         );
 
+        setCaptchaRequired(false);
+        setCaptchaToken('');
+
         localStorage.removeItem(
           `propard_groupkey_${group._id}_v${group.keyVersion}`
         );
@@ -1980,6 +2049,7 @@ export default function GroupChat({
         onDeleted?.();
 
       } catch (err) {
+        handleCaptchaError(err);
         console.error(err);
 
         setLoadError(
@@ -2149,6 +2219,15 @@ export default function GroupChat({
         )}
 
         {!loading &&
+          {captchaRequired && (
+            <div style={{ padding: '8px 12px' }}>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                Vérification anti-bot requise pour continuer.
+              </p>
+              <div ref={captchaRef} />
+            </div>
+          )}
+
           loadError && (
             <p
               style={{
