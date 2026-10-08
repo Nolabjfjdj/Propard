@@ -706,7 +706,14 @@ router.delete('/:friendId', async (req, res) => {
   }
 });
 
-router.post('/block/:userId', async (req, res) => {
+router.post('/block/:userId', createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  keyFn: req => `user-block:${req.user.id}`,
+  captcha: true,
+  resetOnCaptcha: true,
+  message: 'Trop de changements de blocage. Réessaie plus tard.'
+}), async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -814,7 +821,14 @@ router.post('/block/:userId', async (req, res) => {
   }
 });
 
-router.post('/unblock/:userId', async (req, res) => {
+router.post('/unblock/:userId', createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  keyFn: req => `user-unblock:${req.user.id}`,
+  captcha: true,
+  resetOnCaptcha: true,
+  message: 'Trop de changements de blocage. Réessaie plus tard.'
+}), async (req, res) => {
   try {
     const { userId } = req.params;
 
