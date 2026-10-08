@@ -41,10 +41,11 @@ app.use((req,res,next)=>{
     'Content-Security-Policy',
     "default-src 'self'; " +
     "script-src 'self' https://challenges.cloudflare.com; " +
+    "script-src-elem 'self' https://challenges.cloudflare.com; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "font-src 'self' https://fonts.gstatic.com data:; " +
     "img-src 'self' data:; " +
-    "connect-src 'self' https: wss: turn: turns: stun:; " +
+    "connect-src 'self' https: wss: turn: turns: stun: https://challenges.cloudflare.com; " +
     "frame-src 'self' https://challenges.cloudflare.com; " +
     "frame-ancestors 'none'; " +
     "base-uri 'self'; " +
