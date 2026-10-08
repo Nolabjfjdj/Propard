@@ -1429,6 +1429,45 @@ export default function GroupChat({
       }
     };
 
+  const reportConversation = async () => {
+    if (!window.confirm('Signaler toute cette conversation de groupe ? L’équipe de modération pourra consulter les messages des membres, y compris les vôtres.')) return;
+
+    const snapshot = messages
+      .filter(message => !message.deleted && !message.decryptionError && typeof message.content === 'string')
+      .slice(-100)
+      .map(message => {
+        const senderId = (message.sender?._id || message.sender)?.toString();
+        const senderName = senderId === myId
+          ? 'Moi'
+          : (message.sender?.displayName || message.sender?.username || friendNicknames.get(senderId) || 'Membre du groupe');
+        return {
+          senderId,
+          senderName,
+          content: message.content,
+          createdAt: message.createdAt,
+          edited: message.edited === true
+        };
+      });
+
+    if (!snapshot.length) {
+      window.alert('Aucun message lisible à inclure dans le signalement.');
+      return;
+    }
+
+    try {
+      await api.post('/api/reports/conversation', {
+        conversationType: 'group',
+        conversationId: group._id,
+        conversationSnapshot: snapshot
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      window.alert('Conversation de groupe signalée. Merci.');
+    } catch (err) {
+      window.alert(err.response?.data?.error || 'Impossible de signaler cette conversation.');
+    }
+  };
+
   const openReport =
     message => {
       if (
@@ -2142,9 +2181,22 @@ export default function GroupChat({
           style={{
             marginLeft: 'auto',
             display: 'flex',
-            alignItems: 'center'
+            alignItems: 'center',
+            gap: '8px'
           }}
         >
+          <button
+            type="button"
+            onClick={e => {
+              e.stopPropagation();
+              reportConversation();
+            }}
+            style={{ ...styles.callBtn, width: 'auto', padding: '0 10px', borderRadius: '8px', color: 'var(--danger)', whiteSpace: 'nowrap' }}
+            title="Signaler toute la conversation"
+            aria-label="Signaler toute la conversation"
+          >
+            🚩 Signaler
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
               style={styles.callBtn}
