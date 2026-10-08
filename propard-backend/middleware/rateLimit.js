@@ -23,7 +23,7 @@ async function verifyTurnstile(token, remoteip) {
   }
 }
 
-function createRateLimiter({ windowMs, max, keyFn, message, captcha = false }) {
+function createRateLimiter({ windowMs, max, keyFn, message, captcha = false, resetOnCaptcha = false }) {
   return async (req, res, next) => {
     const key = keyFn ? keyFn(req) : req.ip;
     const now = Date.now();
@@ -42,7 +42,12 @@ function createRateLimiter({ windowMs, max, keyFn, message, captcha = false }) {
         if (await verifyTurnstile(captchaToken, req.ip)) {
           // Le CAPTCHA autorise cette tentative, mais conserve le compteur au seuil :
           // les prochaines tentatives devront aussi être vérifiées si elles dépassent la limite.
-          bucket.count = max;
+          if (resetOnCaptcha) {
+            bucket.start = now;
+            bucket.count = 0;
+          } else {
+            bucket.count = max;
+          }
           return next();
         }
         return res.status(429).json({
