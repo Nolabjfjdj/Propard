@@ -2191,7 +2191,7 @@ export default function GroupChat({
               e.stopPropagation();
               reportConversation();
             }}
-            style={{ ...styles.callBtn, width: 'auto', padding: '0 10px', borderRadius: '8px', color: 'var(--danger)', whiteSpace: 'nowrap' }}
+            style={{ ...styles.callBtn, width: 'auto', padding: '0 10px', borderRadius: '8px', color: 'var(--danger)', fontSize: '12px', whiteSpace: 'nowrap' }}
             title="Signaler toute la conversation"
             aria-label="Signaler toute la conversation"
           >
