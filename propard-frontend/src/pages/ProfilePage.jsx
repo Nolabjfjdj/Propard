@@ -123,32 +123,6 @@ export default function ProfilePage({
       );
   }, []);
 
-  if (loading) {
-    return (
-      <div style={styles.container}>
-        <p style={styles.infoText}>
-          Chargement du profil...
-        </p>
-      </div>
-    );
-  }
-
-  if (error || !profile) {
-    return (
-      <div style={styles.container}>
-        <p
-          style={{
-            ...styles.infoText,
-            color: 'var(--danger)'
-          }}
-        >
-          {error || 'Profil introuvable'}
-        </p>
-      </div>
-    );
-  }
-
-
   useEffect(() => {
     if (!captchaRequired) return;
     const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
@@ -191,6 +165,34 @@ export default function ProfilePage({
       captchaWidgetRef.current = null;
     };
   }, [captchaRequired]);
+
+  if (loading) {
+    return (
+      <div style={styles.container}>
+        <p style={styles.infoText}>
+          Chargement du profil...
+        </p>
+      </div>
+    );
+  }
+
+  if (error || !profile) {
+    return (
+      <div style={styles.container}>
+        <p
+          style={{
+            ...styles.infoText,
+            color: 'var(--danger)'
+          }}
+        >
+          {error || 'Profil introuvable'}
+        </p>
+      </div>
+    );
+  }
+
+
+
 
   const displayLabel =
     profile.displayName ||
@@ -543,7 +545,7 @@ export default function ProfilePage({
     try {
       await api.post(
         `/api/friends/block/${userId}`,
-        {},
+        { ...(captchaToken ? { captchaToken } : {}) },
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -551,6 +553,8 @@ export default function ProfilePage({
         }
       );
 
+      setCaptchaRequired(false);
+      setCaptchaToken('');
       setConfirmAction(null);
 
       await fetchProfile();
@@ -560,6 +564,13 @@ export default function ProfilePage({
         userId
       );
     } catch (err) {
+      if (err.response?.data?.captchaRequired) {
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) {
+          window.turnstile.reset(captchaWidgetRef.current);
+        }
+      }
       setActionError(
         err.response?.data?.error ||
         'Erreur serveur'
@@ -576,7 +587,7 @@ export default function ProfilePage({
     try {
       await api.post(
         `/api/friends/unblock/${userId}`,
-        {},
+        { ...(captchaToken ? { captchaToken } : {}) },
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -584,6 +595,8 @@ export default function ProfilePage({
         }
       );
 
+      setCaptchaRequired(false);
+      setCaptchaToken('');
       await fetchProfile();
 
       onRelationshipChanged?.(
@@ -591,6 +604,13 @@ export default function ProfilePage({
         userId
       );
     } catch (err) {
+      if (err.response?.data?.captchaRequired) {
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) {
+          window.turnstile.reset(captchaWidgetRef.current);
+        }
+      }
       setActionError(
         err.response?.data?.error ||
         'Erreur serveur'
@@ -721,6 +741,10 @@ export default function ProfilePage({
           <p style={styles.errorText}>
             {actionError}
           </p>
+        )}
+
+        {captchaRequired && (
+          <div ref={captchaRef} style={{ marginTop: 12 }} />
         )}
 
         {profile.isOwnProfile && (
