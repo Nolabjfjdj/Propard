@@ -6,6 +6,7 @@ const Group = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
+const { createRateLimiter } = require('../middleware/rateLimit');
 const { MAX_AVATAR_LENGTH, MAX_GROUP_NAME_LENGTH } = require('../utils/inputValidation');
 const { parseMessagePagination } = require('../utils/messagePagination');
 
@@ -284,6 +285,14 @@ router.get(
 
 router.post(
   '/create',
+  createRateLimiter({
+    windowMs: 10 * 60 * 1000,
+    max: 3,
+    keyFn: req => `group-create:${req.user.id}`,
+    captcha: true,
+    resetOnCaptcha: true,
+    message: 'Trop de créations de groupes. Réessaie plus tard.'
+  }),
   async (req, res) => {
     try {
       const {
