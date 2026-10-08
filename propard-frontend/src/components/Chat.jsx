@@ -1293,9 +1293,10 @@ export default function Chat({
                       ) : (
                         <>
                           <p
-                            style={
-                              styles.text
-                            }
+                            style={{
+                              ...styles.text,
+                              color: isMe ? '#fff' : 'var(--text-primary)'
+                            }}
                           >
                             {content}
                           </p>
@@ -1312,18 +1313,20 @@ export default function Chat({
                           >
                             {msg.edited && (
                               <p
-                                style={
-                                  styles.editedLabel
-                                }
+                                style={{
+                                  ...styles.editedLabel,
+                                  color: isMe ? 'rgba(255,255,255,0.65)' : 'var(--text-secondary)'
+                                }}
                               >
                                 modifié
                               </p>
                             )}
 
                             <p
-                              style={
-                                styles.msgTime
-                              }
+                              style={{
+                                ...styles.msgTime,
+                                color: isMe ? 'rgba(255,255,255,0.7)' : 'var(--text-secondary)'
+                              }}
                             >
                               {msg.createdAt
                                 ? new Date(
