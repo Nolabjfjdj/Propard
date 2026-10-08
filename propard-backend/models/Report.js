@@ -3,12 +3,14 @@ const { registerModel } = require('../db/shards');
 
 const reportSchema = new mongoose.Schema({
   reporter:{type:mongoose.Schema.Types.ObjectId,ref:'User',required:true,index:true},
-  reportedUser:{type:mongoose.Schema.Types.ObjectId,ref:'User',required:true,index:true},
+  reportedUser:{type:mongoose.Schema.Types.ObjectId,ref:'User',required:false,default:null,index:true},
   messageId:{type:mongoose.Schema.Types.ObjectId,ref:'Message',required:false,default:null,index:true},
   groupMessageId:{type:mongoose.Schema.Types.ObjectId,ref:'GroupMessage',required:false,default:null,index:true},
   messageType:{type:String,enum:['private','group'],default:'private',index:true},
   groupId:{type:mongoose.Schema.Types.ObjectId,ref:'Group',required:false,default:null,index:true},
-  content:{type:String,required:true,maxlength:5000},
+  content:{type:String,required:true,maxlength:100000},
+  reportScope:{type:String,enum:['message','conversation'],default:'message',index:true},
+  conversationSnapshot:{type:[mongoose.Schema.Types.Mixed],default:undefined},
   reason:{type:String,default:null,maxlength:500},
   messageCreatedAt:{type:Date,default:null},
   status:{type:String,enum:['new','processed','rejected'],default:'new',index:true},
