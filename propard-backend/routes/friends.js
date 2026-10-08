@@ -6,6 +6,7 @@ const Message = require('../models/Message');
 const authMiddleware = require('../middleware/auth');
 const { isEncryptedMessagePayload } = require('../utils/inputValidation');
 const { parseMessagePagination } = require('../utils/messagePagination');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
 router.use(authMiddleware);
 
@@ -17,7 +18,14 @@ async function areFriends(userId, friendId) {
   );
 }
 
-router.post('/add', async (req, res) => {
+router.post('/add', createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  keyFn: req => `friend-add:${req.user.id}`,
+  captcha: true,
+  resetOnCaptcha: true,
+  message: 'Trop de demandes d’ami. Réessaie plus tard.'
+}), async (req, res) => {
   try {
     const { ipAlias, userId } = req.body;
 
