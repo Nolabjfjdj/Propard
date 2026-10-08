@@ -42,7 +42,8 @@ const registerRateLimiter = createRateLimiter({
   windowMs: 60 * 60 * 1000,
   max: 8,
   keyFn: (req) => req.ip,
-  message: 'Trop de comptes créés depuis cette adresse, réessaie plus tard.'
+  message: 'Trop de comptes créés depuis cette adresse, réessaie plus tard.',
+  captcha: true
 });
 
 function generateIpAlias() {
