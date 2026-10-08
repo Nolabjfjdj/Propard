@@ -1430,11 +1430,11 @@ export default function GroupChat({
     };
 
   const reportConversation = async () => {
-    if (!window.confirm('Signaler toute cette conversation de groupe ? L’équipe de modération pourra consulter les messages des membres, y compris les vôtres.')) return;
+    if (!window.confirm('Signaler toute cette conversation de groupe ? L’équipe de modération pourra consulter les messages chargés des membres, y compris les vôtres (jusqu’à 2 000 messages).')) return;
 
     const snapshot = messages
       .filter(message => !message.deleted && !message.decryptionError && typeof message.content === 'string')
-      .slice(-100)
+      .slice(-2000)
       .map(message => {
         const senderId = (message.sender?._id || message.sender)?.toString();
         const senderName = senderId === myId
