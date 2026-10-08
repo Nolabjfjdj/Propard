@@ -2218,17 +2218,16 @@ export default function GroupChat({
           </p>
         )}
 
-        {!loading &&
-          {captchaRequired && (
-            <div style={{ padding: '8px 12px' }}>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                Vérification anti-bot requise pour continuer.
-              </p>
-              <div ref={captchaRef} />
-            </div>
-          )}
+        {captchaRequired && (
+          <div style={{ padding: '8px 12px' }}>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              Vérification anti-bot requise pour continuer.
+            </p>
+            <div ref={captchaRef} />
+          </div>
+        )}
 
-          loadError && (
+        {!loading && loadError && (
             <p
               style={{
                 ...styles.infoText,
