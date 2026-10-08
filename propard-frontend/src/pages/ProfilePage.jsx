@@ -34,6 +34,10 @@ export default function ProfilePage({
   const [confirmAction, setConfirmAction] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [captchaRequired, setCaptchaRequired] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captchaRef = useRef(null);
+  const captchaWidgetRef = useRef(null);
   const [copied, setCopied] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
@@ -143,6 +147,50 @@ export default function ProfilePage({
       </div>
     );
   }
+
+
+  useEffect(() => {
+    if (!captchaRequired) return;
+    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+    if (!siteKey) {
+      setActionError('La protection anti-bot n’est pas configurée.');
+      return;
+    }
+    const renderCaptcha = () => {
+      if (!captchaRef.current || !window.turnstile || captchaWidgetRef.current !== null) return;
+      captchaWidgetRef.current = window.turnstile.render(captchaRef.current, {
+        sitekey: siteKey,
+        callback: value => setCaptchaToken(value),
+        'expired-callback': () => setCaptchaToken(''),
+        'error-callback': () => {
+          setCaptchaToken('');
+          setActionError('La vérification anti-bot a échoué. Réessaie.');
+        }
+      });
+    };
+    if (window.turnstile) {
+      renderCaptcha();
+    } else {
+      const existingScript = document.querySelector('script[data-propard-turnstile]');
+      if (existingScript) {
+        existingScript.addEventListener('load', renderCaptcha, { once: true });
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.async = true;
+        script.defer = true;
+        script.dataset.propardTurnstile = 'true';
+        script.addEventListener('load', renderCaptcha, { once: true });
+        document.head.appendChild(script);
+      }
+    }
+    return () => {
+      if (captchaWidgetRef.current !== null && window.turnstile) {
+        window.turnstile.remove(captchaWidgetRef.current);
+      }
+      captchaWidgetRef.current = null;
+    };
+  }, [captchaRequired]);
 
   const displayLabel =
     profile.displayName ||
@@ -378,13 +426,17 @@ export default function ProfilePage({
   };
 
   const sendFriendRequest = async () => {
+    if (captchaRequired && !captchaToken) {
+      setActionError('Valide le CAPTCHA avant de continuer.');
+      return;
+    }
     setActionLoading(true);
     setActionError('');
 
     try {
       await api.post(
         '/api/friends/add',
-        { userId },
+        { userId, ...(captchaToken ? { captchaToken } : {}) },
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -392,6 +444,8 @@ export default function ProfilePage({
         }
       );
 
+      setCaptchaRequired(false);
+      setCaptchaToken('');
       await fetchProfile();
 
       onRelationshipChanged?.(
@@ -399,6 +453,13 @@ export default function ProfilePage({
         userId
       );
     } catch (err) {
+      if (err.response?.data?.captchaRequired) {
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) {
+          window.turnstile.reset(captchaWidgetRef.current);
+        }
+      }
       setActionError(
         err.response?.data?.error ||
         'Erreur serveur'
@@ -1006,6 +1067,8 @@ export default function ProfilePage({
             </div>
           )}
       </div>
+
+      {captchaRequired && <div style={{ display: 'flex', justifyContent: 'center', padding: '12px' }}><div ref={captchaRef} /></div>}
 
       {confirmAction && (
         <div
