@@ -40,6 +40,20 @@ router.post('/subscribe', authMiddleware, async (req, res) => {
       });
     }
 
+    await User.updateMany(
+      {
+        _id: { $ne: req.user.id },
+        'pushSubscriptions.endpoint': subscription.endpoint
+      },
+      {
+        $pull: {
+          pushSubscriptions: {
+            endpoint: subscription.endpoint
+          }
+        }
+      }
+    );
+
     user.pushSubscriptions = (user.pushSubscriptions || []).filter(
       item => item.endpoint !== subscription.endpoint
     );
@@ -87,6 +101,22 @@ router.post('/native/subscribe', authMiddleware, async (req, res) => {
         error: 'Utilisateur introuvable.'
       });
     }
+
+    await User.updateMany(
+      {
+        _id: { $ne: req.user.id },
+        'apnsTokens.token': token,
+        'apnsTokens.platform': 'ios'
+      },
+      {
+        $pull: {
+          apnsTokens: {
+            token,
+            platform: 'ios'
+          }
+        }
+      }
+    );
 
     user.apnsTokens = (user.apnsTokens || []).filter(
       item => item.token !== token
