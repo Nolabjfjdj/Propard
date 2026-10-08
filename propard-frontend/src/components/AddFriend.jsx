@@ -1,20 +1,84 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
 
 export default function AddFriend({ token, onClose }) {
   const [ipAlias, setIpAlias] = useState('');
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [captchaRequired, setCaptchaRequired] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captchaRef = useRef(null);
+  const captchaWidgetRef = useRef(null);
+
+  useEffect(() => {
+    if (!captchaRequired) return;
+    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+    if (!siteKey) {
+      setError('La protection anti-bot n’est pas configurée.');
+      return;
+    }
+    const renderCaptcha = () => {
+      if (!captchaRef.current || !window.turnstile || captchaWidgetRef.current !== null) return;
+      captchaWidgetRef.current = window.turnstile.render(captchaRef.current, {
+        sitekey: siteKey,
+        callback: value => setCaptchaToken(value),
+        'expired-callback': () => setCaptchaToken(''),
+        'error-callback': () => {
+          setCaptchaToken('');
+          setError('La vérification anti-bot a échoué. Réessaie.');
+        }
+      });
+    };
+    if (window.turnstile) {
+      renderCaptcha();
+    } else {
+      const existingScript = document.querySelector('script[data-propard-turnstile]');
+      if (existingScript) {
+        existingScript.addEventListener('load', renderCaptcha, { once: true });
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.async = true;
+        script.defer = true;
+        script.dataset.propardTurnstile = 'true';
+        script.addEventListener('load', renderCaptcha, { once: true });
+        document.head.appendChild(script);
+      }
+    }
+    return () => {
+      if (captchaWidgetRef.current !== null && window.turnstile) {
+        window.turnstile.remove(captchaWidgetRef.current);
+      }
+      captchaWidgetRef.current = null;
+    };
+  }, [captchaRequired]);
 
   const sendRequest = async () => {
     if (!ipAlias.trim()) return;
-    setError(''); setStatus('');
+    if (captchaRequired && !captchaToken) {
+      setError('Valide le CAPTCHA avant de continuer.');
+      return;
+    }
+    setError('');
+    setStatus('');
     try {
       await api.post('/api/friends/add',
-        { ipAlias: ipAlias.trim() }, { headers: { Authorization: `Bearer ${token}` } });
+        { ipAlias: ipAlias.trim(), ...(captchaToken ? { captchaToken } : {}) },
+        { headers: { Authorization: `Bearer ${token}` } });
       setStatus('Demande envoyée !');
       setIpAlias('');
-    } catch (err) { setError(err.response?.data?.error || 'Erreur'); }
+      setCaptchaToken('');
+      setCaptchaRequired(false);
+    } catch (err) {
+      if (err.response?.data?.captchaRequired) {
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) {
+          window.turnstile.reset(captchaWidgetRef.current);
+        }
+      }
+      setError(err.response?.data?.error || 'Erreur');
+    }
   };
 
   return (
@@ -25,6 +89,7 @@ export default function AddFriend({ token, onClose }) {
         <input style={styles.input} placeholder="ex: 105.92.242.207"
           value={ipAlias} onChange={e => setIpAlias(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && sendRequest()} />
+        {captchaRequired && <div ref={captchaRef} />}
         {error && <p style={{ color: 'var(--danger)', fontSize: '13px' }}>{error}</p>}
         {status && <p style={{ color: 'var(--success)', fontSize: '13px' }}>{status}</p>}
         <div style={{ display: 'flex', gap: '8px' }}>
