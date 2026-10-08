@@ -4,8 +4,27 @@
 // plusieurs instances si le projet scale horizontalement un jour.
 const buckets = new Map();
 
-function createRateLimiter({ windowMs, max, keyFn, message }) {
-  return (req, res, next) => {
+async function verifyTurnstile(token, remoteip) {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  if (!secret || typeof token !== 'string' || !token.trim()) return false;
+  try {
+    const body = new URLSearchParams({ secret, response: token });
+    if (remoteip) body.set('remoteip', remoteip);
+    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body
+    });
+    if (!response.ok) return false;
+    const result = await response.json();
+    return result.success === true;
+  } catch {
+    return false;
+  }
+}
+
+function createRateLimiter({ windowMs, max, keyFn, message, captcha = false }) {
+  return async (req, res, next) => {
     const key = keyFn ? keyFn(req) : req.ip;
     const now = Date.now();
 
@@ -18,6 +37,17 @@ function createRateLimiter({ windowMs, max, keyFn, message }) {
     bucket.count += 1;
 
     if (bucket.count > max) {
+      if (captcha) {
+        const captchaToken = req.body?.captchaToken;
+        if (await verifyTurnstile(captchaToken, req.ip)) {
+          bucket.count = 0;
+          return next();
+        }
+        return res.status(429).json({
+          error: 'Vérification anti-bot requise.',
+          captchaRequired: true
+        });
+      }
       return res.status(429).json({
         error: message || 'Trop de requêtes, merci de patienter avant de réessayer.'
       });
