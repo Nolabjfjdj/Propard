@@ -681,11 +681,11 @@ export default function Chat({
   };
 
   const reportConversation = async () => {
-    if (!window.confirm('Signaler toute cette conversation ? L’équipe de modération pourra consulter les messages des deux participants, y compris les vôtres.')) return;
+    if (!window.confirm('Signaler toute cette conversation ? L’équipe de modération pourra consulter les messages chargés des deux participants, y compris les vôtres (jusqu’à 2 000 messages).')) return;
 
     const snapshot = messages
       .filter(msg => !msg.deleted && !msg.decryptionError && typeof msg.content === 'string')
-      .slice(-100)
+      .slice(-2000)
       .map(msg => {
         const senderId = (msg.sender?._id || msg.sender)?.toString();
         return {
