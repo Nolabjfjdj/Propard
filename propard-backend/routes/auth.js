@@ -11,6 +11,37 @@ const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { MAX_AVATAR_LENGTH } = require('../utils/inputValidation');
 
+const profileUpdateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyFn: req => `profile-update:${req.user.id}`,
+  message: 'Trop de modifications du profil. Réessaie dans quelques minutes.'
+});
+const keyChangeLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyFn: req => `key-change:${req.user.id}`,
+  message: 'Trop de modifications de clé. Réessaie dans quelques minutes.'
+});
+const keyBackupLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  keyFn: req => `key-backup:${req.user.id}`,
+  message: 'Trop de modifications de sauvegarde. Réessaie plus tard.'
+});
+const accountDeletionLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 2,
+  keyFn: req => `account-delete:${req.user.id}`,
+  message: 'Trop de tentatives de suppression du compte. Réessaie plus tard.'
+});
+const accountRestoreLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  keyFn: req => `account-restore:${req.user.id}`,
+  message: 'Trop de tentatives de restauration. Réessaie plus tard.'
+});
+
 const PSEUDOS_INTERDITS = ['owner','admin','administrator','superadmin','sysadmin','moderator','mod','comod','staff','team','crew','support','helpdesk','official','propard','propardbot','propardteam','propardstaff','propardadmin','propardsupport','propardofficial','everyone','nigger','nigga','faggot','retard','whore','bitch','salope','pute','connard','connasse','batard','batarde','enculé','encule','fdp','ntm','tg','pd','discord','telegram','whatsapp','snapchat','instagram','kkk','facebook','twitter','tiktok','youtube','google','microsoft','apple','amazon','netflix','spotify','twitch','reddit','github','anthropic','openai','chatgpt','claude','malware','virus','phishing','scam','billing','privacy','terms','rules','guidelines','policy'];
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -260,7 +291,7 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
-router.patch('/me', authMiddleware, async (req, res) => {
+router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
   try {
     const { displayName, avatar } = req.body;
 
@@ -443,7 +474,7 @@ router.get('/user/:id', authMiddleware, async (req, res) => {
   }
 });
 
-router.patch('/publickey', authMiddleware, async (req, res) => {
+router.patch('/publickey', authMiddleware, keyChangeLimiter, async (req, res) => {
   try {
     const { publicKey } = req.body;
 
@@ -515,7 +546,7 @@ router.get('/keybackup', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/keybackup', authMiddleware, async (req, res) => {
+router.post('/keybackup', authMiddleware, keyBackupLimiter, async (req, res) => {
   try {
     const { backup } = req.body;
 
@@ -589,7 +620,7 @@ router.post('/keybackup', authMiddleware, async (req, res) => {
   }
 });
 
-router.delete('/anonymize', authMiddleware, async (req, res) => {
+router.delete('/anonymize', authMiddleware, accountDeletionLimiter, async (req, res) => {
   try {
     const userId = req.user.id;
     const user = await User.findById(userId);
@@ -629,7 +660,7 @@ router.delete('/anonymize', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/cancel-deletion', authMiddleware, async (req, res) => {
+router.post('/cancel-deletion', authMiddleware, accountRestoreLimiter, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
 
@@ -672,7 +703,7 @@ router.post('/cancel-deletion', authMiddleware, async (req, res) => {
   }
 });
 
-router.delete('/delete', authMiddleware, async (req, res) => {
+router.delete('/delete', authMiddleware, accountDeletionLimiter, async (req, res) => {
   try {
     const userId = req.user.id;
 
