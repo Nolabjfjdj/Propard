@@ -20,7 +20,7 @@ export default function AuthPage({ mode }) {
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
-    if (mode !== 'login' || !captchaRequired) return;
+    if (!captchaRequired) return;
     const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
     if (!siteKey) {
       setError('La protection anti-bot n’est pas configurée.');
@@ -83,7 +83,7 @@ export default function AuthPage({ mode }) {
       );
     }
 
-    if (mode === 'login' && captchaRequired && !captchaToken) {
+    if (captchaRequired && !captchaToken) {
       return setError('Valide le CAPTCHA avant de continuer.');
     }
 
@@ -99,7 +99,7 @@ export default function AuthPage({ mode }) {
       const res = await api.post(route, {
         username,
         password,
-        ...(mode === 'login' && captchaToken ? { captchaToken } : {})
+        ...(captchaToken ? { captchaToken } : {})
       });
 
       await login(
@@ -114,7 +114,7 @@ export default function AuthPage({ mode }) {
 
       window.location.href = '/';
     } catch (err) {
-      const requiresCaptcha = mode === 'login' && err.response?.data?.captchaRequired === true;
+      const requiresCaptcha = err.response?.data?.captchaRequired === true;
       if (requiresCaptcha) {
         setCaptchaRequired(true);
       }
@@ -251,7 +251,7 @@ export default function AuthPage({ mode }) {
             </div>
           )}
 
-          {captchaRequired && mode === 'login' && (
+          {captchaRequired && (
             <div
               ref={captchaRef}
               style={{ display: 'flex', justifyContent: 'center' }}
