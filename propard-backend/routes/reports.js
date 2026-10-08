@@ -9,15 +9,23 @@ const GroupMessage = require('../models/GroupMessage');
 const Report = require('../models/Report');
 
 const authMiddleware = require('../middleware/auth');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
 // Anti-spam basique : 1 signalement max toutes les 15 secondes par compte.
 const lastReportTimes = new Map();
 const REPORT_COOLDOWN_MS = 15000;
 
+const reportRateLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  keyFn: req => `reports:${req.user.id}`,
+  message: 'Trop de signalements depuis ce compte. Réessaie dans une heure.'
+});
+
 
 // Signalement d'une conversation complète. Le navigateur transmet les messages
 // déchiffrés volontairement par le participant qui effectue le signalement.
-router.post('/conversation', authMiddleware, async (req, res) => {
+router.post('/conversation', authMiddleware, reportRateLimiter, async (req, res) => {
   try {
     const reporterId = req.user.id.toString();
     const { conversationType, conversationId, reportedUserId, reason, conversationSnapshot } = req.body;
@@ -121,7 +129,7 @@ router.post('/conversation', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, reportRateLimiter, async (req, res) => {
   try {
     const reporterId = req.user.id;
 
