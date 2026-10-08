@@ -674,6 +674,9 @@ export default function GroupProfile({
           await loadGroup();
         }
 
+        setCaptchaRequired(false);
+        setCaptchaToken('');
+
         onUpdated?.(
           updatedGroup
         );
