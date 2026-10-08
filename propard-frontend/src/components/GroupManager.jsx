@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
 import { getStoredPrivateKeyJwk } from '../utils/crypto';
 import {
@@ -16,6 +16,10 @@ export default function GroupManager({
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [captchaRequired, setCaptchaRequired] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captchaRef = useRef(null);
+  const captchaWidgetRef = useRef(null);
 
 useEffect(() => {
   api
@@ -36,6 +40,49 @@ useEffect(() => {
     });
 }, [token]);
 
+  useEffect(() => {
+    if (!captchaRequired) return;
+    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+    if (!siteKey) {
+      setError('La protection anti-bot n’est pas configurée.');
+      return;
+    }
+    const renderCaptcha = () => {
+      if (!captchaRef.current || !window.turnstile || captchaWidgetRef.current !== null) return;
+      captchaWidgetRef.current = window.turnstile.render(captchaRef.current, {
+        sitekey: siteKey,
+        callback: value => setCaptchaToken(value),
+        'expired-callback': () => setCaptchaToken(''),
+        'error-callback': () => {
+          setCaptchaToken('');
+          setError('La vérification anti-bot a échoué. Réessaie.');
+        }
+      });
+    };
+    if (window.turnstile) {
+      renderCaptcha();
+    } else {
+      const existingScript = document.querySelector('script[data-propard-turnstile]');
+      if (existingScript) {
+        existingScript.addEventListener('load', renderCaptcha, { once: true });
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.async = true;
+        script.defer = true;
+        script.dataset.propardTurnstile = 'true';
+        script.addEventListener('load', renderCaptcha, { once: true });
+        document.head.appendChild(script);
+      }
+    }
+    return () => {
+      if (captchaWidgetRef.current !== null && window.turnstile) {
+        window.turnstile.remove(captchaWidgetRef.current);
+      }
+      captchaWidgetRef.current = null;
+    };
+  }, [captchaRequired]);
+
   const toggle = id => {
     setSelected(prev =>
       prev.includes(id)
@@ -53,6 +100,10 @@ useEffect(() => {
 
     if (!selected.length) {
       return setError('Choisis au moins un ami.');
+    }
+
+    if (captchaRequired && !captchaToken) {
+      return setError('Valide le CAPTCHA avant de continuer.');
     }
 
     setLoading(true);
@@ -135,7 +186,8 @@ useEffect(() => {
         {
           name: clean,
           memberIds: selected,
-          keyPackages
+          keyPackages,
+          ...(captchaToken ? { captchaToken } : {})
         },
         {
           headers: {
@@ -144,9 +196,19 @@ useEffect(() => {
         }
       );
 
+      setCaptchaToken('');
+      setCaptchaRequired(false);
       onCreated?.(res.data);
     } catch (e) {
       console.error(e);
+
+      if (e.response?.data?.captchaRequired) {
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) {
+          window.turnstile.reset(captchaWidgetRef.current);
+        }
+      }
 
       setError(
         e.response?.data?.error ||
@@ -258,6 +320,8 @@ useEffect(() => {
             </p>
           )}
         </div>
+
+        {captchaRequired && <div ref={captchaRef} />}
 
         {error && (
           <p style={s.error}>
