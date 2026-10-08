@@ -680,6 +680,43 @@ export default function Chat({
     }
   };
 
+  const reportConversation = async () => {
+    if (!window.confirm('Signaler toute cette conversation ? L’équipe de modération pourra consulter les messages des deux participants, y compris les vôtres.')) return;
+
+    const snapshot = messages
+      .filter(msg => !msg.deleted && !msg.decryptionError && typeof msg.content === 'string')
+      .slice(-100)
+      .map(msg => {
+        const senderId = (msg.sender?._id || msg.sender)?.toString();
+        return {
+          senderId,
+          senderName: senderId === myId ? 'Moi' : friendName,
+          content: msg.content,
+          createdAt: msg.createdAt,
+          edited: msg.edited === true
+        };
+      });
+
+    if (!snapshot.length) {
+      window.alert('Aucun message lisible à inclure dans le signalement.');
+      return;
+    }
+
+    try {
+      await api.post('/api/reports/conversation', {
+        conversationType: 'private',
+        conversationId: friend._id,
+        reportedUserId: friend._id,
+        conversationSnapshot: snapshot
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      window.alert('Conversation signalée. Merci.');
+    } catch (err) {
+      window.alert(err.response?.data?.error || 'Impossible de signaler cette conversation.');
+    }
+  };
+
   const openReport = msg => {
     setReportTarget(msg);
     setReportReason('');
@@ -1000,6 +1037,15 @@ export default function Chat({
             gap: '10px'
           }}
         >
+          <button
+            type="button"
+            onClick={reportConversation}
+            style={{ ...styles.callBtn, width: 'auto', padding: '0 10px', borderRadius: '8px', color: 'var(--danger)', whiteSpace: 'nowrap' }}
+            title="Signaler toute la conversation"
+            aria-label="Signaler toute la conversation"
+          >
+            🚩 Signaler
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
               style={styles.callBtn}
