@@ -40,11 +40,12 @@ app.use((req,res,next)=>{
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self'; " +
+    "script-src 'self' https://challenges.cloudflare.com; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "font-src 'self' https://fonts.gstatic.com data:; " +
     "img-src 'self' data:; " +
     "connect-src 'self' https: wss: turn: turns: stun:; " +
+    "frame-src 'self' https://challenges.cloudflare.com; " +
     "frame-ancestors 'none'; " +
     "base-uri 'self'; " +
     "form-action 'self'"
