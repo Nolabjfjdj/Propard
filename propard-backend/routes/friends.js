@@ -151,7 +151,14 @@ router.post('/add', createRateLimiter({
   }
 });
 
-router.post('/accept', async (req, res) => {
+router.post('/accept', createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  keyFn: req => `friend-accept:${req.user.id}`,
+  captcha: true,
+  resetOnCaptcha: true,
+  message: 'Trop de demandes traitées. Réessaie plus tard.'
+}), async (req, res) => {
   try {
     const { fromUserId } = req.body;
 
@@ -239,7 +246,14 @@ router.post('/accept', async (req, res) => {
   }
 });
 
-router.post('/decline', async (req, res) => {
+router.post('/decline', createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  keyFn: req => `friend-decline:${req.user.id}`,
+  captcha: true,
+  resetOnCaptcha: true,
+  message: 'Trop de demandes traitées. Réessaie plus tard.'
+}), async (req, res) => {
   try {
     const { fromUserId } = req.body;
 
@@ -633,7 +647,14 @@ router.patch('/messages/:messageId', async (req, res) => {
   }
 });
 
-router.delete('/:friendId', async (req, res) => {
+router.delete('/:friendId', createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  keyFn: req => `friend-remove:${req.user.id}`,
+  captcha: true,
+  resetOnCaptcha: true,
+  message: 'Trop de suppressions d’amis. Réessaie plus tard.'
+}), async (req, res) => {
   try {
     const { friendId } = req.params;
 
