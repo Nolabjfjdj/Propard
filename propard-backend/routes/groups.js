@@ -1081,6 +1081,14 @@ router.patch(
 
 router.patch(
   '/:groupId',
+  createRateLimiter({
+    windowMs: 10 * 60 * 1000,
+    max: 5,
+    keyFn: req => `group-update:${req.user.id}`,
+    captcha: true,
+    resetOnCaptcha: true,
+    message: 'Trop de modifications de groupes. Réessaie plus tard.'
+  }),
   async (req, res) => {
     try {
       if (
@@ -1522,6 +1530,14 @@ router.delete(
 
 router.delete(
   '/:groupId',
+  createRateLimiter({
+    windowMs: 10 * 60 * 1000,
+    max: 2,
+    keyFn: req => `group-delete:${req.user.id}`,
+    captcha: true,
+    resetOnCaptcha: true,
+    message: 'Trop de suppressions de groupes. Réessaie plus tard.'
+  }),
   async (req, res) => {
     try {
       if (
@@ -1630,6 +1646,14 @@ router.delete(
 
 router.post(
   '/:groupId/leave',
+  createRateLimiter({
+    windowMs: 10 * 60 * 1000,
+    max: 3,
+    keyFn: req => `group-leave:${req.user.id}`,
+    captcha: true,
+    resetOnCaptcha: true,
+    message: 'Trop de sorties de groupes. Réessaie plus tard.'
+  }),
   async (req, res) => {
     try {
       if (
