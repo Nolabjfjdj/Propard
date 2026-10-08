@@ -1251,6 +1251,14 @@ router.patch(
 
 router.delete(
   '/:groupId/members/:memberId',
+  createRateLimiter({
+    windowMs: 10 * 60 * 1000,
+    max: 3,
+    keyFn: req => `group-member-remove:${req.user.id}`,
+    captcha: true,
+    resetOnCaptcha: true,
+    message: 'Trop de retraits de membres. Réessaie plus tard.'
+  }),
   async (req, res) => {
     try {
       const {
