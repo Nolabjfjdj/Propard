@@ -252,20 +252,36 @@ async function disableNativePushNotifications(token) {
   } catch {}
 
   try {
-    await withTimeout(
-      api.delete('/api/push/native/subscribe', {
-        data: {
-          platform: Capacitor.getPlatform(),
-          token: nativeToken
-        },
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        timeout: 10000
-      }),
-      10000,
-      'Le serveur Propard ne répond pas pour la désactivation des notifications.'
-    );
+    if (nativeToken) {
+      await withTimeout(
+        api.delete('/api/push/native/subscribe', {
+          data: {
+            platform: Capacitor.getPlatform(),
+            token: nativeToken
+          },
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          timeout: 10000
+        }),
+        10000,
+        'Le serveur Propard ne répond pas pour la désactivation des notifications.'
+      );
+    }
+  } finally {
+    try {
+      localStorage.removeItem(
+        NATIVE_PUSH_TOKEN_STORAGE_KEY
+      );
+    } catch {}
+
+    try {
+      await withTimeout(
+        PushNotifications.unregister(),
+        10000,
+        'Délai dépassé lors de la désactivation des notifications.'
+      );
+    } catch {}
   }
 }
 
