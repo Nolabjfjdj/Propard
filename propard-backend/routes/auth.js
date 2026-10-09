@@ -23,17 +23,13 @@ const keyChangeLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
   keyFn: req => `key-change:${req.user.id}`,
-  message: 'Trop de modifications de clé. Réessaie dans quelques minutes.',
-  captcha: true,
-  resetOnCaptcha: true
+  message: 'Trop de modifications de clé. Réessaie dans quelques minutes.'
 });
 const keyBackupLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 5,
   keyFn: req => `key-backup:${req.user.id}`,
-  message: 'Trop de modifications de sauvegarde. Réessaie plus tard.',
-  captcha: true,
-  resetOnCaptcha: true
+  message: 'Trop de modifications de sauvegarde. Réessaie plus tard.'
 });
 const accountDeletionLimiter = createRateLimiter({
   windowMs: 60 * 60 * 1000,
