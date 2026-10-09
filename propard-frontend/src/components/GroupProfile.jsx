@@ -9,7 +9,7 @@ import api from '../utils/api';
 
 import {
   encryptGroupKeyForMember,
-  generateGroupKey
+  getStoredGroupKey
 } from '../utils/groupCrypto';
 
 import {
@@ -527,8 +527,9 @@ export default function GroupProfile({
       if (!privateKey) throw new Error('Clé privée locale introuvable.');
       const publicKey = user?.publicKey || friend.publicKey;
       if (!publicKey) throw new Error('La clé publique de cet ami est indisponible.');
-      const key = await generateGroupKey();
-      const version = (group.keyVersion || 1) + 1;
+      const version = group.keyVersion || 1;
+      const key = await getStoredGroupKey(group._id, version);
+      if (!key) throw new Error('La clé actuelle du groupe est introuvable sur cet appareil. Recharge le groupe depuis un appareil qui peut encore lire ses messages avant d’ajouter un membre.');
       const keyPackages = [];
       for (const member of [...group.members, { _id: friendId, publicKey }]) {
         const id = member._id?.toString();
