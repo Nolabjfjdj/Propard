@@ -39,7 +39,7 @@ function createRateLimiter({ windowMs, max, keyFn, message, captcha = false, res
 
     if (bucket.count > max) {
       if (captcha) {
-        const captchaToken = req.body?.captchaToken;
+        const captchaToken = req.body?.captchaToken || req.get('x-captcha-token');
         if (await verifyTurnstile(captchaToken, req.ip)) {
           // Le CAPTCHA autorise cette tentative, mais conserve le compteur au seuil :
           // les prochaines tentatives devront aussi être vérifiées si elles dépassent la limite.
