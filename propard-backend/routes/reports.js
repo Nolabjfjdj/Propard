@@ -19,7 +19,9 @@ const reportRateLimiter = createRateLimiter({
   windowMs: 60 * 60 * 1000,
   max: 10,
   keyFn: req => `reports:${req.user.id}`,
-  message: 'Trop de signalements depuis ce compte. Réessaie dans une heure.'
+  message: 'Trop de signalements depuis ce compte. Réessaie dans une heure.',
+  captcha: true,
+  resetOnCaptcha: true
 });
 
 
