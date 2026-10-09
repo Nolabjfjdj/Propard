@@ -612,6 +612,12 @@ router.get(
 
 router.get(
   '/:groupId/messages',
+  createRateLimiter({
+    windowMs: 60 * 1000,
+    max: 120,
+    keyFn: req => `group-message-history:${req.user.id}`,
+    message: 'Trop de chargements de messages. Réessaie dans un instant.'
+  }),
   async (req, res) => {
     try {
       if (
@@ -743,6 +749,12 @@ router.get(
 
 router.patch(
   '/:groupId/messages/:messageId',
+  createRateLimiter({
+    windowMs: 10 * 60 * 1000,
+    max: 120,
+    keyFn: req => `group-message-edit:${req.user.id}`,
+    message: 'Trop de modifications de messages. Réessaie plus tard.'
+  }),
   async (req, res) => {
     try {
       const {
