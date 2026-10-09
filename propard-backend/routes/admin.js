@@ -49,7 +49,9 @@ const adminSensitiveLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 5,
   keyFn: (req) => req.ip,
-  message: 'Trop de tentatives, réessaie plus tard.'
+  message: 'Trop de tentatives, réessaie plus tard.',
+  captcha: true,
+  resetOnCaptcha: true
 });
 
 
