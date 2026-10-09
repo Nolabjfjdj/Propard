@@ -1026,7 +1026,26 @@ export default function GroupProfile({
             }).map(friend => {
               const user = friend.userId && typeof friend.userId === 'object' ? friend.userId : null;
               const id = (user?._id || friend.userId || friend._id)?.toString();
-              return <div key={id} style={styles.addMemberRow}><span>{friend.nickname?.trim() || user?.displayName || user?.username || friend.username || 'Ami'}</span><button type="button" disabled={adding} onClick={() => addMember(friend)} style={styles.addMemberAction}>{adding ? 'Ajout...' : 'Ajouter'}</button></div>;
+              const nickname = friend.nickname?.trim() || friend.friendNickname?.trim() || user?.nickname?.trim();
+              const displayName = nickname || user?.displayName?.trim() || user?.username || friend.username || 'Ami';
+              const friendAvatar = user?.avatar || friend.avatar || null;
+              const publicKey = user?.publicKey || friend.publicKey || null;
+              return (
+                <div key={id} style={styles.addMemberRow}>
+                  <div style={styles.addMemberIdentity}>
+                    <div style={styles.addMemberAvatar}>
+                      {friendAvatar ? <img src={friendAvatar} alt="" style={styles.addMemberAvatarImage} /> : displayName.charAt(0).toUpperCase()}
+                    </div>
+                    <div style={styles.addMemberText}>
+                      <span style={styles.addMemberName}>{displayName}</span>
+                      {!publicKey && <span style={styles.addMemberWarning}>Clé de chiffrement indisponible</span>}
+                    </div>
+                  </div>
+                  <button type="button" disabled={adding || !publicKey} onClick={() => addMember(friend)} style={{ ...styles.addMemberAction, ...(!publicKey ? styles.addMemberActionDisabled : {}) }}>
+                    {adding ? 'Ajout...' : publicKey ? 'Ajouter' : 'Indisponible'}
+                  </button>
+                </div>
+              );
             })}
           </div>}
 
@@ -1618,8 +1637,15 @@ const styles = {
   },
 
   addMemberButton: { width: '100%', padding: '9px 12px', border: '1px solid var(--accent)', borderRadius: '8px', background: 'var(--accent-glow)', color: 'var(--accent)', fontWeight: '700', cursor: 'pointer' },
-  addMemberRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '8px 0', color: 'var(--text-primary)', fontSize: '13px' },
-  addMemberAction: { border: 0, borderRadius: '7px', padding: '7px 10px', background: 'var(--accent)', color: '#fff', cursor: 'pointer' },
+  addMemberRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '9px 0', color: 'var(--text-primary)', fontSize: '13px', borderBottom: '1px solid var(--border)' },
+  addMemberIdentity: { display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, flex: 1 },
+  addMemberAvatar: { width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: 'var(--accent-glow)', color: 'var(--accent)', display: 'grid', placeItems: 'center', fontWeight: '700' },
+  addMemberAvatarImage: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
+  addMemberText: { display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 },
+  addMemberName: { color: 'var(--text-primary)', fontWeight: '600', overflowWrap: 'anywhere' },
+  addMemberWarning: { color: 'var(--text-muted)', fontSize: '10px', lineHeight: 1.3 },
+  addMemberAction: { flexShrink: 0, border: 0, borderRadius: '7px', padding: '7px 10px', background: 'var(--accent)', color: '#fff', cursor: 'pointer' },
+  addMemberActionDisabled: { background: 'var(--bg-tertiary)', color: 'var(--text-muted)', cursor: 'not-allowed' },
   removeButton: {
     flexShrink: 0,
     border:
