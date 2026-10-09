@@ -296,7 +296,12 @@ router.post('/decline', createRateLimiter({
   }
 });
 
-router.patch('/nickname', async (req, res) => {
+router.patch('/nickname', createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  keyFn: req => `friend-nickname:${req.user.id}`,
+  message: 'Trop de changements de surnom. Réessaie plus tard.'
+}), async (req, res) => {
   try {
     const { friendId, nickname } = req.body;
 
