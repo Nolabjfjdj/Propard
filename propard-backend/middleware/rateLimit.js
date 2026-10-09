@@ -13,7 +13,8 @@ async function verifyTurnstile(token, remoteip) {
     const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body
+      body,
+      signal: AbortSignal.timeout(5000)
     });
     if (!response.ok) return false;
     const result = await response.json();
@@ -30,7 +31,7 @@ function createRateLimiter({ windowMs, max, keyFn, message, captcha = false, res
 
     let bucket = buckets.get(key);
     if (!bucket || now - bucket.start > windowMs) {
-      bucket = { start: now, count: 0 };
+      bucket = { start: now, count: 0, windowMs };
       buckets.set(key, bucket);
     }
 
@@ -64,12 +65,12 @@ function createRateLimiter({ windowMs, max, keyFn, message, captcha = false, res
   };
 }
 
-// Nettoyage périodique pour éviter une fuite mémoire indéfinie : les
-// entrées inactives depuis plus de 10 minutes sont oubliées.
+// Nettoyage des compteurs uniquement après l'expiration de leur fenêtre réelle.
+// Ne pas utiliser une durée fixe : certaines limites durent 15 ou 60 minutes.
 setInterval(() => {
   const now = Date.now();
   for (const [key, bucket] of buckets) {
-    if (now - bucket.start > 10 * 60 * 1000) buckets.delete(key);
+    if (now - bucket.start > bucket.windowMs) buckets.delete(key);
   }
 }, 5 * 60 * 1000);
 
