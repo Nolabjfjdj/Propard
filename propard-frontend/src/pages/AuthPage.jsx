@@ -13,6 +13,7 @@ export default function AuthPage({ mode }) {
   const [loading, setLoading] = useState(false);
   const [captchaRequired, setCaptchaRequired] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaPurpose, setCaptchaPurpose] = useState('auth');
   const captchaRef = useRef(null);
   const captchaWidgetRef = useRef(null);
 
@@ -96,16 +97,19 @@ export default function AuthPage({ mode }) {
           ? '/api/auth/login'
           : '/api/auth/register';
 
+      const authCaptchaToken = captchaPurpose === 'auth' && captchaToken ? captchaToken : '';
+      const e2eeCaptchaToken = captchaPurpose === 'e2ee' ? captchaToken : '';
       const res = await api.post(route, {
         username,
         password,
-        ...(captchaToken ? { captchaToken } : {})
+        ...(authCaptchaToken ? { captchaToken: authCaptchaToken } : {})
       });
 
       await login(
         res.data.user,
         res.data.token,
-        password
+        password,
+        e2eeCaptchaToken
       );
 
       // Mémorise que ce navigateur a déjà utilisé Propard.
@@ -117,6 +121,8 @@ export default function AuthPage({ mode }) {
       const requiresCaptcha = err.response?.data?.captchaRequired === true;
       if (requiresCaptcha) {
         setCaptchaRequired(true);
+        const failedUrl = err.response?.config?.url || '';
+        setCaptchaPurpose(failedUrl.includes('/api/auth/keybackup') || failedUrl.includes('/api/auth/publickey') ? 'e2ee' : 'auth');
       }
       // Les jetons Turnstile sont à usage unique : réinitialise le widget après
       // toute tentative échouée afin qu'il ne reste pas bloqué sur « succès ».
