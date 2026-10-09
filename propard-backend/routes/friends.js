@@ -366,7 +366,12 @@ router.patch('/nickname', createRateLimiter({
   }
 });
 
-router.get('/unread', async (req, res) => {
+router.get('/unread', createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyFn: req => `message-unread:${req.user.id}`,
+  message: 'Trop de vérifications de messages. Réessaie dans un instant.'
+}), async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
 
@@ -433,7 +438,12 @@ router.patch('/messages/read/:friendId', async (req, res) => {
   }
 });
 
-router.get('/messages/:friendId', async (req, res) => {
+router.get('/messages/:friendId', createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyFn: req => `message-history:${req.user.id}`,
+  message: 'Trop de chargements de messages. Réessaie dans un instant.'
+}), async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.friendId)) {
       return res.status(400).json({ error: 'ID invalide' });
@@ -518,7 +528,12 @@ router.get('/messages/:friendId', async (req, res) => {
   }
 });
 
-router.delete('/messages/:messageId', async (req, res) => {
+router.delete('/messages/:messageId', createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 120,
+  keyFn: req => `message-delete:${req.user.id}`,
+  message: 'Trop de suppressions de messages. Réessaie plus tard.'
+}), async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.messageId)) {
       return res.status(400).json({ error: 'ID invalide' });
@@ -573,7 +588,12 @@ router.delete('/messages/:messageId', async (req, res) => {
   }
 });
 
-router.patch('/messages/:messageId', async (req, res) => {
+router.patch('/messages/:messageId', createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 120,
+  keyFn: req => `message-edit:${req.user.id}`,
+  message: 'Trop de modifications de messages. Réessaie plus tard.'
+}), async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.messageId)) {
       return res.status(400).json({ error: 'ID invalide' });
