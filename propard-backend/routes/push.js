@@ -3,6 +3,26 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const User = require('../models/User');
 const { getPublicKey } = require('../services/push');
+const { createRateLimiter } = require('../middleware/rateLimit');
+
+const webPushSubscribeLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyFn: req => `push-subscribe:${req.user.id}`,
+  message: 'Trop de modifications des notifications. Réessaie plus tard.'
+});
+const nativePushSubscribeLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyFn: req => `push-native-subscribe:${req.user.id}`,
+  message: 'Trop de modifications des notifications natives. Réessaie plus tard.'
+});
+const pushUnsubscribeLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  keyFn: req => `push-unsubscribe:${req.user.id}`,
+  message: 'Trop de demandes de désactivation des notifications. Réessaie plus tard.'
+});
 
 router.get('/public-key', (req, res) => {
   const publicKey = getPublicKey();
@@ -16,7 +36,7 @@ router.get('/public-key', (req, res) => {
   res.json({ publicKey });
 });
 
-router.post('/subscribe', authMiddleware, async (req, res) => {
+router.post('/subscribe', authMiddleware, webPushSubscribeLimiter, async (req, res) => {
   try {
     const subscription = req.body?.subscription;
 
@@ -83,7 +103,7 @@ router.post('/subscribe', authMiddleware, async (req, res) => {
 });
 
 
-router.post('/native/subscribe', authMiddleware, async (req, res) => {
+router.post('/native/subscribe', authMiddleware, nativePushSubscribeLimiter, async (req, res) => {
   try {
     const platform = req.body?.platform;
     const token = req.body?.token;
@@ -142,7 +162,7 @@ router.post('/native/subscribe', authMiddleware, async (req, res) => {
   }
 });
 
-router.delete('/native/subscribe', authMiddleware, async (req, res) => {
+router.delete('/native/subscribe', authMiddleware, pushUnsubscribeLimiter, async (req, res) => {
   try {
     const platform = req.body?.platform;
     const token = req.body?.token;
@@ -191,7 +211,7 @@ router.delete('/native/subscribe', authMiddleware, async (req, res) => {
   }
 });
 
-router.delete('/subscribe', authMiddleware, async (req, res) => {
+router.delete('/subscribe', authMiddleware, pushUnsubscribeLimiter, async (req, res) => {
   try {
     const endpoint = req.body?.endpoint;
 
