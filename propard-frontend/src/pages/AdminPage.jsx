@@ -46,14 +46,21 @@ export default function AdminPage() {
 
   const postAdmin = async (url, payload) => {
     if (captchaRequired && !captchaToken) {
-      throw new Error('Valide le CAPTCHA avant de continuer.');
+      const err = new Error('Valide le CAPTCHA avant de continuer.');
+      err.response = { data: { error: err.message, captchaRequired: true } };
+      throw err;
     }
 
     try {
-      return await api.post(url, {
+      const response = await api.post(url, {
         ...payload,
         ...(captchaToken ? { captchaToken } : {})
       });
+      if (captchaToken) {
+        setCaptchaRequired(false);
+        setCaptchaToken('');
+      }
+      return response;
     } catch (err) {
       if (err.response?.data?.captchaRequired) {
         setCaptchaRequired(true);
