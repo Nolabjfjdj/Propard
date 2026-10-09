@@ -435,6 +435,10 @@ export default function AppPage({
     setCaptchaRequired(true);
     setCaptchaContext(context);
     setCaptchaToken('');
+    const widgetRef = context === 'restore' ? restoreCaptchaWidgetRef : deleteCaptchaWidgetRef;
+    if (widgetRef.current !== null && window.turnstile) {
+      window.turnstile.reset(widgetRef.current);
+    }
   };
 
   const closeDeleteModal = () => {
