@@ -465,6 +465,8 @@ export function AuthProvider({ children }) {
 
       const e2eeError = new Error(message);
       e2eeError.code = 'E2EE_RESTORE_FAILED';
+      e2eeError.response = err.response;
+      e2eeError.config = err.config;
       throw e2eeError;
     }
   };
