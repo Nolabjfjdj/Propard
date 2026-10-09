@@ -35,7 +35,7 @@ const parsePublicKey = value => {
   }
 };
 
-const uploadKeyBackup = async (authToken, privateKeyJwk, password) => {
+const uploadKeyBackup = async (authToken, privateKeyJwk, password, captchaToken = '') => {
   if (!password) return false;
 
   const backup = await encryptPrivateKeyBackup(
@@ -45,7 +45,7 @@ const uploadKeyBackup = async (authToken, privateKeyJwk, password) => {
 
   await api.post(
     '/api/auth/keybackup',
-    { backup },
+    { backup, ...(captchaToken ? { captchaToken } : {}) },
     {
       headers: {
         Authorization: `Bearer ${authToken}`
@@ -60,7 +60,8 @@ const ensureEncryptionKeys = async (
   userId,
   authToken,
   password = null,
-  serverPublicKey = null
+  serverPublicKey = null,
+  captchaToken = ''
 ) => {
   if (!userId || !authToken) return;
 
@@ -79,7 +80,8 @@ const ensureEncryptionKeys = async (
         '/api/auth/keybackup',
         {
           headers: {
-            Authorization: `Bearer ${authToken}`
+            Authorization: `Bearer ${authToken}`,
+            ...(captchaToken ? { 'X-Captcha-Token': captchaToken } : {})
           }
         }
       );
@@ -109,7 +111,8 @@ const ensureEncryptionKeys = async (
           await api.patch(
             '/api/auth/publickey',
             {
-              publicKey: JSON.stringify(restoredPublicKey)
+              publicKey: JSON.stringify(restoredPublicKey),
+              ...(captchaToken ? { captchaToken } : {})
             },
             {
               headers: {
@@ -142,7 +145,8 @@ const ensureEncryptionKeys = async (
           await api.patch(
             '/api/auth/publickey',
             {
-              publicKey: JSON.stringify(derivedPublicKeyJwk)
+              publicKey: JSON.stringify(derivedPublicKeyJwk),
+              ...(captchaToken ? { captchaToken } : {})
             },
             {
               headers: {
@@ -155,7 +159,8 @@ const ensureEncryptionKeys = async (
         await uploadKeyBackup(
           authToken,
           existingPriv,
-          password
+          password,
+          captchaToken
         );
 
         return;
@@ -199,7 +204,8 @@ const ensureEncryptionKeys = async (
     await api.patch(
       '/api/auth/publickey',
       {
-        publicKey: JSON.stringify(publicKeyJwk)
+        publicKey: JSON.stringify(publicKeyJwk),
+        ...(captchaToken ? { captchaToken } : {})
       },
       {
         headers: {
@@ -411,7 +417,8 @@ export function AuthProvider({ children }) {
   const login = async (
     userData,
     userToken,
-    password
+    password,
+    captchaToken = ''
   ) => {
     const normalized = {
       ...userData,
@@ -443,7 +450,8 @@ export function AuthProvider({ children }) {
         normalized.id,
         userToken,
         password,
-        normalized.publicKey
+        normalized.publicKey,
+        captchaToken
       );
     } catch (err) {
       console.error('Erreur de restauration E2EE:', err);
