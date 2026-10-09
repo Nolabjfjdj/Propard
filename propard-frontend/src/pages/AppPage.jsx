@@ -73,6 +73,13 @@ export default function AppPage({
   const [cancelLoading, setCancelLoading] = useState(false);
 
   const [cancelError, setCancelError] = useState('');
+  const [captchaRequired, setCaptchaRequired] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaContext, setCaptchaContext] = useState(null);
+  const deleteCaptchaRef = useRef(null);
+  const restoreCaptchaRef = useRef(null);
+  const deleteCaptchaWidgetRef = useRef(null);
+  const restoreCaptchaWidgetRef = useRef(null);
 
   const grabRef = useRef(null);
 
@@ -380,64 +387,141 @@ export default function AppPage({
       }
     };
 
+  useEffect(() => {
+    if (!captchaRequired || !captchaContext) return;
+    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+    if (!siteKey) {
+      const message = 'La protection anti-bot n’est pas configurée.';
+      if (captchaContext === 'restore') setCancelError(message);
+      else setDeleteError(message);
+      return;
+    }
+    const targetRef = captchaContext === 'restore' ? restoreCaptchaRef : deleteCaptchaRef;
+    const widgetRef = captchaContext === 'restore' ? restoreCaptchaWidgetRef : deleteCaptchaWidgetRef;
+    const renderCaptcha = () => {
+      if (!targetRef.current || !window.turnstile || widgetRef.current !== null) return;
+      widgetRef.current = window.turnstile.render(targetRef.current, {
+        sitekey: siteKey,
+        callback: value => setCaptchaToken(value),
+        'expired-callback': () => setCaptchaToken(''),
+        'error-callback': () => {
+          setCaptchaToken('');
+          if (captchaContext === 'restore') setCancelError('La vérification anti-bot a échoué. Réessaie.');
+          else setDeleteError('La vérification anti-bot a échoué. Réessaie.');
+        }
+      });
+    };
+    if (window.turnstile) renderCaptcha();
+    else {
+      const existingScript = document.querySelector('script[data-propard-turnstile]');
+      if (existingScript) existingScript.addEventListener('load', renderCaptcha, { once: true });
+      else {
+        const script = document.createElement('script');
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.async = true;
+        script.defer = true;
+        script.dataset.propardTurnstile = 'true';
+        script.addEventListener('load', renderCaptcha, { once: true });
+        document.head.appendChild(script);
+      }
+    }
+    return () => {
+      if (widgetRef.current !== null && window.turnstile) window.turnstile.remove(widgetRef.current);
+      widgetRef.current = null;
+    };
+  }, [captchaRequired, captchaContext]);
+
+  const handleCaptchaRequired = (context) => {
+    setCaptchaRequired(true);
+    setCaptchaContext(context);
+    setCaptchaToken('');
+  };
+
   const closeDeleteModal = () => {
     setShowDeleteModal(false);
     setConfirmAction(null);
     setDeleteError('');
+    setCaptchaRequired(false);
+    setCaptchaContext(null);
+    setCaptchaToken('');
   };
 
   const handleAnonymize = async () => {
+    if (captchaRequired && captchaContext === 'delete' && !captchaToken) {
+      setDeleteError('Valide le CAPTCHA avant de continuer.');
+      return;
+    }
     setDeleteLoading(true);
     setDeleteError('');
 
     try {
       await api.delete('/api/auth/anonymize', {
+        data: { ...(captchaToken ? { captchaToken } : {}) },
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
+      setCaptchaRequired(false);
+      setCaptchaContext(null);
+      setCaptchaToken('');
 
       logout();
     } catch (e) {
-      setDeleteError(
-        e.response?.data?.error ||
-          'Erreur serveur'
-      );
-
+      if (e.response?.data?.captchaRequired) {
+        handleCaptchaRequired('delete');
+      } else if (captchaRequired && captchaContext === 'delete') {
+        setCaptchaToken('');
+        if (deleteCaptchaWidgetRef.current !== null && window.turnstile) window.turnstile.reset(deleteCaptchaWidgetRef.current);
+      }
+      setDeleteError(e.response?.data?.error || 'Erreur serveur');
       setDeleteLoading(false);
     }
   };
 
   const handleDeleteTotal = async () => {
+    if (captchaRequired && captchaContext === 'delete' && !captchaToken) {
+      setDeleteError('Valide le CAPTCHA avant de continuer.');
+      return;
+    }
     setDeleteLoading(true);
     setDeleteError('');
 
     try {
       await api.delete('/api/auth/delete', {
+        data: { ...(captchaToken ? { captchaToken } : {}) },
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
+      setCaptchaRequired(false);
+      setCaptchaContext(null);
+      setCaptchaToken('');
 
       logout();
     } catch (e) {
-      setDeleteError(
-        e.response?.data?.error ||
-          'Erreur serveur'
-      );
-
+      if (e.response?.data?.captchaRequired) {
+        handleCaptchaRequired('delete');
+      } else if (captchaRequired && captchaContext === 'delete') {
+        setCaptchaToken('');
+        if (deleteCaptchaWidgetRef.current !== null && window.turnstile) window.turnstile.reset(deleteCaptchaWidgetRef.current);
+      }
+      setDeleteError(e.response?.data?.error || 'Erreur serveur');
       setDeleteLoading(false);
     }
   };
 
   const handleCancelDeletion = async () => {
+    if (captchaRequired && captchaContext === 'restore' && !captchaToken) {
+      setCancelError('Valide le CAPTCHA avant de continuer.');
+      return;
+    }
     setCancelLoading(true);
     setCancelError('');
 
     try {
       await api.post(
         '/api/auth/cancel-deletion',
-        {},
+        { ...(captchaToken ? { captchaToken } : {}) },
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -445,13 +529,18 @@ export default function AppPage({
         }
       );
 
+      setCaptchaRequired(false);
+      setCaptchaContext(null);
+      setCaptchaToken('');
       window.location.reload();
     } catch (e) {
-      setCancelError(
-        e.response?.data?.error ||
-          'Erreur serveur'
-      );
-
+      if (e.response?.data?.captchaRequired) {
+        handleCaptchaRequired('restore');
+      } else if (captchaRequired && captchaContext === 'restore') {
+        setCaptchaToken('');
+        if (restoreCaptchaWidgetRef.current !== null && window.turnstile) window.turnstile.reset(restoreCaptchaWidgetRef.current);
+      }
+      setCancelError(e.response?.data?.error || 'Erreur serveur');
       setCancelLoading(false);
     }
   };
@@ -922,6 +1011,8 @@ export default function AppPage({
                 ? '...'
                 : 'Annuler la suppression'}
             </button>
+
+            {captchaRequired && captchaContext === 'restore' && <div ref={restoreCaptchaRef} style={{ marginTop: 8 }} />}
 
             {cancelError && (
               <p
@@ -1471,6 +1562,8 @@ export default function AppPage({
                   ? 'Ton pseudo sera masqué tout de suite pour tout le monde. Tu pourras te reconnecter pendant 30 jours pour annuler.'
                   : 'Cette action supprime immédiatement et irréversiblement ton compte et tous tes messages.'}
               </p>
+
+              {captchaRequired && captchaContext === 'delete' && <div ref={deleteCaptchaRef} style={{ marginTop: 12 }} />}
 
               {deleteError && (
                 <p
