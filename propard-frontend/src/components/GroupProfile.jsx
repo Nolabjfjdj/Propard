@@ -313,7 +313,7 @@ export default function GroupProfile({
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, showAddMembers]);
 
   /*
    * Retourne le surnom affiché
