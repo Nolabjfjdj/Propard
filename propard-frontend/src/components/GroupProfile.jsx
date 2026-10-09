@@ -55,6 +55,8 @@ export default function GroupProfile({
 
   const [removingId, setRemovingId] =
     useState(null);
+  const [adding, setAdding] = useState(false);
+  const [showAddMembers, setShowAddMembers] = useState(false);
 
   const [friends, setFriends] =
     useState([]);
@@ -513,6 +515,35 @@ export default function GroupProfile({
         setSaving(false);
       }
     };
+
+  const addMember = async friend => {
+    if (!isOwner || adding) return;
+    const user = friend.userId && typeof friend.userId === 'object' ? friend.userId : null;
+    const friendId = (user?._id || friend.userId || friend._id)?.toString();
+    if (!friendId || group.members.some(member => member._id?.toString() === friendId)) return;
+    try {
+      setAdding(true); setError('');
+      const privateKey = await getStoredPrivateKeyJwk(myId);
+      if (!privateKey) throw new Error('Clé privée locale introuvable.');
+      const publicKey = user?.publicKey || friend.publicKey;
+      if (!publicKey) throw new Error('La clé publique de cet ami est indisponible.');
+      const key = await generateGroupKey();
+      const version = (group.keyVersion || 1) + 1;
+      const keyPackages = [];
+      for (const member of [...group.members, { _id: friendId, publicKey }]) {
+        const id = member._id?.toString();
+        if (!id || !member.publicKey) throw new Error('Une clé publique de membre est indisponible.');
+        keyPackages.push({ userId: id, senderId: myId, version, encryptedKey: await encryptGroupKeyForMember(key, privateKey, typeof member.publicKey === 'string' ? JSON.parse(member.publicKey) : member.publicKey) });
+      }
+      const res = await api.post(`/api/groups/${group._id}/members`, { memberId: friendId, keyPackages, ...(captchaToken ? { captchaToken } : {}) }, { headers: { Authorization: `Bearer ${token}` } });
+      const updated = res.data?.group || res.data;
+      setGroup(updated); setName(updated.name || ''); setAvatar(updated.avatar || '');
+      setCaptchaRequired(false); setCaptchaToken(''); setShowAddMembers(false); onUpdated?.(updated);
+    } catch (err) {
+      handleCaptchaError(err); console.error('Erreur ajout membre:', err);
+      setError(err.response?.data?.error || err.message || 'Impossible d’ajouter ce membre.');
+    } finally { setAdding(false); }
+  };
 
   /*
    * Retirer un membre.
@@ -985,6 +1016,19 @@ export default function GroupProfile({
                 0}
             </span>
           </div>
+
+          {isOwner && <div style={{ padding: '12px', borderBottom: '1px solid var(--border)' }}>
+            <button type="button" disabled={adding} onClick={() => setShowAddMembers(v => !v)} style={styles.addMemberButton}>{showAddMembers ? 'Annuler' : '+ Ajouter des membres'}</button>
+            {showAddMembers && friends.filter(friend => {
+              const user = friend.userId && typeof friend.userId === 'object' ? friend.userId : null;
+              const id = (user?._id || friend.userId || friend._id)?.toString();
+              return id && !group.members.some(member => member._id?.toString() === id);
+            }).map(friend => {
+              const user = friend.userId && typeof friend.userId === 'object' ? friend.userId : null;
+              const id = (user?._id || friend.userId || friend._id)?.toString();
+              return <div key={id} style={styles.addMemberRow}><span>{friend.nickname?.trim() || user?.displayName || user?.username || friend.username || 'Ami'}</span><button type="button" disabled={adding} onClick={() => addMember(friend)} style={styles.addMemberAction}>{adding ? 'Ajout...' : 'Ajouter'}</button></div>;
+            })}
+          </div>}
 
           <div
             style={
@@ -1573,6 +1617,9 @@ const styles = {
     textOverflow: 'ellipsis'
   },
 
+  addMemberButton: { width: '100%', padding: '9px 12px', border: '1px solid var(--accent)', borderRadius: '8px', background: 'var(--accent-glow)', color: 'var(--accent)', fontWeight: '700', cursor: 'pointer' },
+  addMemberRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '8px 0', color: 'var(--text-primary)', fontSize: '13px' },
+  addMemberAction: { border: 0, borderRadius: '7px', padding: '7px 10px', background: 'var(--accent)', color: '#fff', cursor: 'pointer' },
   removeButton: {
     flexShrink: 0,
     border:
