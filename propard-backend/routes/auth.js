@@ -39,6 +39,15 @@ const accountDeletionLimiter = createRateLimiter({
   captcha: true,
   resetOnCaptcha: true
 });
+const logoutAllLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  keyFn: req => `logout-all:${req.user.id}`,
+  message: 'Trop de demandes de déconnexion globale. Réessaie plus tard.',
+  captcha: true,
+  resetOnCaptcha: true
+});
+
 const accountRestoreLimiter = createRateLimiter({
   windowMs: 60 * 60 * 1000,
   max: 5,
@@ -247,7 +256,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
 });
 
 
-router.post('/logout-all', authMiddleware, async (req, res) => {
+router.post('/logout-all', authMiddleware, logoutAllLimiter, async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(
       req.user.id,
