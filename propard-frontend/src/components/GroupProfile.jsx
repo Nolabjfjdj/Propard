@@ -290,10 +290,11 @@ export default function GroupProfile({
 
         if (!cancelled) {
           setFriends(
-            Array.isArray(
-              res.data?.friends
-            )
-              ? res.data.friends
+            Array.isArray(res.data?.friends)
+              ? res.data.friends.filter(friend => {
+                  const user = friend?.userId;
+                  return !!user && typeof user === 'object' && !!user._id;
+                })
               : []
           );
         }
