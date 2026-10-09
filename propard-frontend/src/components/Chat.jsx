@@ -35,6 +35,10 @@ export default function Chat({
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState('');
   const [reportSuccess, setReportSuccess] = useState(false);
+  const [captchaRequired, setCaptchaRequired] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captchaRef = useRef(null);
+  const captchaWidgetRef = useRef(null);
 
   const bottomRef = useRef(null);
   const messageCount = useRef(0);
@@ -65,6 +69,45 @@ export default function Chat({
       clearTimeout(grabHoldTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!captchaRequired) return;
+    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+    if (!siteKey) {
+      setReportError('La protection anti-bot n’est pas configurée.');
+      return;
+    }
+    const renderCaptcha = () => {
+      if (!captchaRef.current || !window.turnstile || captchaWidgetRef.current !== null) return;
+      captchaWidgetRef.current = window.turnstile.render(captchaRef.current, {
+        sitekey: siteKey,
+        callback: value => setCaptchaToken(value),
+        'expired-callback': () => setCaptchaToken(''),
+        'error-callback': () => {
+          setCaptchaToken('');
+          setReportError('La vérification anti-bot a échoué. Réessaie.');
+        }
+      });
+    };
+    if (window.turnstile) renderCaptcha();
+    else {
+      const existingScript = document.querySelector('script[data-propard-turnstile]');
+      if (existingScript) existingScript.addEventListener('load', renderCaptcha, { once: true });
+      else {
+        const script = document.createElement('script');
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.async = true;
+        script.defer = true;
+        script.dataset.propardTurnstile = 'true';
+        script.addEventListener('load', renderCaptcha, { once: true });
+        document.head.appendChild(script);
+      }
+    }
+    return () => {
+      if (captchaWidgetRef.current !== null && window.turnstile) window.turnstile.remove(captchaWidgetRef.current);
+      captchaWidgetRef.current = null;
+    };
+  }, [captchaRequired]);
 
   if (!friend || !friend._id) {
     return <div style={styles.container} />;
@@ -707,12 +750,20 @@ export default function Chat({
         conversationType: 'private',
         conversationId: friend._id,
         reportedUserId: friend._id,
-        conversationSnapshot: snapshot
+        conversationSnapshot: snapshot,
+        ...(captchaToken ? { captchaToken } : {})
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      setCaptchaRequired(false);
+      setCaptchaToken('');
       window.alert('Conversation signalée. Merci.');
     } catch (err) {
+      if (err.response?.data?.captchaRequired) {
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) window.turnstile.reset(captchaWidgetRef.current);
+      }
       window.alert(err.response?.data?.error || 'Impossible de signaler cette conversation.');
     }
   };
@@ -734,6 +785,10 @@ export default function Chat({
 
   const submitReport = async () => {
     if (!reportTarget || reportTarget.decryptionError) return;
+    if (captchaRequired && !captchaToken) {
+      setReportError('Valide le CAPTCHA avant de continuer.');
+      return;
+    }
 
     const senderId = (
       reportTarget.sender?._id ||
@@ -750,7 +805,8 @@ export default function Chat({
           messageId: reportTarget._id,
           reportedUserId: senderId,
           content: reportTarget.content,
-          reason: reportReason.trim() || undefined
+          reason: reportReason.trim() || undefined,
+          ...(captchaToken ? { captchaToken } : {})
         },
         {
           headers: {
@@ -760,11 +816,18 @@ export default function Chat({
       );
 
       setReportSuccess(true);
+      setCaptchaRequired(false);
+      setCaptchaToken('');
 
       setTimeout(() => {
         closeReport();
       }, 1800);
     } catch (err) {
+      if (err.response?.data?.captchaRequired) {
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) window.turnstile.reset(captchaWidgetRef.current);
+      }
       setReportError(
         err.response?.data?.error ||
         'Erreur lors de l’envoi du signalement.'
@@ -1455,6 +1518,13 @@ export default function Chat({
           ➤
         </button>
       </div>
+
+      {captchaRequired && (
+        <div style={{ padding: '8px 12px' }}>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Vérification anti-bot requise pour continuer.</p>
+          <div ref={captchaRef} />
+        </div>
+      )}
 
       {reportTarget && (
         <div
