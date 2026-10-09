@@ -908,6 +908,12 @@ router.patch(
 
 router.delete(
   '/:groupId/messages/:messageId',
+  createRateLimiter({
+    windowMs: 10 * 60 * 1000,
+    max: 120,
+    keyFn: req => `group-message-delete:${req.user.id}`,
+    message: 'Trop de suppressions de messages. Réessaie plus tard.'
+  }),
   async (req, res) => {
     try {
       const {
