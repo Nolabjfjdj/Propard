@@ -1257,6 +1257,43 @@ router.patch(
    RETIRER UN MEMBRE
 ========================= */
 
+router.post('/:groupId/members', createRateLimiter({
+  windowMs: 10 * 60 * 1000, max: 5,
+  keyFn: req => `group-member-add:${req.user.id}`,
+  captcha: true, resetOnCaptcha: true,
+  message: 'Trop d’ajouts de membres. Réessaie plus tard.'
+}), async (req, res) => {
+  try {
+    const { groupId } = req.params, memberId = req.body?.memberId;
+    if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(memberId)) return res.status(400).json({ error: 'ID invalide' });
+    const group = await Group.findById(groupId).populate('members.userId', 'username displayName avatar publicKey');
+    if (!group) return res.status(404).json({ error: 'Groupe introuvable' });
+    if (group.owner.toString() !== req.user.id.toString()) return res.status(403).json({ error: 'Seul le propriétaire peut ajouter un membre.' });
+    if (memberOf(group, memberId)) return res.status(409).json({ error: 'Cette personne est déjà membre du groupe.' });
+    if (group.members.length >= 50) return res.status(400).json({ error: 'Le groupe a atteint sa limite de 50 membres.' });
+    const [owner, target] = await Promise.all([User.findById(req.user.id).select('friends blockedUsers'), User.findById(memberId).select('publicKey')]);
+    if (!owner || !target) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    if (!target.publicKey) return res.status(400).json({ error: 'La clé publique de cet ami est indisponible.' });
+    const isFriend = (owner.friends || []).some(friend => { const id = friend.userId?._id || friend.userId; return id && id.toString() === memberId.toString(); });
+    if (!isFriend) return res.status(403).json({ error: 'Tu peux uniquement ajouter un ami.' });
+    if ((owner.blockedUsers || []).some(id => id.toString() === memberId.toString())) return res.status(403).json({ error: 'Impossible d’ajouter une personne bloquée.' });
+    const nextVersion = (group.keyVersion || 1) + 1;
+    const memberIds = new Set([...group.members.map(member => (member.userId?._id || member.userId).toString()), memberId.toString()]);
+    if (!validPackages(req.body?.keyPackages, memberIds, nextVersion)) return res.status(400).json({ error: 'Paquets de clés invalides : renouvellement du chiffrement impossible.' });
+    if (req.body.keyPackages.some(item => item.senderId.toString() !== req.user.id.toString())) return res.status(400).json({ error: 'Émetteur de clé invalide.' });
+    group.members.push({ userId: memberId, role: 'member' });
+    group.keyVersion = nextVersion; group.keyPackages = req.body.keyPackages;
+    await group.save();
+    const populated = await Group.findById(group._id).populate('members.userId', 'username displayName avatar publicKey');
+    if (!populated) return res.status(500).json({ error: 'Groupe modifié mais impossible de le récupérer.' });
+    emitGroupEvent(req, populated, 'groupUpdated', { groupId: populated._id.toString() });
+    const obj = populated.toObject(); obj.members = safeMembers(populated); obj.memberCount = populated.members.length;
+    obj.keyPackage = populated.keyPackages.find(item => item.userId.toString() === req.user.id.toString()) || null; delete obj.keyPackages;
+    res.json({ success: true, group: obj });
+  } catch (e) { console.error('Add group member error:', e); res.status(500).json({ error: 'Erreur serveur' }); }
+});
+
+
 router.delete(
   '/:groupId/members/:memberId',
   createRateLimiter({
