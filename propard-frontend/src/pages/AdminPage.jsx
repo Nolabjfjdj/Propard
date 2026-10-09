@@ -1,8 +1,72 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
 import { markdownToHtml } from '../utils/markdown';
 
 export default function AdminPage() {
+  const [captchaRequired, setCaptchaRequired] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captchaContainerRef = useRef(null);
+  const captchaWidgetRef = useRef(null);
+
+  useEffect(() => {
+    if (!captchaRequired) return;
+    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+    if (!siteKey) return;
+
+    const renderCaptcha = () => {
+      if (!captchaContainerRef.current || !window.turnstile || captchaWidgetRef.current !== null) return;
+      captchaWidgetRef.current = window.turnstile.render(captchaContainerRef.current, {
+        sitekey: siteKey,
+        callback: value => setCaptchaToken(value),
+        'expired-callback': () => setCaptchaToken(''),
+        'error-callback': () => setCaptchaToken('')
+      });
+    };
+
+    if (window.turnstile) renderCaptcha();
+    else {
+      const existingScript = document.querySelector('script[data-propard-turnstile]');
+      if (existingScript) existingScript.addEventListener('load', renderCaptcha, { once: true });
+      else {
+        const script = document.createElement('script');
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.async = true;
+        script.defer = true;
+        script.dataset.propardTurnstile = 'true';
+        script.addEventListener('load', renderCaptcha, { once: true });
+        document.head.appendChild(script);
+      }
+    }
+
+    return () => {
+      if (captchaWidgetRef.current !== null && window.turnstile) window.turnstile.remove(captchaWidgetRef.current);
+      captchaWidgetRef.current = null;
+    };
+  }, [captchaRequired]);
+
+  const postAdmin = async (url, payload) => {
+    if (captchaRequired && !captchaToken) {
+      throw new Error('Valide le CAPTCHA avant de continuer.');
+    }
+
+    try {
+      return await postAdmin(url, {
+        ...payload,
+        ...(captchaToken ? { captchaToken } : {})
+      });
+    } catch (err) {
+      if (err.response?.data?.captchaRequired) {
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+      } else if (captchaRequired) {
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) {
+          window.turnstile.reset(captchaWidgetRef.current);
+        }
+      }
+      throw err;
+    }
+  };
   // ============================
   // MOT DE PASSE
   // ============================
@@ -73,7 +137,7 @@ export default function AdminPage() {
     setBansLoading(true);
 
     try {
-      const res = await api.post(
+      const res = await postAdmin(
         '/api/admin/bans/list',
         { banKey }
       );
@@ -121,7 +185,7 @@ export default function AdminPage() {
     setBanActionLoading(banUsername.trim());
 
     try {
-      const res = await api.post(
+      const res = await postAdmin(
         '/api/admin/bans/ban',
         {
           banKey,
@@ -168,7 +232,7 @@ export default function AdminPage() {
     setBanActionLoading(username);
 
     try {
-      const res = await api.post(
+      const res = await postAdmin(
         '/api/admin/bans/unban',
         {
           banKey,
@@ -209,7 +273,7 @@ export default function AdminPage() {
     setPasswordLoading(true);
 
     try {
-      const res = await api.post(
+      const res = await postAdmin(
         '/api/admin/reset-password',
         {
           adminKey,
@@ -257,7 +321,7 @@ export default function AdminPage() {
     setAnnouncementLoading(true);
 
     try {
-      const res = await api.post(
+      const res = await postAdmin(
         '/api/admin/announcement/create',
         {
           announcementKey,
@@ -301,7 +365,7 @@ export default function AdminPage() {
     setAnnouncementLoading(true);
 
     try {
-      const res = await api.post(
+      const res = await postAdmin(
         '/api/admin/announcement/delete',
         {
           announcementKey
@@ -340,7 +404,7 @@ export default function AdminPage() {
     setReportsLoading(true);
 
     try {
-      const res = await api.post(
+      const res = await postAdmin(
         '/api/admin/reports/list',
         {
           reportKey
@@ -393,7 +457,7 @@ export default function AdminPage() {
     setReportsResult('');
 
     try {
-      await api.post(
+      await postAdmin(
         `/api/admin/reports/${reportId}/status`,
         {
           reportKey,
@@ -490,7 +554,7 @@ export default function AdminPage() {
     setReportsResult('');
 
     try {
-      await api.post(
+      await postAdmin(
         `/api/admin/reports/${reportId}/delete`,
         {
           reportKey
@@ -587,6 +651,16 @@ export default function AdminPage() {
           <p style={styles.subtitle}>
             Panneau d'administration
           </p>
+
+          {captchaRequired && (
+            <div style={{ marginTop: 12 }}>
+              <p style={styles.description}>Vérification anti-bot requise après plusieurs tentatives.</p>
+              <div ref={captchaContainerRef} />
+              {!import.meta.env.VITE_TURNSTILE_SITE_KEY && (
+                <p style={styles.error}>La clé publique Turnstile (VITE_TURNSTILE_SITE_KEY) n’est pas configurée.</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ========================================
