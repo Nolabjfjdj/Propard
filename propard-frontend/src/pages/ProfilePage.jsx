@@ -324,6 +324,10 @@ export default function ProfilePage({
   };
 
   const saveProfile = async () => {
+    if (captchaRequired && !captchaToken) {
+      setSaveError('Valide le CAPTCHA avant de continuer.');
+      return;
+    }
     setSaving(true);
     setSaveError('');
 
@@ -335,6 +339,7 @@ export default function ProfilePage({
       if (editAvatarData !== undefined) {
         body.avatar = editAvatarData;
       }
+      if (captchaToken) body.captchaToken = captchaToken;
 
       const res = await api.patch(
         '/api/auth/me',
@@ -360,7 +365,16 @@ export default function ProfilePage({
       });
 
       setIsEditing(false);
+      setCaptchaRequired(false);
+      setCaptchaToken('');
     } catch (err) {
+      if (err.response?.data?.captchaRequired) {
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) {
+          window.turnstile.reset(captchaWidgetRef.current);
+        }
+      }
       setSaveError(
         err.response?.data?.error ||
         'Erreur serveur'
