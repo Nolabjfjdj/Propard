@@ -33,13 +33,17 @@ const accountDeletionLimiter = createRateLimiter({
   windowMs: 60 * 60 * 1000,
   max: 2,
   keyFn: req => `account-delete:${req.user.id}`,
-  message: 'Trop de tentatives de suppression du compte. Réessaie plus tard.'
+  message: 'Trop de tentatives de suppression du compte. Réessaie plus tard.',
+  captcha: true,
+  resetOnCaptcha: true
 });
 const accountRestoreLimiter = createRateLimiter({
   windowMs: 60 * 60 * 1000,
   max: 5,
   keyFn: req => `account-restore:${req.user.id}`,
-  message: 'Trop de tentatives de restauration. Réessaie plus tard.'
+  message: 'Trop de tentatives de restauration. Réessaie plus tard.',
+  captcha: true,
+  resetOnCaptcha: true
 });
 
 const PSEUDOS_INTERDITS = ['owner','admin','administrator','superadmin','sysadmin','moderator','mod','comod','staff','team','crew','support','helpdesk','official','propard','propardbot','propardteam','propardstaff','propardadmin','propardsupport','propardofficial','everyone','nigger','nigga','faggot','retard','whore','bitch','salope','pute','connard','connasse','batard','batarde','enculé','encule','fdp','ntm','tg','pd','discord','telegram','whatsapp','snapchat','instagram','kkk','facebook','twitter','tiktok','youtube','google','microsoft','apple','amazon','netflix','spotify','twitch','reddit','github','anthropic','openai','chatgpt','claude','malware','virus','phishing','scam','billing','privacy','terms','rules','guidelines','policy'];
