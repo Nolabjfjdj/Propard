@@ -50,7 +50,7 @@ export default function AdminPage() {
     }
 
     try {
-      return await postAdmin(url, {
+      return await api.post(url, {
         ...payload,
         ...(captchaToken ? { captchaToken } : {})
       });
