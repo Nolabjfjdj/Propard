@@ -35,6 +35,14 @@ const keyBackupLimiter = createRateLimiter({
   captcha: true,
   resetOnCaptcha: true
 });
+const keyBackupReadLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyFn: req => `key-backup-read:${req.user.id}`,
+  message: 'Trop de récupérations de sauvegarde. Réessaie plus tard.',
+  captcha: true,
+  resetOnCaptcha: true
+});
 const accountDeletionLimiter = createRateLimiter({
   windowMs: 60 * 60 * 1000,
   max: 2,
@@ -543,7 +551,7 @@ router.patch('/publickey', authMiddleware, keyChangeLimiter, async (req, res) =>
   }
 });
 
-router.get('/keybackup', authMiddleware, async (req, res) => {
+router.get('/keybackup', authMiddleware, keyBackupReadLimiter, async (req, res) => {
   try {
     const user = await User.findById(req.user.id)
       .select('e2eeKeyBackup');
