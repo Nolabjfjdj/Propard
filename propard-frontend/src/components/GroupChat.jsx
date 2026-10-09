@@ -541,6 +541,18 @@ export default function GroupChat({
 
         setKey(groupKey);
 
+        // Conserve les clés historiques présentes localement : les messages
+        // plus anciens peuvent avoir été chiffrés avant une rotation de clé.
+        const historicalKeys = [groupKey];
+        for (let version = 1; version < (loadedGroup.keyVersion || 1); version += 1) {
+          try {
+            const oldKey = await getStoredGroupKey(loadedGroup._id, version);
+            if (oldKey) historicalKeys.push(oldKey);
+          } catch (keyError) {
+            console.warn('Impossible de charger une ancienne clé de groupe:', keyError);
+          }
+        }
+
         const messagesRes =
           await api.get(
             `/api/groups/${loadedGroup._id}/messages`,
@@ -574,15 +586,13 @@ export default function GroupChat({
                   return message;
                 }
 
-                const plaintext =
-                  await decryptMessage(
-                    groupKey,
-                    message.content
-                  );
+                let plaintext = null;
+                for (const messageKey of historicalKeys) {
+                  plaintext = await decryptMessage(messageKey, message.content);
+                  if (plaintext !== null) break;
+                }
 
-                if (
-                  plaintext === null
-                ) {
+                if (plaintext === null) {
                   return {
                     ...message,
                     content: null,
