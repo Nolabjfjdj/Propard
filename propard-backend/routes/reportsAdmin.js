@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 
 const Report = require('../models/Report');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
 
@@ -10,48 +11,14 @@ const router = express.Router();
 // RATE LIMITER ADMIN SIGNALMENTS
 // ========================================
 
-const attempts = new Map();
-
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-const RATE_LIMIT_MAX = 30;
-
-function checkRateLimit(req) {
-  const key = req.ip || 'unknown';
-  const now = Date.now();
-
-  const entry = attempts.get(key);
-
-  if (!entry || now - entry.firstAttempt > RATE_LIMIT_WINDOW_MS) {
-    attempts.set(key, {
-      firstAttempt: now,
-      count: 1
-    });
-
-    return true;
-  }
-
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return false;
-  }
-
-  entry.count += 1;
-
-  return true;
-}
-
-// Nettoyage périodique de la mémoire
-setInterval(() => {
-  const now = Date.now();
-
-  for (const [key, entry] of attempts.entries()) {
-    if (
-      now - entry.firstAttempt >
-      RATE_LIMIT_WINDOW_MS
-    ) {
-      attempts.delete(key);
-    }
-  }
-}, RATE_LIMIT_WINDOW_MS).unref();
+const reportsAdminLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  keyFn: req => req.ip || 'unknown',
+  message: 'Trop de tentatives, réessaie plus tard.',
+  captcha: true,
+  resetOnCaptcha: true
+});
 
 // ========================================
 // VÉRIFICATION CLÉ
@@ -91,13 +58,6 @@ function checkKey(providedKey, environmentKey) {
 // ========================================
 
 function requireReportsAdmin(req, res, next) {
-  if (!checkRateLimit(req)) {
-    return res.status(429).json({
-      error:
-        'Trop de tentatives, réessaie plus tard.'
-    });
-  }
-
   const adminKey =
     req.body?.reportKey;
 
@@ -124,6 +84,7 @@ function requireReportsAdmin(req, res, next) {
 
 router.post(
   '/list',
+  reportsAdminLimiter,
   requireReportsAdmin,
   async (req, res) => {
     try {
@@ -173,6 +134,7 @@ router.post(
 
 router.post(
   '/:reportId/status',
+  reportsAdminLimiter,
   requireReportsAdmin,
   async (req, res) => {
     try {
@@ -256,6 +218,7 @@ router.post(
 
 router.post(
   '/:reportId/delete',
+  reportsAdminLimiter,
   requireReportsAdmin,
   async (req, res) => {
     try {
