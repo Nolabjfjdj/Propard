@@ -1569,6 +1569,7 @@ export default function GroupChat({
           true
         );
       } catch (err) {
+        handleCaptchaError(err);
         console.error(
           'Group message report error:',
           err
