@@ -1458,12 +1458,16 @@ export default function GroupChat({
       await api.post('/api/reports/conversation', {
         conversationType: 'group',
         conversationId: group._id,
-        conversationSnapshot: snapshot
+        conversationSnapshot: snapshot,
+        ...(captchaToken ? { captchaToken } : {})
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      setCaptchaRequired(false);
+      setCaptchaToken('');
       window.alert('Conversation de groupe signalée. Merci.');
     } catch (err) {
+      handleCaptchaError(err);
       window.alert(err.response?.data?.error || 'Impossible de signaler cette conversation.');
     }
   };
