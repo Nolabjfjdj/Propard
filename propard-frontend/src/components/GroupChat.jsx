@@ -696,13 +696,16 @@ export default function GroupChat({
           return;
         }
 
-        let decryptedMessage = {
-          ...message,
-          content: null,
-          decryptionError: true
-        };
+        let decryptedMessage = message.encrypted === false
+          ? { ...message, decryptionError: false }
+          : {
+              ...message,
+              content: null,
+              decryptionError: true
+            };
 
         if (
+          message.encrypted !== false &&
           key &&
           message.content
         ) {
