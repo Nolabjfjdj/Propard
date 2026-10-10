@@ -191,21 +191,15 @@ function createCallStateManager({
       }
     }
 
-    for (const [key, call] of privateCalls.entries()) {
-      if (call.callerId === userKey) {
-        privateCalls.delete(key);
-        emitToUser(call.receiverId, 'callEnded');
-        changed = true;
-        continue;
-      }
-
+    for (const call of [...privateCalls.values()]) {
       if (
-        call.receiverId === userKey &&
-        call.answered
+        call.callerId === userKey ||
+        call.receiverId === userKey
       ) {
-        privateCalls.delete(key);
-        emitToUser(call.callerId, 'callEnded');
-        changed = true;
+        changed = endPrivateCall(
+          call.callerId,
+          call.receiverId
+        ) || changed;
       }
     }
 
