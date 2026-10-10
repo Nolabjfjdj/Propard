@@ -60,8 +60,6 @@ export default function GroupChat({
   const [input, setInput] =
     useState('');
 
-  const [spamWarning, setSpamWarning] =
-    useState(false);
 
   const [key, setKey] =
     useState(null);
