@@ -297,7 +297,7 @@ async function verifySocketMessageCaptcha(socket,captchaToken,kind,requestId){
 
   if(state.verificationPromise){
     const verified=await state.verificationPromise;
-    if(verified && state.captchaPassedUntil>Date.now()){
+    if(verified && state.captchaPassedUntil>Date.now() && state.count<15){
       state.count+=1;
       return true;
     }
