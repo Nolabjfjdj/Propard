@@ -164,8 +164,8 @@ export async function getSecureLocalValue(storageKey) {
 export async function storePrivateKey(userId, privateKeyJwk) {
   if (!userId || !privateKeyJwk) return;
 
+  const db = await openPrivateKeyDb();
   try {
-    const db = await openPrivateKeyDb();
     const encryptedValue = await encryptStoredPrivateKey(db, privateKeyJwk);
 
     await new Promise((resolve, reject) => {
@@ -176,14 +176,9 @@ export async function storePrivateKey(userId, privateKeyJwk) {
       transaction.onabort = () => reject(transaction.error || new Error('Stockage de clé interrompu'));
     });
 
-    db.close();
     localStorage.removeItem(privKeyStorageKey(userId));
-  } catch (error) {
-    try {
-      localStorage.setItem(privKeyStorageKey(userId), JSON.stringify(privateKeyJwk));
-    } catch {
-      throw error;
-    }
+  } finally {
+    db.close();
   }
 }
 
@@ -223,13 +218,21 @@ export async function getStoredPrivateKeyJwk(userId) {
   const raw = localStorage.getItem(privKeyStorageKey(userId));
   if (!raw) return null;
 
+  let parsed;
   try {
-    const parsed = JSON.parse(raw);
-    await storePrivateKey(userId, parsed);
-    return parsed;
+    parsed = JSON.parse(raw);
   } catch {
     return null;
   }
+
+  // Une ancienne clé en clair reste utilisable si la migration échoue :
+  // ne pas la supprimer ni rendre les anciens messages inaccessibles.
+  try {
+    await storePrivateKey(userId, parsed);
+  } catch {
+    // Compatibilité temporaire avec les anciennes clés déjà présentes.
+  }
+  return parsed;
 }
 
 export async function hasStoredPrivateKey(userId) {
