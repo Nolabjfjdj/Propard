@@ -103,6 +103,55 @@ async function decryptStoredPrivateKey(db, value) {
   return JSON.parse(new TextDecoder().decode(plaintext));
 }
 
+export async function storeSecureLocalValue(storageKey, value) {
+  if (!storageKey) return;
+
+  const db = await openPrivateKeyDb();
+  try {
+    const encryptedValue = await encryptStoredPrivateKey(db, value);
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(PRIVATE_KEY_STORE, 'readwrite');
+      transaction.objectStore(PRIVATE_KEY_STORE).put(encryptedValue, `secure:${storageKey}`);
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error || new Error('Stockage sécurisé interrompu'));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+export async function getSecureLocalValue(storageKey) {
+  if (!storageKey) return null;
+
+  const db = await openPrivateKeyDb();
+  try {
+    const storedValue = await new Promise((resolve, reject) => {
+      const transaction = db.transaction(PRIVATE_KEY_STORE, 'readonly');
+      const request = transaction.objectStore(PRIVATE_KEY_STORE).get(`secure:${storageKey}`);
+      request.onsuccess = () => resolve(request.result ?? null);
+      request.onerror = () => reject(request.error);
+    });
+
+    if (storedValue === null) return null;
+
+    const value = await decryptStoredPrivateKey(db, storedValue);
+    if (storedValue.version !== 2) {
+      const encryptedValue = await encryptStoredPrivateKey(db, value);
+      await new Promise((resolve, reject) => {
+        const transaction = db.transaction(PRIVATE_KEY_STORE, 'readwrite');
+        transaction.objectStore(PRIVATE_KEY_STORE).put(encryptedValue, `secure:${storageKey}`);
+        transaction.oncomplete = resolve;
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error || new Error('Migration du stockage sécurisé interrompue'));
+      });
+    }
+    return value;
+  } finally {
+    db.close();
+  }
+}
+
 export async function storePrivateKey(userId, privateKeyJwk) {
   if (!userId || !privateKeyJwk) return;
 
