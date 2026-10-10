@@ -211,18 +211,21 @@ export default function Chat({
   }, [friendPublicKey, userId]);
 
   const decryptMessages = async (rawMessages, key) => {
-    if (!key) {
-      return rawMessages.map(msg => ({
-        ...msg,
-        content: null,
-        decryptionError: true
-      }));
-    }
-
     return Promise.all(
       rawMessages.map(async msg => {
         if (!msg.content || msg.deleted || msg.encrypted === false) {
-          return msg;
+          return {
+            ...msg,
+            decryptionError: false
+          };
+        }
+
+        if (!key) {
+          return {
+            ...msg,
+            content: null,
+            decryptionError: true
+          };
         }
 
         const plaintext = await decryptMessage(

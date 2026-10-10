@@ -689,12 +689,17 @@ router.get(
       } else {
         query = query
           .sort({
-            createdAt: 1
+            createdAt: -1,
+            _id: -1
           })
           .limit(100);
       }
 
       let messages = await query;
+
+      if (!pagination.enabled) {
+        messages.reverse();
+      }
 
       if (pagination.enabled) {
         const hasMore =

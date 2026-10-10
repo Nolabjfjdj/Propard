@@ -1090,6 +1090,7 @@ export default function AppPage({
 
         <FriendList
           token={token}
+          userId={user?.id}
           selectedFriend={selectedFriend}
           selectedGroup={selectedGroup}
           onSelectFriend={handleSelectFriend}

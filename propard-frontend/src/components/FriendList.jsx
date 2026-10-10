@@ -4,6 +4,7 @@ import socket from '../socket';
 
 export default function FriendList({
   token,
+  userId,
   selectedFriend,
   selectedGroup,
   onSelectFriend,
@@ -223,7 +224,7 @@ export default function FriendList({
         msg.sender
       )?.toString();
 
-      if (!senderId) return;
+      if (!senderId || senderId === userId?.toString()) return;
 
       const selectedId =
         selectedFriend?._id?.toString();
@@ -267,7 +268,7 @@ export default function FriendList({
     return () => {
       socket.off('newMessage', handleNew);
     };
-  }, [selectedFriend, token]);
+  }, [selectedFriend, token, userId]);
 
   useEffect(() => {
     const refreshGroups = () => {
