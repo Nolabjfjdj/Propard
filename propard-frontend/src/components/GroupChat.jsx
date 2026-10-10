@@ -54,6 +54,8 @@ export default function GroupChat({
 
   const captchaRef = useRef(null);
   const captchaWidgetRef = useRef(null);
+  const captchaPurposeRef = useRef('general');
+  const pendingGroupMessageRef = useRef(null);
 
   const [input, setInput] =
     useState('');
@@ -120,12 +122,6 @@ export default function GroupChat({
   const lastMessageTime =
     useRef(0);
 
-  const messageCount =
-    useRef(0);
-
-  const messageCountTimer =
-    useRef(null);
-
   const longPressTimer =
     useRef(null);
 
@@ -144,8 +140,6 @@ export default function GroupChat({
   const DOUBLE_TAP_WINDOW_MS = 300;
   const HOLD_TO_GRAB_MS = 180;
   const MOVE_CANCEL_PX = 12;
-
-  const SPAM_LIMIT = 15;
 
   const normalize = id =>
     id?.toString();
@@ -354,10 +348,6 @@ export default function GroupChat({
    */
   useEffect(() => {
     return () => {
-      clearTimeout(
-        messageCountTimer.current
-      );
-
       clearTimeout(
         grabHoldTimerRef.current
       );
@@ -1670,31 +1660,6 @@ export default function GroupChat({
         return;
       }
 
-      messageCount.current +=
-        1;
-
-      clearTimeout(
-        messageCountTimer.current
-      );
-
-      messageCountTimer.current =
-        setTimeout(() => {
-          messageCount.current = 0;
-        }, 10000);
-
-      if (
-        messageCount.current >
-        SPAM_LIMIT
-      ) {
-        setSpamWarning(true);
-
-        setTimeout(() => {
-          setSpamWarning(false);
-        }, 3000);
-
-        return;
-      }
-
       try {
         const encryptedContent =
           await encryptMessage(
@@ -1702,15 +1667,12 @@ export default function GroupChat({
             plaintext
           );
 
-        socket.emit(
-          'sendGroupMessage',
-          {
-            groupId:
-              group._id,
-            content:
-              encryptedContent
-          }
-        );
+        const payload = {
+          groupId: group._id,
+          content: encryptedContent
+        };
+        pendingGroupMessageRef.current = payload;
+        socket.emit('sendGroupMessage', payload);
 
         setInput('');
         setMentionQuery(null);
@@ -1928,7 +1890,18 @@ export default function GroupChat({
       if (!captchaRef.current || !window.turnstile || captchaWidgetRef.current !== null) return;
       captchaWidgetRef.current = window.turnstile.render(captchaRef.current, {
         sitekey: siteKey,
-        callback: value => setCaptchaToken(value),
+        callback: value => {
+          setCaptchaToken(value);
+          if (captchaPurposeRef.current === 'message' && pendingGroupMessageRef.current) {
+            socket.emit('sendGroupMessage', {
+              ...pendingGroupMessageRef.current,
+              captchaToken: value
+            });
+            captchaPurposeRef.current = 'general';
+            setCaptchaRequired(false);
+            setCaptchaToken('');
+          }
+        },
         'expired-callback': () => setCaptchaToken(''),
         'error-callback': () => {
           setCaptchaToken('');
@@ -1959,6 +1932,32 @@ export default function GroupChat({
       captchaWidgetRef.current = null;
     };
   }, [captchaRequired]);
+
+  useEffect(() => {
+    const handleMessageCaptchaRequired = ({ kind } = {}) => {
+      if (kind !== 'group') return;
+      captchaPurposeRef.current = 'message';
+      setCaptchaRequired(true);
+      setCaptchaToken('');
+      if (captchaWidgetRef.current !== null && window.turnstile) {
+        window.turnstile.reset(captchaWidgetRef.current);
+      }
+    };
+    const handleGroupMessageSent = () => {
+      pendingGroupMessageRef.current = null;
+      if (captchaPurposeRef.current === 'message') {
+        captchaPurposeRef.current = 'general';
+        setCaptchaRequired(false);
+        setCaptchaToken('');
+      }
+    };
+    socket.on('messageCaptchaRequired', handleMessageCaptchaRequired);
+    socket.on('groupMessageSent', handleGroupMessageSent);
+    return () => {
+      socket.off('messageCaptchaRequired', handleMessageCaptchaRequired);
+      socket.off('groupMessageSent', handleGroupMessageSent);
+    };
+  }, []);
 
   const handleCaptchaError = err => {
     if (!err.response?.data?.captchaRequired) return;
@@ -2844,16 +2843,6 @@ export default function GroupChat({
               </>
             )}
           </div>
-        </div>
-      )}
-
-      {spamWarning && (
-        <div
-          style={
-            styles.spamAlert
-          }
-        >
-          ⚠️ Envoie moins vite !
         </div>
       )}
 
