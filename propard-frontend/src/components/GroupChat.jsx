@@ -55,7 +55,8 @@ export default function GroupChat({
   const captchaRef = useRef(null);
   const captchaWidgetRef = useRef(null);
   const captchaPurposeRef = useRef('general');
-  const pendingGroupMessageRef = useRef(null);
+  const pendingGroupMessagesRef = useRef(new Map());
+  const captchaRequestIdsRef = useRef(new Set());
 
   const [input, setInput] =
     useState('');
@@ -1665,11 +1666,13 @@ export default function GroupChat({
             plaintext
           );
 
+        const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const payload = {
           groupId: group._id,
-          content: encryptedContent
+          content: encryptedContent,
+          requestId
         };
-        pendingGroupMessageRef.current = payload;
+        pendingGroupMessagesRef.current.set(requestId, payload);
         socket.emit('sendGroupMessage', payload);
 
         setInput('');
@@ -1890,11 +1893,18 @@ export default function GroupChat({
         sitekey: siteKey,
         callback: value => {
           setCaptchaToken(value);
-          if (captchaPurposeRef.current === 'message' && pendingGroupMessageRef.current) {
-            socket.emit('sendGroupMessage', {
-              ...pendingGroupMessageRef.current,
-              captchaToken: value
-            });
+          if (captchaPurposeRef.current === 'message') {
+            const requestIds = [...captchaRequestIdsRef.current];
+            captchaRequestIdsRef.current.clear();
+            for (const requestId of requestIds) {
+              const pending = pendingGroupMessagesRef.current.get(requestId);
+              if (pending) {
+                socket.emit('sendGroupMessage', {
+                  ...pending,
+                  captchaToken: value
+                });
+              }
+            }
             captchaPurposeRef.current = 'general';
             setCaptchaRequired(false);
             setCaptchaToken('');
@@ -1932,18 +1942,25 @@ export default function GroupChat({
   }, [captchaRequired]);
 
   useEffect(() => {
-    const handleMessageCaptchaRequired = ({ kind } = {}) => {
-      if (kind !== 'group') return;
-      captchaPurposeRef.current = 'message';
-      setCaptchaRequired(true);
-      setCaptchaToken('');
-      if (captchaWidgetRef.current !== null && window.turnstile) {
-        window.turnstile.reset(captchaWidgetRef.current);
+    const handleMessageCaptchaRequired = ({ kind, requestId } = {}) => {
+      if (kind !== 'group' || typeof requestId !== 'string') return;
+      if (!pendingGroupMessagesRef.current.has(requestId)) return;
+      captchaRequestIdsRef.current.add(requestId);
+      if (captchaPurposeRef.current !== 'message') {
+        captchaPurposeRef.current = 'message';
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) {
+          window.turnstile.reset(captchaWidgetRef.current);
+        }
       }
     };
-    const handleGroupMessageSent = () => {
-      pendingGroupMessageRef.current = null;
-      if (captchaPurposeRef.current === 'message') {
+    const handleGroupMessageSent = ({ requestId } = {}) => {
+      if (typeof requestId === 'string') {
+        pendingGroupMessagesRef.current.delete(requestId);
+        captchaRequestIdsRef.current.delete(requestId);
+      }
+      if (captchaPurposeRef.current === 'message' && captchaRequestIdsRef.current.size === 0) {
         captchaPurposeRef.current = 'general';
         setCaptchaRequired(false);
         setCaptchaToken('');
