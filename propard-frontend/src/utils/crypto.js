@@ -50,14 +50,17 @@ function openPrivateKeyDb() {
   });
 }
 
-async function getLocalStorageEncryptionKey(db) {
-  const existingKey = await new Promise((resolve, reject) => {
+async function readLocalStorageEncryptionKey(db) {
+  return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORAGE_KEY_STORE, 'readonly');
     const request = transaction.objectStore(STORAGE_KEY_STORE).get('private-key-encryption');
     request.onsuccess = () => resolve(request.result || null);
     request.onerror = () => reject(request.error);
   });
+}
 
+async function getLocalStorageEncryptionKey(db) {
+  const existingKey = await readLocalStorageEncryptionKey(db);
   if (existingKey) return existingKey;
 
   const key = await crypto.subtle.generateKey(
@@ -66,15 +69,21 @@ async function getLocalStorageEncryptionKey(db) {
     ['encrypt', 'decrypt']
   );
 
-  await new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORAGE_KEY_STORE, 'readwrite');
-    transaction.objectStore(STORAGE_KEY_STORE).put(key, 'private-key-encryption');
-    transaction.oncomplete = resolve;
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error || new Error('Création de la clé de stockage interrompue'));
-  });
-
-  return key;
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORAGE_KEY_STORE, 'readwrite');
+      transaction.objectStore(STORAGE_KEY_STORE).add(key, 'private-key-encryption');
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error || new Error('Création de la clé de stockage interrompue'));
+      transaction.onabort = () => reject(transaction.error || new Error('Création de la clé de stockage interrompue'));
+    });
+    return key;
+  } catch (error) {
+    // Une autre opération ou un autre onglet a peut-être créé la clé entre-temps.
+    const concurrentlyCreatedKey = await readLocalStorageEncryptionKey(db);
+    if (concurrentlyCreatedKey) return concurrentlyCreatedKey;
+    throw error;
+  }
 }
 
 async function encryptStoredPrivateKey(db, privateKeyJwk) {
