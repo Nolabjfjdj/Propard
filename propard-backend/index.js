@@ -7,6 +7,7 @@ const jwt=require('jsonwebtoken');
 const path=require('path');
 const {randomUUID}=require('crypto');
 const {createCallStateManager}=require('./services/callState');
+const {verifyTurnstile}=require('./middleware/rateLimit');
 const {connectShards}=require('./db/shards');
 const {
   isEncryptedMessagePayload,
@@ -252,6 +253,43 @@ function isCallMember(call,userId){
     call.members.has(userId.toString());
 }
 
+const socketMessageCaptchaState=new Map();
+
+async function verifySocketMessageCaptcha(socket,captchaToken,kind){
+  const userId=socket.userId?.toString();
+  if(!userId) return false;
+
+  const now=Date.now();
+
+  if(socketMessageCaptchaState.size>2000){
+    for(const [key,state] of socketMessageCaptchaState){
+      if(now-state.start>=10000){
+        socketMessageCaptchaState.delete(key);
+      }
+    }
+  }
+
+  let state=socketMessageCaptchaState.get(userId);
+  if(!state || now-state.start>=10000){
+    state={start:now,count:0};
+  }
+
+  if(state.count<15){
+    state.count+=1;
+    socketMessageCaptchaState.set(userId,state);
+    return true;
+  }
+
+  if(await verifyTurnstile(captchaToken,socket.handshake.address)){
+    socketMessageCaptchaState.set(userId,{start:now,count:1});
+    return true;
+  }
+
+  socketMessageCaptchaState.set(userId,state);
+  socket.emit('messageCaptchaRequired',{kind});
+  return false;
+}
+
 io.on('connection',socket=>{
 
   console.log(`🔌 Socket connecté: ${socket.id}`);
@@ -360,7 +398,7 @@ io.on('connection',socket=>{
     );
   });
 
-  socket.on('sendMessage',async({receiverId,content}={})=>{
+  socket.on('sendMessage',async({receiverId,content,captchaToken}={})=>{
     try{
       if(!socket.userId) return;
 
@@ -388,6 +426,8 @@ io.on('connection',socket=>{
           {message:'Message chiffré invalide ou trop volumineux.'}
         );
       }
+
+      if(!await verifySocketMessageCaptcha(socket,captchaToken,'private')) return;
 
       const message=await Message.create({
         sender:socket.userId,
@@ -461,7 +501,7 @@ io.on('connection',socket=>{
   // MESSAGES DE GROUPE
   // ─────────────────────────────────────
 
-  socket.on('sendGroupMessage',async({groupId,content}={})=>{
+  socket.on('sendGroupMessage',async({groupId,content,captchaToken}={})=>{
     try{
       if(!socket.userId) return;
 
@@ -494,6 +534,8 @@ io.on('connection',socket=>{
           {message:'Tu ne fais pas partie de ce groupe.'}
         );
       }
+
+      if(!await verifySocketMessageCaptcha(socket,captchaToken,'group')) return;
 
       const message=await GroupMessage.create({
         group:groupId,
