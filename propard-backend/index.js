@@ -213,6 +213,40 @@ const callState=createCallStateManager({
   privateCalls,
   emitToUser:(userId,event,payload)=>{
     emitToUser(io,userId,event,payload);
+  },
+  onCallFinished: async ({type,call,status,durationSeconds}) => {
+    try {
+      if (type === 'private') {
+        const sender = call.callerId;
+        const receiver = call.receiverId;
+        const content = status === 'missed'
+          ? '📵 Appel manqué'
+          : `📞 Appel terminé — Durée : ${Math.floor(durationSeconds / 60).toString().padStart(2,'0')}:${(durationSeconds % 60).toString().padStart(2,'0')}`;
+        const message = await Message.create({ sender, receiver, content, encrypted: false, read: false });
+        const populated = await Message.findById(message._id)
+          .populate('sender', 'username displayName avatar ipAlias');
+        emitToUser(io, sender, 'newMessage', populated);
+        emitToUser(io, receiver, 'newMessage', populated);
+        return;
+      }
+
+      if (type === 'group') {
+        const content = status === 'missed'
+          ? '📵 Appel de groupe manqué'
+          : `📞 Appel de groupe terminé — Durée : ${Math.floor(durationSeconds / 60).toString().padStart(2,'0')}:${(durationSeconds % 60).toString().padStart(2,'0')}`;
+        const message = await GroupMessage.create({ group: call.groupId, sender: call.callerId, content, encrypted: false });
+        const populated = await GroupMessage.findById(message._id)
+          .populate('sender', 'username displayName avatar ipAlias');
+        const payload = { ...populated.toObject(), groupId: call.groupId };
+        const group = await Group.findById(call.groupId).select('members');
+        for (const member of group?.members || []) {
+          const memberId = (member.userId?._id || member.userId).toString();
+          emitToUser(io, memberId, 'newGroupMessage', payload);
+        }
+      }
+    } catch (error) {
+      console.error('Erreur enregistrement historique d’appel:', error);
+    }
   }
 });
 
