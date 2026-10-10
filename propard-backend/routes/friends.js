@@ -635,6 +635,7 @@ router.patch('/messages/:messageId', createRateLimiter({
     }
 
     message.content = content.trim();
+    message.encrypted = true;
     message.originalContent = null;
     message.edited = true;
 
@@ -651,6 +652,7 @@ router.patch('/messages/:messageId', createRateLimiter({
         {
           messageId: message._id.toString(),
           content: message.content,
+          encrypted: true,
           edited: true
         }
       );
