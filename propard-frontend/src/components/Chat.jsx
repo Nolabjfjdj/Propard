@@ -39,10 +39,10 @@ export default function Chat({
   const [captchaToken, setCaptchaToken] = useState('');
   const captchaRef = useRef(null);
   const captchaWidgetRef = useRef(null);
+  const captchaPurposeRef = useRef('report');
+  const pendingMessageRef = useRef(null);
 
   const bottomRef = useRef(null);
-  const messageCount = useRef(0);
-  const messageCountTimer = useRef(null);
   const longPressTimer = useRef(null);
 
   const lastTapRef = useRef({ id: null, time: 0 });
@@ -52,9 +52,7 @@ export default function Chat({
   const HOLD_TO_GRAB_MS = 180;
   const MOVE_CANCEL_PX = 12;
 
-  const SPAM_LIMIT = 15;
-
-  const normalize = id => id?.toString();
+   const normalize = id => id?.toString();
   const myId = normalize(userId);
 
   const friendName =
@@ -65,7 +63,6 @@ export default function Chat({
 
   useEffect(() => {
     return () => {
-      clearTimeout(messageCountTimer.current);
       clearTimeout(grabHoldTimerRef.current);
     };
   }, []);
@@ -81,7 +78,18 @@ export default function Chat({
       if (!captchaRef.current || !window.turnstile || captchaWidgetRef.current !== null) return;
       captchaWidgetRef.current = window.turnstile.render(captchaRef.current, {
         sitekey: siteKey,
-        callback: value => setCaptchaToken(value),
+        callback: value => {
+          setCaptchaToken(value);
+          if (captchaPurposeRef.current === 'message' && pendingMessageRef.current) {
+            socket.emit('sendMessage', {
+              ...pendingMessageRef.current,
+              captchaToken: value
+            });
+            captchaPurposeRef.current = 'report';
+            setCaptchaRequired(false);
+            setCaptchaToken('');
+          }
+        },
         'expired-callback': () => setCaptchaToken(''),
         'error-callback': () => {
           setCaptchaToken('');
@@ -108,6 +116,32 @@ export default function Chat({
       captchaWidgetRef.current = null;
     };
   }, [captchaRequired]);
+
+  useEffect(() => {
+    const handleMessageCaptchaRequired = ({ kind } = {}) => {
+      if (kind !== 'private') return;
+      captchaPurposeRef.current = 'message';
+      setCaptchaRequired(true);
+      setCaptchaToken('');
+      if (captchaWidgetRef.current !== null && window.turnstile) {
+        window.turnstile.reset(captchaWidgetRef.current);
+      }
+    };
+    const handleMessageSent = () => {
+      pendingMessageRef.current = null;
+      if (captchaPurposeRef.current === 'message') {
+        captchaPurposeRef.current = 'report';
+        setCaptchaRequired(false);
+        setCaptchaToken('');
+      }
+    };
+    socket.on('messageCaptchaRequired', handleMessageCaptchaRequired);
+    socket.on('messageSent', handleMessageSent);
+    return () => {
+      socket.off('messageCaptchaRequired', handleMessageCaptchaRequired);
+      socket.off('messageSent', handleMessageSent);
+    };
+  }, []);
 
   if (!friend || !friend._id) {
     return <div style={styles.container} />;
@@ -579,38 +613,19 @@ export default function Chat({
       return;
     }
 
-    if (messageCount.current >= SPAM_LIMIT) {
-      setSpamWarning(true);
-
-      setTimeout(() => {
-        setSpamWarning(false);
-      }, 3000);
-
-      return;
-    }
-
-    messageCount.current += 1;
-
-    clearTimeout(
-      messageCountTimer.current
-    );
-
-    messageCountTimer.current =
-      setTimeout(() => {
-        messageCount.current = 0;
-      }, 10000);
-
-    try {
+     try {
       const encryptedContent =
         await encryptMessage(
           sharedKey,
           plaintext
         );
 
-      socket.emit('sendMessage', {
+      const payload = {
         receiverId: friend._id,
         content: encryptedContent
-      });
+      };
+      pendingMessageRef.current = payload;
+      socket.emit('sendMessage', payload);
 
       setInput('');
     } catch (err) {
@@ -1489,13 +1504,7 @@ export default function Chat({
         );
       })()}
 
-      {spamWarning && (
-        <div style={styles.spamAlert}>
-          ⚠️ Envoie moins vite !
-        </div>
-      )}
-
-      <div style={styles.inputBar}>
+       <div style={styles.inputBar}>
         <input
           value={input}
           onChange={e =>
