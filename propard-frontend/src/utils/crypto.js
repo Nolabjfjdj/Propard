@@ -208,6 +208,35 @@ function base64ToUint8Array(value) {
   return Uint8Array.from(atob(value), c => c.charCodeAt(0));
 }
 
+function isCanonicalBase64(value, expectedBytes = null) {
+  if (typeof value !== 'string' || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
+    return false;
+  }
+
+  try {
+    const decoded = base64ToUint8Array(value);
+    return (
+      btoa(String.fromCharCode(...decoded)) === value &&
+      (expectedBytes === null || decoded.length === expectedBytes)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isP256JwkCoordinate(value) {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(value)) {
+    return false;
+  }
+
+  try {
+    const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+    return atob(base64 + '=').length === 32;
+  } catch {
+    return false;
+  }
+}
+
 async function deriveBackupKey(password, salt) {
   const passwordKey = await crypto.subtle.importKey(
     'raw',
@@ -286,9 +315,25 @@ export async function decryptPrivateKeyBackup(backup, password) {
     throw new Error('Sauvegarde E2EE invalide ou incompatible');
   }
 
+  // Valide le format avant PBKDF2 : évite de lancer une dérivation coûteuse
+  // sur une sauvegarde mal formée ou sur des paramètres hors format attendu.
+  if (
+    !isCanonicalBase64(backup.salt, 16) ||
+    !isCanonicalBase64(backup.iv, 12) ||
+    !isCanonicalBase64(backup.ciphertext) ||
+    backup.ciphertext.length > 10000
+  ) {
+    throw new Error('Sauvegarde E2EE invalide ou corrompue');
+  }
+
   const salt = base64ToUint8Array(backup.salt);
   const iv = base64ToUint8Array(backup.iv);
   const ciphertext = base64ToUint8Array(backup.ciphertext);
+
+  if (ciphertext.length < 16) {
+    throw new Error('Sauvegarde E2EE invalide ou corrompue');
+  }
+
   const key = await deriveBackupKey(password, salt);
 
   const decrypted = await crypto.subtle.decrypt(
@@ -305,9 +350,9 @@ export async function decryptPrivateKeyBackup(backup, password) {
     !privateKeyJwk ||
     privateKeyJwk.kty !== 'EC' ||
     privateKeyJwk.crv !== 'P-256' ||
-    typeof privateKeyJwk.x !== 'string' ||
-    typeof privateKeyJwk.y !== 'string' ||
-    typeof privateKeyJwk.d !== 'string'
+    !isP256JwkCoordinate(privateKeyJwk.x) ||
+    !isP256JwkCoordinate(privateKeyJwk.y) ||
+    !isP256JwkCoordinate(privateKeyJwk.d)
   ) {
     throw new Error('Clé privée E2EE invalide');
   }
