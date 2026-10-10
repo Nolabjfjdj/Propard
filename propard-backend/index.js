@@ -170,36 +170,6 @@ app.get('/health',(req,res)=>res.status(200).send('OK'));
 
 const groupMessageSpam=new Map();
 const privateMessageSpam=new Map();
-const socketActionRateLimits=new Map();
-
-function isSocketActionRateLimited(userId, action, max, windowMs){
-  const now=Date.now();
-
-  if(socketActionRateLimits.size>1000){
-    for(const [key,state] of socketActionRateLimits){
-      if(now>=state.resetAt){
-        socketActionRateLimits.delete(key);
-      }
-    }
-  }
-
-  const key=`${userId}:${action}`;
-  let state=socketActionRateLimits.get(key);
-
-  if(!state || now>=state.resetAt){
-    state={count:0,resetAt:now+windowMs};
-  }
-
-  if(state.count>=max){
-    socketActionRateLimits.set(key,state);
-    return true;
-  }
-
-  state.count+=1;
-  socketActionRateLimits.set(key,state);
-  return false;
-}
-
 const Message=require('./models/Message');
 const User=require('./models/User');
 const Group=require('./models/Group');
@@ -649,13 +619,6 @@ io.on('connection',socket=>{
   socket.on('callUser',async({receiverId,offer,videoCall=false}={})=>{
     if(!socket.userId) return;
 
-    if(isSocketActionRateLimited(socket.userId,'private-call-start',10,5*60*1000)){
-      return socket.emit(
-        'callFailed',
-        {message:'Trop de tentatives d’appel. Réessaie dans quelques minutes.'}
-      );
-    }
-
     if(!mongoose.isValidObjectId(receiverId) || !isSessionDescription(offer,'offer')) return;
 
     if(!(await areFriends(socket.userId,receiverId))){
@@ -843,13 +806,6 @@ io.on('connection',socket=>{
   socket.on('groupCallStart',async({groupId,videoCall=false}={})=>{
     try{
       if(!socket.userId) return;
-
-      if(isSocketActionRateLimited(socket.userId,'group-call-start',10,5*60*1000)){
-        return socket.emit(
-          'groupCallError',
-          {groupId,message:'Trop de tentatives d’appel. Réessaie dans quelques minutes.'}
-        );
-      }
 
       const group=await getGroupForMember(
         groupId,
