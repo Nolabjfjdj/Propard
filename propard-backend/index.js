@@ -168,8 +168,6 @@ app.use('/api/push',require('./routes/push'));
 
 app.get('/health',(req,res)=>res.status(200).send('OK'));
 
-const groupMessageSpam=new Map();
-const privateMessageSpam=new Map();
 const Message=require('./models/Message');
 const User=require('./models/User');
 const Group=require('./models/Group');
@@ -391,25 +389,6 @@ io.on('connection',socket=>{
         );
       }
 
-      const now=Date.now();
-      const spamState=privateMessageSpam.get(socket.userId)||{count:0,resetAt:now+10000};
-
-      if(now>=spamState.resetAt){
-        spamState.count=0;
-        spamState.resetAt=now+10000;
-      }
-
-      if(spamState.count>=15){
-        privateMessageSpam.set(socket.userId,spamState);
-        return socket.emit(
-          'spamWarning',
-          {message:'Envoie moins vite !'}
-        );
-      }
-
-      spamState.count+=1;
-      privateMessageSpam.set(socket.userId,spamState);
-
       const message=await Message.create({
         sender:socket.userId,
         receiver:receiverId,
@@ -515,25 +494,6 @@ io.on('connection',socket=>{
           {message:'Tu ne fais pas partie de ce groupe.'}
         );
       }
-
-      const now=Date.now();
-      const spamState=groupMessageSpam.get(socket.userId)||{count:0,resetAt:now+10000};
-
-      if(now>=spamState.resetAt){
-        spamState.count=0;
-        spamState.resetAt=now+10000;
-      }
-
-      if(spamState.count>=15){
-        groupMessageSpam.set(socket.userId,spamState);
-        return socket.emit(
-          'spamWarning',
-          {message:'Envoie moins vite !'}
-        );
-      }
-
-      spamState.count+=1;
-      groupMessageSpam.set(socket.userId,spamState);
 
       const message=await GroupMessage.create({
         group:groupId,
@@ -1146,13 +1106,7 @@ io.on('connection',socket=>{
         socket.id
       );
 
-      groupMessageSpam.delete(
-        socket.userId
-      );
 
-      privateMessageSpam.delete(
-        socket.userId
-      );
 
       if(becameOffline){
         callState.removeUserFromAllCalls(
