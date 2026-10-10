@@ -39,7 +39,8 @@ export default function Chat({
   const captchaRef = useRef(null);
   const captchaWidgetRef = useRef(null);
   const captchaPurposeRef = useRef('report');
-  const pendingMessageRef = useRef(null);
+  const pendingMessagesRef = useRef(new Map());
+  const captchaRequestIdsRef = useRef(new Set());
 
   const bottomRef = useRef(null);
   const longPressTimer = useRef(null);
@@ -79,11 +80,18 @@ export default function Chat({
         sitekey: siteKey,
         callback: value => {
           setCaptchaToken(value);
-          if (captchaPurposeRef.current === 'message' && pendingMessageRef.current) {
-            socket.emit('sendMessage', {
-              ...pendingMessageRef.current,
-              captchaToken: value
-            });
+          if (captchaPurposeRef.current === 'message') {
+            const requestIds = [...captchaRequestIdsRef.current];
+            captchaRequestIdsRef.current.clear();
+            for (const requestId of requestIds) {
+              const pending = pendingMessagesRef.current.get(requestId);
+              if (pending) {
+                socket.emit('sendMessage', {
+                  ...pending,
+                  captchaToken: value
+                });
+              }
+            }
             captchaPurposeRef.current = 'report';
             setCaptchaRequired(false);
             setCaptchaToken('');
@@ -117,18 +125,25 @@ export default function Chat({
   }, [captchaRequired]);
 
   useEffect(() => {
-    const handleMessageCaptchaRequired = ({ kind } = {}) => {
-      if (kind !== 'private') return;
-      captchaPurposeRef.current = 'message';
-      setCaptchaRequired(true);
-      setCaptchaToken('');
-      if (captchaWidgetRef.current !== null && window.turnstile) {
-        window.turnstile.reset(captchaWidgetRef.current);
+    const handleMessageCaptchaRequired = ({ kind, requestId } = {}) => {
+      if (kind !== 'private' || typeof requestId !== 'string') return;
+      if (!pendingMessagesRef.current.has(requestId)) return;
+      captchaRequestIdsRef.current.add(requestId);
+      if (captchaPurposeRef.current !== 'message') {
+        captchaPurposeRef.current = 'message';
+        setCaptchaRequired(true);
+        setCaptchaToken('');
+        if (captchaWidgetRef.current !== null && window.turnstile) {
+          window.turnstile.reset(captchaWidgetRef.current);
+        }
       }
     };
-    const handleMessageSent = () => {
-      pendingMessageRef.current = null;
-      if (captchaPurposeRef.current === 'message') {
+    const handleMessageSent = ({ requestId } = {}) => {
+      if (typeof requestId === 'string') {
+        pendingMessagesRef.current.delete(requestId);
+        captchaRequestIdsRef.current.delete(requestId);
+      }
+      if (captchaPurposeRef.current === 'message' && captchaRequestIdsRef.current.size === 0) {
         captchaPurposeRef.current = 'report';
         setCaptchaRequired(false);
         setCaptchaToken('');
@@ -619,11 +634,13 @@ export default function Chat({
           plaintext
         );
 
+      const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const payload = {
         receiverId: friend._id,
-        content: encryptedContent
+        content: encryptedContent,
+        requestId
       };
-      pendingMessageRef.current = payload;
+      pendingMessagesRef.current.set(requestId, payload);
       socket.emit('sendMessage', payload);
 
       setInput('');
