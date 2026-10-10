@@ -280,7 +280,7 @@ async function verifySocketMessageCaptcha(socket,captchaToken,kind){
     return true;
   }
 
-  if(await verifyTurnstile(captchaToken,socket.handshake.address)){
+  if(await verifyTurnstile(captchaToken)){
     socketMessageCaptchaState.set(userId,{start:now,count:1});
     return true;
   }
