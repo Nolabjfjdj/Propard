@@ -1344,6 +1344,8 @@ export default function GroupChat({
                   ...message,
                   content:
                     plaintext,
+                  encrypted:
+                    true,
                   edited:
                     true
                 }
@@ -1626,6 +1628,8 @@ export default function GroupChat({
                 ...message,
                 content:
                   plaintext,
+                encrypted:
+                  true,
                 edited:
                   true,
                 decryptionError:
