@@ -7,7 +7,6 @@ const jwt=require('jsonwebtoken');
 const path=require('path');
 const {randomUUID}=require('crypto');
 const {createCallStateManager}=require('./services/callState');
-const {verifyTurnstile}=require('./middleware/rateLimit');
 const {connectShards}=require('./db/shards');
 const {
   isEncryptedMessagePayload,
@@ -253,82 +252,6 @@ function isCallMember(call,userId){
     call.members.has(userId.toString());
 }
 
-const socketMessageCaptchaState=new Map();
-
-async function verifySocketMessageCaptcha(socket,captchaToken,kind,requestId){
-  const userId=socket.userId?.toString();
-  if(!userId) return false;
-
-  const now=Date.now();
-
-  if(socketMessageCaptchaState.size>2000){
-    for(const [key,state] of socketMessageCaptchaState){
-      if(now-state.start>=10000 && !state.verificationPromise){
-        socketMessageCaptchaState.delete(key);
-      }
-    }
-  }
-
-  let state=socketMessageCaptchaState.get(userId);
-  if(!state){
-    state={start:now,count:0};
-    socketMessageCaptchaState.set(userId,state);
-  }else if(now-state.start>=10000){
-    state.start=now;
-    state.count=0;
-  }
-
-  if(state.captchaPassedUntil>now && state.count<15){
-    state.count+=1;
-    return true;
-  }
-
-  if(state.count<15){
-    state.count+=1;
-    return true;
-  }
-
-  const emitChallenge=()=>{
-    socket.emit('messageCaptchaRequired',{
-      kind,
-      requestId:typeof requestId==='string' ? requestId.slice(0,100) : null
-    });
-  };
-
-  if(state.verificationPromise){
-    const verified=await state.verificationPromise;
-    if(verified && state.captchaPassedUntil>Date.now() && state.count<15){
-      state.count+=1;
-      return true;
-    }
-    emitChallenge();
-    return false;
-  }
-
-  if(typeof captchaToken==='string' && captchaToken.trim()){
-    state.verificationPromise=verifyTurnstile(captchaToken).then(verified=>{
-      if(verified){
-        const verifiedAt=Date.now();
-        state.start=verifiedAt;
-        state.count=0;
-        state.captchaPassedUntil=verifiedAt+30000;
-      }
-      return verified;
-    }).catch(()=>false).finally(()=>{
-      state.verificationPromise=null;
-    });
-
-    const verified=await state.verificationPromise;
-    if(verified){
-      state.count+=1;
-      return true;
-    }
-  }
-
-  emitChallenge();
-  return false;
-}
-
 io.on('connection',socket=>{
 
   console.log(`🔌 Socket connecté: ${socket.id}`);
@@ -437,7 +360,7 @@ io.on('connection',socket=>{
     );
   });
 
-  socket.on('sendMessage',async({receiverId,content,captchaToken,requestId}={})=>{
+  socket.on('sendMessage',async({receiverId,content}={})=>{
     try{
       if(!socket.userId) return;
 
@@ -465,8 +388,6 @@ io.on('connection',socket=>{
           {message:'Message chiffré invalide ou trop volumineux.'}
         );
       }
-
-      if(!await verifySocketMessageCaptcha(socket,captchaToken,'private',requestId)) return;
 
       const message=await Message.create({
         sender:socket.userId,
@@ -524,7 +445,7 @@ io.on('connection',socket=>{
         });
       }
 
-      socket.emit('messageSent',{...messageData,requestId});
+      socket.emit('messageSent',messageData);
 
     }catch(e){
       console.error('sendMessage error:',e);
@@ -540,7 +461,7 @@ io.on('connection',socket=>{
   // MESSAGES DE GROUPE
   // ─────────────────────────────────────
 
-  socket.on('sendGroupMessage',async({groupId,content,captchaToken,requestId}={})=>{
+  socket.on('sendGroupMessage',async({groupId,content}={})=>{
     try{
       if(!socket.userId) return;
 
@@ -573,8 +494,6 @@ io.on('connection',socket=>{
           {message:'Tu ne fais pas partie de ce groupe.'}
         );
       }
-
-      if(!await verifySocketMessageCaptcha(socket,captchaToken,'group',requestId)) return;
 
       const message=await GroupMessage.create({
         group:groupId,
@@ -641,7 +560,7 @@ io.on('connection',socket=>{
         }
       }
 
-      socket.emit('groupMessageSent',{...messageData,requestId});
+      socket.emit('groupMessageSent',messageData);
 
     }catch(e){
       console.error('sendGroupMessage error:',e);
