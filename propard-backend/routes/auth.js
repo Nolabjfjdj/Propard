@@ -558,16 +558,26 @@ router.patch('/publickey', authMiddleware, keyChangeLimiter, async (req, res) =>
       parsed.kty !== 'EC' ||
       parsed.crv !== 'P-256' ||
       !isP256Coordinate(parsed.x) ||
-      !isP256Coordinate(parsed.y)
+      !isP256Coordinate(parsed.y) ||
+      Object.prototype.hasOwnProperty.call(parsed, 'd')
     ) {
       return res.status(400).json({
         error: 'Clé publique invalide'
       });
     }
 
+    const sanitizedPublicKey = {
+      kty: 'EC',
+      crv: 'P-256',
+      x: parsed.x,
+      y: parsed.y,
+      ext: true,
+      key_ops: []
+    };
+
     await User.findByIdAndUpdate(
       req.user.id,
-      { publicKey }
+      { publicKey: JSON.stringify(sanitizedPublicKey) }
     );
 
     res.json({ success: true });
