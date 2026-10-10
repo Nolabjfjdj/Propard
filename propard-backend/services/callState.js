@@ -20,6 +20,7 @@ function createCallStateManager({
     if (!call) return false;
 
     privateCalls.delete(key);
+    if (call.timeout) clearTimeout(call.timeout);
     void onCallFinished({ type: 'private', call, status: call.answered ? 'ended' : 'missed', durationSeconds: call.answered ? Math.max(0, Math.floor((Date.now() - (call.answeredAt || call.startedAt)) / 1000)) : 0 });
     emitToUser(call.callerId, 'callEnded');
     emitToUser(call.receiverId, 'callEnded');
@@ -35,6 +36,7 @@ function createCallStateManager({
 
     call.answered = true;
     call.answeredAt = Date.now();
+    if (call.timeout) clearTimeout(call.timeout);
     return true;
   };
 
