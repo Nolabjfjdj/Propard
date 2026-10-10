@@ -73,6 +73,32 @@ const PSEUDOS_INTERDITS = ['owner','admin','administrator','superadmin','sysadmi
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
+function isBase64(value, expectedBytes = null) {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length % 4 !== 0 ||
+    !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)
+  ) {
+    return false;
+  }
+
+  const decoded = Buffer.from(value, 'base64');
+
+  return (
+    decoded.toString('base64') === value &&
+    (expectedBytes === null || decoded.length === expectedBytes)
+  );
+}
+
+function isP256Coordinate(value) {
+  return (
+    typeof value === 'string' &&
+    /^[A-Za-z0-9_-]{43}$/.test(value) &&
+    Buffer.from(value, 'base64url').length === 32
+  );
+}
+
 function signToken(user) {
   return jwt.sign(
     {
@@ -531,8 +557,8 @@ router.patch('/publickey', authMiddleware, keyChangeLimiter, async (req, res) =>
       !parsed ||
       parsed.kty !== 'EC' ||
       parsed.crv !== 'P-256' ||
-      typeof parsed.x !== 'string' ||
-      typeof parsed.y !== 'string'
+      !isP256Coordinate(parsed.x) ||
+      !isP256Coordinate(parsed.y)
     ) {
       return res.status(400).json({
         error: 'Clé publique invalide'
@@ -606,8 +632,10 @@ router.post('/keybackup', authMiddleware, keyBackupLimiter, async (req, res) => 
     }
 
     if (
-      backup.salt.length > 100 ||
-      backup.iv.length > 100 ||
+      !isBase64(backup.salt, 16) ||
+      !isBase64(backup.iv, 12) ||
+      !isBase64(backup.ciphertext) ||
+      Buffer.from(backup.ciphertext, 'base64').length < 16 ||
       backup.ciphertext.length > 10000
     ) {
       return res.status(400).json({
