@@ -294,18 +294,6 @@ io.on('connection',socket=>{
       return;
     }
 
-    const authNow=Date.now();
-    if(!socket.authAttemptRateLimit || authNow>=socket.authAttemptRateLimit.resetAt){
-      socket.authAttemptRateLimit={count:0,resetAt:authNow+60*1000};
-    }
-
-    socket.authAttemptRateLimit.count+=1;
-    if(socket.authAttemptRateLimit.count>10){
-      socket.emit('authenticated',false);
-      socket.disconnect(true);
-      return;
-    }
-
     try{
       if(typeof token!=='string' || !token.trim()){
         throw new Error('Token manquant');
@@ -805,8 +793,6 @@ io.on('connection',socket=>{
   socket.on('iceRestartOffer',async({receiverId,offer}={})=>{
     if(!socket.userId) return;
 
-    if(isSocketActionRateLimited(socket.userId,'private-ice-restart-offer',20,5*60*1000)) return;
-
     if(!mongoose.isValidObjectId(receiverId) || !isSessionDescription(offer,'offer')) return;
 
     if(!(await areFriends(socket.userId,receiverId))) return;
@@ -824,8 +810,6 @@ io.on('connection',socket=>{
 
   socket.on('iceRestartAnswer',async({callerId,answer}={})=>{
     if(!socket.userId) return;
-
-    if(isSocketActionRateLimited(socket.userId,'private-ice-restart-answer',20,5*60*1000)) return;
 
     if(!mongoose.isValidObjectId(callerId) || !isSessionDescription(answer,'answer')) return;
 
@@ -1117,22 +1101,6 @@ io.on('connection',socket=>{
     if(offer) payload.offer=offer;
     if(answer) payload.answer=answer;
     if(candidate) payload.candidate=candidate;
-
-    if(
-      eventName==='groupCallOffer' ||
-      eventName==='groupCallAnswer' ||
-      eventName==='groupCallIceRestartOffer' ||
-      eventName==='groupCallIceRestartAnswer'
-    ){
-      if(isSocketActionRateLimited(
-        socket.userId,
-        `group-signal:${eventName}`,
-        60,
-        60*1000
-      )){
-        return;
-      }
-    }
 
     emitToUser(
       io,
