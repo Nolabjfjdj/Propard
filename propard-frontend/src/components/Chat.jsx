@@ -449,6 +449,7 @@ export default function Chat({
               ? {
                   ...m,
                   content: null,
+                  encrypted: true,
                   decryptionError: true,
                   edited: true
                 }
@@ -472,6 +473,7 @@ export default function Chat({
                   plaintext !== null
                     ? plaintext
                     : null,
+                encrypted: true,
                 decryptionError:
                   plaintext === null,
                 edited: true
@@ -687,6 +689,8 @@ export default function Chat({
             ? {
                 ...m,
                 content: plaintext,
+                encrypted: true,
+                decryptionError: false,
                 edited: true
               }
             : m
