@@ -22,7 +22,6 @@ export default function Chat({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [input, setInput] = useState('');
-  const [spamWarning, setSpamWarning] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState('');
   const [contextMenu, setContextMenu] = useState(null);
