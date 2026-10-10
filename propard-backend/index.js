@@ -235,6 +235,7 @@ const callState=createCallStateManager({
           ? '📵 Appel de groupe manqué'
           : `📞 Appel de groupe Terminé — Durée : ${Math.floor(durationSeconds / 60).toString().padStart(2,'0')}:${(durationSeconds % 60).toString().padStart(2,'0')}`;
         const message = await GroupMessage.create({ group: call.groupId, sender: call.callerId, content, encrypted: false });
+        await Group.findByIdAndUpdate(call.groupId, { lastMessageAt: message.createdAt });
         const populated = await GroupMessage.findById(message._id)
           .populate('sender', 'username displayName avatar ipAlias');
         const payload = { ...populated.toObject(), groupId: call.groupId };
