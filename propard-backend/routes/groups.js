@@ -850,6 +850,7 @@ router.patch(
 
       message.content =
         encryptedContent.trim();
+      message.encrypted = true;
 
       message.edited =
         true;
@@ -867,6 +868,8 @@ router.patch(
             messageId.toString(),
           content:
             message.content,
+          encrypted:
+            true,
           edited:
             true
         }
@@ -884,6 +887,8 @@ router.patch(
             message.sender,
           content:
             message.content,
+          encrypted:
+            message.encrypted,
           edited:
             message.edited,
           deleted:
