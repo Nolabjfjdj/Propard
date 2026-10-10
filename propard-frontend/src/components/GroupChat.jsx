@@ -567,7 +567,8 @@ export default function GroupChat({
               async message => {
                 if (
                   message.deleted ||
-                  !message.content
+                  !message.content ||
+                  message.encrypted === false
                 ) {
                   return message;
                 }
