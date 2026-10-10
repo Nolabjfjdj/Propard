@@ -1,7 +1,8 @@
 function createCallStateManager({
   groupCalls,
   privateCalls,
-  emitToUser
+  emitToUser,
+  onCallFinished = () => {}
 }) {
   const getPrivateCallKey = (a, b) =>
     [a.toString(), b.toString()].sort().join(':');
@@ -19,7 +20,8 @@ function createCallStateManager({
     if (!call) return false;
 
     privateCalls.delete(key);
-
+    if (call.timeout) clearTimeout(call.timeout);
+    void onCallFinished({ type: 'private', call, status: call.answered ? 'ended' : 'missed', durationSeconds: call.answered ? Math.max(0, Math.floor((Date.now() - (call.answeredAt || call.startedAt)) / 1000)) : 0 });
     emitToUser(call.callerId, 'callEnded');
     emitToUser(call.receiverId, 'callEnded');
 
@@ -33,6 +35,8 @@ function createCallStateManager({
     if (!call) return false;
 
     call.answered = true;
+    call.answeredAt = Date.now();
+    if (call.timeout) clearTimeout(call.timeout);
     return true;
   };
 
@@ -57,6 +61,7 @@ function createCallStateManager({
 
     if (!call) return false;
 
+    void onCallFinished({ type: 'group', call, status: call.everAnswered ? 'ended' : 'missed', durationSeconds: call.everAnswered ? Math.max(0, Math.floor((Date.now() - (call.answeredAt || call.startedAt)) / 1000)) : 0 });
     emitGroupCall(
       call,
       'groupCallEnded',
@@ -109,7 +114,7 @@ function createCallStateManager({
 
     if (call.members.size === 0) {
       groupCalls.delete(key);
-
+      void onCallFinished({ type: 'group', call, status: call.everAnswered ? 'ended' : 'missed', durationSeconds: call.everAnswered ? Math.max(0, Math.floor((Date.now() - (call.answeredAt || call.startedAt)) / 1000)) : 0 });
       for (const pendingUserId of call.pendingInvites || []) {
         emitToUser(
           pendingUserId,
@@ -166,6 +171,8 @@ function createCallStateManager({
 
     call.pendingInvites?.delete(userKey);
     call.members.add(userKey);
+    call.everAnswered = true;
+    call.answeredAt = call.answeredAt || Date.now();
     return true;
   };
 
@@ -184,21 +191,15 @@ function createCallStateManager({
       }
     }
 
-    for (const [key, call] of privateCalls.entries()) {
-      if (call.callerId === userKey) {
-        privateCalls.delete(key);
-        emitToUser(call.receiverId, 'callEnded');
-        changed = true;
-        continue;
-      }
-
+    for (const call of [...privateCalls.values()]) {
       if (
-        call.receiverId === userKey &&
-        call.answered
+        call.callerId === userKey ||
+        call.receiverId === userKey
       ) {
-        privateCalls.delete(key);
-        emitToUser(call.callerId, 'callEnded');
-        changed = true;
+        changed = endPrivateCall(
+          call.callerId,
+          call.receiverId
+        ) || changed;
       }
     }
 

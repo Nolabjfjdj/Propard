@@ -221,7 +221,7 @@ export default function Chat({
 
     return Promise.all(
       rawMessages.map(async msg => {
-        if (!msg.content || msg.deleted) {
+        if (!msg.content || msg.deleted || msg.encrypted === false) {
           return msg;
         }
 
@@ -369,13 +369,15 @@ export default function Chat({
         return;
       }
 
-      let decryptedMessage = {
-        ...msg,
-        content: null,
-        decryptionError: true
-      };
+      let decryptedMessage = msg.encrypted === false
+        ? { ...msg, decryptionError: false }
+        : {
+            ...msg,
+            content: null,
+            decryptionError: true
+          };
 
-      if (sharedKey && msg.content) {
+      if (msg.encrypted !== false && sharedKey && msg.content) {
         const plaintext = await decryptMessage(
           sharedKey,
           msg.content
