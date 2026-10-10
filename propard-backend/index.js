@@ -255,7 +255,7 @@ function isCallMember(call,userId){
 
 const socketMessageCaptchaState=new Map();
 
-async function verifySocketMessageCaptcha(socket,captchaToken,kind){
+async function verifySocketMessageCaptcha(socket,captchaToken,kind,requestId){
   const userId=socket.userId?.toString();
   if(!userId) return false;
 
@@ -263,30 +263,69 @@ async function verifySocketMessageCaptcha(socket,captchaToken,kind){
 
   if(socketMessageCaptchaState.size>2000){
     for(const [key,state] of socketMessageCaptchaState){
-      if(now-state.start>=10000){
+      if(now-state.start>=10000 && !state.verificationPromise){
         socketMessageCaptchaState.delete(key);
       }
     }
   }
 
   let state=socketMessageCaptchaState.get(userId);
-  if(!state || now-state.start>=10000){
+  if(!state){
     state={start:now,count:0};
+    socketMessageCaptchaState.set(userId,state);
+  }else if(now-state.start>=10000){
+    state.start=now;
+    state.count=0;
+  }
+
+  if(state.captchaPassedUntil>now){
+    state.count+=1;
+    return true;
   }
 
   if(state.count<15){
     state.count+=1;
-    socketMessageCaptchaState.set(userId,state);
     return true;
   }
 
-  if(await verifyTurnstile(captchaToken)){
-    socketMessageCaptchaState.set(userId,{start:now,count:1});
-    return true;
+  const emitChallenge=()=>{
+    socket.emit('messageCaptchaRequired',{
+      kind,
+      requestId:typeof requestId==='string' ? requestId.slice(0,100) : null
+    });
+  };
+
+  if(state.verificationPromise){
+    const verified=await state.verificationPromise;
+    if(verified && state.captchaPassedUntil>Date.now()){
+      state.count+=1;
+      return true;
+    }
+    emitChallenge();
+    return false;
   }
 
-  socketMessageCaptchaState.set(userId,state);
-  socket.emit('messageCaptchaRequired',{kind});
+  if(typeof captchaToken==='string' && captchaToken.trim()){
+    state.verificationPromise=verifyTurnstile(captchaToken).then(verified=>{
+      if(verified){
+        const verifiedAt=Date.now();
+        state.start=verifiedAt;
+        state.count=0;
+        state.captchaPassedUntil=verifiedAt+30000;
+      }
+      return verified;
+    }).catch(()=>false).finally(()=>{
+      state.verificationPromise=null;
+    });
+
+    const verified=await state.verificationPromise;
+    if(verified){
+      state.count+=1;
+      return true;
+    }
+  }
+
+  emitChallenge();
   return false;
 }
 
@@ -398,7 +437,7 @@ io.on('connection',socket=>{
     );
   });
 
-  socket.on('sendMessage',async({receiverId,content,captchaToken}={})=>{
+  socket.on('sendMessage',async({receiverId,content,captchaToken,requestId}={})=>{
     try{
       if(!socket.userId) return;
 
@@ -427,7 +466,7 @@ io.on('connection',socket=>{
         );
       }
 
-      if(!await verifySocketMessageCaptcha(socket,captchaToken,'private')) return;
+      if(!await verifySocketMessageCaptcha(socket,captchaToken,'private',requestId)) return;
 
       const message=await Message.create({
         sender:socket.userId,
@@ -485,7 +524,7 @@ io.on('connection',socket=>{
         });
       }
 
-      socket.emit('messageSent',messageData);
+      socket.emit('messageSent',{...messageData,requestId});
 
     }catch(e){
       console.error('sendMessage error:',e);
@@ -501,7 +540,7 @@ io.on('connection',socket=>{
   // MESSAGES DE GROUPE
   // ─────────────────────────────────────
 
-  socket.on('sendGroupMessage',async({groupId,content,captchaToken}={})=>{
+  socket.on('sendGroupMessage',async({groupId,content,captchaToken,requestId}={})=>{
     try{
       if(!socket.userId) return;
 
@@ -535,7 +574,7 @@ io.on('connection',socket=>{
         );
       }
 
-      if(!await verifySocketMessageCaptcha(socket,captchaToken,'group')) return;
+      if(!await verifySocketMessageCaptcha(socket,captchaToken,'group',requestId)) return;
 
       const message=await GroupMessage.create({
         group:groupId,
@@ -602,7 +641,7 @@ io.on('connection',socket=>{
         }
       }
 
-      socket.emit('groupMessageSent',messageData);
+      socket.emit('groupMessageSent',{...messageData,requestId});
 
     }catch(e){
       console.error('sendGroupMessage error:',e);
