@@ -25,6 +25,7 @@ export async function generateKeyPair() {
 const privKeyStorageKey = (userId) => `propard_privkey_${userId}`;
 const PRIVATE_KEY_DB = 'propard-secure-storage';
 const PRIVATE_KEY_STORE = 'private-keys';
+const STORAGE_KEY_STORE = 'storage-keys';
 
 function openPrivateKeyDb() {
   return new Promise((resolve, reject) => {
@@ -33,11 +34,14 @@ function openPrivateKeyDb() {
       return;
     }
 
-    const request = indexedDB.open(PRIVATE_KEY_DB, 1);
+    const request = indexedDB.open(PRIVATE_KEY_DB, 2);
 
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(PRIVATE_KEY_STORE)) {
         request.result.createObjectStore(PRIVATE_KEY_STORE);
+      }
+      if (!request.result.objectStoreNames.contains(STORAGE_KEY_STORE)) {
+        request.result.createObjectStore(STORAGE_KEY_STORE);
       }
     };
 
@@ -46,18 +50,69 @@ function openPrivateKeyDb() {
   });
 }
 
+async function getLocalStorageEncryptionKey(db) {
+  const existingKey = await new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORAGE_KEY_STORE, 'readonly');
+    const request = transaction.objectStore(STORAGE_KEY_STORE).get('private-key-encryption');
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+
+  if (existingKey) return existingKey;
+
+  const key = await crypto.subtle.generateKey(
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+
+  await new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORAGE_KEY_STORE, 'readwrite');
+    transaction.objectStore(STORAGE_KEY_STORE).put(key, 'private-key-encryption');
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error || new Error('Création de la clé de stockage interrompue'));
+  });
+
+  return key;
+}
+
+async function encryptStoredPrivateKey(db, privateKeyJwk) {
+  const key = await getLocalStorageEncryptionKey(db);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plaintext = new TextEncoder().encode(JSON.stringify(privateKeyJwk));
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
+  return {
+    version: 2,
+    iv: Array.from(iv),
+    ciphertext: Array.from(new Uint8Array(ciphertext))
+  };
+}
+
+async function decryptStoredPrivateKey(db, value) {
+  if (!value || value.version !== 2 || !Array.isArray(value.iv) || !Array.isArray(value.ciphertext)) {
+    return value || null;
+  }
+
+  const key = await getLocalStorageEncryptionKey(db);
+  const plaintext = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: new Uint8Array(value.iv) },
+    key,
+    new Uint8Array(value.ciphertext)
+  );
+  return JSON.parse(new TextDecoder().decode(plaintext));
+}
+
 export async function storePrivateKey(userId, privateKeyJwk) {
   if (!userId || !privateKeyJwk) return;
 
   try {
     const db = await openPrivateKeyDb();
+    const encryptedValue = await encryptStoredPrivateKey(db, privateKeyJwk);
 
     await new Promise((resolve, reject) => {
       const transaction = db.transaction(PRIVATE_KEY_STORE, 'readwrite');
-      transaction.objectStore(PRIVATE_KEY_STORE).put(
-        privateKeyJwk,
-        String(userId)
-      );
+      transaction.objectStore(PRIVATE_KEY_STORE).put(encryptedValue, String(userId));
       transaction.oncomplete = resolve;
       transaction.onerror = () => reject(transaction.error);
       transaction.onabort = () => reject(transaction.error || new Error('Stockage de clé interrompu'));
@@ -67,10 +122,7 @@ export async function storePrivateKey(userId, privateKeyJwk) {
     localStorage.removeItem(privKeyStorageKey(userId));
   } catch (error) {
     try {
-      localStorage.setItem(
-        privKeyStorageKey(userId),
-        JSON.stringify(privateKeyJwk)
-      );
+      localStorage.setItem(privKeyStorageKey(userId), JSON.stringify(privateKeyJwk));
     } catch {
       throw error;
     }
@@ -82,22 +134,35 @@ export async function getStoredPrivateKeyJwk(userId) {
 
   try {
     const db = await openPrivateKeyDb();
-    const value = await new Promise((resolve, reject) => {
+    const storedValue = await new Promise((resolve, reject) => {
       const transaction = db.transaction(PRIVATE_KEY_STORE, 'readonly');
       const request = transaction.objectStore(PRIVATE_KEY_STORE).get(String(userId));
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
     });
 
-    db.close();
+    if (storedValue) {
+      const privateKeyJwk = await decryptStoredPrivateKey(db, storedValue);
+      if (storedValue.version !== 2) {
+        const encryptedValue = await encryptStoredPrivateKey(db, privateKeyJwk);
+        await new Promise((resolve, reject) => {
+          const transaction = db.transaction(PRIVATE_KEY_STORE, 'readwrite');
+          transaction.objectStore(PRIVATE_KEY_STORE).put(encryptedValue, String(userId));
+          transaction.oncomplete = resolve;
+          transaction.onerror = () => reject(transaction.error);
+          transaction.onabort = () => reject(transaction.error || new Error('Migration de clé interrompue'));
+        });
+      }
+      db.close();
+      return privateKeyJwk;
+    }
 
-    if (value) return value;
+    db.close();
   } catch {
     // Fallback de compatibilité pour les navigateurs sans IndexedDB fonctionnel.
   }
 
   const raw = localStorage.getItem(privKeyStorageKey(userId));
-
   if (!raw) return null;
 
   try {
