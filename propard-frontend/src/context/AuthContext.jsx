@@ -6,6 +6,7 @@ import {
   storePrivateKey,
   getStoredPrivateKeyJwk,
   publicKeyFromPrivateJwk,
+  validatePrivateKeyJwk,
   encryptPrivateKeyBackup,
   decryptPrivateKeyBackup
 } from '../utils/crypto';
@@ -95,6 +96,8 @@ const ensureEncryptionKeys = async (
             password
           );
 
+        await validatePrivateKeyJwk(restoredPrivateKey);
+
         const restoredPublicKey =
           publicKeyFromPrivateJwk(restoredPrivateKey);
 
@@ -135,6 +138,8 @@ const ensureEncryptionKeys = async (
        * messages indéchiffrables.
        */
       if (existingPriv) {
+        await validatePrivateKeyJwk(existingPriv);
+
         const derivedPublicKeyJwk =
           publicKeyFromPrivateJwk(existingPriv);
 
