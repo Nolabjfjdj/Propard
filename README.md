@@ -189,4 +189,4 @@ Les documents juridiques du site sont destinés à informer les utilisateurs. Il
 
 Propard est un logiciel propriétaire. La publication du code source permet son inspection technique, mais ne constitue pas une licence open source et n'accorde pas automatiquement le droit de copier, modifier, redistribuer ou exploiter le logiciel.
 
-Le nom Propard, son identité visuelle et le code original sont revendiqués par **BananeVR**, sous réserve des droits de tiers. Les dépendances restent soumises à leurs licences respectives. Toute utilisation non expressément autorisée nécessite une autorisation écrite préalable du titulaire des droits.
+Le fichier `LICENSE` indique que le code de Propard est réservé et que toute copie, modification, distribution ou utilisation nécessite une autorisation écrite préalable. Le projet est développé par **BananeVR** ; les droits et mentions de copyright applicables sont ceux indiqués dans le dépôt, sous réserve des droits de tiers. Les dépendances restent soumises à leurs licences respectives.
