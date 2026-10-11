@@ -2543,6 +2543,14 @@ export default function GroupChat({
                           </p>
                         )}
 
+                        {isCallEventMessage(message) && message.callEndedAt && (
+                          <p style={{ fontSize: 11, margin: '2px 0 4px', color: isMe ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)' }}>
+                            {message.callStartedAt && `Début : ${new Date(message.callStartedAt).toLocaleString('fr-FR')} · `}
+                            Fin : {new Date(message.callEndedAt).toLocaleString('fr-FR')}
+                            {typeof message.callDurationSeconds === 'number' && message.callDurationSeconds > 0 && ` · Durée : ${Math.floor(message.callDurationSeconds / 60).toString().padStart(2, '0')}:${(message.callDurationSeconds % 60).toString().padStart(2, '0')}`}
+                          </p>
+                        )}
+
                         <div
                           style={{
                             display:
