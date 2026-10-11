@@ -26,7 +26,7 @@ Propard est une plateforme de communication web développée indépendamment par
 - Signalements de messages ou d'une conversation, y compris un instantané fourni volontairement par la personne qui signale.
 - Outils d'administration pour traiter les signalements et appliquer des mesures de modération.
 - CAPTCHA Cloudflare Turnstile sur certaines actions sensibles ou répétées.
-- Suppression de compte avec période de restauration de 30 jours, selon le parcours proposé par le service.
+- Demande de suppression avec période de restauration de 30 jours et anonymisation du compte à l’expiration ; les messages de conversation et signalements ne sont pas tous automatiquement supprimés par ce traitement.
 
 ## Architecture
 
