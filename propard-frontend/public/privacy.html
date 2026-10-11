@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Politique de Confidentialité — Propard</title>
-<meta name="description" content="Politique de Confidentialité de Propard.">
+<title>Politique de confidentialité — Propard</title>
+<meta name="description" content="Politique de confidentialité et informations sur les données traitées par Propard.">
 <meta name="robots" content="index, follow">
-<link rel="canonical" href="https://propard.site/privacy/">
+<link rel="canonical" href="https://propard.site/privacy.html">
 <style>@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
 :root {
   --bg-primary:#0e0f13; --bg-secondary:#16181f; --text-primary:#f0f0f5;
@@ -34,785 +34,86 @@ body{font-family:var(--font-body);background:var(--bg-primary);color:var(--text-
 strong{color:var(--text-primary)}
 @media(max-width:600px){.legal-card{padding:28px 20px}.legal-title{font-size:23px}}
 </style>
-<script>
-try {
-  const theme = localStorage.getItem('propard_theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', theme);
-} catch (_) {}
-</script>
+<script>try{document.documentElement.setAttribute('data-theme',localStorage.getItem('propard_theme')||'dark')}catch(_){}</script>
 </head>
-<body>
-<div class="legal-page">
-      <div class="legal-card">
-        <a href="/help" class="legal-back">← Retour</a>
-
-        <h1 class="legal-title">Politique de Confidentialité</h1>
-        <p class="legal-date">En vigueur depuis le 9 octobre 2026</p>
-
-        <div class="legal-section">
-          <h2 class="legal-section-title">1. Responsable du traitement</h2>
-
-          <p class="legal-text">
-            Propard est un projet personnel développé et exploité par BananeVR,
-            particulier domicilié en France.
-          </p>
-
-          <p class="legal-text">
-            Pour toute question relative à la protection des données personnelles
-            ou pour exercer vos droits, vous pouvez contacter :
-          </p>
-
-          <p class="legal-text">
-            <a href="mailto:support@propard.site" class="legal-link">
-              support@propard.site
-            </a>
-          </p>
-        </div>
-
-        <div class="legal-section">
-          <h2 class="legal-section-title">2. Données traitées</h2>
-
-          <p class="legal-text">
-            Propard applique un principe de minimisation des données et ne demande
-            pas, pour la création d'un compte, d'adresse e-mail ou de numéro de
-            téléphone.
-          </p>
-
-          <p class="legal-text">
-            Selon l'utilisation du service, les catégories de données suivantes
-            peuvent être traitées :
-          </p>
-
-          <ul class="legal-list">
-            <li>
-              Un nom d'utilisateur (pseudo) choisi par l'utilisateur
-            </li>
-            <li>
-              Un nom d'affichage lorsqu'il est renseigné
-            </li>
-            <li>
-              Un avatar lorsqu'il est renseigné
-            </li>
-            <li>
-              Un mot de passe conservé sous forme de hachage et non sous sa
-              forme lisible
-            </li>
-            <li>
-              Une adresse IP alias générée aléatoirement et utilisée comme
-              identifiant technique sur la plateforme
-            </li>
-            <li>
-              La date de création du compte
-            </li>
-            <li>
-              Le statut en ligne ou hors ligne nécessaire au fonctionnement
-              de certaines fonctionnalités
-            </li>
-            <li>
-              Les relations entre utilisateurs nécessaires au fonctionnement
-              des amis, demandes d'amis et blocages
-            </li>
-            <li>
-              Les surnoms éventuellement associés aux relations d'amis
-            </li>
-            <li>
-              Lorsque les notifications Push sont activées, les informations
-              techniques de l'abonnement Push (notamment son endpoint et les
-              clés nécessaires au fonctionnement du service Push)
-            </li>
-            <li>
-              Une clé publique cryptographique utilisée pour permettre le
-              chiffrement de bout en bout des communications
-            </li>
-            <li>
-              Une sauvegarde chiffrée côté client de la clé privée E2EE,
-              lorsqu'elle est créée pour permettre la récupération de l'identité
-              cryptographique sur un autre navigateur ou appareil
-            </li>
-            <li>
-              Les informations nécessaires au fonctionnement de la messagerie
-            </li>
-            <li>
-              Les informations relatives à certaines annonces et à leur
-              acceptation lorsqu'une telle fonctionnalité est utilisée
-            </li>
-            <li>
-              Les informations nécessaires au traitement des signalements
-              effectués par les utilisateurs, notamment le contenu signalé
-              lorsque celui-ci est fourni dans le cadre du signalement
-            </li>
-            <li>
-              Certaines données techniques nécessaires à la sécurité et au
-              fonctionnement du service, notamment les compteurs temporaires de
-              limitation des requêtes et les résultats des vérifications anti-robot
-            </li>
-            <li>
-              Lorsqu'une vérification anti-robot est déclenchée, le jeton CAPTCHA
-              et les informations techniques nécessaires à sa validation par Cloudflare
-              Turnstile
-            </li>
-          </ul>
-
-          <p class="legal-text">
-            Propard ne demande pas directement votre adresse e-mail ou votre
-            numéro de téléphone pour créer un compte.
-          </p>
-
-          <p class="legal-text">
-            Propard ne collecte ni ne stocke volontairement les adresses IP des
-            utilisateurs dans la base de données des comptes à des fins
-            d'identification des utilisateurs. Le fonctionnement de
-            l'infrastructure d'hébergement peut toutefois entraîner la création
-            de journaux techniques par les prestataires d'infrastructure,
-            indépendamment des données enregistrées par Propard dans sa propre
-            base de données.
-          </p>
-        </div>
-
-        <div class="legal-section">
-          <h2 class="legal-section-title">2 bis. Données relatives aux groupes</h2>
-
-          <p class="legal-text">
-            Lorsque vous utilisez les fonctionnalités de groupes, Propard traite également
-            les informations nécessaires à leur fonctionnement, notamment le nom et
-            l'avatar du groupe lorsqu'ils sont utilisés, les identifiants des membres,
-            leurs rôles, les relations de membre au sein du groupe, les informations
-            nécessaires à la gestion du groupe ainsi que la version des clés de groupe.
-          </p>
-
-          <p class="legal-text">
-            Les paquets de clés nécessaires au chiffrement des groupes peuvent être
-            conservés sous forme chiffrée afin de permettre aux membres autorisés
-            d'utiliser les clés correspondant à leur groupe et à sa version actuelle.
-          </p>
-
-          <p class="legal-text">
-            Les messages de groupe sont conservés sous forme chiffrée dans le fonctionnement
-            normal du service. Certaines informations associées aux messages, telles que
-            leur auteur, leur groupe, leurs dates et leur état, peuvent être traitées pour
-            assurer le fonctionnement de la messagerie, l'historique, la sécurité et la
-            gestion des groupes.
-          </p>
-        </div>
-
-        <div class="legal-section">
-          <h2 class="legal-section-title">3. Finalités et bases juridiques</h2>
-
-          <p class="legal-text">
-            Les données personnelles sont traitées uniquement pour des finalités
-            déterminées et légitimes. Selon la nature du traitement, les bases
-            juridiques utilisées sont notamment les suivantes :
-          </p>
-
-          <ul class="legal-list">
-            <li>
-              <strong>Création et gestion du compte :</strong> exécution du
-              contrat permettant l'utilisation du service.
-            </li>
-            <li>
-              <strong>Authentification et accès au compte :</strong> exécution
-              du contrat et sécurité du service.
-            </li>
-            <li>
-              <strong>Messagerie et fonctionnalités sociales :</strong>
-              exécution du contrat et fourniture des fonctionnalités demandées
-              par l'utilisateur.
-            </li>
-            <li>
-              <strong>Chiffrement et gestion des clés cryptographiques :</strong>
-              exécution du contrat et sécurité des communications. Propard
-              conserve notamment la clé publique nécessaire aux échanges
-              chiffrés ainsi qu'une sauvegarde chiffrée de la clé privée lorsque
-              cette sauvegarde est utilisée pour permettre la récupération de
-              l'identité E2EE sur un autre navigateur ou appareil.
-            </li>
-            <li>
-              <strong>
-                Sécurité, prévention des abus et protection du service :
-              </strong>
-              intérêt légitime de Propard à maintenir un service sécurisé,
-              fonctionnel et à prévenir les utilisations abusives.
-            </li>
-            <li>
-              <strong>Traitement des signalements :</strong> intérêt légitime
-              de Propard à faire respecter les règles du service et, lorsque
-              cela est applicable, respect des obligations légales.
-            </li>
-            <li>
-              <strong>Respect d'une obligation légale :</strong> lorsque la loi
-              impose à Propard de conserver ou de communiquer certaines données.
-            </li>
-          </ul>
-
-          <p class="legal-text">
-            Lorsqu'un traitement repose sur l'intérêt légitime, Propard veille
-            à prendre en compte les droits et libertés des personnes concernées
-            ainsi que leurs attentes raisonnables.
-          </p>
-
-          <p class="legal-text">
-            Propard ne vend ni ne loue les données personnelles de ses
-            utilisateurs à des fins commerciales.
-          </p>
-        </div>
-
-        <div class="legal-section">
-          <h2 class="legal-section-title">
-            4. Messages privés et chiffrement de bout en bout
-          </h2>
-
-          <p class="legal-text">
-            Les messages privés sont chiffrés de bout en bout (E2EE) avant leur
-            transmission au serveur dans le fonctionnement normal du service.
-            Le serveur reçoit et stocke donc le contenu des messages sous une
-            forme chiffrée.
-          </p>
-
-          <p class="legal-text">
-            La paire de clés cryptographiques utilisée pour l'identité E2EE est
-            générée côté client. La clé privée est conservée localement sur
-            l'appareil dans le stockage du navigateur et n'est pas transmise
-            au serveur en clair dans le fonctionnement normal du système.
-          </p>
-
-          <p class="legal-text">
-            Afin de permettre la récupération de la même identité E2EE sur un
-            autre navigateur ou appareil, Propard peut également conserver une
-            sauvegarde chiffrée de la clé privée.
-          </p>
-
-          <p class="legal-text">
-            Cette sauvegarde est chiffrée côté client avant d'être transmise au
-            serveur. Le chiffrement de la sauvegarde utilise une clé dérivée du
-            mot de passe du compte à l'aide d'un mécanisme de dérivation de clé,
-            puis un chiffrement authentifié. Le mot de passe lui-même et la clé
-            privée en clair ne sont pas transmis à Propard dans le cadre de ce
-            mécanisme.
-          </p>
-
-          <p class="legal-text">
-            La sauvegarde chiffrée est stockée avec les paramètres cryptographiques
-            nécessaires à sa tentative de déchiffrement, tels que le sel, le
-            vecteur d'initialisation, le nombre d'itérations et le contenu
-            chiffré. Ces éléments seuls ne permettent normalement pas de
-            reconstituer la clé privée sans le secret nécessaire à la dérivation
-            de la clé de sauvegarde.
-          </p>
-
-          <p class="legal-text">
-            Lorsqu'un utilisateur se reconnecte sur un autre navigateur ou
-            appareil et fournit son mot de passe, le client peut récupérer cette
-            sauvegarde et tenter de restaurer la même clé privée E2EE. Cela
-            permet d'éviter qu'une nouvelle clé cryptographique soit créée
-            automatiquement et rende les anciens messages chiffrés
-            inaccessibles.
-          </p>
-
-          <p class="legal-text">
-            Si la sauvegarde chiffrée est absente, invalide ou impossible à
-            déchiffrer, la récupération de l'identité E2EE peut rester
-            impossible. La suppression ou la perte de toutes les copies
-            disponibles de la clé privée peut notamment rendre définitivement
-            inaccessible le contenu de certains messages chiffrés.
-          </p>
-
-          <p class="legal-text">
-            Propard ne dispose normalement pas de la clé privée en clair
-            permettant de déchiffrer les messages privés. La présence d'une
-            sauvegarde chiffrée côté serveur ne signifie donc pas que Propard
-            possède directement la clé privée utilisable en clair.
-          </p>
-
-          <p class="legal-text">
-            L'implémentation du chiffrement constitue une mesure technique de
-            protection des communications. Elle n'est pas présentée comme ayant
-            fait l'objet d'un audit cryptographique professionnel indépendant.
-          </p>
-
-          <p class="legal-text">
-            La fonctionnalité « Signaler » constitue une exception volontaire au
-            fonctionnement habituel du chiffrement. Lorsqu'un utilisateur signale
-            un message privé, un message de groupe ou une conversation entière,
-            jusqu'à 2 000 messages présents dans l'historique chargé au moment du
-            signalement peuvent être transmis à Propard et enregistrés avec celui-ci.
-            Pour un signalement de conversation entière, cela inclut les messages
-            envoyés par la personne qui signale et ceux des autres participants.
-            Les éléments transmis peuvent être consultés par l'équipe de modération.
-          </p>
-
-          <p class="legal-text">
-            Le contenu transmis lors d'un signalement peut être examiné afin de
-            déterminer si le contenu enfreint les CGU ou la réglementation
-            applicable et afin de permettre la prise de mesures appropriées.
-          </p>
-
-          <p class="legal-text">
-            Les messages supprimés sont supprimés de la base de données utilisée
-            par le service. Des copies techniques temporaires peuvent toutefois
-            subsister lorsqu'elles sont nécessaires au fonctionnement, à la
-            sécurité ou au respect d'une obligation légale.
-          </p>
-        </div>
-
-        <div class="legal-section">
-          <h3 class="legal-section-title">Messages de groupe et chiffrement</h3>
-
-          <p class="legal-text">
-            Les groupes disposent également d'un mécanisme de chiffrement côté client.
-            Les clés de groupe sont protégées pour les membres autorisés au moyen de
-            paquets de clés associés aux différentes versions de la clé du groupe.
-          </p>
-
-          <p class="legal-text">
-            Propard traite les informations nécessaires au fonctionnement du groupe,
-            notamment sa liste de membres, les rôles, la version de clé et les paquets
-            de clés chiffrés.
-          </p>
-
-          <p class="legal-text">
-            Dans le fonctionnement normal du service, le contenu des messages de groupe
-            est chiffré côté client avant sa transmission. Le serveur stocke le contenu
-            sous forme chiffrée et ne reçoit normalement pas le contenu de ces messages
-            en clair. La clé de groupe peut être renouvelée notamment lors du retrait
-            d'un membre.
-          </p>
-
-          <p class="legal-text">
-            Les messages de groupe peuvent être modifiés ou supprimés selon les
-            fonctionnalités du service. Certaines informations techniques peuvent
-            rester conservées lorsque cela est nécessaire au fonctionnement, à la
-            sécurité ou à la gestion de l'historique.
-          </p>
-
-          <h2 class="legal-section-title">
-            5. Signalements et destinataires
-          </h2>
-
-          <p class="legal-text">
-            Lorsqu'un utilisateur effectue un signalement, Propard peut traiter
-            notamment l'identifiant du message, les utilisateurs concernés, le
-            motif du signalement, la date du message et le contenu signalé
-            lorsque celui-ci est nécessaire au traitement du signalement.
-          </p>
-
-          <p class="legal-text">
-            Les informations nécessaires au traitement d'un signalement sont
-            enregistrées dans une collection dédiée de la base de données de
-            Propard. Elles peuvent notamment comprendre le contenu du message
-            signalé, le compte ayant effectué le signalement, le compte signalé,
-            l'identifiant du message, le motif du signalement ainsi que les
-            dates associées.
-          </p>
-
-          <p class="legal-text">
-            Ces informations sont accessibles uniquement dans le cadre de
-            l'administration et de la modération de Propard. Elles sont utilisées
-            afin d'examiner les signalements, de faire respecter les présentes
-            CGU, de prévenir les abus et, lorsque cela est nécessaire, de
-            répondre aux obligations légales applicables.
-          </p>
-
-          <p class="legal-text">
-            Les signalements peuvent être classés comme nouveaux, traités ou
-            rejetés. Les informations associées à un signalement peuvent être
-            supprimées lorsqu'elles ne sont plus nécessaires à son traitement,
-            sous réserve des obligations légales ou des nécessités liées à la
-            sécurité et à la défense des droits de Propard.
-          </p>
-
-          <p class="legal-text">
-            Le contenu transmis dans le cadre d'un signalement constitue une
-            exception au fonctionnement habituel du chiffrement de bout en bout :
-            lorsqu'un utilisateur choisit volontairement de signaler un message,
-            le contenu fourni dans le signalement peut être enregistré en clair
-            afin de permettre son examen.
-          </p>
-
-          <p class="legal-text">
-            Propard ne transmet actuellement plus les signalements à Discord.
-            Le système de traitement des signalements est directement intégré
-            à l'infrastructure de Propard.
-          </p>
-        </div>
-
-        <div class="legal-section">
-          <h2 class="legal-section-title">
-            6. Hébergement et prestataires techniques
-          </h2>
-
-          <p class="legal-text">
-            Propard utilise plusieurs prestataires techniques nécessaires à son
-            fonctionnement, notamment :
-          </p>
-
-          <ul class="legal-list">
-            <li>
-              <strong>Render</strong> pour l'hébergement et l'exécution du
-              service ;
-            </li>
-            <li>
-              <strong>MongoDB Atlas</strong> pour l'hébergement de la base de
-              données ;
-            </li>
-            <li>
-              <strong>Metered</strong> pour certains services techniques liés
-              au relais TURN utilisé lors des communications en temps réel ;
-            </li>
-            <li>
-              <strong>Cloudflare</strong> pour la vérification anti-robot via Turnstile
-              lorsque cette vérification est déclenchée.
-            </li>
-          </ul>
-
-          <p class="legal-text">
-            Les sauvegardes chiffrées de clés E2EE sont stockées dans la base de
-            données de Propard lorsqu'elles sont utilisées par le service. Elles
-            sont transmises sous une forme chiffrée depuis le client.
-          </p>
-
-          <p class="legal-text">
-            Lorsqu'une vérification anti-robot est nécessaire, le navigateur charge
-            le service Cloudflare Turnstile et Propard transmet le jeton de vérification
-            au service de validation de Cloudflare. Cloudflare peut traiter les données
-            techniques nécessaires à cette vérification conformément à ses propres
-            conditions et à sa politique de confidentialité. Turnstile n'est pas
-            déclenché pour chaque action et intervient uniquement sur certaines
-            fonctionnalités ou lorsque des limites sont atteintes.
-          </p>
-
-          <p class="legal-text">
-            Les signalements sont enregistrés directement dans la base de données
-            utilisée par Propard et ne sont pas transmis à un service tiers de
-            messagerie ou de notification pour leur traitement.
-          </p>
-
-          <p class="legal-text">
-            Ces prestataires peuvent traiter certaines données personnelles
-            nécessaires à leurs fonctions respectives. Leur intervention est
-            limitée aux finalités techniques pour lesquelles ils sont utilisés.
-          </p>
-
-          <p class="legal-text">
-            Certains prestataires peuvent traiter ou stocker des données en
-            dehors de l'Union européenne. Lorsque des données personnelles sont
-            transférées vers un pays situé en dehors de l'Espace économique
-            européen, Propard applique ou exige l'application du mécanisme de
-            transfert prévu par le RGPD lorsqu'il est applicable, notamment une
-            décision d'adéquation ou des garanties appropriées.
-          </p>
-        </div>
-
-        <div class="legal-section">
-          <h2 class="legal-section-title">8. Durées de conservation</h2>
-
-          <p class="legal-text">
-            Propard ne conserve pas les données personnelles plus longtemps que
-            nécessaire aux finalités pour lesquelles elles sont traitées, sous
-            réserve des durées pouvant être imposées par la loi ou nécessaires à
-            la constatation, à l'exercice ou à la défense de droits en justice.
-          </p>
-
-          <ul class="legal-list">
-            <li>
-              <strong>Données du compte :</strong> pendant la durée d'existence
-              du compte, sous réserve des périodes de conservation ou
-              d'archivage nécessaires pour des raisons légales ou de sécurité.
-            </li>
-            <li>
-              <strong>Suppression du compte :</strong> les données destinées à
-              être supprimées sont supprimées conformément au fonctionnement du
-              service. Lorsqu'une période de restauration de 30 jours est
-              applicable, certaines données restent temporairement conservées
-              pendant cette période afin de permettre la restauration du compte.
-            </li>
-            <li>
-              <strong>Messages :</strong> pendant la durée nécessaire au
-              fonctionnement de la messagerie, jusqu'à leur suppression ou
-              jusqu'à la suppression définitive du compte, sous réserve des
-              obligations légales applicables.
-            </li>
-            <li>
-              <strong>Abonnements aux notifications Push :</strong> tant que
-              les notifications sont activées sur l'appareil concerné. Ils
-              peuvent être supprimés lorsque l'utilisateur désactive les
-              notifications ou lorsque l'abonnement devient invalide.
-            </li>
-            <li>
-              <strong>Clé publique et sauvegarde E2EE :</strong> pendant la
-              durée nécessaire au fonctionnement du chiffrement, à la
-              récupération de l'identité E2EE et à la fourniture des
-              fonctionnalités associées, sous réserve des obligations légales
-              applicables. La sauvegarde est conservée sous forme chiffrée.
-            </li>
-            <li>
-              <strong>Signalements :</strong> pendant la durée nécessaire à leur
-              traitement, à la gestion d'une contestation éventuelle ou au
-              respect d'une obligation légale. Les signalements enregistrés dans
-              la base de données de Propard peuvent être supprimés lorsqu'ils
-              ne sont plus nécessaires aux finalités pour lesquelles ils ont été
-              conservés, sous réserve des obligations légales ou des nécessités
-              liées à la sécurité et à la défense des droits de Propard.
-            </li>
-            <li>
-              <strong>Données techniques et de sécurité :</strong> pendant la
-              durée nécessaire à la sécurité et au fonctionnement du service,
-              selon les politiques de conservation applicables aux prestataires
-              concernés.
-            </li>
-          </ul>
-
-          <p class="legal-text">
-            Les durées de conservation peuvent différer selon la finalité et la
-            catégorie de données concernée. Les données devenues inutiles sont
-            supprimées, anonymisées ou archivées lorsque la réglementation le
-            permet ou l'impose.
-          </p>
-        </div>
-
-        <div class="legal-section">
-          <h2 class="legal-section-title">9. Suppression du compte</h2>
-
-          <p class="legal-text">
-            L'utilisateur peut demander la suppression de son compte selon les
-            fonctionnalités proposées par Propard.
-          </p>
-
-          <p class="legal-text">
-            Lorsqu'une période de restauration de 30 jours est prévue, le compte
-            est temporairement rendu inactif et certaines informations sont
-            conservées pendant cette période afin de permettre une restauration
-            volontaire.
-          </p>
-
-          <p class="legal-text">
-            À l'issue de cette période, lorsque la suppression définitive est
-            effectuée, les données du compte et les relations associées sont
-            supprimées conformément au fonctionnement du service, sous réserve
-            des données qui doivent être conservées pour respecter une
-            obligation légale, assurer la sécurité ou défendre des droits en
-            justice.
-          </p>
-        </div>
-
-        <div class="legal-section">
-          <h2 class="legal-section-title">10. Mineurs</h2>
-
-          <p class="legal-text">
-            Propard peut être utilisé par des personnes mineures dans les limites
-            prévues par ses CGU et la réglementation applicable.
-          </p>
-
-          <p class="legal-text">
-            Lorsque le traitement de données personnelles d'un mineur repose
-            sur le consentement dans le cadre d'un service de la société de
-            l'information, les règles françaises relatives au consentement des
-            mineurs s'appliquent. En France, lorsqu'un tel traitement repose sur
-            le consentement et concerne un enfant de moins de 15 ans, le
-            consentement doit être donné ou autorisé dans les conditions prévues
-            par la réglementation, notamment avec l'intervention du titulaire
-            de l'autorité parentale lorsque celle-ci est requise.
-          </p>
-
-          <p class="legal-text">
-            Les traitements nécessaires au fonctionnement du service ne sont pas
-            automatiquement fondés sur le consentement. Leur base juridique est
-            déterminée en fonction de leur finalité, conformément au RGPD.
-          </p>
-        </div>
-
-        <div class="legal-section">
-          <h2 class="legal-section-title">11. Vos droits au titre du RGPD</h2>
-
-          <p class="legal-text">
-            Conformément au RGPD et dans les conditions prévues par celui-ci,
-            vous disposez notamment des droits suivants :
-          </p>
-
-          <ul class="legal-list">
-            <li>
-              <strong>Droit d'accès :</strong> obtenir la confirmation que vos
-              données sont traitées et, lorsque les conditions sont réunies,
-              obtenir une copie de celles-ci.
-            </li>
-            <li>
-              <strong>Droit de rectification :</strong> demander la correction
-              de données personnelles inexactes ou incomplètes.
-            </li>
-            <li>
-              <strong>Droit à l'effacement :</strong> demander la suppression
-              de vos données lorsque les conditions légales sont réunies.
-            </li>
-            <li>
-              <strong>Droit à la limitation :</strong> demander la limitation
-              temporaire de certains traitements dans les situations prévues
-              par le RGPD.
-            </li>
-            <li>
-              <strong>Droit d'opposition :</strong> vous opposer à certains
-              traitements fondés sur l'intérêt légitime lorsque les conditions
-              légales sont réunies.
-            </li>
-            <li>
-              <strong>Droit à la portabilité :</strong> recevoir certaines
-              données personnelles dans un format structuré, couramment utilisé
-              et lisible par machine lorsque les conditions du droit à la
-              portabilité sont réunies.
-            </li>
-          </ul>
-
-          <p class="legal-text">
-            Pour exercer vos droits, contactez :
-          </p>
-
-          <p class="legal-text">
-            <a href="mailto:support@propard.site" class="legal-link">
-              support@propard.site
-            </a>
-          </p>
-
-          <p class="legal-text">
-            Propard répond aux demandes dans les délais prévus par le RGPD.
-            Lorsque cela est nécessaire pour protéger les données personnelles,
-            des informations complémentaires peuvent être demandées afin de
-            vérifier raisonnablement l'identité du demandeur.
-          </p>
-
-          <p class="legal-text">
-            Vous disposez également du droit d'introduire une réclamation auprès
-            de la Commission Nationale de l'Informatique et des Libertés (CNIL).
-          </p>
-        </div>
-
-        <div class="legal-section">
-          <h2 class="legal-section-title">12. Cookies et stockage local</h2>
-
-          <p class="legal-text">
-            Propard n'utilise pas de cookies publicitaires ou de cookies de
-            suivi destinés à établir des profils publicitaires.
-          </p>
-
-          <p class="legal-text">
-            Le navigateur peut utiliser son stockage local (localStorage) pour
-            conserver certaines informations nécessaires au fonctionnement de
-            l'application, notamment la session de connexion et certaines
-            préférences d'affichage telles que le thème clair ou sombre.
-          </p>
-
-          <p class="legal-text">
-            Le stockage local peut également contenir la clé privée E2EE
-            nécessaire au fonctionnement des communications chiffrées sur
-            l'appareil. Cette clé privée n'est pas transmise au serveur en clair.
-          </p>
-
-          <p class="legal-text">
-            En complément, une sauvegarde chiffrée de cette clé privée peut être
-            conservée côté serveur afin de permettre sa récupération lors d'une
-            nouvelle connexion sur un autre navigateur ou appareil. Cette
-            sauvegarde est chiffrée côté client et ne contient pas le mot de
-            passe utilisé pour la protéger.
-          </p>
-
-          <p class="legal-text">
-            La suppression du stockage local peut donc supprimer la copie locale
-            de la clé privée. Lorsque la sauvegarde E2EE correspondante est
-            toujours disponible, le client peut tenter de restaurer cette clé
-            lors d'une nouvelle connexion avec le mot de passe du compte.
-          </p>
-
-          <p class="legal-text">
-            Ces mécanismes ne sont pas utilisés par Propard pour vendre des
-            données personnelles ou réaliser du suivi publicitaire.
-          </p>
-        </div>
-
-        <div class="legal-section">
-          <h2 class="legal-section-title">13. Décisions automatisées et profilage</h2>
-
-          <p class="legal-text">
-            Propard ne met pas en œuvre de décision automatisée produisant des
-            effets juridiques ou des effets significatifs similaires à l'égard
-            des utilisateurs.
-          </p>
-
-          <p class="legal-text">
-            Propard n'utilise pas les données personnelles des utilisateurs pour
-            établir des profils publicitaires.
-          </p>
-        </div>
-
-        <div class="legal-section">
-          <h2 class="legal-section-title">14. Sécurité</h2>
-
-          <p class="legal-text">
-            Propard met en œuvre des mesures techniques destinées à protéger les
-            données personnelles contre les accès non autorisés, la perte,
-            l'altération ou la divulgation non autorisée.
-          </p>
-
-          <p class="legal-text">
-            Ces mesures comprennent notamment le hachage des mots de passe,
-            l'utilisation du chiffrement pour les messages privés, la protection
-            cryptographique des sauvegardes de clés E2EE, des contrôles d'accès,
-            des mécanismes de limitation des requêtes et différentes mesures de
-            sécurité applicative.
-          </p>
-
-          <p class="legal-text">
-            Certaines actions font l'objet de limites temporaires afin de réduire
-            le spam et les abus. Selon la fonctionnalité et le nombre de tentatives,
-            une vérification Cloudflare Turnstile peut être demandée. Les compteurs
-            de limitation sont des données techniques de sécurité et leur fonctionnement
-            peut être réinitialisé ou modifié pour protéger le service.
-          </p>
-
-          <p class="legal-text">
-            La sauvegarde de clé E2EE est chiffrée côté client avant son stockage
-            sur le serveur. Propard ne reçoit pas le mot de passe utilisé pour
-            dériver la clé permettant de déchiffrer cette sauvegarde.
-          </p>
-
-          <p class="legal-text">
-            L'implémentation du chiffrement constitue une mesure technique de
-            protection des communications. Elle n'est pas présentée comme ayant
-            fait l'objet d'un audit cryptographique professionnel indépendant.
-          </p>
-
-          <p class="legal-text">
-            Aucune mesure de sécurité ne pouvant garantir un risque nul, Propard
-            ne peut garantir une sécurité absolue des données.
-          </p>
-        </div>
-
-        <div class="legal-section">
-          <h2 class="legal-section-title">15. Mise à jour de cette politique</h2>
-
-          <p class="legal-text">
-            Cette politique peut être mise à jour lorsque le fonctionnement de
-            Propard, les traitements de données, les prestataires utilisés ou
-            les exigences légales évoluent.
-          </p>
-
-          <p class="legal-text">
-            La date indiquée en haut de cette page correspond à la dernière
-            version en vigueur.
-          </p>
-        </div>
-
-        <div class="legal-section">
-          <h2 class="legal-section-title">16. Contact</h2>
-
-          <p class="legal-text">
-            Pour toute question concernant cette politique, le traitement de vos
-            données personnelles ou l'exercice de vos droits :
-          </p>
-
-          <p class="legal-text">
-            <a href="mailto:support@propard.site" class="legal-link">
-              support@propard.site
-            </a>
-          </p>
-        </div>
-      </div>
-    </div>
-</body>
-</html>
+<body><main class="legal-page"><article class="legal-card">
+<a href="/help" class="legal-back">← Retour</a>
+<h1 class="legal-title">Politique de confidentialité</h1>
+<p class="legal-date">Version du 11 octobre 2026</p>
+
+<section class="legal-section"><h2 class="legal-section-title">1. Responsable du traitement et contact</h2>
+<p class="legal-text">Propard est un projet personnel développé et exploité par BananeVR, particulier domicilié en France. Pour toute question ou demande concernant vos données personnelles : <a class="legal-link" href="mailto:support@propard.site">support@propard.site</a>.</p></section>
+
+<section class="legal-section"><h2 class="legal-section-title">2. Données traitées</h2>
+<p class="legal-text">Les données traitées dépendent des fonctions que vous utilisez. Propard ne demande pas directement d’adresse e-mail ni de numéro de téléphone pour créer un compte.</p>
+<ul class="legal-list">
+<li><strong>Compte et profil :</strong> pseudo, nom d’affichage et avatar facultatifs, hachage du mot de passe, identifiant technique aléatoire (« IP alias »), date de création, statut en ligne/hors ligne, état de suppression, données de bannissement et version de session.</li>
+<li><strong>Relations sociales :</strong> identifiants d’amis, demandes d’amis, blocages et surnoms choisis dans votre propre liste.</li>
+<li><strong>Messagerie privée :</strong> contenu chiffré, identifiants de l’expéditeur et du destinataire, dates, état de lecture, modification ou suppression et autres métadonnées nécessaires à l’historique.</li>
+<li><strong>Chiffrement :</strong> clé publique, sauvegarde chiffrée de la clé privée lorsqu’elle est activée, et métadonnées de version nécessaires au chiffrement.</li>
+<li><strong>Groupes :</strong> nom, avatar éventuel, propriétaire, membres, rôles, dates d’adhésion et de lecture, version des clés, paquets de clés chiffrés, messages chiffrés et métadonnées associées.</li>
+<li><strong>Appels :</strong> événements d’appel manqué ou terminé dans l’historique, identifiants des participants ou du groupe, dates de début et de fin et durée calculée lorsqu’ils sont pris en charge par la version déployée.</li>
+<li><strong>Notifications :</strong> abonnements Web Push et/ou jetons de notification native, clés et identifiants techniques nécessaires à la livraison.</li>
+<li><strong>Signalements :</strong> compte à l’origine du signalement, compte ou groupe concerné, motif facultatif, statut, dates et contenu fourni. Un signalement de conversation peut inclure un instantané déchiffré de jusqu’à 2 000 messages, dans la limite de taille appliquée par l’API.</li>
+<li><strong>Administration et annonces :</strong> acceptation d’annonces, données de modération, motif et échéance d’un bannissement, et statut de traitement des signalements.</li>
+<li><strong>Sécurité :</strong> compteurs temporaires de limitation de débit, résultats de vérification anti-robot et jetons nécessaires à la validation de certaines actions par Cloudflare Turnstile.</li>
+<li><strong>Stockage local :</strong> préférences de thème, données de session selon le mécanisme d’authentification, clés cryptographiques et données nécessaires au fonctionnement hors ligne dans le navigateur ou l’application.</li>
+</ul>
+<p class="legal-text">L’IP alias est un identifiant généré par l’application ; il ne s’agit pas de l’adresse IP réseau réelle. Propard ne déclare pas stocker volontairement les adresses IP réelles dans le document de compte comme identifiant utilisateur. Les hébergeurs, fournisseurs réseau et services tiers peuvent néanmoins traiter des données techniques, dont des adresses IP, dans leurs journaux conformément à leurs propres règles.</p></section>
+
+<section class="legal-section"><h2 class="legal-section-title">3. Finalités et bases juridiques</h2>
+<ul class="legal-list">
+<li><strong>Fournir le service :</strong> créer et gérer les comptes, connecter les utilisateurs, faire fonctionner les messages, groupes, appels et notifications — exécution du service demandé.</li>
+<li><strong>Sécuriser les comptes et prévenir les abus :</strong> authentification, limitation de débit, CAPTCHA, détection d’actions abusives et invalidation de sessions — intérêt légitime à protéger le service et ses utilisateurs.</li>
+<li><strong>Gérer les signalements :</strong> examiner les contenus transmis volontairement, traiter les contestations et appliquer les règles — intérêt légitime et, le cas échéant, respect d’obligations légales.</li>
+<li><strong>Respecter la loi :</strong> conserver ou communiquer les données lorsque la réglementation l’exige — obligation légale.</li>
+<li><strong>Préférences et stockage local :</strong> mémoriser les paramètres et fournir les fonctions explicitement demandées, selon la nature du stockage et les règles applicables.</li>
+</ul>
+<p class="legal-text">Propard ne vend ni ne loue les données personnelles à des fins commerciales et ne déclare pas utiliser les messages pour de la publicité ciblée. Les fournisseurs tiers peuvent traiter les données techniques nécessaires à leurs services selon leurs propres conditions.</p></section>
+
+<section class="legal-section"><h2 class="legal-section-title">4. Chiffrement des messages et limites</h2>
+<p class="legal-text">Dans le fonctionnement normal du client, les messages privés sont chiffrés avant leur transmission. Le mécanisme utilise notamment ECDH P-256 et AES-256-GCM. Les messages de groupe sont chiffrés côté client avec une clé de groupe distribuée aux membres autorisés au moyen de paquets chiffrés.</p>
+<p class="legal-text">Le serveur conserve normalement le contenu des messages chiffré, mais traite les métadonnées nécessaires au service. Les clés privées sont utilisées côté client. Une sauvegarde facultative peut être chiffrée côté client avant d’être envoyée au serveur ; le serveur ne reçoit pas le mot de passe permettant de la déchiffrer dans ce mécanisme.</p>
+<p class="legal-text"><strong>Exception importante — signalements :</strong> si vous signalez volontairement un message ou une conversation, le client transmet à Propard le contenu déchiffré sélectionné pour que le signalement puisse être examiné. Le contenu et les informations associées peuvent alors être consultés par les personnes autorisées à traiter les signalements. Le chiffrement ne peut pas empêcher un participant de transmettre volontairement une copie du contenu.</p></section>
+
+<section class="legal-section"><h2 class="legal-section-title">5. Appels et métadonnées d’historique</h2>
+<p class="legal-text">Les appels audio/vidéo utilisent WebRTC. Selon le réseau, les flux peuvent être établis directement entre participants ou transiter par un relais TURN. Les serveurs de signalisation et les prestataires réseau peuvent traiter les informations techniques nécessaires à l’établissement de la connexion.</p>
+<p class="legal-text">Le code d’historique des appels ne crée pas d’enregistrement audio ou vidéo. Il peut enregistrer un événement système avec le statut de l’appel, les dates serveur de début et de fin et la durée calculée. Ces événements sont conservés dans l’historique de conversation comme des messages système. Les événements nouvellement marqués sont conçus pour ne pas pouvoir être modifiés ou supprimés par les routes ordinaires ; les événements anciens peuvent ne pas disposer de tous ces champs.</p></section>
+
+<section class="legal-section"><h2 class="legal-section-title">6. Signalements, accès et modération</h2>
+<p class="legal-text">Les signalements sont conservés dans une collection dédiée et peuvent inclure le motif, les identifiants des personnes concernées, les dates et un instantané du contenu. Les personnes disposant de l’accès administratif approprié peuvent consulter les signalements, mettre à jour leur statut et supprimer les dossiers lorsque cela est possible. Les signalements sont utilisés pour examiner les violations présumées, appliquer les CGU, gérer les contestations et protéger le service.</p>
+<p class="legal-text">Le contenu signalé est conservé pendant la durée nécessaire au traitement du signalement, à la gestion d’une contestation, à la sécurité ou au respect d’une obligation légale. La durée exacte peut varier selon la situation ; les dossiers ne doivent pas être conservés indéfiniment sans raison.</p></section>
+
+<section class="legal-section"><h2 class="legal-section-title">7. Destinataires et prestataires</h2>
+<p class="legal-text">Les données sont accessibles aux systèmes techniques qui font fonctionner Propard et aux personnes autorisées à administrer le service, dans la mesure nécessaire à leurs tâches. Les prestataires utilisés comprennent notamment Render pour l’hébergement applicatif, MongoDB Atlas pour la base de données, Metered lorsqu’un serveur TURN est configuré, Cloudflare Turnstile pour certaines vérifications anti-robot, ainsi que les fournisseurs de notifications Web Push et Apple Push Notification service (APNs) pour les notifications natives iOS lorsqu’ils sont activés. Les services de navigateur et les fournisseurs réseau peuvent également intervenir dans la livraison des notifications ou l’établissement des appels. Ces prestataires traitent les données nécessaires à leurs fonctions conformément à leurs propres conditions et politiques de confidentialité.</p>
+<p class="legal-text">Les prestataires et leur infrastructure peuvent être situés dans différents pays. Les transferts éventuels et les garanties applicables doivent être appréciés selon la configuration réellement utilisée. Pour les détails des prestataires activés, contactez support@propard.site.</p></section>
+
+<section class="legal-section"><h2 class="legal-section-title">8. Durées de conservation</h2>
+<ul class="legal-list">
+<li><strong>Données de compte :</strong> pendant l’utilisation du compte. Après une demande de suppression avec délai de restauration, le compte est anonymisé après 30 jours selon le mécanisme décrit ci-dessus ; cela ne signifie pas que toutes les données de conversation sont supprimées.</li>
+<li><strong>Suppression de compte :</strong> la demande de suppression commence par une période de restauration de 30 jours. À l’expiration, le traitement automatique prévu par le code anonymise davantage le compte : le mot de passe est remplacé, l’IP alias est régénérée, la sauvegarde E2EE est supprimée et le pseudo réel est effacé. Cette opération n’efface pas automatiquement tous les messages déjà envoyés, les messages de groupe, les groupes ni les signalements. Les contenus et métadonnées restant nécessaires à l’historique ou à la modération peuvent donc subsister, selon les cas. Une suppression immédiate distincte, lorsqu’elle est utilisée, supprime les données visées par son parcours, mais les signalements et certaines données nécessaires à la sécurité ou à la loi peuvent rester conservés.</li>
+<li><strong>Messages et événements d’appel :</strong> tant qu’ils sont nécessaires à l’historique et au fonctionnement du compte ou de la conversation, puis selon les fonctions de suppression, la suppression du compte et les obligations applicables. Les dates d’appel sont des métadonnées d’historique, pas des enregistrements audio/vidéo.</li>
+<li><strong>Clés et sauvegarde chiffrée :</strong> aussi longtemps que nécessaire au fonctionnement du chiffrement et à la récupération de l’identité cryptographique, sous réserve des actions de suppression et des obligations applicables.</li>
+<li><strong>Signalements :</strong> le temps nécessaire à l’examen, à la gestion d’une contestation, à la sécurité ou au respect d’une obligation légale.</li>
+<li><strong>Limitation de débit et CAPTCHA :</strong> selon les fenêtres temporaires configurées pour la sécurité et la prévention des abus.</li>
+<li><strong>Journaux des prestataires :</strong> selon les politiques de conservation propres aux prestataires concernés.</li>
+</ul>
+<p class="legal-text">Les données ne doivent pas être conservées au-delà de ce qui est nécessaire à leur finalité, sauf obligation ou motif légal légitime. Les durées effectives doivent être revues lorsque le code, la configuration ou les prestataires changent.</p></section>
+
+<section class="legal-section"><h2 class="legal-section-title">9. Cookies et stockage sur l’appareil</h2>
+<p class="legal-text">Le site utilise notamment le stockage local du navigateur pour certaines préférences, comme le thème, et peut utiliser IndexedDB pour les clés et données cryptographiques du client. Le Service Worker utilise la Cache API pour les ressources nécessaires à l’affichage hors ligne. Ces mécanismes ne sont pas tous des cookies HTTP, mais peuvent stocker des informations sur l’appareil. Les technologies réellement utilisées et leur éventuelle exemption de consentement doivent être évaluées selon leur finalité et la réglementation applicable.</p></section>
+
+<section class="legal-section"><h2 class="legal-section-title">10. Sécurité</h2>
+<p class="legal-text">Propard met en œuvre des mesures techniques prévues par le code, notamment le hachage des mots de passe, l’authentification des routes, le chiffrement côté client des messages, des limites de fréquence, des vérifications anti-robot et l’invalidation de sessions. Aucune mesure ne garantit une sécurité absolue. Protégez votre appareil, vos identifiants et les moyens de récupération de vos clés.</p></section>
+
+<section class="legal-section"><h2 class="legal-section-title">11. Mineurs</h2>
+<p class="legal-text">Le service est destiné aux personnes âgées d’au moins 13 ans, sous réserve des CGU et du droit applicable. Lorsque le traitement repose sur le consentement d’un enfant pour un service de la société de l’information, les règles françaises relatives aux moins de 15 ans peuvent nécessiter l’intervention du titulaire de l’autorité parentale. Les traitements nécessaires à la fourniture du service ne reposent pas automatiquement sur le consentement ; leur base juridique dépend de leur finalité.</p></section>
+
+<section class="legal-section"><h2 class="legal-section-title">12. Vos droits</h2>
+<p class="legal-text">Dans les conditions prévues par le RGPD, vous pouvez demander l’accès à vos données, leur rectification, leur effacement, la limitation de certains traitements, vous opposer aux traitements fondés sur l’intérêt légitime et demander la portabilité lorsque ce droit s’applique. Lorsque le traitement repose sur le consentement, vous pouvez le retirer pour l’avenir. Vous pouvez également introduire une réclamation auprès de la CNIL.</p>
+<p class="legal-text">Pour exercer vos droits, écrivez à <a class="legal-link" href="mailto:support@propard.site">support@propard.site</a> en précisant votre demande. Des informations supplémentaires peuvent être demandées si elles sont nécessaires pour vérifier que la demande concerne bien vos données. Les droits peuvent être soumis à des exceptions prévues par la loi.</p>
+<p class="legal-text">CNIL : <a class="legal-link" href="https://www.cnil.fr/">www.cnil.fr</a>.</p></section>
+
+<section class="legal-section"><h2 class="legal-section-title">13. Évolutions de la politique</h2>
+<p class="legal-text">Cette politique peut être actualisée lorsque les fonctionnalités, les prestataires, les durées de conservation ou le cadre légal évoluent. La date de version indiquée en haut de page permet de repérer la dernière mise à jour publiée. Les changements importants seront portés à la connaissance des utilisateurs dans des conditions appropriées.</p></section>
+</article></main></body></html>

@@ -25,6 +25,14 @@ import {
   storeGroupKey
 } from '../utils/groupCrypto';
 
+const isCallEventMessage = message =>
+  message?.isCallEvent === true || (
+    message?.encrypted !== true &&
+    typeof message?.content === 'string' &&
+    ['📵 Appel de groupe manqué', '📞 Appel de groupe Terminé — Durée :']
+      .some(prefix => message.content.startsWith(prefix))
+  );
+
 export default function GroupChat({
   group: initialGroup,
   token,
@@ -1266,6 +1274,7 @@ export default function GroupChat({
   const startEditGroupMessage =
     message => {
       if (
+        isCallEventMessage(message) ||
         !isOwnGroupMessage(message) ||
         message.deleted ||
         message.decryptionError ||
@@ -2534,6 +2543,14 @@ export default function GroupChat({
                           </p>
                         )}
 
+                        {isCallEventMessage(message) && message.callEndedAt && (
+                          <p style={{ fontSize: 11, margin: '2px 0 4px', color: isMe ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)' }}>
+                            {message.callStartedAt && `Début : ${new Date(message.callStartedAt).toLocaleString('fr-FR')} · `}
+                            Fin : {new Date(message.callEndedAt).toLocaleString('fr-FR')}
+                            {typeof message.callDurationSeconds === 'number' && message.callDurationSeconds > 0 && ` · Durée : ${Math.floor(message.callDurationSeconds / 60).toString().padStart(2, '0')}:${(message.callDurationSeconds % 60).toString().padStart(2, '0')}`}
+                          </p>
+                        )}
+
                         <div
                           style={{
                             display:
@@ -2621,7 +2638,7 @@ export default function GroupChat({
             📋 Copier
           </button>
 
-          {isOwnGroupMessage(
+          {!isCallEventMessage(contextMenu.message) && isOwnGroupMessage(
             contextMenu.message
           ) ? (
             <>
@@ -2653,7 +2670,7 @@ export default function GroupChat({
                 🗑️ Supprimer
               </button>
             </>
-          ) : (
+          ) : !isCallEventMessage(contextMenu.message) ? (
             <button
               type="button"
               style={
@@ -2667,7 +2684,7 @@ export default function GroupChat({
             >
               🚩 Signaler
             </button>
-          )}
+          ) : null}
         </div>
       )}
 

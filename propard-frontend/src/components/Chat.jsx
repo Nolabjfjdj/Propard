@@ -9,6 +9,14 @@ import {
   getStoredPrivateKeyJwk
 } from '../utils/crypto';
 
+const isCallEventMessage = message =>
+  message?.isCallEvent === true || (
+    message?.encrypted !== true &&
+    typeof message?.content === 'string' &&
+    ['📵 Appel manqué', '📞 Appel Terminé — Durée :']
+      .some(prefix => message.content.startsWith(prefix))
+  );
+
 export default function Chat({
   friend,
   token,
@@ -646,6 +654,7 @@ export default function Chat({
 
   const startEdit = msg => {
     if (
+      isCallEventMessage(msg) ||
       msg.decryptionError ||
       typeof msg.content !== 'string'
     ) {
@@ -1348,6 +1357,14 @@ export default function Chat({
                             {content}
                           </p>
 
+                          {isCallEventMessage(msg) && msg.callEndedAt && (
+                            <p style={{ fontSize: 11, margin: '2px 0 4px', color: isMe ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)' }}>
+                              {msg.callStartedAt && `Début : ${new Date(msg.callStartedAt).toLocaleString('fr-FR')} · `}
+                              Fin : {new Date(msg.callEndedAt).toLocaleString('fr-FR')}
+                              {typeof msg.callDurationSeconds === 'number' && msg.callDurationSeconds > 0 && ` · Durée : ${Math.floor(msg.callDurationSeconds / 60).toString().padStart(2, '0')}:${(msg.callDurationSeconds % 60).toString().padStart(2, '0')}`}
+                            </p>
+                          )}
+
                           <div
                             style={{
                               display: 'flex',
@@ -1427,7 +1444,7 @@ export default function Chat({
               📋 Copier
             </button>
 
-            {isMe ? (
+            {!isCallEventMessage(contextMenu.msg) && isMe ? (
               <>
                 <button
                   style={styles.contextItem}
@@ -1454,7 +1471,7 @@ export default function Chat({
                   🗑️ Supprimer
                 </button>
               </>
-            ) : (
+            ) : !isCallEventMessage(contextMenu.msg) ? (
               <button
                 style={{
                   ...styles.contextItem,
@@ -1468,7 +1485,7 @@ export default function Chat({
               >
                 🚩 Signaler
               </button>
-            )}
+            ) : null}
           </div>
         );
       })()}

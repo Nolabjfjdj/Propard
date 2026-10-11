@@ -10,6 +10,14 @@ const { createRateLimiter } = require('../middleware/rateLimit');
 
 router.use(authMiddleware);
 
+const isCallEventMessage = message =>
+  message?.isCallEvent === true || (
+    message?.encrypted !== true &&
+    typeof message?.content === 'string' &&
+    ['📵 Appel manqué', '📞 Appel Terminé — Durée :']
+      .some(prefix => message.content.startsWith(prefix))
+  );
+
 async function areFriends(userId, friendId) {
   const user = await User.findById(userId).select('friends');
 
@@ -561,6 +569,10 @@ router.delete('/messages/:messageId', createRateLimiter({
       });
     }
 
+    if (isCallEventMessage(message)) {
+      return res.status(403).json({ error: 'Les événements d’appel ne peuvent pas être supprimés.' });
+    }
+
     const receiverId = message.receiver.toString();
     const messageId = message._id.toString();
 
@@ -632,6 +644,10 @@ router.patch('/messages/:messageId', createRateLimiter({
       return res.status(403).json({
         error: 'Non autorisé'
       });
+    }
+
+    if (isCallEventMessage(message)) {
+      return res.status(403).json({ error: 'Les événements d’appel ne peuvent pas être modifiés.' });
     }
 
     message.content = content.trim();
