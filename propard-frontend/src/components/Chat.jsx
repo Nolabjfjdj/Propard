@@ -1357,6 +1357,14 @@ export default function Chat({
                             {content}
                           </p>
 
+                          {isCallEventMessage(msg) && msg.callEndedAt && (
+                            <p style={{ fontSize: 11, margin: '2px 0 4px', color: isMe ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)' }}>
+                              {msg.callStartedAt && `Début : ${new Date(msg.callStartedAt).toLocaleString('fr-FR')} · `}
+                              Fin : {new Date(msg.callEndedAt).toLocaleString('fr-FR')}
+                              {typeof msg.callDurationSeconds === 'number' && msg.callDurationSeconds > 0 && ` · Durée : ${Math.floor(msg.callDurationSeconds / 60).toString().padStart(2, '0')}:${(msg.callDurationSeconds % 60).toString().padStart(2, '0')}`}
+                            </p>
+                          )}
+
                           <div
                             style={{
                               display: 'flex',
