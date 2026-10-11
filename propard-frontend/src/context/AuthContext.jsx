@@ -138,6 +138,15 @@ const ensureEncryptionKeys = async (
         const derivedPublicKeyJwk =
           publicKeyFromPrivateJwk(existingPriv);
 
+        // Garantir que la sauvegarde récupérable existe avant de modifier
+        // la clé publique du compte sur le serveur.
+        await uploadKeyBackup(
+          authToken,
+          existingPriv,
+          password,
+          captchaToken
+        );
+
         if (
           !serverPub ||
           !samePublicKey(derivedPublicKeyJwk, serverPub)
@@ -155,13 +164,6 @@ const ensureEncryptionKeys = async (
             }
           );
         }
-
-        await uploadKeyBackup(
-          authToken,
-          existingPriv,
-          password,
-          captchaToken
-        );
 
         return;
       }
