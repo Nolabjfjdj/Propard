@@ -249,6 +249,22 @@ export function publicKeyFromPrivateJwk(privateKeyJwk) {
   return { kty, crv, x, y, ext: true, key_ops: [] };
 }
 
+export async function validatePrivateKeyJwk(privateKeyJwk) {
+  if (
+    !privateKeyJwk ||
+    privateKeyJwk.kty !== 'EC' ||
+    privateKeyJwk.crv !== CURVE ||
+    !isP256JwkCoordinate(privateKeyJwk.x) ||
+    !isP256JwkCoordinate(privateKeyJwk.y) ||
+    !isP256JwkCoordinate(privateKeyJwk.d)
+  ) {
+    throw new Error('Clé privée E2EE locale invalide');
+  }
+
+  await importPrivateKey(privateKeyJwk);
+  return true;
+}
+
 async function importPrivateKey(jwk) {
   return crypto.subtle.importKey(
     'jwk', jwk, { name: 'ECDH', namedCurve: CURVE }, true, ['deriveKey']
