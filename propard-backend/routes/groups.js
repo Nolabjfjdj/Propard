@@ -10,6 +10,14 @@ const { createRateLimiter } = require('../middleware/rateLimit');
 const { MAX_AVATAR_LENGTH, MAX_GROUP_NAME_LENGTH } = require('../utils/inputValidation');
 const { parseMessagePagination } = require('../utils/messagePagination');
 
+const isCallEventMessage = message =>
+  message?.isCallEvent === true || (
+    message?.encrypted !== true &&
+    typeof message?.content === 'string' &&
+    ['📵 Appel de groupe manqué', '📞 Appel de groupe Terminé — Durée :']
+      .some(prefix => message.content.startsWith(prefix))
+  );
+
 router.use(authMiddleware);
 
 
@@ -831,6 +839,10 @@ router.patch(
         });
       }
 
+      if (isCallEventMessage(message)) {
+        return res.status(403).json({ error: 'Les événements d’appel ne peuvent pas être modifiés.' });
+      }
+
       if (
         message.sender.toString() !==
         req.user.id.toString()
@@ -972,6 +984,10 @@ router.delete(
           error:
             'Message introuvable'
         });
+      }
+
+      if (isCallEventMessage(message)) {
+        return res.status(403).json({ error: 'Les événements d’appel ne peuvent pas être supprimés.' });
       }
 
       if (
