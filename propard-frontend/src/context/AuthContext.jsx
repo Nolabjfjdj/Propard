@@ -201,6 +201,14 @@ const ensureEncryptionKeys = async (
       privateKeyJwk
     } = await generateKeyPair();
 
+    // Stocker la clé privée avant de publier sa clé publique :
+    // si le stockage local échoue, le serveur ne doit pas conserver une
+    // clé publique dont cet appareil n'a pas sauvegardé la clé privée.
+    await storePrivateKey(
+      userId,
+      privateKeyJwk
+    );
+
     await api.patch(
       '/api/auth/publickey',
       {
@@ -212,11 +220,6 @@ const ensureEncryptionKeys = async (
           Authorization: `Bearer ${authToken}`
         }
       }
-    );
-
-    await storePrivateKey(
-      userId,
-      privateKeyJwk
     );
 
     console.log(
