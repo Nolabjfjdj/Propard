@@ -25,6 +25,14 @@ import {
   storeGroupKey
 } from '../utils/groupCrypto';
 
+const isCallEventMessage = message =>
+  message?.isCallEvent === true || (
+    message?.encrypted !== true &&
+    typeof message?.content === 'string' &&
+    ['📵 Appel de groupe manqué', '📞 Appel de groupe Terminé — Durée :']
+      .some(prefix => message.content.startsWith(prefix))
+  );
+
 export default function GroupChat({
   group: initialGroup,
   token,
@@ -1266,6 +1274,7 @@ export default function GroupChat({
   const startEditGroupMessage =
     message => {
       if (
+        isCallEventMessage(message) ||
         !isOwnGroupMessage(message) ||
         message.deleted ||
         message.decryptionError ||
@@ -2621,7 +2630,7 @@ export default function GroupChat({
             📋 Copier
           </button>
 
-          {isOwnGroupMessage(
+          {!isCallEventMessage(contextMenu.message) && isOwnGroupMessage(
             contextMenu.message
           ) ? (
             <>
@@ -2653,7 +2662,7 @@ export default function GroupChat({
                 🗑️ Supprimer
               </button>
             </>
-          ) : (
+          ) : !isCallEventMessage(contextMenu.message) ? (
             <button
               type="button"
               style={
@@ -2667,7 +2676,7 @@ export default function GroupChat({
             >
               🚩 Signaler
             </button>
-          )}
+          ) : null}
         </div>
       )}
 
