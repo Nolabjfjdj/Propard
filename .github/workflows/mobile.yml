@@ -5,13 +5,61 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
 
 jobs:
+  backend-tests:
+    name: Backend tests
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: propard-backend
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: propard-backend/package-lock.json
+      - name: Installer les dépendances backend
+        run: npm ci
+      - name: Exécuter les tests backend
+        run: npm test
+
+  frontend-checks:
+    name: Frontend build and lint
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: propard-frontend
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: propard-frontend/package-lock.json
+      - name: Installer les dépendances frontend
+        run: npm ci
+      - name: Construire le frontend
+        run: npm run build
+      - name: Vérifier le lint
+        run: npm run lint
+
   android:
     name: Android
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
 
     defaults:
@@ -89,6 +137,7 @@ jobs:
 
   ios:
     name: iOS
+    if: github.event_name != 'pull_request'
     runs-on: macos-latest
 
     defaults:
