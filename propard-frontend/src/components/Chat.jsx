@@ -9,6 +9,14 @@ import {
   getStoredPrivateKeyJwk
 } from '../utils/crypto';
 
+const isCallEventMessage = message =>
+  message?.isCallEvent === true || (
+    message?.encrypted !== true &&
+    typeof message?.content === 'string' &&
+    ['📵 Appel manqué', '📞 Appel Terminé — Durée :']
+      .some(prefix => message.content.startsWith(prefix))
+  );
+
 export default function Chat({
   friend,
   token,
@@ -646,6 +654,7 @@ export default function Chat({
 
   const startEdit = msg => {
     if (
+      isCallEventMessage(msg) ||
       msg.decryptionError ||
       typeof msg.content !== 'string'
     ) {
@@ -1427,7 +1436,7 @@ export default function Chat({
               📋 Copier
             </button>
 
-            {isMe ? (
+            {!isCallEventMessage(contextMenu.msg) && isMe ? (
               <>
                 <button
                   style={styles.contextItem}
@@ -1454,7 +1463,7 @@ export default function Chat({
                   🗑️ Supprimer
                 </button>
               </>
-            ) : (
+            ) : !isCallEventMessage(contextMenu.msg) ? (
               <button
                 style={{
                   ...styles.contextItem,
@@ -1468,7 +1477,7 @@ export default function Chat({
               >
                 🚩 Signaler
               </button>
-            )}
+            ) : null}
           </div>
         );
       })()}
