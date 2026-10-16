@@ -7,7 +7,7 @@ const User = require('../models/User');
 const Announcement = require('../models/Announcement');
 const StaffAuditLog = require('../models/StaffAuditLog');
 const authMiddleware = require('../middleware/auth');
-const { requireStaffRole } = require('../middleware/staffRoles');
+const { requireStaffRole, roleLevel } = require('../middleware/staffRoles');
 const { createRateLimiter } = require('../middleware/rateLimit');
 
 /*
@@ -120,6 +120,10 @@ router.post('/reset-password', authMiddleware, requireStaffRole('admin'), adminS
       return res.status(404).json({
         error: 'Utilisateur introuvable'
       });
+    }
+
+    if (roleLevel(req.user.staffRole) <= roleLevel(user.staffRole || 'user')) {
+      return res.status(403).json({ error: 'Tu ne peux pas réinitialiser le compte d’un membre du personnel de niveau égal ou supérieur.' });
     }
 
     if (user.e2eeKeyBackup && acknowledgeE2eeKeyBackupLoss !== true) {
@@ -456,6 +460,10 @@ router.post('/bans/ban', authMiddleware, requireStaffRole('admin'), adminSensiti
       return res.status(404).json({ error: 'Utilisateur introuvable' });
     }
 
+    if (roleLevel(req.user.staffRole) <= roleLevel(user.staffRole || 'user')) {
+      return res.status(403).json({ error: 'Tu ne peux pas bannir un membre du personnel de niveau égal ou supérieur.' });
+    }
+
     user.bannedAt = new Date();
     user.banExpiresAt = durationMs === null
       ? null
@@ -523,6 +531,10 @@ router.post('/bans/unban', authMiddleware, requireStaffRole('admin'), adminSensi
 
     if (!user) {
       return res.status(404).json({ error: 'Utilisateur introuvable' });
+    }
+
+    if (roleLevel(req.user.staffRole) <= roleLevel(user.staffRole || 'user')) {
+      return res.status(403).json({ error: 'Tu ne peux pas modifier la sanction d’un membre du personnel de niveau égal ou supérieur.' });
     }
 
     if (!user.bannedAt) {
