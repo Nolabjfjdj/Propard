@@ -1536,6 +1536,11 @@ export default function GroupChat({
         return;
       }
 
+      if (captchaRequired && !captchaToken) {
+        setReportError('Valide le CAPTCHA avant de continuer.');
+        return;
+      }
+
       setReportLoading(
         true
       );
@@ -1570,6 +1575,8 @@ export default function GroupChat({
         setReportSuccess(
           true
         );
+        setCaptchaRequired(false);
+        setCaptchaToken('');
       } catch (err) {
         handleCaptchaError(err);
         console.error(
@@ -2673,139 +2680,66 @@ export default function GroupChat({
 
       {reportTarget && (
         <div
-          style={
-            styles.modalOverlay
-          }
-          onClick={e => {
-            if (
-              e.target ===
-              e.currentTarget
-            ) {
-              closeReport();
-            }
-          }}
+          style={styles.modalOverlay}
+          onClick={closeReport}
         >
           <div
-            style={
-              styles.modal
-            }
+            style={styles.modal}
+            onClick={e => e.stopPropagation()}
           >
-            <h3
-              style={
-                styles.modalTitle
-              }
-            >
-              Signaler ce message
-            </h3>
+            <h2 style={styles.modalTitle}>
+              🚩 Signaler ce message
+            </h2>
 
-            {!reportSuccess ? (
-              <>
-                <p
-                  style={
-                    styles.modalDesc
-                  }
-                >
-                  Uniquement ce message sera
-                  transmis à la modération de
-                  Propard. Le reste de la
-                  conversation reste privé.
-                </p>
+            <p style={styles.modalDesc}>
+              Ce message, uniquement celui-ci, en clair, sera envoyé à l'équipe
+              Propard pour modération. Le reste de ta conversation reste privé.
+            </p>
 
-                <div
-                  style={
-                    styles.reportedContent
-                  }
-                >
-                  {reportTarget.content}
-                </div>
+            <p style={styles.reportedContent}>
+              {reportTarget.decryptionError
+                ? '🔒 Message impossible à déchiffrer'
+                : reportTarget.content}
+            </p>
 
-                <textarea
-                  value={
-                    reportReason
-                  }
-                  onChange={e =>
-                    setReportReason(
-                      e.target.value
-                    )
-                  }
-                  placeholder="Motif du signalement (facultatif)"
-                  maxLength={500}
-                  style={
-                    styles.reportTextarea
-                  }
-                  disabled={
-                    reportLoading
-                  }
-                />
+            <textarea
+              style={styles.reportTextarea}
+              placeholder="Motif (optionnel)"
+              value={reportReason}
+              onChange={e => setReportReason(e.target.value)}
+              rows={3}
+              maxLength={500}
+              disabled={reportLoading || reportSuccess}
+            />
 
-                {reportError && (
-                  <p
-                    style={
-                      styles.modalError
-                    }
-                  >
-                    {reportError}
-                  </p>
-                )}
+            {reportError && (
+              <p style={styles.modalError}>
+                {reportError}
+              </p>
+            )}
 
-                <div
-                  style={
-                    styles.modalActions
-                  }
-                >
-                  <button
-                    type="button"
-                    style={
-                      styles.modalBtnCancel
-                    }
-                    onClick={
-                      closeReport
-                    }
-                    disabled={
-                      reportLoading
-                    }
-                  >
-                    Annuler
-                  </button>
-
-                  <button
-                    type="button"
-                    style={
-                      styles.modalBtnDanger
-                    }
-                    onClick={
-                      submitReport
-                    }
-                    disabled={
-                      reportLoading
-                    }
-                  >
-                    {reportLoading
-                      ? 'Envoi...'
-                      : 'Signaler'}
-                  </button>
-                </div>
-              </>
+            {reportSuccess ? (
+              <p style={styles.reportSuccess}>
+                ✓ Signalement envoyé, merci.
+              </p>
             ) : (
               <>
-                <p
-                  style={
-                    styles.reportSuccess
-                  }
+                <button
+                  type="button"
+                  style={styles.modalBtnDanger}
+                  onClick={submitReport}
+                  disabled={reportLoading || reportTarget.decryptionError}
                 >
-                  ✓ Signalement envoyé.
-                </p>
+                  {reportLoading ? '...' : 'Envoyer le signalement'}
+                </button>
 
                 <button
                   type="button"
-                  style={
-                    styles.modalBtnCancel
-                  }
-                  onClick={
-                    closeReport
-                  }
+                  style={styles.modalBtnCancel}
+                  onClick={closeReport}
+                  disabled={reportLoading}
                 >
-                  Fermer
+                  Annuler
                 </button>
               </>
             )}
