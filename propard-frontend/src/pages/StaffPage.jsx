@@ -121,6 +121,7 @@ export default function StaffPage() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSettingsLoading, setPushSettingsLoading] = useState(false);
   const knownHelpRequestIds = useRef(null);
+  const manualRecoveryRef = useRef(null);
 
   const request = useCallback(async (method, path, data) => {
     const token = localStorage.getItem('propard_token');
@@ -557,8 +558,20 @@ export default function StaffPage() {
                     {item.kind === 'password_reset' && item.userId && (
                       <button type="button" style={buttonStyle} onClick={() => issueRequestRecoveryCode(item._id)}>Valider et envoyer un code temporaire</button>
                     )}
-                    {item.kind === 'password_reset' && item.userId && (
-                      <button type="button" style={buttonStyle} onClick={() => setResetUserId(item.userId._id)}>Ouvrir la récupération manuelle</button>
+                    {item.userId && (
+                      <button
+                        type="button"
+                        style={buttonStyle}
+                        onClick={() => {
+                          setResetUserId(item.userId._id || item.userId);
+                          setResetToken('');
+                          setError('');
+                          setNotice(`Récupération manuelle ouverte pour @${item.username}. Vérifie l’identité du demandeur avant de créer un code.`);
+                          manualRecoveryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }}
+                      >
+                        Ouvrir la récupération manuelle
+                      </button>
                     )}
                   </div>
                 </article>
@@ -634,8 +647,9 @@ export default function StaffPage() {
           )}
 
           {['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(staffRole) && (
+            <div ref={manualRecoveryRef}>
             <Panel title="Aide à la récupération de compte">
-              <p>Le personnel ne choisit pas et ne voit jamais le nouveau mot de passe. Le code est à usage unique et expire après 15 minutes. Remets le code à l’utilisateur et demande-lui d’ouvrir <code>/password-reset</code>. La réinitialisation peut supprimer la sauvegarde E2EE chiffrée avec l’ancien mot de passe.</p>
+              <p>Utilise cet outil pour une demande de mot de passe oublié ou pour aider manuellement un utilisateur qui t’a contacté via le support. Le personnel ne choisit pas et ne voit jamais le nouveau mot de passe. Le code est à usage unique et expire après 15 minutes. Remets le code au propriétaire du compte par un canal vérifié et demande-lui d’ouvrir <code>/password-reset</code>. La réinitialisation peut supprimer la sauvegarde E2EE chiffrée avec l’ancien mot de passe.</p>
               <Field label="ID du compte" value={resetUserId} onChange={setResetUserId} placeholder="Identifiant utilisateur" />
               <button style={buttonStyle} onClick={issueReset}>Créer un code temporaire</button>
               {resetToken && (
@@ -646,6 +660,7 @@ export default function StaffPage() {
                 </div>
               )}
             </Panel>
+            </div>
           )}
 
           {['admin', 'owner'].includes(staffRole) && (
