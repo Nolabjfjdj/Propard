@@ -67,6 +67,8 @@ export default function StaffPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [bootstrapKey, setBootstrapKey] = useState('');
+  const [lookupUsername, setLookupUsername] = useState('');
+  const [lookupResult, setLookupResult] = useState(null);
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
   const [reportStatus, setReportStatus] = useState('new');
@@ -109,6 +111,22 @@ export default function StaffPage() {
   useEffect(() => {
     loadRole();
   }, [loadRole]);
+
+  const lookupUser = async () => {
+    setError('');
+    setLookupResult(null);
+    try {
+      const response = await request('get', `/api/staff/users/search?username=${encodeURIComponent(lookupUsername.trim())}`);
+      const found = response.data.user;
+      setLookupResult(found);
+      setTargetUserId(found._id);
+      setResetUserId(found._id);
+      setRoleUserId(found._id);
+      setNotice(`Compte trouvé : ${found.username}`);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Recherche du compte impossible.');
+    }
+  };
 
   const loadReports = async () => {
     setError('');
@@ -228,6 +246,21 @@ export default function StaffPage() {
 
       {error && <div role="alert" style={{ padding: 12, borderRadius: 8, background: '#5a2020' }}>{error}</div>}
       {notice && <div role="status" style={{ padding: 12, borderRadius: 8, background: 'var(--bg-secondary, #222)' }}>{notice}</div>}
+
+      {staffRole && (
+        <Panel title="Rechercher un compte">
+          <p>Recherche exacte par pseudo. Le résultat remplit automatiquement les formulaires de modération ci-dessous.</p>
+          <Field label="Pseudo" value={lookupUsername} onChange={setLookupUsername} placeholder="Pseudo Propard" />
+          <button style={buttonStyle} onClick={lookupUser}>Rechercher le compte</button>
+          {lookupResult && (
+            <div style={{ marginTop: 12 }}>
+              <strong>{lookupResult.displayName || lookupResult.username}</strong>
+              <div>@{lookupResult.username} · ID : <code>{lookupResult._id}</code></div>
+              <div>Rôle : {lookupResult.staffRole || 'user'} · {lookupResult.bannedAt ? 'Compte banni' : 'Non banni'}</div>
+            </div>
+          )}
+        </Panel>
+      )}
 
       {!staffRole ? (
         <Panel title="Configuration initiale du propriétaire">
