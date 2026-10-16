@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 
 const Report = require('../models/Report');
+const StaffAuditLog = require('../models/StaffAuditLog');
 const authMiddleware = require('../middleware/auth');
 const { requireStaffRole } = require('../middleware/staffRoles');
 const { createRateLimiter } = require('../middleware/rateLimit');
@@ -87,7 +88,7 @@ function requireReportsAdmin(req, res, next) {
 router.post(
   '/list',
   authMiddleware,
-  requireStaffRole('junior_moderator'),
+  requireStaffRole('senior_moderator'),
   reportsAdminLimiter,
   requireReportsAdmin,
   async (req, res) => {
@@ -112,6 +113,14 @@ router.post(
           report =>
             report.status === 'new'
         ).length;
+
+      await StaffAuditLog.create({
+        actor: req.user.id,
+        action: 'report.bulk_review.accessed',
+        details: { count: reports.length },
+        ip: typeof req.ip === 'string' ? req.ip.slice(0, 128) : null,
+        userAgent: typeof req.get('user-agent') === 'string' ? req.get('user-agent').slice(0, 512) : null
+      });
 
       return res.json({
         success: true,
