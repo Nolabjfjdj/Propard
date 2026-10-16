@@ -1,17 +1,35 @@
 import { useState } from 'react';
+import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 
 export default function ContactPage() {
   const { user } = useAuth();
   const [message, setMessage] = useState('');
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const name = user?.username || 'Anonyme';
 
-  const handleSend = () => {
-    if (!message.trim()) return;
-    window.location.href = `mailto:support@propard.site?subject=Contact Propard - ${encodeURIComponent(name)}&body=${encodeURIComponent(message)}`;
-    setSent(true);
+  const handleSend = async () => {
+    if (message.trim().length < 20) {
+      setError('Décris ta demande en au moins 20 caractères, en précisant comment vérifier que le compte t’appartient.');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      await api.post('/api/auth/account-help', {
+        username: name,
+        kind: 'support',
+        message: message.trim()
+      });
+      setSent(true);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible d’envoyer la demande.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -19,10 +37,10 @@ export default function ContactPage() {
       <div style={styles.card}>
         <a href="/help" style={styles.back}>← Retour à l'aide</a>
         <h1 style={styles.title}>Nous contacter</h1>
-        <p style={styles.subtitle}>On te répondra à <strong>support@propard.site</strong></p>
+        <p style={styles.subtitle}>Ta demande sera transmise au panneau du personnel Propard. Aucun e-mail ne sera envoyé.</p>
         {sent ? (
           <div style={styles.success}>
-            ✅ Ton client mail s'est ouvert ! Envoie le mail pour nous contacter.
+            ✅ Ta demande a été envoyée au panneau du personnel. Tu peux fermer cette page.
           </div>
         ) : (
           <div style={styles.form}>
@@ -33,13 +51,17 @@ export default function ContactPage() {
             <label style={styles.label}>Ton message</label>
             <textarea
               style={styles.textarea}
-              placeholder="Décris ton problème ou ta suggestion..."
+              placeholder="Décris le problème, et explique comment le personnel peut vérifier que le compte est bien le tien..."
               value={message}
               onChange={e => setMessage(e.target.value)}
               rows={6}
+              minLength={20}
+              maxLength={1500}
             />
-            <button style={styles.btn} onClick={handleSend}>
-              📨 Envoyer
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>N’envoie jamais ton mot de passe. Le personnel examinera les informations fournies.</p>
+            {error && <p role="alert" style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</p>}
+            <button style={styles.btn} onClick={handleSend} disabled={loading}>
+              {loading ? 'Envoi…' : '📨 Envoyer'}
             </button>
           </div>
         )}
