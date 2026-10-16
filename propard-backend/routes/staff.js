@@ -130,7 +130,9 @@ router.post('/bootstrap', async (req, res) => {
       return res.status(403).json({ error: 'Clé de configuration invalide.' });
     }
 
-    const existingStaff = await User.countDocuments({ staffRole: { $ne: 'user' } });
+    const existingStaff = await User.countDocuments({
+      staffRole: { $in: Object.keys(ROLE_LEVELS).filter(role => role !== 'user') }
+    });
     if (existingStaff > 0) {
       return res.status(409).json({ error: 'Le personnel est déjà configuré.' });
     }
