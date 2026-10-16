@@ -107,9 +107,7 @@ export default function AuthPage({ mode }) {
         kind: helpType,
         message: helpMessage.trim()
       });
-      setHelpResult(response.data.message || 'Demande transmise au personnel.');
-      setHelpTracking({ reference: response.data.reference, accessToken: response.data.accessToken });
-      setHelpMessage('');
+      window.location.href = `/support/${response.data.reference}#${response.data.accessToken}`;
     } catch (err) {
       setHelpError(err.response?.data?.error || 'Impossible d’envoyer la demande.');
     } finally {
