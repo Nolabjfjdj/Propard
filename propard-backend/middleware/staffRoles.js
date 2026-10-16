@@ -16,7 +16,9 @@ function requireStaffRole(minimumRole) {
   return (req, res, next) => {
     const currentRole = req.user?.staffRole || 'user';
 
-    if (roleLevel(currentRole) < roleLevel(minimumRole)) {
+    if (!Object.prototype.hasOwnProperty.call(ROLE_LEVELS, currentRole) ||
+        !Object.prototype.hasOwnProperty.call(ROLE_LEVELS, minimumRole) ||
+        roleLevel(currentRole) < roleLevel(minimumRole)) {
       return res.status(403).json({
         error: 'Accès réservé au personnel autorisé.'
       });
