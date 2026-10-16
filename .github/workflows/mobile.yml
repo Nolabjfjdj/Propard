@@ -178,3 +178,31 @@ jobs:
           name: propard-ios-project
           path: propard-frontend/ios
           if-no-files-found: error
+
+  backend-check:
+    name: Backend syntax and tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: propard-backend
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: propard-backend/package-lock.json
+
+      - name: Installer les dépendances backend
+        run: npm ci
+
+      - name: Vérifier la syntaxe JavaScript
+        run: find . -type d -name node_modules -prune -o -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+
+      - name: Exécuter les tests backend
+        run: npm test
