@@ -1495,6 +1495,8 @@ export default function GroupChat({
       setReportSuccess(
         false
       );
+      setCaptchaRequired(false);
+      setCaptchaToken('');
     };
 
   const closeReport =
