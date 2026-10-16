@@ -58,6 +58,24 @@ test('role middleware denies ordinary users and allows qualifying staff', () => 
   assert.equal(deniedResponse.statusCode, 403);
   assert.equal(deniedNextCalled, false);
 
+  const invalidMinimumResponse = {
+    statusCode: null,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+      return this;
+    }
+  };
+  let invalidMinimumNextCalled = false;
+  requireStaffRole('not_a_role')({ user: { staffRole: 'owner' } }, invalidMinimumResponse, () => {
+    invalidMinimumNextCalled = true;
+  });
+  assert.equal(invalidMinimumResponse.statusCode, 403);
+  assert.equal(invalidMinimumNextCalled, false);
+
   const allowedResponse = {};
   let allowedNextCalled = false;
   const allowedRequest = { user: { staffRole: 'moderator' } };
