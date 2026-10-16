@@ -20,9 +20,10 @@ test('staff roles have a strict increasing hierarchy', () => {
 });
 
 test('unknown or missing roles have no staff privileges', () => {
-  assert.equal(roleLevel(undefined), 0);
-  assert.equal(roleLevel('not_a_role'), 0);
-  assert.equal(canManageRole('support', 'not_a_role'), true);
+  assert.equal(roleLevel(undefined), -1);
+  assert.equal(roleLevel('not_a_role'), -1);
+  assert.equal(canManageRole('support', 'not_a_role'), false);
+  assert.equal(canManageRole('not_a_role', 'user'), false);
   assert.equal(canManageRole('user', 'support'), false);
 });
 
