@@ -78,7 +78,7 @@ router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) =
     const user = await User.findOne({
       passwordResetTokenHash: hashToken(token),
       passwordResetExpiresAt: { $gt: new Date() }
-    }).select('+passwordResetTokenHash +passwordResetExpiresAt');
+    }).select('+passwordResetTokenHash +passwordResetExpiresAt +passwordResetIssuedBy');
 
     if (!user) {
       return res.status(400).json({ error: 'Code de récupération invalide ou expiré.' });
@@ -91,14 +91,27 @@ router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) =
       });
     }
 
+    const resetIssuedBy = user.passwordResetIssuedBy || user._id;
+    const e2eeBackupCleared = Boolean(user.e2eeKeyBackup);
+
     user.password = await bcrypt.hash(newPassword, 10);
-    if (user.e2eeKeyBackup) {
+    if (e2eeBackupCleared) {
       user.e2eeKeyBackup = null;
     }
     user.passwordResetTokenHash = null;
     user.passwordResetExpiresAt = null;
+    user.passwordResetIssuedBy = null;
     user.sessionVersion = (user.sessionVersion || 0) + 1;
     await user.save();
+
+    await StaffAuditLog.create({
+      actor: resetIssuedBy,
+      action: 'user.password_reset.completed',
+      targetUser: user._id,
+      details: { e2eeBackupCleared },
+      ip: typeof req.ip === 'string' ? req.ip.slice(0, 128) : null,
+      userAgent: typeof req.get('user-agent') === 'string' ? req.get('user-agent').slice(0, 512) : null
+    });
 
     return res.json({
       success: true,
@@ -334,6 +347,7 @@ router.post('/users/:userId/password-reset', requireStaffRole('support'), async 
     const token = crypto.randomBytes(32).toString('base64url');
     target.passwordResetTokenHash = hashToken(token);
     target.passwordResetExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    target.passwordResetIssuedBy = req.user.id;
     await target.save();
 
     await audit(req, 'user.password_reset.issued', {
@@ -362,8 +376,9 @@ router.patch('/users/:userId/role', requireStaffRole('admin'), async (req, res) 
     if (!Object.prototype.hasOwnProperty.call(ROLE_LEVELS, staffRole) || staffRole === 'user') {
       return res.status(400).json({ error: 'Rôle du personnel invalide.' });
     }
-    if (!actorCanManageTarget(req.user.staffRole, target.staffRole) ||
-        !canManageRole(req.user.staffRole, staffRole)) {
+    const canAssignRole = canManageRole(req.user.staffRole, staffRole) ||
+      (req.user.staffRole === 'owner' && staffRole === 'owner');
+    if (!actorCanManageTarget(req.user.staffRole, target.staffRole) || !canAssignRole) {
       return res.status(403).json({ error: 'Tu ne peux pas attribuer ou modifier ce niveau de rôle.' });
     }
 
