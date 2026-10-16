@@ -21,6 +21,13 @@ const accountHelpLimiter = createRateLimiter({
   message: 'Trop de demandes envoyées. Réessaie plus tard.'
 });
 
+const accountHelpStatusLimiter = createRateLimiter({
+  windowMs: 30 * 60 * 1000,
+  max: 20,
+  keyFn: req => `account-help-status:${req.ip || 'unknown'}`,
+  message: 'Trop de consultations. Réessaie plus tard.'
+});
+
 const profileUpdateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
@@ -223,7 +230,7 @@ router.post('/account-help', accountHelpLimiter, async (req, res) => {
   }
 });
 
-router.post('/account-help/status', accountHelpLimiter, async (req, res) => {
+router.post('/account-help/status', accountHelpStatusLimiter, async (req, res) => {
   try {
     const reference = typeof req.body?.reference === 'string' ? req.body.reference.trim().toUpperCase() : '';
     const accessToken = typeof req.body?.accessToken === 'string' ? req.body.accessToken.trim() : '';
