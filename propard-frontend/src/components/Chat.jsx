@@ -1497,13 +1497,6 @@ export default function Chat({
         </button>
       </div>
 
-      {captchaRequired && (
-        <div style={{ padding: '8px 12px' }}>
-          <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Vérification anti-bot requise pour continuer.</p>
-          <div ref={captchaRef} />
-        </div>
-      )}
-
       {reportTarget && (
         <div
           style={styles.modalOverlay}
@@ -1547,6 +1540,15 @@ export default function Chat({
                 reportSuccess
               }
             />
+
+            {captchaRequired && (
+              <div style={{ padding: '8px 12px' }}>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  Vérification anti-bot requise pour continuer.
+                </p>
+                <div ref={captchaRef} />
+              </div>
+            )}
 
             {reportError && (
               <p style={styles.modalError}>
