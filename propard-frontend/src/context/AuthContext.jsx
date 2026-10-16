@@ -7,6 +7,7 @@ import {
   getStoredPrivateKeyJwk,
   publicKeyFromPrivateJwk,
   validatePrivateKeyJwk,
+  validatePrivateKeyMatchesPublicKey,
   encryptPrivateKeyBackup,
   decryptPrivateKeyBackup
 } from '../utils/crypto';
@@ -96,10 +97,17 @@ const ensureEncryptionKeys = async (
             password
           );
 
-        await validatePrivateKeyJwk(restoredPrivateKey);
-
         const restoredPublicKey =
           publicKeyFromPrivateJwk(restoredPrivateKey);
+
+        if (serverPub) {
+          await validatePrivateKeyMatchesPublicKey(
+            restoredPrivateKey,
+            serverPub
+          );
+        } else {
+          await validatePrivateKeyJwk(restoredPrivateKey);
+        }
 
         /*
          * La clé privée restaurée est canonique. On la stocke avant de
@@ -138,10 +146,17 @@ const ensureEncryptionKeys = async (
        * messages indéchiffrables.
        */
       if (existingPriv) {
-        await validatePrivateKeyJwk(existingPriv);
-
         const derivedPublicKeyJwk =
           publicKeyFromPrivateJwk(existingPriv);
+
+        if (serverPub) {
+          await validatePrivateKeyMatchesPublicKey(
+            existingPriv,
+            serverPub
+          );
+        } else {
+          await validatePrivateKeyJwk(existingPriv);
+        }
 
         // Garantir que la sauvegarde récupérable existe avant de modifier
         // la clé publique du compte sur le serveur.
