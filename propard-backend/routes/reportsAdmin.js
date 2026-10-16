@@ -234,7 +234,7 @@ router.post(
 router.post(
   '/:reportId/delete',
   authMiddleware,
-  requireStaffRole('junior_moderator'),
+  requireStaffRole('senior_moderator'),
   reportsAdminLimiter,
   requireReportsAdmin,
   async (req, res) => {
