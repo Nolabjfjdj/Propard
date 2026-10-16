@@ -211,6 +211,10 @@ self.addEventListener('push', event => {
         .split('/')
         .filter(Boolean);
 
+      if (type === 'account-help' && parts[0] === 'staff') {
+        return true;
+      }
+
       if (type === 'private-message' && senderId) {
         return parts.length === 2 &&
           parts[0] === 'chat' &&
