@@ -164,6 +164,8 @@ export async function getSecureLocalValue(storageKey) {
 export async function storePrivateKey(userId, privateKeyJwk) {
   if (!userId || !privateKeyJwk) return;
 
+  await validatePrivateKeyJwk(privateKeyJwk);
+
   const db = await openPrivateKeyDb();
   try {
     const encryptedValue = await encryptStoredPrivateKey(db, privateKeyJwk);
