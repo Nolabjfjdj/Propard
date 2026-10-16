@@ -3315,7 +3315,7 @@ const styles = {
     color: 'var(--danger)',
     fontSize: '13px',
     textAlign: 'center'
-  }
+  },
 
   reportSuccess: {
     color: 'var(--success)',
