@@ -6,9 +6,9 @@ const inputStyle = {
   boxSizing: 'border-box',
   padding: '12px',
   borderRadius: 8,
-  border: '1px solid var(--border, #444)',
-  background: 'var(--bg-tertiary, #222)',
-  color: 'var(--text-primary, #fff)',
+  border: '1px solid var(--border)',
+  background: 'var(--bg-tertiary)',
+  color: 'var(--text-primary)',
   marginTop: 6
 };
 
@@ -38,8 +38,8 @@ export default function AccountHelpStatusPage() {
   };
 
   return (
-    <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 16, background: 'var(--bg-primary, #101010)', color: 'var(--text-primary, #fff)' }}>
-      <section style={{ width: '100%', maxWidth: 520, boxSizing: 'border-box', padding: 24, borderRadius: 14, border: '1px solid var(--border, #333)', background: 'var(--bg-secondary, #171717)' }}>
+    <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '24px 14px', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+      <section style={{ width: '100%', maxWidth: 520, boxSizing: 'border-box', padding: 'clamp(20px, 5vw, 32px)', borderRadius: 'var(--radius)', border: '1px solid var(--border, #333)', background: 'var(--bg-secondary, #171717)' }}>
         <a href="/login" style={{ color: 'var(--accent)' }}>← Retour à la connexion</a>
         <h1>Suivi d’une demande</h1>
         <p style={{ color: 'var(--text-secondary, #aaa)', lineHeight: 1.5 }}>Entre la référence et la clé privée affichées lors de l’envoi de ta demande. Sans ces deux informations, personne ne peut consulter sa réponse.</p>
@@ -56,7 +56,7 @@ export default function AccountHelpStatusPage() {
           </button>
         </form>
         {result && (
-          <section style={{ marginTop: 20, padding: 14, border: '1px solid var(--border, #444)', borderRadius: 10 }}>
+          <section style={{ marginTop: 20, padding: 14, border: '1px solid var(--border)', borderRadius: 10 }}>
             <h2 style={{ marginTop: 0 }}>Demande @{result.username}</h2>
             <p>Type : {result.kind === 'password_reset' ? 'Récupération de compte' : 'Support'}</p>
             <p>Statut : {result.status === 'new' ? 'Nouvelle' : result.status === 'in_progress' ? 'En cours de traitement' : 'Résolue'}</p>
@@ -65,7 +65,7 @@ export default function AccountHelpStatusPage() {
               <div style={{ padding: 12, borderRadius: 8, border: '1px solid var(--accent)' }}>
                 <strong>Ton code de récupération (expire le {new Date(result.recoveryCodeExpiresAt).toLocaleString()})</strong>
                 <code style={{ display: 'block', margin: '10px 0', overflowWrap: 'anywhere', userSelect: 'all' }}>{result.recoveryCode}</code>
-                <button type="button" onClick={() => navigator.clipboard?.writeText(result.recoveryCode)} style={{ padding: 10, borderRadius: 8, border: '1px solid var(--border, #444)', background: 'var(--bg-tertiary, #222)', color: 'var(--text-primary, #fff)' }}>Copier le code</button>
+                <button type="button" onClick={() => navigator.clipboard?.writeText(result.recoveryCode)} style={{ padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}>Copier le code</button>
                 <p>Ouvre ensuite <a href="/password-reset" style={{ color: 'var(--accent)' }}>/password-reset</a> pour choisir un nouveau mot de passe. Ne partage pas ce code.</p>
               </div>
             )}
