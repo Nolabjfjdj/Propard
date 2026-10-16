@@ -8,6 +8,7 @@ import AdminPage from './pages/AdminPage';
 import StaffPage from './pages/StaffPage';
 import PasswordResetPage from './pages/PasswordResetPage';
 import AccountHelpStatusPage from './pages/AccountHelpStatusPage';
+import SupportConversationPage from './pages/SupportConversationPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import GlobalAnnouncement from './components/GlobalAnnouncement';
@@ -285,6 +286,14 @@ export default function App() {
         <GlobalAnnouncement />
       </>
     );
+  }
+
+  if (path.startsWith('/support/')) {
+    const reference = path.split('/support/')[1]?.split('/')[0]?.toUpperCase();
+    if (!reference || !/^[A-F0-9]{16}$/.test(reference)) {
+      return <div style={{ padding: 24, color: 'var(--text-primary)' }}>Lien de support invalide.</div>;
+    }
+    return <SupportConversationPage reference={reference} />;
   }
 
   if (path === '/account-help-status') {
