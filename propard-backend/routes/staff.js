@@ -15,7 +15,7 @@ const router = express.Router();
 const actionLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 60,
-  keyFn: req => req.user?.id || req.ip || 'unknown',
+  keyFn: req => req.user && req.user.id ? req.user.id : req.ip || 'unknown',
   message: 'Trop d’actions en peu de temps. Réessaie plus tard.'
 });
 
@@ -43,17 +43,16 @@ function escapeRegex(value) {
   const special = new Set(['.', '*', '+', '?', '^', '$', '{', '}', '(', ')', '|', '[', ']', '\\']);
   return Array.from(value, character => special.has(character) ? '\\' + character : character).join('');
 }
-async function audit(req, action, { targetUser = null, targetReport = null, details = null } = {}) {
+
+async function audit(req, action, options = {}) {
   await StaffAuditLog.create({
-    actor: req.user.id,
+    actor: options.actor || req.user.id,
     action,
-    targetUser,
-    targetReport,
-    details,
+    targetUser: options.targetUser || null,
+    targetReport: options.targetReport || null,
+    details: options.details || null,
     ip: typeof req.ip === 'string' ? req.ip.slice(0, 128) : null,
-    userAgent: typeof req.get('user-agent') === 'string'
-      ? req.get('user-agent').slice(0, 512)
-      : null
+    userAgent: typeof req.get('user-agent') === 'string' ? req.get('user-agent').slice(0, 512) : null
   });
 }
 
@@ -66,13 +65,12 @@ function actorCanManageTarget(actorRole, targetRole) {
   return roleLevel(actorRole) > roleLevel(targetRole || 'user');
 }
 
-/*
- * Public completion endpoint: the staff member never chooses or sees the
- * user's new password. The one-time token expires after 15 minutes.
- */
 router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) => {
   try {
-    const { token, newPassword, acknowledgeE2eeKeyBackupLoss } = req.body || {};
+    const body = req.body || {};
+    const token = body.token;
+    const newPassword = body.newPassword;
+    const acknowledgeE2eeKeyBackupLoss = body.acknowledgeE2eeKeyBackupLoss;
 
     if (typeof token !== 'string' || token.length < 32 || token.length > 200 ||
         typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
@@ -99,22 +97,17 @@ router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) =
     const e2eeBackupCleared = Boolean(user.e2eeKeyBackup);
 
     user.password = await bcrypt.hash(newPassword, 10);
-    if (e2eeBackupCleared) {
-      user.e2eeKeyBackup = null;
-    }
+    if (e2eeBackupCleared) user.e2eeKeyBackup = null;
     user.passwordResetTokenHash = null;
     user.passwordResetExpiresAt = null;
     user.passwordResetIssuedBy = null;
     user.sessionVersion = (user.sessionVersion || 0) + 1;
     await user.save();
 
-    await StaffAuditLog.create({
+    await audit(req, 'user.password_reset.completed', {
       actor: resetIssuedBy,
-      action: 'user.password_reset.completed',
       targetUser: user._id,
-      details: { e2eeBackupCleared },
-      ip: typeof req.ip === 'string' ? req.ip.slice(0, 128) : null,
-      userAgent: typeof req.get('user-agent') === 'string' ? req.get('user-agent').slice(0, 512) : null
+      details: { e2eeBackupCleared }
     });
 
     return res.json({
@@ -130,15 +123,10 @@ router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) =
 router.use(authMiddleware);
 router.use(actionLimiter);
 
-/*
- * One-time bootstrap: the first owner must be an authenticated account and
- * must also know the server-only bootstrap secret. Once staff roles exist,
- * this route can no longer create another owner.
- */
 router.post('/bootstrap', async (req, res) => {
   try {
     const expectedSecret = process.env.STAFF_BOOTSTRAP_KEY || process.env.ADMIN_KEY;
-    if (!safeEqual(req.body?.bootstrapKey, expectedSecret)) {
+    if (!safeEqual(req.body && req.body.bootstrapKey, expectedSecret)) {
       return res.status(403).json({ error: 'Clé de configuration invalide.' });
     }
 
@@ -157,7 +145,6 @@ router.post('/bootstrap', async (req, res) => {
 
     req.user.staffRole = 'owner';
     await audit(req, 'staff.bootstrap.completed', { targetUser: user._id });
-
     return res.json({ success: true, staffRole: 'owner' });
   } catch (error) {
     console.error('Staff bootstrap failed:', error);
@@ -166,21 +153,16 @@ router.post('/bootstrap', async (req, res) => {
 });
 
 router.get('/me', requireStaffRole('support'), (req, res) => {
-  res.json({
+  return res.json({
     staffRole: req.user.staffRole,
-    permissions: Object.entries(ROLE_LEVELS)
-      .filter(([, level]) => level <= roleLevel(req.user.staffRole))
-      .map(([role]) => role)
+    permissions: Object.keys(ROLE_LEVELS).filter(role => roleLevel(role) <= roleLevel(req.user.staffRole))
   });
 });
 
 router.get('/reports', requireStaffRole('junior_moderator'), async (req, res) => {
   try {
-    const status = ['new', 'processed', 'rejected'].includes(req.query.status)
-      ? req.query.status
-      : null;
-    const filter = status ? { status } : {};
-    const reports = await Report.find(filter)
+    const status = ['new', 'processed', 'rejected'].includes(req.query.status) ? req.query.status : null;
+    const reports = await Report.find(status ? { status } : {})
       .select('-content -conversationSnapshot')
       .sort({ createdAt: -1 })
       .limit(100)
@@ -211,9 +193,9 @@ router.get('/reports/:reportId', requireStaffRole('junior_moderator'), async (re
       return res.status(403).json({ error: 'Une autorisation de modération senior est requise pour consulter une conversation complète.' });
     }
 
-    await audit(req, report.reportScope === 'conversation'
-      ? 'report.conversation.viewed'
-      : 'report.message.viewed', { targetReport: report._id });
+    await audit(req, report.reportScope === 'conversation' ? 'report.conversation.viewed' : 'report.message.viewed', {
+      targetReport: report._id
+    });
 
     return res.json({ report });
   } catch (error) {
@@ -227,7 +209,8 @@ router.patch('/reports/:reportId/status', requireStaffRole('junior_moderator'), 
     if (!mongoose.isValidObjectId(req.params.reportId)) {
       return res.status(400).json({ error: 'Signalement invalide.' });
     }
-    const { status } = req.body || {};
+
+    const status = req.body && req.body.status;
     if (!['new', 'processed', 'rejected'].includes(status)) {
       return res.status(400).json({ error: 'Statut invalide.' });
     }
@@ -239,6 +222,7 @@ router.patch('/reports/:reportId/status', requireStaffRole('junior_moderator'), 
     report.status = status;
     report.processedAt = status === 'new' ? null : new Date();
     await report.save();
+
     await audit(req, 'report.status.updated', {
       targetReport: report._id,
       details: { previousStatus, status }
@@ -259,177 +243,7 @@ router.get('/users/search', requireStaffRole('support'), async (req, res) => {
     }
 
     const target = await User.findOne({
-      username: { $regex: new RegExp('^' + escapeRegex(username) + '
-  try {
-    const target = await findTargetUser(req.params.userId);
-    if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
-    if (!actorCanManageTarget(req.user.staffRole, target.staffRole)) {
-      return res.status(403).json({ error: 'Tu ne peux pas sanctionner un membre du personnel de niveau égal ou supérieur.' });
-    }
-
-    const { duration, reason } = req.body || {};
-    const durations = {
-      '1h': 60 * 60 * 1000,
-      '6h': 6 * 60 * 60 * 1000,
-      '24h': 24 * 60 * 60 * 1000,
-      '7d': 7 * 24 * 60 * 60 * 1000,
-      '30d': 30 * 24 * 60 * 60 * 1000
-    };
-
-    if (typeof reason !== 'string' || reason.trim().length < 3 || reason.trim().length > 500) {
-      return res.status(400).json({ error: 'Un motif de 3 à 500 caractères est requis.' });
-    }
-    if (duration === 'permanent' && roleLevel(req.user.staffRole) < roleLevel('senior_moderator')) {
-      return res.status(403).json({ error: 'Seuls les modérateurs seniors et les administrateurs peuvent appliquer un bannissement permanent.' });
-    }
-    if (duration !== 'permanent' && !Object.prototype.hasOwnProperty.call(durations, duration)) {
-      return res.status(400).json({ error: 'Durée de bannissement invalide.' });
-    }
-
-    const durationMs = duration === 'permanent' ? null : durations[duration];
-    target.bannedAt = new Date();
-    target.banExpiresAt = durationMs === null ? null : new Date(Date.now() + durationMs);
-    target.banReason = reason.trim();
-    target.sessionVersion = (target.sessionVersion || 0) + 1;
-    target.isOnline = false;
-    await target.save();
-
-    const io = req.app.get('io');
-    if (io) {
-      for (const socket of io.sockets.sockets.values()) {
-        if (socket.userId?.toString() === target._id.toString()) {
-          socket.emit('accountBanned', { message: 'Ton compte a été banni de Propard.' });
-          socket.disconnect(true);
-        }
-      }
-    }
-
-    await audit(req, 'user.banned', {
-      targetUser: target._id,
-      details: { duration, reason: reason.trim(), banExpiresAt: target.banExpiresAt }
-    });
-
-    return res.json({
-      success: true,
-      user: {
-        _id: target._id,
-        username: target.username,
-        bannedAt: target.bannedAt,
-        banExpiresAt: target.banExpiresAt,
-        banReason: target.banReason
-      }
-    });
-  } catch (error) {
-    console.error('Staff ban failed:', error);
-    return res.status(500).json({ error: 'Erreur serveur.' });
-  }
-});
-
-router.post('/users/:userId/unban', requireStaffRole('moderator'), async (req, res) => {
-  try {
-    const target = await findTargetUser(req.params.userId);
-    if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
-    if (!actorCanManageTarget(req.user.staffRole, target.staffRole)) {
-      return res.status(403).json({ error: 'Tu ne peux pas modifier les sanctions d’un membre du personnel de niveau égal ou supérieur.' });
-    }
-    if (!target.bannedAt) return res.status(400).json({ error: 'Ce compte n’est pas banni.' });
-
-    target.bannedAt = null;
-    target.banExpiresAt = null;
-    target.banReason = null;
-    target.sessionVersion = (target.sessionVersion || 0) + 1;
-    await target.save();
-
-    await audit(req, 'user.unbanned', { targetUser: target._id });
-    return res.json({ success: true, message: 'Compte débanni.' });
-  } catch (error) {
-    console.error('Staff unban failed:', error);
-    return res.status(500).json({ error: 'Erreur serveur.' });
-  }
-});
-
-router.post('/users/:userId/password-reset', requireStaffRole('support'), async (req, res) => {
-  try {
-    const target = await findTargetUser(req.params.userId);
-    if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
-    if (!actorCanManageTarget(req.user.staffRole, target.staffRole)) {
-      return res.status(403).json({ error: 'Tu ne peux pas lancer la récupération du compte d’un membre du personnel de niveau égal ou supérieur.' });
-    }
-
-    const token = crypto.randomBytes(32).toString('base64url');
-    target.passwordResetTokenHash = hashToken(token);
-    target.passwordResetExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    target.passwordResetIssuedBy = req.user.id;
-    await target.save();
-
-    await audit(req, 'user.password_reset.issued', {
-      targetUser: target._id,
-      details: { expiresAt: target.passwordResetExpiresAt }
-    });
-
-    return res.json({
-      success: true,
-      resetToken: token,
-      expiresAt: target.passwordResetExpiresAt,
-      warning: 'Ce code est affiché une seule fois. Transmets-le au propriétaire du compte par un canal vérifié.'
-    });
-  } catch (error) {
-    console.error('Staff password reset issuance failed:', error);
-    return res.status(500).json({ error: 'Erreur serveur.' });
-  }
-});
-
-router.patch('/users/:userId/role', requireStaffRole('admin'), async (req, res) => {
-  try {
-    const target = await findTargetUser(req.params.userId);
-    if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
-    const { staffRole } = req.body || {};
-
-    if (!Object.prototype.hasOwnProperty.call(ROLE_LEVELS, staffRole) || staffRole === 'user') {
-      return res.status(400).json({ error: 'Rôle du personnel invalide.' });
-    }
-    const canAssignRole = canManageRole(req.user.staffRole, staffRole) ||
-      (req.user.staffRole === 'owner' && staffRole === 'owner');
-    if (!actorCanManageTarget(req.user.staffRole, target.staffRole) || !canAssignRole) {
-      return res.status(403).json({ error: 'Tu ne peux pas attribuer ou modifier ce niveau de rôle.' });
-    }
-
-    const previousRole = target.staffRole || 'user';
-    target.staffRole = staffRole;
-    target.staffRoleUpdatedAt = new Date();
-    target.staffRoleUpdatedBy = new mongoose.Types.ObjectId(req.user.id);
-    await target.save();
-
-    await audit(req, 'staff.role.updated', {
-      targetUser: target._id,
-      details: { previousRole, staffRole }
-    });
-
-    return res.json({ success: true, username: target.username, staffRole });
-  } catch (error) {
-    console.error('Staff role update failed:', error);
-    return res.status(500).json({ error: 'Erreur serveur.' });
-  }
-});
-
-router.get('/audit', requireStaffRole('admin'), async (req, res) => {
-  try {
-    const logs = await StaffAuditLog.find({})
-      .sort({ createdAt: -1 })
-      .limit(100)
-      .populate('actor', 'username displayName staffRole')
-      .populate('targetUser', 'username displayName staffRole')
-      .populate('targetReport', 'status reportScope createdAt')
-      .lean();
-    return res.json({ logs });
-  } catch (error) {
-    console.error('Staff audit log retrieval failed:', error);
-    return res.status(500).json({ error: 'Erreur serveur.' });
-  }
-});
-
-module.exports = router;
-, 'i') }
+      username: { $regex: new RegExp('^' + escapeRegex(username) + '$', 'i') }
     }).select('_id username displayName staffRole bannedAt banExpiresAt banReason');
 
     if (!target) return res.status(404).json({ error: 'Utilisateur introuvable.' });
@@ -454,7 +268,9 @@ router.post('/users/:userId/ban', requireStaffRole('moderator'), async (req, res
       return res.status(403).json({ error: 'Tu ne peux pas sanctionner un membre du personnel de niveau égal ou supérieur.' });
     }
 
-    const { duration, reason } = req.body || {};
+    const body = req.body || {};
+    const duration = body.duration;
+    const reason = body.reason;
     const durations = {
       '1h': 60 * 60 * 1000,
       '6h': 6 * 60 * 60 * 1000,
@@ -484,7 +300,7 @@ router.post('/users/:userId/ban', requireStaffRole('moderator'), async (req, res
     const io = req.app.get('io');
     if (io) {
       for (const socket of io.sockets.sockets.values()) {
-        if (socket.userId?.toString() === target._id.toString()) {
+        if (socket.userId && socket.userId.toString() === target._id.toString()) {
           socket.emit('accountBanned', { message: 'Ton compte a été banni de Propard.' });
           socket.disconnect(true);
         }
@@ -570,11 +386,12 @@ router.patch('/users/:userId/role', requireStaffRole('admin'), async (req, res) 
   try {
     const target = await findTargetUser(req.params.userId);
     if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
-    const { staffRole } = req.body || {};
 
+    const staffRole = req.body && req.body.staffRole;
     if (!Object.prototype.hasOwnProperty.call(ROLE_LEVELS, staffRole) || staffRole === 'user') {
       return res.status(400).json({ error: 'Rôle du personnel invalide.' });
     }
+
     const canAssignRole = canManageRole(req.user.staffRole, staffRole) ||
       (req.user.staffRole === 'owner' && staffRole === 'owner');
     if (!actorCanManageTarget(req.user.staffRole, target.staffRole) || !canAssignRole) {
