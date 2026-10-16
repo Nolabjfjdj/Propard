@@ -148,32 +148,91 @@ router.get('/account-help/requests', requireStaffRole('support'), async (req, re
 
 router.patch('/account-help/requests/:id', requireStaffRole('support'), async (req, res) => {
   try {
-    const { status } = req.body || {};
-    if (!mongoose.isValidObjectId(req.params.id) || !['new', 'in_progress', 'resolved'].includes(status)) {
-      return res.status(400).json({ error: 'Demande ou statut invalide.' });
+    const body = req.body || {};
+    const hasStatus = Object.prototype.hasOwnProperty.call(body, 'status');
+    const hasReply = Object.prototype.hasOwnProperty.call(body, 'staffReply');
+    if (!mongoose.isValidObjectId(req.params.id) ||
+        (hasStatus && !['new', 'in_progress', 'resolved'].includes(body.status)) ||
+        (hasReply && (typeof body.staffReply !== 'string' || body.staffReply.trim().length > 1500)) ||
+        (!hasStatus && !hasReply)) {
+      return res.status(400).json({ error: 'Demande, statut ou réponse invalide.' });
     }
-    const request = await SupportRequest.findById(req.params.id);
-    if (!request) return res.status(404).json({ error: 'Demande introuvable.' });
+    const supportRequest = await SupportRequest.findById(req.params.id);
+    if (!supportRequest) return res.status(404).json({ error: 'Demande introuvable.' });
 
-    request.status = status;
-    request.updatedAt = new Date();
-    request.handledBy = req.user.id;
-    await request.save();
+    if (hasStatus) supportRequest.status = body.status;
+    if (hasReply) {
+      supportRequest.staffReply = body.staffReply.trim();
+      supportRequest.staffReplyAt = new Date();
+    }
+    supportRequest.updatedAt = new Date();
+    supportRequest.handledBy = req.user.id;
+    await supportRequest.save();
 
-    const populatedRequests = await SupportRequest.find({ _id: request._id })
+    const populatedRequests = await SupportRequest.find({ _id: supportRequest._id })
       .populate('userId', 'username displayName')
       .populate('handledBy', 'username displayName')
       .lean();
-    const updatedRequest = populatedRequests[0] || request.toObject();
+    const updatedRequest = populatedRequests[0] || supportRequest.toObject();
 
-    await audit(req, 'account_help.status_updated', {
-      targetUser: updatedRequest.userId?._id || request.userId || null,
-      details: { requestId: request._id.toString(), status }
+    await audit(req, hasReply ? 'account_help.reply_updated' : 'account_help.status_updated', {
+      targetUser: updatedRequest.userId?._id || supportRequest.userId || null,
+      details: { requestId: supportRequest._id.toString(), status: supportRequest.status, replyUpdated: hasReply }
     });
     return res.json({ success: true, request: updatedRequest });
   } catch (error) {
     console.error('Account help request update failed:', error);
     return res.status(500).json({ error: 'Impossible de modifier la demande.' });
+  }
+});
+
+router.post('/account-help/requests/:id/recovery-code', requireStaffRole('support'), async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ error: 'Demande invalide.' });
+    }
+    const supportRequest = await SupportRequest.findById(req.params.id);
+    if (!supportRequest || supportRequest.kind !== 'password_reset') {
+      return res.status(404).json({ error: 'Demande de récupération introuvable.' });
+    }
+    if (!supportRequest.userId) {
+      return res.status(409).json({ error: 'Le compte associé n’a pas été trouvé. Recherche le pseudo exact puis vérifie la demande avant de continuer.' });
+    }
+    const target = await findTargetUser(supportRequest.userId.toString());
+    if (!target) return res.status(404).json({ error: 'Compte Propard introuvable.' });
+    if (!actorCanManageTarget(req.user.staffRole, target.staffRole)) {
+      return res.status(403).json({ error: 'Tu ne peux pas lancer la récupération de ce compte du personnel.' });
+    }
+
+    const token = crypto.randomBytes(32).toString('base64url');
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    target.passwordResetTokenHash = hashToken(token);
+    target.passwordResetExpiresAt = expiresAt;
+    target.passwordResetIssuedBy = req.user.id;
+    await target.save();
+
+    if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is not configured');
+    const key = crypto.createHash('sha256').update(process.env.JWT_SECRET).digest();
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const encrypted = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
+    supportRequest.recoveryCodeEncrypted = Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString('base64url');
+    supportRequest.recoveryCodeExpiresAt = expiresAt;
+    supportRequest.status = 'in_progress';
+    supportRequest.updatedAt = new Date();
+    supportRequest.handledBy = req.user.id;
+    supportRequest.staffReply = 'Ta demande a été acceptée. Un code de récupération temporaire est disponible dans le suivi de ta demande. Il expire dans 15 minutes.';
+    supportRequest.staffReplyAt = new Date();
+    await supportRequest.save();
+
+    await audit(req, 'account_help.recovery_code_issued', {
+      targetUser: target._id,
+      details: { requestId: supportRequest._id.toString(), expiresAt }
+    });
+    return res.json({ success: true, expiresAt, message: 'Code créé. Le demandeur peut le consulter depuis le suivi sécurisé de sa demande.' });
+  } catch (error) {
+    console.error('Account-help recovery code creation failed:', error);
+    return res.status(500).json({ error: 'Impossible de créer le code de récupération.' });
   }
 });
 
