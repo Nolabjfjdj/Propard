@@ -22,9 +22,6 @@ export default function SupportConversationPage({ reference }) {
   useEffect(() => {
     const token = window.location.hash.slice(1);
     setAccessToken(token);
-    if (token) {
-      window.history.replaceState({}, '', window.location.pathname + window.location.search);
-    }
   }, []);
 
   const refresh = useCallback(async () => {
