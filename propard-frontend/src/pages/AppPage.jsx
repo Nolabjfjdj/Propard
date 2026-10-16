@@ -16,6 +16,11 @@ import {
   encryptMessage,
   getStoredPrivateKeyJwk
 } from '../utils/crypto';
+import {
+  decryptGroupKeyPackage,
+  getStoredGroupKey,
+  storeGroupKey
+} from '../utils/groupCrypto';
 
 export default function AppPage({
   initialFriendId,
@@ -581,27 +586,30 @@ export default function AppPage({
       e.clientY
     );
 
-    const zone =
-      el && el.closest
-        ? el.closest(
-            '[data-friend-drop-zone]'
-          )
-        : null;
+    const friendZone =
+      el?.closest?.('[data-friend-drop-zone]') || null;
+    const groupZone =
+      el?.closest?.('[data-group-drop-zone]') || null;
 
-    const targetId = zone
-      ? zone.getAttribute(
-          'data-friend-id'
-        )
+    let target = null;
+    if (friendZone) {
+      const id = friendZone.getAttribute('data-friend-id');
+      if (id && !(g.sourceType === 'friend' && id === g.sourceId)) {
+        target = { type: 'friend', id };
+      }
+    } else if (groupZone) {
+      const id = groupZone.getAttribute('data-group-id');
+      if (id && !(g.sourceType === 'group' && id === g.sourceId)) {
+        target = { type: 'group', id };
+      }
+    }
+
+    g.dragOverTarget = target;
+    g.dragOverFriendId = target
+      ? target.type === 'group'
+        ? `group:${target.id}`
+        : target.id
       : null;
-
-    const targetFriendId =
-      targetId &&
-      targetId !== g.sourceFriendId
-        ? targetId
-        : null;
-
-    g.dragOverFriendId =
-      targetFriendId;
   };
 
   const forwardGrabbedMessage = async (
@@ -665,6 +673,51 @@ export default function AppPage({
     }
   };
 
+  const forwardGrabbedMessageToGroup = async (g, targetId) => {
+    try {
+      const response = await api.get(
+        `/api/groups/${targetId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const targetGroup = response.data;
+      let groupKey = await getStoredGroupKey(targetGroup._id, targetGroup.keyVersion);
+
+      if (!groupKey) {
+        const packageData = targetGroup.keyPackage;
+        const senderId = packageData?.senderId?.toString();
+        const sender = targetGroup.members?.find(
+          member => member._id?.toString() === senderId
+        );
+        if (!packageData?.encryptedKey || !sender?.publicKey) {
+          throw new Error('Clé de chiffrement du groupe indisponible.');
+        }
+
+        const privateKey = await getStoredPrivateKeyJwk(user?.id);
+        if (!privateKey) throw new Error('Clé privée locale introuvable.');
+        const senderPublicKey = typeof sender.publicKey === 'string'
+          ? JSON.parse(sender.publicKey)
+          : sender.publicKey;
+
+        groupKey = await decryptGroupKeyPackage(
+          packageData.encryptedKey,
+          privateKey,
+          senderPublicKey
+        );
+        if (!groupKey) throw new Error('Impossible de déchiffrer la clé du groupe.');
+        await storeGroupKey(targetGroup._id, targetGroup.keyVersion, groupKey);
+      }
+
+      const encryptedContent = await encryptMessage(groupKey, g.msg.content);
+      socket.emit('sendGroupMessage', {
+        groupId: targetGroup._id,
+        content: encryptedContent
+      });
+    } catch (err) {
+      console.error('Erreur transfert de message vers un groupe (Grab & Send):', err);
+      window.alert(err.response?.data?.error || err.message || 'Impossible de transférer le message vers ce groupe.');
+    }
+  };
+
   const handleGrabEndImpl = e => {
     const g = grabRef.current;
 
@@ -697,24 +750,26 @@ export default function AppPage({
 
     lockPageSelection(false);
 
-    const targetId =
-      g.dragOverFriendId;
+    const target = g.dragOverTarget;
 
-    if (targetId) {
+    if (target) {
+      const targetKey = target.type === 'group'
+        ? `group:${target.id}`
+        : target.id;
       setGrabVisual(
         v =>
           v && {
             ...v,
             landing: true,
-            dragOverFriendId:
-              targetId
+            dragOverFriendId: targetKey
           }
       );
 
-      forwardGrabbedMessage(
-        g,
-        targetId
-      );
+      if (target.type === 'group') {
+        forwardGrabbedMessageToGroup(g, target.id);
+      } else {
+        forwardGrabbedMessage(g, target.id);
+      }
 
       setTimeout(() => {
         setGrabVisual(null);
@@ -756,7 +811,7 @@ export default function AppPage({
       rect,
       pointerId
     },
-    sourceFriendId
+    sourceConversation
   ) => {
     if (grabRef.current) return;
 
@@ -777,9 +832,8 @@ export default function AppPage({
 
     grabRef.current = {
       msg,
-      sourceFriendId: sourceFriendId
-        ? sourceFriendId.toString()
-        : null,
+      sourceType: sourceConversation?.type || null,
+      sourceId: sourceConversation?.id?.toString() || null,
       originRect: rect,
       pointerId:
         pointerId != null
@@ -799,6 +853,7 @@ export default function AppPage({
       },
       rotation: 0,
       dragOverFriendId: null,
+      dragOverTarget: null,
       forcedSidebarOpen:
         wasSidebarHidden,
       moveHandler,
@@ -1283,7 +1338,7 @@ export default function AppPage({
             onGrabStart={payload =>
               handleGrabStart(
                 payload,
-                null
+                { type: 'group', id: selectedGroup?._id }
               )
             }
             grabbedMessageId={
@@ -1300,7 +1355,7 @@ export default function AppPage({
             onGrabStart={payload =>
               handleGrabStart(
                 payload,
-                selectedFriend?._id
+                { type: 'friend', id: selectedFriend?._id }
               )
             }
             grabbedMessageId={
