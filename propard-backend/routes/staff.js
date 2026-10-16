@@ -152,17 +152,25 @@ router.patch('/account-help/requests/:id', requireStaffRole('support'), async (r
     if (!mongoose.isValidObjectId(req.params.id) || !['new', 'in_progress', 'resolved'].includes(status)) {
       return res.status(400).json({ error: 'Demande ou statut invalide.' });
     }
-    const request = await SupportRequest.findByIdAndUpdate(
-      req.params.id,
-      { $set: { status, updatedAt: new Date(), handledBy: req.user.id } },
-      { new: true, runValidators: true }
-    ).populate('userId', 'username displayName');
+    const request = await SupportRequest.findById(req.params.id);
     if (!request) return res.status(404).json({ error: 'Demande introuvable.' });
+
+    request.status = status;
+    request.updatedAt = new Date();
+    request.handledBy = req.user.id;
+    await request.save();
+
+    const populatedRequests = await SupportRequest.find({ _id: request._id })
+      .populate('userId', 'username displayName')
+      .populate('handledBy', 'username displayName')
+      .lean();
+    const updatedRequest = populatedRequests[0] || request.toObject();
+
     await audit(req, 'account_help.status_updated', {
-      targetUser: request.userId?._id || null,
+      targetUser: updatedRequest.userId?._id || request.userId || null,
       details: { requestId: request._id.toString(), status }
     });
-    return res.json({ success: true, request });
+    return res.json({ success: true, request: updatedRequest });
   } catch (error) {
     console.error('Account help request update failed:', error);
     return res.status(500).json({ error: 'Impossible de modifier la demande.' });
