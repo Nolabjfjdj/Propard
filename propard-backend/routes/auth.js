@@ -208,7 +208,18 @@ router.post('/account-help', accountHelpLimiter, async (req, res) => {
     }
 
     const account = await User.findOne({
-      username: { $regex: new RegExp('^' + escapeRegExp(normalizedUsername) + '
+      username: { $regex: new RegExp('^' + escapeRegExp(normalizedUsername) + '$', 'i') }
+    }).select('_id username');
+    const accessToken = crypto.randomBytes(32).toString('base64url');
+    const publicReference = crypto.randomBytes(8).toString('hex').toUpperCase();
+    const supportRequest = await SupportRequest.create({
+      kind,
+      username: account?.username || normalizedUsername,
+      userId: account?._id || null,
+      message: normalizedMessage,
+      publicReference,
+      accessTokenHash: hashAccountHelpToken(accessToken)
+    });
 
     void sendStaffHelpNotification({
       kind,
