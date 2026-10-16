@@ -467,12 +467,14 @@ export default function StaffPage() {
                     <span style={{ fontSize: 12 }}>{item.status === 'new' ? 'Nouvelle' : item.status === 'in_progress' ? 'En cours' : 'Résolue'}</span>
                   </div>
                   <small style={{ display: 'block', opacity: 0.75, marginTop: 5 }}>{new Date(item.createdAt).toLocaleString()} · {item.userId ? 'Compte trouvé' : 'Compte non trouvé à la réception'}</small>
-                  <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginBottom: 10 }}>{item.message}</p>
-                  {item.staffReply && (
-                    <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', padding: 10, borderRadius: 8, background: 'var(--bg-primary, #111)' }}>
-                      <strong>Réponse envoyée :</strong><br />{item.staffReply}
-                    </p>
-                  )}
+                  <div style={{ display: 'grid', gap: 8, margin: '12px 0' }}>
+                    {(item.messages && item.messages.length ? item.messages : [{ senderType: 'user', senderName: item.username, text: item.message, createdAt: item.createdAt }]).map((message, index) => (
+                      <div key={message._id || index} style={{ padding: 10, borderRadius: 8, border: '1px solid var(--border-color, #333)', background: message.senderType === 'staff' ? 'var(--bg-primary, #111)' : 'var(--bg-secondary, #222)' }}>
+                        <small style={{ display: 'block', opacity: 0.75, marginBottom: 5 }}>{message.senderType === 'staff' ? 'Personnel · ' : 'Demandeur · '}{message.senderName || ''}{message.createdAt ? ` · ${new Date(message.createdAt).toLocaleString()}` : ''}</small>
+                        <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{message.text}</div>
+                      </div>
+                    ))}
+                  </div>
                   <label style={{ display: 'block', marginTop: 10 }}>
                     Réponse visible par le demandeur
                     <textarea
