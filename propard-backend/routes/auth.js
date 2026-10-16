@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const SupportRequest = require('../models/SupportRequest');
+const { sendStaffHelpNotification } = require('../services/push');
 const Message = require('../models/Message');
 const Group = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
@@ -172,11 +173,19 @@ router.post('/account-help', accountHelpLimiter, async (req, res) => {
     }
 
     const account = await User.findOne({ username: normalizedUsername }).select('_id username');
-    await SupportRequest.create({
+    const supportRequest = await SupportRequest.create({
       kind,
       username: normalizedUsername,
       userId: account?._id || null,
       message: normalizedMessage
+    });
+
+    void sendStaffHelpNotification({
+      kind,
+      username: normalizedUsername,
+      requestId: supportRequest._id
+    }).catch(error => {
+      console.error('Account-help push delivery failed:', error.message);
     });
 
     return res.status(202).json({
