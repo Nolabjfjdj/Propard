@@ -275,7 +275,7 @@ export async function validatePrivateKeyJwk(privateKeyJwk) {
   const probePair = await crypto.subtle.generateKey(
     { name: 'ECDH', namedCurve: CURVE },
     true,
-    ['deriveKey']
+    ['deriveKey', 'deriveBits']
   );
 
   const [privateSide, publicSide] = await Promise.all([
