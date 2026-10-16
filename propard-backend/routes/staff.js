@@ -40,11 +40,9 @@ function hashToken(token) {
 }
 
 function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\\]\\]/g, '\\function hashToken(token) {
-  return crypto.createHash('sha256').update(token).digest('hex');
-}');
+  const special = new Set(['.', '*', '+', '?', '^', '$', '{', '}', '(', ')', '|', '[', ']', '\\']);
+  return Array.from(value, character => special.has(character) ? '\\' + character : character).join('');
 }
-
 async function audit(req, action, { targetUser = null, targetReport = null, details = null } = {}) {
   await StaffAuditLog.create({
     actor: req.user.id,
