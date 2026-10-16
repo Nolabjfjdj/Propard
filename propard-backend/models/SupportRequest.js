@@ -9,6 +9,12 @@ const supportRequestSchema = new mongoose.Schema({
   publicReference: { type: String, unique: true, sparse: true, index: true },
   accessTokenHash: { type: String, select: false },
   staffReply: { type: String, default: '', maxlength: 1500 },
+  messages: [{
+    senderType: { type: String, enum: ['user', 'staff'], required: true },
+    senderName: { type: String, required: true, maxlength: 32 },
+    text: { type: String, required: true, maxlength: 1500 },
+    createdAt: { type: Date, default: Date.now }
+  }],
   staffReplyAt: { type: Date, default: null },
   recoveryCodeEncrypted: { type: String, select: false, default: null },
   recoveryCodeExpiresAt: { type: Date, default: null },
