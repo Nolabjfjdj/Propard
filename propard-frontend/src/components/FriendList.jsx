@@ -505,15 +505,22 @@ export default function FriendList({
           const groupId = group?._id?.toString();
           const unreadCount = group?.unreadCount || 0;
 
+          const isDropTarget = dragOverFriendId === `group:${groupId}`;
+
           return (
             <div
               key={groupId}
+              data-group-drop-zone="true"
+              data-group-id={groupId}
               style={{
                 ...styles.friendItem,
-                background:
-                  selectedGroup?._id?.toString() === groupId
+                background: isDropTarget
+                  ? 'var(--accent-glow)'
+                  : selectedGroup?._id?.toString() === groupId
                     ? 'var(--bg-hover)'
-                    : 'transparent'
+                    : 'transparent',
+                boxShadow: isDropTarget ? '0 0 0 2px var(--accent)' : 'none',
+                transform: isDropTarget ? 'scale(1.03)' : 'scale(1)'
               }}
               onClick={() => {
                 setGroups(prev =>
