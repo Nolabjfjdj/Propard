@@ -262,7 +262,7 @@ export default function StaffPage() {
   useEffect(() => {
     if (!['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(staffRole)) return;
     loadAccountHelpRequests();
-    const interval = window.setInterval(() => loadAccountHelpRequests({ notify: true }), 30000);
+    const interval = window.setInterval(() => loadAccountHelpRequests({ notify: true }), 5000);
     return () => window.clearInterval(interval);
   }, [staffRole, loadAccountHelpRequests]);
 
