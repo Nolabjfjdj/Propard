@@ -5,6 +5,8 @@ const crypto = require('crypto');
 
 const User = require('../models/User');
 const Announcement = require('../models/Announcement');
+const authMiddleware = require('../middleware/auth');
+const { requireStaffRole } = require('../middleware/staffRoles');
 const { createRateLimiter } = require('../middleware/rateLimit');
 
 /*
@@ -61,7 +63,7 @@ const adminSensitiveLimiter = createRateLimiter({
  * ============================================================
  */
 
-router.post('/reset-password', adminSensitiveLimiter, async (req, res) => {
+router.post('/reset-password', authMiddleware, requireStaffRole('admin'), adminSensitiveLimiter, async (req, res) => {
   try {
     const {
       adminKey,
@@ -134,7 +136,7 @@ router.post('/reset-password', adminSensitiveLimiter, async (req, res) => {
  * ============================================================
  */
 
-router.post('/announcement/create', adminSensitiveLimiter, async (req, res) => {
+router.post('/announcement/create', authMiddleware, requireStaffRole('admin'), adminSensitiveLimiter, async (req, res) => {
   try {
     const {
       announcementKey,
@@ -281,7 +283,7 @@ router.get('/announcement', async (req, res) => {
  * ============================================================
  */
 
-router.post('/announcement/delete', adminSensitiveLimiter, async (req, res) => {
+router.post('/announcement/delete', authMiddleware, requireStaffRole('admin'), adminSensitiveLimiter, async (req, res) => {
   try {
     const {
       announcementKey
@@ -330,7 +332,7 @@ router.post('/announcement/delete', adminSensitiveLimiter, async (req, res) => {
  * ============================================================
  */
 
-router.post('/bans/list', adminSensitiveLimiter, async (req, res) => {
+router.post('/bans/list', authMiddleware, requireStaffRole('admin'), adminSensitiveLimiter, async (req, res) => {
   try {
     const { banKey } = req.body;
 
@@ -356,7 +358,7 @@ router.post('/bans/list', adminSensitiveLimiter, async (req, res) => {
   }
 });
 
-router.post('/bans/ban', adminSensitiveLimiter, async (req, res) => {
+router.post('/bans/ban', authMiddleware, requireStaffRole('admin'), adminSensitiveLimiter, async (req, res) => {
   try {
     const { banKey, username, reason, duration, customDuration, customUnit } = req.body;
 
@@ -470,7 +472,7 @@ router.post('/bans/ban', adminSensitiveLimiter, async (req, res) => {
   }
 });
 
-router.post('/bans/unban', adminSensitiveLimiter, async (req, res) => {
+router.post('/bans/unban', authMiddleware, requireStaffRole('admin'), adminSensitiveLimiter, async (req, res) => {
   try {
     const { banKey, username } = req.body;
 
