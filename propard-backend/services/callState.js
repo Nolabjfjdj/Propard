@@ -98,6 +98,10 @@ function createCallStateManager({
       return true;
     }
 
+    if (call.callerId === userKey) {
+      return endGroupCall(key);
+    }
+
     if (!call.members.has(userKey)) return false;
 
     call.members.delete(userKey);
@@ -129,9 +133,6 @@ function createCallStateManager({
       return true;
     }
 
-    if (call.callerId === userKey) {
-      call.callerId = [...call.members][0];
-    }
 
     emitToUser(
       userKey,
