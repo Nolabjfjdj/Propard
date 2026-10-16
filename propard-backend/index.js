@@ -160,6 +160,7 @@ app.use('/api/auth',require('./routes/auth'));
 app.use('/api/friends',require('./routes/friends'));
 app.use('/api/admin',require('./routes/admin'));
 app.use('/api/admin/reports',require('./routes/reportsAdmin'));
+app.use('/api/staff',require('./routes/staff'));
 app.use('/api/announcements',require('./routes/announcements'));
 app.use('/api',require('./routes/turn'));
 app.use('/api/reports',require('./routes/reports'));
