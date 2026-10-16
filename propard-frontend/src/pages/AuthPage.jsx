@@ -14,6 +14,13 @@ export default function AuthPage({ mode }) {
   const [captchaRequired, setCaptchaRequired] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaPurpose, setCaptchaPurpose] = useState('auth');
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpType, setHelpType] = useState('password_reset');
+  const [helpUsername, setHelpUsername] = useState('');
+  const [helpMessage, setHelpMessage] = useState('');
+  const [helpLoading, setHelpLoading] = useState(false);
+  const [helpError, setHelpError] = useState('');
+  const [helpResult, setHelpResult] = useState('');
   const captchaRef = useRef(null);
   const captchaWidgetRef = useRef(null);
 
@@ -71,6 +78,39 @@ export default function AuthPage({ mode }) {
 
     window.location.href =
       newMode === 'login' ? '/login' : '/register';
+  };
+
+  const openHelp = kind => {
+    setHelpType(kind);
+    setHelpUsername(username.trim());
+    setHelpMessage('');
+    setHelpError('');
+    setHelpResult('');
+    setHelpOpen(true);
+  };
+
+  const submitHelp = async event => {
+    event.preventDefault();
+    setHelpError('');
+    setHelpResult('');
+    if (helpMessage.trim().length < 20) {
+      setHelpError('Explique pourquoi tu demandes cette aide en au moins 20 caractères.');
+      return;
+    }
+    setHelpLoading(true);
+    try {
+      const response = await api.post('/api/auth/account-help', {
+        username: helpUsername.trim(),
+        kind: helpType,
+        message: helpMessage.trim()
+      });
+      setHelpResult(response.data.message || 'Demande transmise au personnel.');
+      setHelpMessage('');
+    } catch (err) {
+      setHelpError(err.response?.data?.error || 'Impossible d’envoyer la demande.');
+    } finally {
+      setHelpLoading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -205,6 +245,13 @@ export default function AuthPage({ mode }) {
             </button>
           </div>
 
+          {mode === 'login' && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, fontSize: 13, marginTop: -2 }}>
+              <button type="button" style={styles.helpLink} onClick={() => openHelp('password_reset')}>Mot de passe oublié ?</button>
+              <button type="button" style={styles.helpLink} onClick={() => openHelp('support')}>Contacter le support</button>
+            </div>
+          )}
+
           {mode === 'register' && (
             <div style={styles.checkboxes}>
               <label style={styles.checkboxLabel}>
@@ -313,6 +360,44 @@ export default function AuthPage({ mode }) {
           </span>
         </p>
       </div>
+
+      {helpOpen && (
+        <div style={styles.modalBackdrop} role="presentation">
+          <form style={styles.helpModal} onSubmit={submitHelp}>
+            <button type="button" aria-label="Fermer" style={styles.modalClose} onClick={() => setHelpOpen(false)}>×</button>
+            <h2 style={{ marginTop: 0, color: 'var(--text-primary)' }}>
+              {helpType === 'password_reset' ? 'Mot de passe oublié' : 'Contacter le support'}
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.5 }}>
+              Ta demande sera visible dans le panneau du personnel Propard. Aucun e-mail ne sera envoyé.
+              {helpType === 'password_reset' ? ' Le personnel vérifiera les informations avant de fournir un code temporaire.' : ''}
+            </p>
+            <label style={styles.helpLabel}>Pseudo Propard
+              <input style={styles.input} value={helpUsername} onChange={event => setHelpUsername(event.target.value)} minLength={3} maxLength={20} autoComplete="username" required />
+            </label>
+            <label style={styles.helpLabel}>
+              {helpType === 'password_reset' ? 'Explique pourquoi tu es le propriétaire de ce compte' : 'Explique ta demande au support et comment vérifier que le compte est bien le tien'}
+              <textarea
+                style={{ ...styles.input, minHeight: 130, resize: 'vertical', fontFamily: 'inherit' }}
+                value={helpMessage}
+                onChange={event => setHelpMessage(event.target.value)}
+                minLength={20}
+                maxLength={1500}
+                placeholder={helpType === 'password_reset' ? 'Donne des détails permettant au personnel de vérifier que le compte t’appartient. Ne donne jamais ton ancien mot de passe.' : 'Décris le problème et ajoute des détails permettant de vérifier ton lien avec le compte si nécessaire.'}
+                required
+              />
+            </label>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 12, margin: '0 0 8px' }}>
+              Ne communique jamais ton mot de passe. Le message est une preuve à examiner, pas une vérification automatique.
+            </p>
+            {helpError && <p role="alert" style={{ color: 'var(--danger)', fontSize: 13 }}>{helpError}</p>}
+            {helpResult && <p role="status" style={{ color: 'var(--success)', fontSize: 13 }}>{helpResult}</p>}
+            <button type="submit" style={{ ...styles.btn, width: '100%' }} disabled={helpLoading}>
+              {helpLoading ? 'Envoi…' : 'Envoyer la demande'}
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
@@ -433,6 +518,62 @@ const styles = {
     fontSize: '15px',
     fontWeight: '600',
     marginTop: '4px'
+  },
+
+  helpLink: {
+    background: 'transparent',
+    border: 'none',
+    padding: 0,
+    color: '#3b82f6',
+    textDecoration: 'none',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer'
+  },
+
+  modalBackdrop: {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 1000,
+    background: 'rgba(0, 0, 0, 0.72)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    overflowY: 'auto'
+  },
+
+  helpModal: {
+    position: 'relative',
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    padding: '28px 24px',
+    width: '100%',
+    maxWidth: 460,
+    maxHeight: '90vh',
+    overflowY: 'auto',
+    boxShadow: 'var(--shadow)'
+  },
+
+  modalClose: {
+    position: 'absolute',
+    top: 10,
+    right: 12,
+    background: 'transparent',
+    border: 'none',
+    color: 'var(--text-secondary)',
+    fontSize: 25,
+    cursor: 'pointer'
+  },
+
+  helpLabel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 7,
+    marginBottom: 14,
+    color: 'var(--text-secondary)',
+    fontSize: 13
   },
 
   switchText: {
