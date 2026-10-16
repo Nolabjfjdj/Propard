@@ -80,7 +80,8 @@ router.post('/reset-password', authMiddleware, requireStaffRole('admin'), adminS
     const {
       adminKey,
       username,
-      newPassword
+      newPassword,
+      acknowledgeE2eeKeyBackupLoss
     } = req.body;
 
     if (!checkKey(adminKey, process.env.ADMIN_KEY)) {
@@ -101,9 +102,9 @@ router.post('/reset-password', authMiddleware, requireStaffRole('admin'), adminS
       });
     }
 
-    if (newPassword.length < 8) {
+    if (newPassword.length < 8 || newPassword.length > 128) {
       return res.status(400).json({
-        error: 'Mot de passe minimum 8 caractères'
+        error: 'Le mot de passe doit contenir entre 8 et 128 caractères'
       });
     }
 
@@ -121,12 +122,25 @@ router.post('/reset-password', authMiddleware, requireStaffRole('admin'), adminS
       });
     }
 
+    if (user.e2eeKeyBackup && acknowledgeE2eeKeyBackupLoss !== true) {
+      return res.status(409).json({
+        error: 'La sauvegarde E2EE est chiffrée avec l’ancien mot de passe. Utilise la récupération assistée ou confirme explicitement la suppression de cette sauvegarde.',
+        e2eeBackupAcknowledgementRequired: true
+      });
+    }
+
     const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const e2eeBackupCleared = Boolean(user.e2eeKeyBackup);
 
     user.password = hashedPassword;
+    if (e2eeBackupCleared) user.e2eeKeyBackup = null;
+    user.sessionVersion = (user.sessionVersion || 0) + 1;
 
     await user.save();
-    await auditAdminAction(req, 'user.password_reset.admin_override', user._id, { method: 'legacy-admin-reset' });
+    await auditAdminAction(req, 'user.password_reset.admin_override', user._id, {
+      method: 'legacy-admin-reset',
+      e2eeBackupCleared
+    });
 
     res.json({
       success: true,
