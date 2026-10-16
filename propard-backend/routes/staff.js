@@ -6,6 +6,8 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Report = require('../models/Report');
 const StaffAuditLog = require('../models/StaffAuditLog');
+const SupportRequest = require('../models/SupportRequest');
+const StaffSettings = require('../models/StaffSettings');
 const authMiddleware = require('../middleware/auth');
 const { ROLE_LEVELS, roleLevel, requireStaffRole, canManageRole } = require('../middleware/staffRoles');
 const { createRateLimiter } = require('../middleware/rateLimit');
@@ -122,6 +124,95 @@ router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) =
 
 router.use(authMiddleware);
 router.use(actionLimiter);
+
+router.get('/account-help/requests', requireStaffRole('support'), async (req, res) => {
+  try {
+    const requests = await SupportRequest.find({})
+      .sort({ status: 1, createdAt: -1 })
+      .limit(200)
+      .populate('userId', 'username displayName')
+      .lean();
+    const settings = await StaffSettings.findOne({ key: 'global' }).lean();
+    return res.json({
+      requests,
+      notifications: {
+        passwordReset: settings?.passwordResetNotifications !== false,
+        support: settings?.supportNotifications !== false
+      }
+    });
+  } catch (error) {
+    console.error('Account help requests retrieval failed:', error);
+    return res.status(500).json({ error: 'Impossible de charger les demandes.' });
+  }
+});
+
+router.patch('/account-help/requests/:id', requireStaffRole('support'), async (req, res) => {
+  try {
+    const { status } = req.body || {};
+    if (!mongoose.isValidObjectId(req.params.id) || !['new', 'in_progress', 'resolved'].includes(status)) {
+      return res.status(400).json({ error: 'Demande ou statut invalide.' });
+    }
+    const request = await SupportRequest.findByIdAndUpdate(
+      req.params.id,
+      { $set: { status, updatedAt: new Date(), handledBy: req.user.id } },
+      { new: true, runValidators: true }
+    ).populate('userId', 'username displayName');
+    if (!request) return res.status(404).json({ error: 'Demande introuvable.' });
+    await audit(req, 'account_help.status_updated', {
+      targetUser: request.userId?._id || null,
+      details: { requestId: request._id.toString(), status }
+    });
+    return res.json({ success: true, request });
+  } catch (error) {
+    console.error('Account help request update failed:', error);
+    return res.status(500).json({ error: 'Impossible de modifier la demande.' });
+  }
+});
+
+router.get('/account-help/settings', requireStaffRole('admin'), async (req, res) => {
+  try {
+    const settings = await StaffSettings.findOne({ key: 'global' }).lean();
+    return res.json({
+      passwordResetNotifications: settings?.passwordResetNotifications !== false,
+      supportNotifications: settings?.supportNotifications !== false
+    });
+  } catch (error) {
+    console.error('Account help settings retrieval failed:', error);
+    return res.status(500).json({ error: 'Impossible de charger les préférences.' });
+  }
+});
+
+router.patch('/account-help/settings', requireStaffRole('admin'), async (req, res) => {
+  try {
+    const { passwordResetNotifications, supportNotifications } = req.body || {};
+    if (typeof passwordResetNotifications !== 'boolean' || typeof supportNotifications !== 'boolean') {
+      return res.status(400).json({ error: 'Préférences de notification invalides.' });
+    }
+    const settings = await StaffSettings.findOneAndUpdate(
+      { key: 'global' },
+      {
+        $set: {
+          passwordResetNotifications,
+          supportNotifications,
+          updatedAt: new Date(),
+          updatedBy: req.user.id
+        },
+        $setOnInsert: { key: 'global' }
+      },
+      { new: true, upsert: true, runValidators: true }
+    );
+    await audit(req, 'account_help.notifications_updated', {
+      details: { passwordResetNotifications, supportNotifications }
+    });
+    return res.json({
+      passwordResetNotifications: settings.passwordResetNotifications,
+      supportNotifications: settings.supportNotifications
+    });
+  } catch (error) {
+    console.error('Account help settings update failed:', error);
+    return res.status(500).json({ error: 'Impossible d’enregistrer les préférences.' });
+  }
+});
 
 router.get('/bootstrap/status', async (req, res) => {
   try {
