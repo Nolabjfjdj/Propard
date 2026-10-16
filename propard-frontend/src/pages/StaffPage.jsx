@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
 
 const roles = [
@@ -81,6 +81,11 @@ export default function StaffPage() {
   const [roleUserId, setRoleUserId] = useState('');
   const [newRole, setNewRole] = useState('support');
   const [auditLogs, setAuditLogs] = useState([]);
+  const [accountHelpRequests, setAccountHelpRequests] = useState([]);
+  const [helpNotifications, setHelpNotifications] = useState({ passwordReset: true, support: true });
+  const [helpRequestsLoading, setHelpRequestsLoading] = useState(false);
+  const [helpSettingsSaving, setHelpSettingsSaving] = useState(false);
+  const knownHelpRequestIds = useRef(null);
 
   const request = useCallback(async (method, path, data) => {
     const token = localStorage.getItem('propard_token');
@@ -90,6 +95,68 @@ export default function StaffPage() {
     if (method === 'patch') return api.patch(path, data, config);
     return api.post(path, data, config);
   }, []);
+
+  const loadAccountHelpRequests = useCallback(async ({ notify = false } = {}) => {
+    if (!['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(staffRole)) return;
+    setHelpRequestsLoading(true);
+    try {
+      const response = await request('get', '/api/staff/account-help/requests');
+      const incoming = response.data.requests || [];
+      const preferences = response.data.notifications || { passwordReset: true, support: true };
+      if (notify && knownHelpRequestIds.current) {
+        const fresh = incoming.filter(item =>
+          !knownHelpRequestIds.current.has(item._id) &&
+          item.status === 'new' &&
+          (item.kind === 'password_reset' ? preferences.passwordReset : preferences.support)
+        );
+        if (fresh.length && typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted') {
+          new window.Notification('Nouvelle demande Propard', {
+            body: fresh.length === 1
+              ? `${fresh[0].kind === 'password_reset' ? 'Récupération de compte' : 'Support'} · @${fresh[0].username}`
+              : `${fresh.length} nouvelles demandes reçues.`
+          });
+        }
+      }
+      knownHelpRequestIds.current = new Set(incoming.map(item => item._id));
+      setAccountHelpRequests(incoming);
+      setHelpNotifications(preferences);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de charger les demandes de support.');
+    } finally {
+      setHelpRequestsLoading(false);
+    }
+  }, [request, staffRole]);
+
+  const updateHelpRequestStatus = async (requestId, status) => {
+    setError('');
+    try {
+      const response = await request('patch', `/api/staff/account-help/requests/${requestId}`, { status });
+      setAccountHelpRequests(previous => previous.map(item => item._id === requestId ? response.data.request : item));
+      setNotice('Statut de la demande mis à jour.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de modifier la demande.');
+    }
+  };
+
+  const saveHelpNotifications = async (nextSettings) => {
+    setHelpSettingsSaving(true);
+    setError('');
+    try {
+      const response = await request('patch', '/api/staff/account-help/settings', {
+        passwordResetNotifications: nextSettings.passwordReset,
+        supportNotifications: nextSettings.support
+      });
+      setHelpNotifications({
+        passwordReset: response.data.passwordResetNotifications,
+        support: response.data.supportNotifications
+      });
+      setNotice('Préférences de notification enregistrées.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible d’enregistrer les notifications.');
+    } finally {
+      setHelpSettingsSaving(false);
+    }
+  };
 
   const loadRole = useCallback(async () => {
     setLoading(true);
@@ -120,6 +187,13 @@ export default function StaffPage() {
   useEffect(() => {
     loadRole();
   }, [loadRole]);
+
+  useEffect(() => {
+    if (!['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(staffRole)) return;
+    loadAccountHelpRequests();
+    const interval = window.setInterval(() => loadAccountHelpRequests({ notify: true }), 30000);
+    return () => window.clearInterval(interval);
+  }, [staffRole, loadAccountHelpRequests]);
 
   const lookupUser = async () => {
     setError('');
@@ -286,6 +360,48 @@ export default function StaffPage() {
         )
       ) : (
         <>
+          <Panel title="Demandes de récupération et support">
+            <p>Les demandes envoyées depuis la page de connexion arrivent ici. Aucun e-mail n’est envoyé. Pour les demandes de récupération, lis les explications avant de décider si l’identité du demandeur est suffisamment vérifiée.</p>
+            {['admin', 'owner'].includes(staffRole) && (
+              <div style={{ display: 'grid', gap: 8, padding: 12, border: '1px solid var(--border-color, #444)', borderRadius: 8, marginBottom: 12 }}>
+                <strong>Notifications du panneau</strong>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="checkbox" checked={helpNotifications.passwordReset} disabled={helpSettingsSaving} onChange={event => saveHelpNotifications({ ...helpNotifications, passwordReset: event.target.checked })} />
+                  Demandes « Mot de passe oublié »
+                </label>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="checkbox" checked={helpNotifications.support} disabled={helpSettingsSaving} onChange={event => saveHelpNotifications({ ...helpNotifications, support: event.target.checked })} />
+                  Demandes de support
+                </label>
+                <small>Le panneau vérifie les nouvelles demandes toutes les 30 secondes. Les notifications du navigateur apparaissent seulement si elles sont déjà autorisées dans le navigateur.</small>
+              </div>
+            )}
+            <button style={buttonStyle} onClick={() => loadAccountHelpRequests()} disabled={helpRequestsLoading}>
+              {helpRequestsLoading ? 'Actualisation…' : 'Actualiser les demandes'}
+            </button>
+            <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+              {accountHelpRequests.map(item => (
+                <article key={item._id} style={{ padding: 12, borderRadius: 8, border: '1px solid var(--border-color, #444)', background: 'var(--bg-secondary, #222)' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 }}>
+                    <strong>{item.kind === 'password_reset' ? '🔐 Mot de passe oublié' : '💬 Support'} · @{item.username}</strong>
+                    <span style={{ fontSize: 12 }}>{item.status === 'new' ? 'Nouvelle' : item.status === 'in_progress' ? 'En cours' : 'Résolue'}</span>
+                  </div>
+                  <small style={{ display: 'block', opacity: 0.75, marginTop: 5 }}>{new Date(item.createdAt).toLocaleString()} · {item.userId ? 'Compte trouvé' : 'Compte non trouvé à la réception'}</small>
+                  <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginBottom: 10 }}>{item.message}</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    <button style={buttonStyle} onClick={() => updateHelpRequestStatus(item._id, 'in_progress')}>Prendre en charge</button>
+                    <button style={buttonStyle} onClick={() => updateHelpRequestStatus(item._id, 'resolved')}>Marquer résolue</button>
+                    <button style={buttonStyle} onClick={() => updateHelpRequestStatus(item._id, 'new')}>Remettre en nouvelle</button>
+                    {item.kind === 'password_reset' && item.userId && (
+                      <button style={buttonStyle} onClick={() => setResetUserId(item.userId._id)}>Utiliser ce compte pour la récupération</button>
+                    )}
+                  </div>
+                </article>
+              ))}
+              {!accountHelpRequests.length && !helpRequestsLoading && <p style={{ color: 'var(--text-secondary, #aaa)' }}>Aucune demande pour le moment.</p>}
+            </div>
+          </Panel>
+
           {['junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(staffRole) && (
             <Panel title="Signalements">
               <p>La liste ne charge pas le contenu complet des conversations. Ouvre un signalement pour consulter les détails selon tes permissions.</p>
