@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema({
   staffRole:{type:String,enum:['user','support','junior_moderator','moderator','senior_moderator','admin','owner'],default:'user',index:true},
   staffRoleUpdatedAt:{type:Date,default:null},
   staffRoleUpdatedBy:{type:mongoose.Schema.Types.ObjectId,ref:'User',default:null},
+  staffNotificationPreferences:{passwordReset:{type:Boolean,default:true},support:{type:Boolean,default:true}},
   passwordResetTokenHash:{type:String,default:null,select:false},
   passwordResetExpiresAt:{type:Date,default:null,select:false},
   passwordResetIssuedBy:{type:mongoose.Schema.Types.ObjectId,ref:'User',default:null,select:false},
