@@ -175,6 +175,20 @@ export default function StaffPage() {
     }
   };
 
+  const deleteHelpRequest = async item => {
+    if (!item || item.status !== 'resolved') return;
+    const confirmed = window.confirm('Supprimer définitivement cette demande de support ou de récupération ? Cette action est irréversible. Le journal d’audit sera conservé.');
+    if (!confirmed) return;
+    setError('');
+    try {
+      await request('delete', `/api/staff/account-help/requests/${item._id}`);
+      setAccountHelpRequests(previous => previous.filter(entry => entry._id !== item._id));
+      setNotice('Demande supprimée manuellement. Le journal d’audit est conservé.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer cette demande.');
+    }
+  };
+
   const sendHelpReply = async requestId => {
     const staffReply = (helpReplyDrafts[requestId] || '').trim();
     if (!staffReply) {
@@ -557,6 +571,15 @@ export default function StaffPage() {
                     <button type="button" style={buttonStyle} onClick={() => updateHelpRequestStatus(item._id, 'new')}>Remettre en nouvelle</button>
                     {item.kind === 'password_reset' && item.userId && (
                       <button type="button" style={buttonStyle} onClick={() => issueRequestRecoveryCode(item._id)}>Valider et envoyer un code temporaire</button>
+                    )}
+                    {['senior_moderator', 'admin', 'owner'].includes(staffRole) && item.status === 'resolved' && (
+                      <button
+                        type="button"
+                        style={{ ...buttonStyle, background: '#a32626', borderColor: '#a32626' }}
+                        onClick={() => deleteHelpRequest(item)}
+                      >
+                        Supprimer la demande résolue
+                      </button>
                     )}
                     {item.userId && (
                       <button
