@@ -4,12 +4,20 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const SupportRequest = require('../models/SupportRequest');
 const Message = require('../models/Message');
 const Group = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
 const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { MAX_AVATAR_LENGTH } = require('../utils/inputValidation');
+
+const accountHelpLimiter = createRateLimiter({
+  windowMs: 30 * 60 * 1000,
+  max: 4,
+  keyFn: req => `account-help:${req.ip || 'unknown'}`,
+  message: 'Trop de demandes envoyées. Réessaie plus tard.'
+});
 
 const profileUpdateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
@@ -146,6 +154,40 @@ async function generateUniqueIpAlias() {
 
   return ip;
 }
+
+router.post('/account-help', accountHelpLimiter, async (req, res) => {
+  try {
+    const { username, kind, message } = req.body || {};
+    const normalizedUsername = typeof username === 'string' ? username.trim() : '';
+    const normalizedMessage = typeof message === 'string' ? message.trim() : '';
+
+    if (normalizedUsername.length < 3 || normalizedUsername.length > 20) {
+      return res.status(400).json({ error: 'Entre un pseudo Propard valide de 3 à 20 caractères.' });
+    }
+    if (!['password_reset', 'support'].includes(kind)) {
+      return res.status(400).json({ error: 'Type de demande invalide.' });
+    }
+    if (normalizedMessage.length < 20 || normalizedMessage.length > 1500) {
+      return res.status(400).json({ error: 'Explique ta demande en 20 à 1500 caractères pour que le personnel puisse l’étudier.' });
+    }
+
+    const account = await User.findOne({ username: normalizedUsername }).select('_id username');
+    await SupportRequest.create({
+      kind,
+      username: normalizedUsername,
+      userId: account?._id || null,
+      message: normalizedMessage
+    });
+
+    return res.status(202).json({
+      success: true,
+      message: 'Ta demande a été transmise au panneau du personnel. Aucun e-mail ne sera envoyé.'
+    });
+  } catch (error) {
+    console.error('Account help request failed:', error);
+    return res.status(500).json({ error: 'Impossible d’envoyer la demande pour le moment.' });
+  }
+});
 
 router.post('/register', registerRateLimiter, async (req, res) => {
   try {
