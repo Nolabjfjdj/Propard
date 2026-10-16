@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
   staffRoleUpdatedBy:{type:mongoose.Schema.Types.ObjectId,ref:'User',default:null},
   passwordResetTokenHash:{type:String,default:null,select:false},
   passwordResetExpiresAt:{type:Date,default:null,select:false},
+  passwordResetIssuedBy:{type:mongoose.Schema.Types.ObjectId,ref:'User',default:null,select:false},
   ipAlias:{type:String,required:true,unique:true},
   publicKey:{type:String,default:null},
   apnsTokens:[{token:{type:String,required:true,maxlength:512},platform:{type:String,enum:['ios'],required:true},createdAt:{type:Date,default:Date.now}}],
