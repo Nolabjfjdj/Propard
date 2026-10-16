@@ -5,6 +5,7 @@ const crypto = require('crypto');
 
 const User = require('../models/User');
 const Announcement = require('../models/Announcement');
+const StaffAuditLog = require('../models/StaffAuditLog');
 const authMiddleware = require('../middleware/auth');
 const { requireStaffRole } = require('../middleware/staffRoles');
 const { createRateLimiter } = require('../middleware/rateLimit');
@@ -43,6 +44,17 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+
+async function auditAdminAction(req, action, targetUser = null, details = null) {
+  await StaffAuditLog.create({
+    actor: req.user.id,
+    action,
+    targetUser,
+    details,
+    ip: typeof req.ip === 'string' ? req.ip.slice(0, 128) : null,
+    userAgent: typeof req.get('user-agent') === 'string' ? req.get('user-agent').slice(0, 512) : null
+  });
+}
 // Ces routes ne sont protégées que par une clé secrète (pas de JWT), donc
 // un rate limit strict par IP est important pour rendre le brute-force de
 // la clé impraticable — même une clé "très longue et aléatoire" mérite
@@ -114,6 +126,7 @@ router.post('/reset-password', authMiddleware, requireStaffRole('admin'), adminS
     user.password = hashedPassword;
 
     await user.save();
+    await auditAdminAction(req, 'user.password_reset.admin_override', user._id, { method: 'legacy-admin-reset' });
 
     res.json({
       success: true,
@@ -194,6 +207,7 @@ router.post('/announcement/create', authMiddleware, requireStaffRole('admin'), a
       message: message.trim(),
       active: true
     });
+    await auditAdminAction(req, 'announcement.created', null, { announcementId: announcement._id.toString(), title: announcement.title });
 
     /*
      * Si des clients utilisent déjà Socket.IO pour autre chose,
@@ -437,6 +451,7 @@ router.post('/bans/ban', authMiddleware, requireStaffRole('admin'), adminSensiti
     user.isOnline = false;
 
     await user.save();
+    await auditAdminAction(req, 'user.banned.admin_override', user._id, { duration, reason: reason?.trim() || null, banExpiresAt: user.banExpiresAt });
 
     const io = req.app.get('io');
 
@@ -506,6 +521,7 @@ router.post('/bans/unban', authMiddleware, requireStaffRole('admin'), adminSensi
     user.sessionVersion = (user.sessionVersion || 0) + 1;
 
     await user.save();
+    await auditAdminAction(req, 'user.unbanned.admin_override', user._id);
 
     return res.json({
       success: true,
