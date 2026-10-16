@@ -765,6 +765,8 @@ export default function Chat({
     setReportReason('');
     setReportError('');
     setReportSuccess(false);
+    setCaptchaRequired(false);
+    setCaptchaToken('');
   };
 
   const submitReport = async () => {
