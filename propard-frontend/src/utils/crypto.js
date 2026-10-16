@@ -267,6 +267,25 @@ export async function validatePrivateKeyJwk(privateKeyJwk) {
   return true;
 }
 
+export async function validatePrivateKeyMatchesPublicKey(privateKeyJwk, publicKeyJwk) {
+  await validatePrivateKeyJwk(privateKeyJwk);
+
+  if (
+    !publicKeyJwk ||
+    publicKeyJwk.kty !== 'EC' ||
+    publicKeyJwk.crv !== CURVE ||
+    !isP256JwkCoordinate(publicKeyJwk.x) ||
+    !isP256JwkCoordinate(publicKeyJwk.y) ||
+    privateKeyJwk.x !== publicKeyJwk.x ||
+    privateKeyJwk.y !== publicKeyJwk.y
+  ) {
+    throw new Error('La clé privée E2EE ne correspond pas à la clé publique du compte');
+  }
+
+  await importPublicKey(publicKeyJwk);
+  return true;
+}
+
 async function importPrivateKey(jwk) {
   return crypto.subtle.importKey(
     'jwk', jwk, { name: 'ECDH', namedCurve: CURVE }, true, ['deriveKey']
