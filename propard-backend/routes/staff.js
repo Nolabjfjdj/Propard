@@ -68,7 +68,7 @@ function actorCanManageTarget(actorRole, targetRole) {
  */
 router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) => {
   try {
-    const { token, newPassword } = req.body || {};
+    const { token, newPassword, acknowledgeE2eeKeyBackupLoss } = req.body || {};
 
     if (typeof token !== 'string' || token.length < 32 || token.length > 200 ||
         typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
@@ -84,7 +84,17 @@ router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) =
       return res.status(400).json({ error: 'Code de récupération invalide ou expiré.' });
     }
 
+    if (user.e2eeKeyBackup && acknowledgeE2eeKeyBackupLoss !== true) {
+      return res.status(409).json({
+        error: 'La sauvegarde E2EE est chiffrée avec l’ancien mot de passe. Pour continuer, confirme que tu comprends que cette sauvegarde sera supprimée et que seuls les appareils possédant encore la clé privée locale pourront en créer une nouvelle.',
+        e2eeBackupAcknowledgementRequired: true
+      });
+    }
+
     user.password = await bcrypt.hash(newPassword, 10);
+    if (user.e2eeKeyBackup) {
+      user.e2eeKeyBackup = null;
+    }
     user.passwordResetTokenHash = null;
     user.passwordResetExpiresAt = null;
     user.sessionVersion = (user.sessionVersion || 0) + 1;
