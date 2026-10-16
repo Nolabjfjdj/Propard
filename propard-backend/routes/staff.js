@@ -598,7 +598,7 @@ router.patch('/users/:userId/role', requireStaffRole('admin'), async (req, res) 
     if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
 
     const staffRole = req.body && req.body.staffRole;
-    if (!Object.prototype.hasOwnProperty.call(ROLE_LEVELS, staffRole) || staffRole === 'user') {
+    if (!Object.prototype.hasOwnProperty.call(ROLE_LEVELS, staffRole)) {
       return res.status(400).json({ error: 'Rôle du personnel invalide.' });
     }
 
