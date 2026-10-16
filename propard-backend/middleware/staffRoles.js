@@ -9,7 +9,7 @@ const ROLE_LEVELS = Object.freeze({
 });
 
 function roleLevel(role) {
-  return ROLE_LEVELS[role] ?? 0;
+  return Object.prototype.hasOwnProperty.call(ROLE_LEVELS, role) ? ROLE_LEVELS[role] : -1;
 }
 
 function requireStaffRole(minimumRole) {
@@ -28,6 +28,11 @@ function requireStaffRole(minimumRole) {
 }
 
 function canManageRole(actorRole, targetRole) {
+  if (!Object.prototype.hasOwnProperty.call(ROLE_LEVELS, actorRole) ||
+      !Object.prototype.hasOwnProperty.call(ROLE_LEVELS, targetRole)) {
+    return false;
+  }
+
   return roleLevel(actorRole) > roleLevel(targetRole);
 }
 
