@@ -3,6 +3,7 @@ import api from '../utils/api';
 import { enablePushNotifications, disablePushNotifications, isPushEnabled } from '../utils/pushNotifications';
 
 const roles = [
+  ['user', 'Utilisateur'],
   ['support', 'Support'],
   ['junior_moderator', 'Modérateur junior'],
   ['moderator', 'Modérateur'],
