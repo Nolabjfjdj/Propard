@@ -6,6 +6,7 @@ import HelpPage from './pages/HelpPage';
 import ContactPage from './pages/ContactPage';
 import AdminPage from './pages/AdminPage';
 import StaffPage from './pages/StaffPage';
+import PasswordResetPage from './pages/PasswordResetPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import GlobalAnnouncement from './components/GlobalAnnouncement';
@@ -283,6 +284,10 @@ export default function App() {
         <GlobalAnnouncement />
       </>
     );
+  }
+
+  if (path === '/password-reset') {
+    return <PasswordResetPage />;
   }
 
   if (path === '/staff') {
