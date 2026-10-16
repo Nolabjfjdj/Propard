@@ -117,6 +117,11 @@ export default function PrivacyPage() {
               lorsque celui-ci est fourni dans le cadre du signalement
             </li>
             <li>
+              Les demandes d'assistance et de récupération de compte : référence publique,
+              type de demande, état, dates, réponse éventuelle, compte associé et membre du
+              personnel chargé du traitement, ainsi que l'empreinte du jeton secret d'accès
+            </li>
+            <li>
               Certaines données techniques nécessaires à la sécurité et au
               fonctionnement du service, notamment les compteurs temporaires de
               limitation des requêtes et les résultats des vérifications anti-robot
@@ -813,6 +818,24 @@ export default function PrivacyPage() {
           <p style={styles.text}>
             La date indiquée en haut de cette page correspond à la dernière
             version en vigueur.
+          </p>
+        </div>
+
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>Demandes d'assistance et récupération de compte</h2>
+
+          <p style={styles.text}>
+            Le suivi d'une demande repose sur une référence publique et un lien d'accès
+            individuel contenant un secret. Le serveur conserve une empreinte du jeton secret
+            dans le champ prévu à cet effet, et non le jeton brut dans ce champ. Le lien permet
+            d'accéder à la demande sans adresse e-mail ; toute personne qui le possède peut
+            potentiellement consulter les informations associées. Gardez-le confidentiel.
+          </p>
+
+          <p style={styles.text}>
+            Les demandes et les réponses peuvent être consultées par le personnel autorisé.
+            Les données associées sont conservées pendant la durée nécessaire au suivi de la
+            demande, à la sécurité du service et au respect des obligations légales applicables.
           </p>
         </div>
 
