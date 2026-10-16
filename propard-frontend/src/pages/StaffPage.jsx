@@ -595,7 +595,7 @@ export default function StaffPage() {
                 {auditLogs.map(log => (
                   <article key={log._id} style={{ padding: 10, borderRadius: 8, background: 'var(--bg-secondary, #222)' }}>
                     <strong>{log.action}</strong>
-                    <div>{log.actorUsername || log.actor?.username || log.details?.actorUsername || 'Personnel inconnu'} → {log.targetUsername || log.targetUser?.username || log.details?.username || 'aucune cible'}</div>
+                    <div>{log.actorUsername || log.actor?.username || log.details?.actorUsername || (log.actorId ? `Compte introuvable (${log.actorId.slice(-6)})` : 'Personnel inconnu')} → {log.targetUsername || log.targetUser?.username || log.details?.username || (log.targetUserId ? `Compte introuvable (${log.targetUserId.slice(-6)})` : 'aucune cible')}</div>
                     <small>{new Date(log.createdAt).toLocaleString()}</small>
                   </article>
                 ))}
