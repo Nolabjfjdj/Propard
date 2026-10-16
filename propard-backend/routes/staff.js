@@ -46,10 +46,18 @@ function escapeRegex(value) {
 }
 
 async function audit(req, action, options = {}) {
+  const actorId = options.actor || req.user.id;
+  const targetUserId = options.targetUser || null;
+  const [actorUser, targetUser] = await Promise.all([
+    User.findById(actorId).select('username').lean().catch(() => null),
+    targetUserId ? User.findById(targetUserId).select('username').lean().catch(() => null) : Promise.resolve(null)
+  ]);
   await StaffAuditLog.create({
-    actor: options.actor || req.user.id,
+    actor: actorId,
+    actorUsername: actorUser?.username || req.user.username || null,
     action,
-    targetUser: options.targetUser || null,
+    targetUser: targetUserId,
+    targetUsername: targetUser?.username || options.targetUsername || options.details?.username || null,
     targetReport: options.targetReport || null,
     details: options.details || null,
     ip: typeof req.ip === 'string' ? req.ip.slice(0, 128) : null,
