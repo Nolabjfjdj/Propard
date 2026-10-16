@@ -50,6 +50,27 @@ function Field({ label, value, onChange, placeholder, type = 'text' }) {
   );
 }
 
+function PaginationControls({ total, page, pageSize, onPageChange, onPageSizeChange }) {
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const first = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const last = Math.min(page * pageSize, total);
+  return <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 12 }}>
+    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-secondary)' }}>Éléments par page
+      <select style={{ ...inputStyle, width: 'auto', marginTop: 0 }} value={pageSize} onChange={event => onPageSizeChange(Number(event.target.value))}>
+        {[5, 10, 20, 50].map(size => <option key={size} value={size}>{size}</option>)}
+      </select>
+    </label>
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+      <small style={{ color: 'var(--text-secondary)' }}>{first}–{last} sur {total}</small>
+      <button type="button" style={{ ...buttonStyle, marginTop: 0 }} onClick={() => onPageChange(1)} disabled={page <= 1}>«</button>
+      <button type="button" style={{ ...buttonStyle, marginTop: 0 }} onClick={() => onPageChange(page - 1)} disabled={page <= 1}>Précédent</button>
+      <span style={{ fontSize: 13 }}>Page {Math.min(page, pageCount)} / {pageCount}</span>
+      <button type="button" style={{ ...buttonStyle, marginTop: 0 }} onClick={() => onPageChange(page + 1)} disabled={page >= pageCount}>Suivant</button>
+      <button type="button" style={{ ...buttonStyle, marginTop: 0 }} onClick={() => onPageChange(pageCount)} disabled={page >= pageCount}>»</button>
+    </div>
+  </div>;
+}
+
 function Panel({ title, children }) {
   return (
     <section style={{
@@ -75,6 +96,8 @@ export default function StaffPage() {
   const [lookupUsername, setLookupUsername] = useState('');
   const [lookupResult, setLookupResult] = useState(null);
   const [reports, setReports] = useState([]);
+  const [reportsPage, setReportsPage] = useState(1);
+  const [reportsPageSize, setReportsPageSize] = useState(5);
   const [selectedReport, setSelectedReport] = useState(null);
   const [reportStatus, setReportStatus] = useState('new');
   const [targetUserId, setTargetUserId] = useState('');
@@ -85,7 +108,11 @@ export default function StaffPage() {
   const [roleUserId, setRoleUserId] = useState('');
   const [newRole, setNewRole] = useState('support');
   const [auditLogs, setAuditLogs] = useState([]);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditPageSize, setAuditPageSize] = useState(5);
   const [accountHelpRequests, setAccountHelpRequests] = useState([]);
+  const [helpPage, setHelpPage] = useState(1);
+  const [helpPageSize, setHelpPageSize] = useState(5);
   const [helpReplyDrafts, setHelpReplyDrafts] = useState({});
   const [helpReplySaving, setHelpReplySaving] = useState('');
   const [helpNotifications, setHelpNotifications] = useState({ passwordReset: true, support: true });
@@ -290,6 +317,7 @@ export default function StaffPage() {
     try {
       const response = await request('get', '/api/staff/reports');
       setReports(response.data.reports || []);
+      setReportsPage(1);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de charger les signalements.');
     }
@@ -368,6 +396,7 @@ export default function StaffPage() {
     try {
       const response = await request('get', '/api/staff/audit');
       setAuditLogs(response.data.logs || []);
+      setAuditPage(1);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de charger le journal d’audit.');
     }
@@ -470,7 +499,8 @@ export default function StaffPage() {
               {helpRequestsLoading ? 'Actualisation…' : 'Actualiser les demandes'}
             </button>
             <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
-              {accountHelpRequests.map(item => (
+              <PaginationControls total={accountHelpRequests.length} page={helpPage} pageSize={helpPageSize} onPageChange={setHelpPage} onPageSizeChange={size => { setHelpPageSize(size); setHelpPage(1); }} />
+              {accountHelpRequests.slice((helpPage - 1) * helpPageSize, helpPage * helpPageSize).map(item => (
                 <article key={item._id} style={{ padding: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-tertiary)' }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 }}>
                     <strong>{item.kind === 'password_reset' ? '🔐 Mot de passe oublié' : '💬 Support'} · @{item.username}</strong>
@@ -518,6 +548,7 @@ export default function StaffPage() {
                 </article>
               ))}
               {!accountHelpRequests.length && !helpRequestsLoading && <p style={{ color: 'var(--text-secondary)' }}>Aucune demande pour le moment.</p>}
+              {!!accountHelpRequests.length && <PaginationControls total={accountHelpRequests.length} page={helpPage} pageSize={helpPageSize} onPageChange={setHelpPage} onPageSizeChange={size => { setHelpPageSize(size); setHelpPage(1); }} />}
             </div>
           </Panel>
 
@@ -526,7 +557,8 @@ export default function StaffPage() {
               <p>La liste ne charge pas le contenu complet des conversations. Ouvre un signalement pour consulter les détails selon tes permissions.</p>
               <button style={buttonStyle} onClick={loadReports}>Charger les signalements</button>
               <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-                {reports.map(report => (
+                <PaginationControls total={reports.length} page={reportsPage} pageSize={reportsPageSize} onPageChange={setReportsPage} onPageSizeChange={size => { setReportsPageSize(size); setReportsPage(1); }} />
+                {reports.slice((reportsPage - 1) * reportsPageSize, reportsPage * reportsPageSize).map(report => (
                   <button key={report._id} style={{ ...buttonStyle, textAlign: 'left', marginTop: 0 }} onClick={() => openReport(report._id)}>
                     <strong>{report.reportScope === 'conversation' ? 'Conversation' : 'Message'} · {report.status}</strong>
                     <div style={{ fontSize: 12, opacity: 0.8 }}>{report.reason || 'Aucun motif fourni'} · {new Date(report.createdAt).toLocaleString()}</div>
@@ -612,7 +644,8 @@ export default function StaffPage() {
             <Panel title="Journal d’audit">
               <button style={buttonStyle} onClick={loadAudit}>Charger les dernières actions</button>
               <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-                {auditLogs.map(log => (
+                <PaginationControls total={auditLogs.length} page={auditPage} pageSize={auditPageSize} onPageChange={setAuditPage} onPageSizeChange={size => { setAuditPageSize(size); setAuditPage(1); }} />
+                {auditLogs.slice((auditPage - 1) * auditPageSize, auditPage * auditPageSize).map(log => (
                   <article key={log._id} style={{ padding: 10, borderRadius: 8, background: 'var(--bg-tertiary)' }}>
                     <strong>{log.action}</strong>
                     <div>{log.actorUsername || log.actor?.username || log.details?.actorUsername || (log.actorId ? `Compte introuvable (${log.actorId.slice(-6)})` : 'Personnel inconnu')} → {log.targetUsername || log.targetUser?.username || log.details?.username || (log.targetUserId ? `Compte introuvable (${log.targetUserId.slice(-6)})` : 'aucune cible')}</div>
