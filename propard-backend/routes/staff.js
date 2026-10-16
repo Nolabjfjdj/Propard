@@ -172,6 +172,15 @@ router.patch('/account-help/requests/:id', requireStaffRole('support'), async (r
     if (hasReply) {
       supportRequest.staffReply = body.staffReply.trim();
       supportRequest.staffReplyAt = new Date();
+      if (body.staffReply.trim()) {
+        const staffUser = await User.findById(req.user.id).select('username').lean();
+        supportRequest.messages.push({
+          senderType: 'staff',
+          senderName: staffUser?.username || 'Support Propard',
+          text: body.staffReply.trim(),
+          createdAt: new Date()
+        });
+      }
     }
     supportRequest.updatedAt = new Date();
     supportRequest.handledBy = req.user.id;
