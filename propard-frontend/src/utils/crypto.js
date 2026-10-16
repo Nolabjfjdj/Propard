@@ -263,7 +263,43 @@ export async function validatePrivateKeyJwk(privateKeyJwk) {
     throw new Error('Clé privée E2EE locale invalide');
   }
 
-  await importPrivateKey(privateKeyJwk);
+  const privateKey = await importPrivateKey(privateKeyJwk);
+  const embeddedPublicKey = await importPublicKey({
+    kty: 'EC',
+    crv: CURVE,
+    x: privateKeyJwk.x,
+    y: privateKeyJwk.y,
+    ext: true,
+    key_ops: []
+  });
+  const probePair = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: CURVE },
+    true,
+    ['deriveKey']
+  );
+
+  const [privateSide, publicSide] = await Promise.all([
+    crypto.subtle.deriveBits(
+      { name: 'ECDH', public: probePair.publicKey },
+      privateKey,
+      256
+    ),
+    crypto.subtle.deriveBits(
+      { name: 'ECDH', public: embeddedPublicKey },
+      probePair.privateKey,
+      256
+    )
+  ]);
+
+  const privateBytes = new Uint8Array(privateSide);
+  const publicBytes = new Uint8Array(publicSide);
+  const matches = privateBytes.length === publicBytes.length &&
+    privateBytes.every((byte, index) => byte === publicBytes[index]);
+
+  if (!matches) {
+    throw new Error('La clé privée E2EE ne correspond pas aux coordonnées publiques intégrées');
+  }
+
   return true;
 }
 
