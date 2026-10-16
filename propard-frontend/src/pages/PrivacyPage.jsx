@@ -5,7 +5,7 @@ export default function PrivacyPage() {
         <a href="/help" style={styles.back}>← Retour</a>
 
         <h1 style={styles.title}>Politique de Confidentialité</h1>
-        <p style={styles.date}>En vigueur depuis le 9 octobre 2026</p>
+        <p style={styles.date}>En vigueur depuis le 16 octobre 2026</p>
 
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>1. Responsable du traitement</h2>
@@ -106,6 +106,12 @@ export default function PrivacyPage() {
               acceptation lorsqu'une telle fonctionnalité est utilisée
             </li>
             <li>
+              Les demandes d'assistance et de récupération de compte : pseudo indiqué,
+              type de demande, message initial, référence publique, hachage de la clé
+              d'accès, échanges avec le personnel, statut et dates de la demande ainsi
+              que, le cas échéant, un code de récupération chiffré et sa date d'expiration
+            </li>
+                        <li>
               Les informations nécessaires au traitement des signalements
               effectués par les utilisateurs, notamment le contenu signalé
               lorsque celui-ci est fourni dans le cadre du signalement
@@ -803,7 +809,17 @@ export default function PrivacyPage() {
           </p>
         </div>
 
-        <div style={styles.section}>
+        <p style={styles.text}>
+          Les demandes d'assistance et de récupération sont accessibles au personnel
+          habilité. Elles contiennent les messages envoyés par l'utilisateur et les
+          réponses du personnel. Le code prévoit un statut et des dates de création et
+          de mise à jour, mais ne définit pas dans ce modèle de délai automatique fixe
+          de suppression des demandes ; leur durée de conservation doit donc être
+          déterminée et appliquée par l'exploitant selon la finalité, les besoins de
+          sécurité et les obligations applicables.
+        </p>
+
+                <div style={styles.section}>
           <h2 style={styles.sectionTitle}>16. Contact</h2>
 
           <p style={styles.text}>
