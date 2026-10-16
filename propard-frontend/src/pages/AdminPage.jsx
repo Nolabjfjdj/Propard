@@ -52,9 +52,12 @@ export default function AdminPage() {
     }
 
     try {
+      const token = localStorage.getItem('propard_token');
       const response = await api.post(url, {
         ...payload,
         ...(captchaToken ? { captchaToken } : {})
+      }, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       if (captchaToken) {
         setCaptchaRequired(false);
