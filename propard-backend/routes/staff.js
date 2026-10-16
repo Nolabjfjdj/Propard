@@ -387,6 +387,36 @@ router.get('/reports', requireStaffRole('junior_moderator'), async (req, res) =>
   }
 });
 
+router.delete('/reports/:reportId', requireStaffRole('senior_moderator'), async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.reportId)) {
+      return res.status(400).json({ error: 'Signalement invalide.' });
+    }
+
+    const report = await Report.findById(req.params.reportId);
+    if (!report) return res.status(404).json({ error: 'Signalement introuvable.' });
+    if (!['processed', 'rejected'].includes(report.status)) {
+      return res.status(409).json({ error: 'Seuls les signalements déjà traités ou rejetés peuvent être supprimés.' });
+    }
+
+    await audit(req, 'report.deleted', {
+      targetReport: report._id,
+      details: {
+        status: report.status,
+        reportScope: report.reportScope,
+        createdAt: report.createdAt,
+        processedAt: report.processedAt
+      }
+    });
+    await Report.deleteOne({ _id: report._id });
+
+    return res.json({ success: true, message: 'Signalement supprimé.' });
+  } catch (error) {
+    console.error('Staff report deletion failed:', error);
+    return res.status(500).json({ error: 'Impossible de supprimer le signalement.' });
+  }
+});
+
 router.get('/reports/:reportId', requireStaffRole('junior_moderator'), async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.reportId)) {
