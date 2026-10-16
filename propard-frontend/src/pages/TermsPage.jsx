@@ -5,7 +5,7 @@ export default function TermsPage() {
         <a href="/help" style={styles.back}>← Retour</a>
 
         <h1 style={styles.title}>Conditions Générales d'Utilisation</h1>
-        <p style={styles.date}>En vigueur depuis le 9 octobre 2026</p>
+        <p style={styles.date}>En vigueur depuis le 16 octobre 2026</p>
 
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>1. Présentation du service</h2>
@@ -377,7 +377,36 @@ export default function TermsPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>13. Contact</h2>
+          <h2 style={styles.sectionTitle}>13. Demandes d'assistance et de récupération de compte</h2>
+
+          <p style={styles.text}>
+            Propard propose un formulaire permettant d'envoyer une demande d'assistance
+            ou de récupération de mot de passe sans adresse e-mail. La demande comprend
+            le pseudo indiqué, le type de demande et le message transmis. Une référence
+            publique et une clé d'accès secrète sont générées afin de permettre de
+            consulter la conversation et les réponses du personnel sur une page dédiée.
+          </p>
+
+          <p style={styles.text}>
+            La clé d'accès doit être conservée confidentiellement : toute personne qui
+            dispose à la fois de la référence et de cette clé peut accéder aux informations
+            de la demande. Le serveur ne conserve que le hachage de la clé d'accès. Le
+            personnel habilité peut consulter et traiter la demande, répondre dans la
+            conversation et, pour une demande de récupération, fournir un code temporaire
+            lorsque cette fonction est utilisée. Une demande marquée comme résolue ne
+            peut plus recevoir de nouveaux messages dans la même conversation.
+          </p>
+
+          <p style={styles.text}>
+            N'inclus pas de mot de passe actuel, de clé privée E2EE ni d'autres secrets
+            dans le message. Le formulaire ne garantit pas à lui seul que la personne
+            demandant la récupération est titulaire du compte ; les demandes sont
+            examinées par le personnel avant toute action.
+          </p>
+        </div>
+
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>14. Contact</h2>
 
           <p style={styles.text}>
             Pour toute question relative aux présentes CGU :
