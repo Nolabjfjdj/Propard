@@ -128,6 +128,7 @@ export default function StaffPage() {
     const config = { headers: { Authorization: `Bearer ${token}`, 'Cache-Control': 'no-cache' } };
     if (method === 'get') return api.get(path, config);
     if (method === 'patch') return api.patch(path, data, config);
+    if (method === 'delete') return api.delete(path, config);
     return api.post(path, data, config);
   }, []);
 
@@ -345,6 +346,21 @@ export default function StaffPage() {
       setNotice('Statut du signalement mis à jour.');
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de mettre à jour le signalement.');
+    }
+  };
+
+  const deleteReport = async () => {
+    if (!selectedReport || !['processed', 'rejected'].includes(selectedReport.status)) return;
+    const confirmed = window.confirm('Supprimer définitivement ce signalement ? Cette action est irréversible. Elle ne supprimera pas les journaux d’audit.');
+    if (!confirmed) return;
+    setError('');
+    try {
+      await request('delete', `/api/staff/reports/${selectedReport._id}`);
+      setReports(previous => previous.filter(report => report._id !== selectedReport._id));
+      setSelectedReport(null);
+      setNotice('Signalement supprimé manuellement. L’action reste inscrite dans le journal d’audit.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer le signalement.');
     }
   };
 
@@ -588,7 +604,11 @@ export default function StaffPage() {
                     <button style={buttonStyle} onClick={() => updateReport('processed')}>Marquer traité</button>
                     <button style={buttonStyle} onClick={() => updateReport('rejected')}>Rejeter</button>
                     <button style={buttonStyle} onClick={() => updateReport('new')}>Remettre en nouveau</button>
+                    {['senior_moderator', 'admin', 'owner'].includes(staffRole) && ['processed', 'rejected'].includes(selectedReport.status) && (
+                      <button type="button" style={{ ...buttonStyle, background: '#a52b2b' }} onClick={deleteReport}>Supprimer le signalement</button>
+                    )}
                   </div>
+                  {['processed', 'rejected'].includes(selectedReport.status) && <small style={{ display: 'block', marginTop: 8, color: 'var(--text-secondary)' }}>Ce signalement est terminé. Sa suppression est manuelle et irréversible ; elle ne se déclenche jamais automatiquement.</small>}
                 </div>
               )}
             </Panel>
