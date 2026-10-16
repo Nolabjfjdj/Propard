@@ -350,7 +350,7 @@ export default function StaffPage() {
               <Field label="ID du compte" value={roleUserId} onChange={setRoleUserId} placeholder="Identifiant utilisateur" />
               <label style={{ display: 'block' }}>Nouveau rôle
                 <select style={inputStyle} value={newRole} onChange={event => setNewRole(event.target.value)}>
-                  {roles.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  {roles.filter(([value]) => value !== 'owner' || staffRole === 'owner').map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </label>
               <button style={buttonStyle} onClick={changeRole}>Modifier le rôle</button>
