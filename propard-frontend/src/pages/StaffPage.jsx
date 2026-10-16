@@ -332,7 +332,7 @@ export default function StaffPage() {
 
           {['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(staffRole) && (
             <Panel title="Aide à la récupération de compte">
-              <p>Le personnel ne choisit pas et ne voit jamais le nouveau mot de passe. Le code est à usage unique et expire après 15 minutes. La réinitialisation peut supprimer la sauvegarde E2EE chiffrée avec l’ancien mot de passe.</p>
+              <p>Le personnel ne choisit pas et ne voit jamais le nouveau mot de passe. Le code est à usage unique et expire après 15 minutes. Remets le code à l’utilisateur et demande-lui d’ouvrir <code>/password-reset</code>. La réinitialisation peut supprimer la sauvegarde E2EE chiffrée avec l’ancien mot de passe.</p>
               <Field label="ID du compte" value={resetUserId} onChange={setResetUserId} placeholder="Identifiant utilisateur" />
               <button style={buttonStyle} onClick={issueReset}>Créer un code temporaire</button>
               {resetToken && (
