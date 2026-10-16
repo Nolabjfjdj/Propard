@@ -119,7 +119,44 @@ async function sendPushNotification(userId, payload) {
   ]);
 }
 
+async function sendStaffHelpNotification({ kind, username, requestId }) {
+  if (!['password_reset', 'support'].includes(kind)) return;
+
+  const preferenceKey = kind === 'password_reset' ? 'passwordReset' : 'support';
+  const staffRoles = ['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'];
+  const staffUsers = await User.find({
+    staffRole: { $in: staffRoles },
+    [`staffNotificationPreferences.${preferenceKey}`]: { $ne: false }
+  }).select('_id staffRole staffNotificationPreferences pushSubscriptions apnsTokens');
+
+  const requestLabel = kind === 'password_reset' ? 'Mot de passe oublié' : 'Support';
+  const payload = {
+    title: 'Nouvelle demande Propard',
+    body: `${requestLabel} · @${username}`,
+    url: '/staff',
+    tag: `account-help-${String(requestId)}`,
+    data: {
+      type: 'account-help',
+      kind,
+      requestId: String(requestId),
+      url: '/staff'
+    }
+  };
+
+  await Promise.all(staffUsers.map(async user => {
+    try {
+      await Promise.all([
+        sendWebPush(user, payload),
+        sendApnsPush(user, payload)
+      ]);
+    } catch (error) {
+      console.error('🔔 Account-help push error:', error.statusCode || error.message);
+    }
+  }));
+}
+
 module.exports = {
   getPublicKey,
-  sendPushNotification
+  sendPushNotification,
+  sendStaffHelpNotification
 };
