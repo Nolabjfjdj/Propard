@@ -212,6 +212,9 @@ router.post('/account-help/requests/:id/recovery-code', requireStaffRole('suppor
       return res.status(403).json({ error: 'Tu ne peux pas lancer la récupération de ce compte du personnel.' });
     }
 
+    if (!process.env.JWT_SECRET) {
+      return res.status(503).json({ error: 'Le service de récupération n’est pas configuré côté serveur.' });
+    }
     const token = crypto.randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     target.passwordResetTokenHash = hashToken(token);
