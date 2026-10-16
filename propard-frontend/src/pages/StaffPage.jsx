@@ -16,25 +16,27 @@ const inputStyle = {
   boxSizing: 'border-box',
   padding: '10px 12px',
   borderRadius: 8,
-  border: '1px solid var(--border-color, #444)',
-  background: 'var(--bg-secondary, #171717)',
-  color: 'var(--text-primary, #fff)',
+  border: '1px solid var(--border)',
+  background: 'var(--bg-tertiary)',
+  color: 'var(--text-primary)',
   marginTop: 6
 };
 
 const buttonStyle = {
   padding: '10px 14px',
   borderRadius: 8,
-  border: '1px solid var(--border-color, #555)',
-  background: 'var(--bg-secondary, #222)',
-  color: 'var(--text-primary, #fff)',
+  border: '1px solid var(--border)',
+  background: 'var(--accent)',
+  color: '#fff',
   cursor: 'pointer',
-  marginTop: 8
+  marginTop: 8,
+  fontWeight: 600,
+  transition: 'background 0.2s ease, transform 0.2s ease'
 };
 
 function Field({ label, value, onChange, placeholder, type = 'text' }) {
   return (
-    <label style={{ display: 'block', marginBottom: 12, color: 'var(--text-primary, #fff)' }}>
+    <label style={{ display: 'block', marginBottom: 12, color: 'var(--text-primary)' }}>
       {label}
       <input
         style={inputStyle}
@@ -51,9 +53,9 @@ function Panel({ title, children }) {
   return (
     <section style={{
       padding: 18,
-      border: '1px solid var(--border-color, #333)',
+      border: '1px solid var(--border)',
       borderRadius: 12,
-      background: 'var(--bg-primary, #101010)',
+      background: 'var(--bg-secondary)',
       minWidth: 0
     }}>
       <h2 style={{ marginTop: 0, fontSize: 18 }}>{title}</h2>
@@ -103,7 +105,7 @@ export default function StaffPage() {
 
   const loadAccountHelpRequests = useCallback(async ({ notify = false } = {}) => {
     if (!['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(staffRole)) return;
-    setHelpRequestsLoading(true);
+    if (!notify) setHelpRequestsLoading(true);
     try {
       const response = await request('get', '/api/staff/account-help/requests');
       const incoming = response.data.requests || [];
@@ -128,7 +130,7 @@ export default function StaffPage() {
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de charger les demandes de support.');
     } finally {
-      setHelpRequestsLoading(false);
+      if (!notify) setHelpRequestsLoading(false);
     }
   }, [request, staffRole]);
 
@@ -378,7 +380,7 @@ export default function StaffPage() {
   };
 
   if (loading) {
-    return <main style={{ padding: 24, color: 'var(--text-primary, #fff)' }}>Chargement du panneau de modération…</main>;
+    return <main style={{ padding: 24, color: 'var(--text-primary)' }}>Chargement du panneau de modération…</main>;
   }
 
   return (
@@ -386,20 +388,22 @@ export default function StaffPage() {
       maxWidth: 1100,
       margin: '0 auto',
       padding: '24px 16px 48px',
-      color: 'var(--text-primary, #fff)',
+      color: 'var(--text-primary)',
+      background: 'var(--bg-primary)',
+      minHeight: '100vh',
       display: 'grid',
       gap: 16
     }}>
       <header>
         <h1 style={{ marginBottom: 6 }}>Propard · Modération</h1>
-        <p style={{ color: 'var(--text-secondary, #aaa)', marginTop: 0 }}>
+        <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>
           Permissions côté serveur · accès aux conversations signalées journalisé.
         </p>
         {staffRole && <strong>Rôle actuel : {roles.find(([value]) => value === staffRole)?.[1] || staffRole}</strong>}
       </header>
 
       {error && <div role="alert" style={{ padding: 12, borderRadius: 8, background: '#5a2020' }}>{error}</div>}
-      {notice && <div role="status" style={{ padding: 12, borderRadius: 8, background: 'var(--bg-secondary, #222)' }}>{notice}</div>}
+      {notice && <div role="status" style={{ padding: 12, borderRadius: 8, background: 'var(--bg-tertiary)' }}>{notice}</div>}
 
       {staffRole && (
         <Panel title="Rechercher un compte">
@@ -434,7 +438,7 @@ export default function StaffPage() {
           <Panel title="Demandes de récupération et support">
             <p>Les demandes envoyées depuis la page de connexion arrivent ici. Aucun e-mail n’est envoyé. Pour les demandes de récupération, lis les explications avant de décider si l’identité du demandeur est suffisamment vérifiée.</p>
             { (
-              <div style={{ display: 'grid', gap: 8, padding: 12, border: '1px solid var(--border-color, #444)', borderRadius: 8, marginBottom: 12 }}>
+              <div style={{ display: 'grid', gap: 8, padding: 12, border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12 }}>
                 <strong>Mes notifications</strong>
                 <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input type="checkbox" checked={helpNotifications.passwordReset} disabled={helpSettingsSaving} onChange={event => saveHelpNotifications({ ...helpNotifications, passwordReset: event.target.checked })} />
@@ -461,7 +465,7 @@ export default function StaffPage() {
             </button>
             <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
               {accountHelpRequests.map(item => (
-                <article key={item._id} style={{ padding: 12, borderRadius: 8, border: '1px solid var(--border-color, #444)', background: 'var(--bg-secondary, #222)' }}>
+                <article key={item._id} style={{ padding: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-tertiary)' }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 }}>
                     <strong>{item.kind === 'password_reset' ? '🔐 Mot de passe oublié' : '💬 Support'} · @{item.username}</strong>
                     <span style={{ fontSize: 12 }}>{item.status === 'new' ? 'Nouvelle' : item.status === 'in_progress' ? 'En cours' : 'Résolue'}</span>
@@ -469,7 +473,7 @@ export default function StaffPage() {
                   <small style={{ display: 'block', opacity: 0.75, marginTop: 5 }}>{new Date(item.createdAt).toLocaleString()} · {item.userId ? 'Compte trouvé' : 'Compte non trouvé à la réception'}</small>
                   <div style={{ display: 'grid', gap: 8, margin: '12px 0' }}>
                     {(item.messages && item.messages.length ? item.messages : [{ senderType: 'user', senderName: item.username, text: item.message, createdAt: item.createdAt }]).map((message, index) => (
-                      <div key={message._id || index} style={{ padding: 10, borderRadius: 8, border: '1px solid var(--border-color, #333)', background: message.senderType === 'staff' ? 'var(--bg-primary, #111)' : 'var(--bg-secondary, #222)' }}>
+                      <div key={message._id || index} style={{ padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: message.senderType === 'staff' ? 'var(--bg-primary, #111)' : 'var(--bg-tertiary)' }}>
                         <small style={{ display: 'block', opacity: 0.75, marginBottom: 5 }}>{message.senderType === 'staff' ? 'Personnel · ' : 'Demandeur · '}{message.senderName || ''}{message.createdAt ? ` · ${new Date(message.createdAt).toLocaleString()}` : ''}</small>
                         <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{message.text}</div>
                       </div>
@@ -499,7 +503,7 @@ export default function StaffPage() {
                   </div>
                 </article>
               ))}
-              {!accountHelpRequests.length && !helpRequestsLoading && <p style={{ color: 'var(--text-secondary, #aaa)' }}>Aucune demande pour le moment.</p>}
+              {!accountHelpRequests.length && !helpRequestsLoading && <p style={{ color: 'var(--text-secondary)' }}>Aucune demande pour le moment.</p>}
             </div>
           </Panel>
 
@@ -516,7 +520,7 @@ export default function StaffPage() {
                 ))}
               </div>
               {selectedReport && (
-                <div style={{ marginTop: 16, padding: 14, border: '1px solid var(--border-color, #444)', borderRadius: 8 }}>
+                <div style={{ marginTop: 16, padding: 14, border: '1px solid var(--border)', borderRadius: 8 }}>
                   <h3>Signalement sélectionné</h3>
                   <p>Type : {selectedReport.reportScope || 'message'} · Statut : {selectedReport.status}</p>
                   <p>Signalé par : {selectedReport.reporter?.username || 'Compte indisponible'}</p>
@@ -525,7 +529,7 @@ export default function StaffPage() {
                     <div style={{ display: 'grid', gap: 8 }}>
                       <strong>Conversation fournie avec le signalement</strong>
                       {(selectedReport.conversationSnapshot || []).map((message, index) => (
-                        <article key={`${selectedReport._id}-${index}`} style={{ padding: 10, borderRadius: 8, background: 'var(--bg-secondary, #222)' }}>
+                        <article key={`${selectedReport._id}-${index}`} style={{ padding: 10, borderRadius: 8, background: 'var(--bg-tertiary)' }}>
                           <small>{message.senderName || message.senderId} · {message.createdAt ? new Date(message.createdAt).toLocaleString() : 'Date inconnue'}</small>
                           <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{message.content}</div>
                         </article>
@@ -571,7 +575,7 @@ export default function StaffPage() {
               {resetToken && (
                 <div style={{ marginTop: 12 }}>
                   <strong>Code affiché une seule fois</strong>
-                  <code style={{ display: 'block', overflowWrap: 'anywhere', padding: 12, marginTop: 6, background: 'var(--bg-secondary, #222)' }}>{resetToken}</code>
+                  <code style={{ display: 'block', overflowWrap: 'anywhere', padding: 12, marginTop: 6, background: 'var(--bg-tertiary)' }}>{resetToken}</code>
                   <button style={buttonStyle} onClick={() => navigator.clipboard?.writeText(resetToken)}>Copier le code</button>
                 </div>
               )}
@@ -595,7 +599,7 @@ export default function StaffPage() {
               <button style={buttonStyle} onClick={loadAudit}>Charger les dernières actions</button>
               <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
                 {auditLogs.map(log => (
-                  <article key={log._id} style={{ padding: 10, borderRadius: 8, background: 'var(--bg-secondary, #222)' }}>
+                  <article key={log._id} style={{ padding: 10, borderRadius: 8, background: 'var(--bg-tertiary)' }}>
                     <strong>{log.action}</strong>
                     <div>{log.actorUsername || log.actor?.username || log.details?.actorUsername || (log.actorId ? `Compte introuvable (${log.actorId.slice(-6)})` : 'Personnel inconnu')} → {log.targetUsername || log.targetUser?.username || log.details?.username || (log.targetUserId ? `Compte introuvable (${log.targetUserId.slice(-6)})` : 'aucune cible')}</div>
                     <small>{new Date(log.createdAt).toLocaleString()}</small>
