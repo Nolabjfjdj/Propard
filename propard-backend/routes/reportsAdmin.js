@@ -197,16 +197,31 @@ router.post(
         });
       }
 
+      const previousStatus = report.status;
       report.status = status;
 
       if (status === 'new') {
         report.processedAt = null;
       } else {
-        report.processedAt =
-          new Date();
+        report.processedAt = new Date();
+      }
+
+      if (status === 'new') {
+        report.processedAt = null;
+      } else {
+        report.processedAt = new Date();
       }
 
       await report.save();
+
+      await StaffAuditLog.create({
+        actor: req.user.id,
+        action: 'report.status.changed',
+        targetReport: report._id,
+        details: { previousStatus, newStatus: status },
+        ip: typeof req.ip === 'string' ? req.ip.slice(0, 128) : null,
+        userAgent: typeof req.get('user-agent') === 'string' ? req.get('user-agent').slice(0, 512) : null
+      });
 
       return res.json({
         success: true,
@@ -267,6 +282,15 @@ router.post(
             'Signalement introuvable'
         });
       }
+
+      await StaffAuditLog.create({
+        actor: req.user.id,
+        action: 'report.deleted',
+        targetReport: reportId,
+        details: { deletedCount: result.deletedCount },
+        ip: typeof req.ip === 'string' ? req.ip.slice(0, 128) : null,
+        userAgent: typeof req.get('user-agent') === 'string' ? req.get('user-agent').slice(0, 512) : null
+      });
 
       return res.json({
         success: true,
