@@ -3,6 +3,8 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 
 const Report = require('../models/Report');
+const authMiddleware = require('../middleware/auth');
+const { requireStaffRole } = require('../middleware/staffRoles');
 const { createRateLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
@@ -84,6 +86,8 @@ function requireReportsAdmin(req, res, next) {
 
 router.post(
   '/list',
+  authMiddleware,
+  requireStaffRole('junior_moderator'),
   reportsAdminLimiter,
   requireReportsAdmin,
   async (req, res) => {
@@ -134,6 +138,8 @@ router.post(
 
 router.post(
   '/:reportId/status',
+  authMiddleware,
+  requireStaffRole('junior_moderator'),
   reportsAdminLimiter,
   requireReportsAdmin,
   async (req, res) => {
@@ -218,6 +224,8 @@ router.post(
 
 router.post(
   '/:reportId/delete',
+  authMiddleware,
+  requireStaffRole('junior_moderator'),
   reportsAdminLimiter,
   requireReportsAdmin,
   async (req, res) => {
