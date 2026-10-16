@@ -54,7 +54,7 @@ async function audit(req, action, options = {}) {
   ]);
   await StaffAuditLog.create({
     actor: actorId,
-    actorUsername: actorUser?.username || req.user.username || null,
+    actorUsername: actorUser?.username || req.user?.username || null,
     action,
     targetUser: targetUserId,
     targetUsername: targetUser?.username || options.targetUsername || options.details?.username || null,
