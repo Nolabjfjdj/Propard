@@ -240,6 +240,15 @@ export default function TermsPage() {
           <h2 style={styles.sectionTitle}>8. Modération et sanctions</h2>
 
           <p style={styles.text}>
+            Propard propose également des demandes d'assistance et de récupération de compte.
+            Chaque demande dispose d'une référence publique et d'un lien d'accès individuel
+            associé à un jeton secret. Ce lien doit rester confidentiel : toute personne qui
+            le détient peut potentiellement accéder aux informations de la demande. Les demandes
+            peuvent être consultées et traitées par les membres du personnel autorisés. Une
+            demande de récupération ne garantit pas que le compte pourra être récupéré.
+          </p>
+
+          <p style={styles.text}>
             En cas de non-respect des présentes CGU, Propard peut prendre des mesures
             adaptées à la situation, notamment une restriction de fonctionnalités,
             une suspension temporaire ou un bannissement permanent du compte.
