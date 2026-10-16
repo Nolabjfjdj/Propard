@@ -618,6 +618,18 @@ export default function StaffPage() {
           )}
         </>
       )}
+      <a
+        href="/"
+        style={{
+          display: 'block',
+          marginTop: 24,
+          fontSize: 13,
+          color: 'var(--text-secondary)',
+          textDecoration: 'none'
+        }}
+      >
+        ← Retour
+      </a>
     </main>
   );
 }
