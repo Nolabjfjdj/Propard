@@ -206,12 +206,6 @@ router.post(
         report.processedAt = new Date();
       }
 
-      if (status === 'new') {
-        report.processedAt = null;
-      } else {
-        report.processedAt = new Date();
-      }
-
       await report.save();
 
       await StaffAuditLog.create({
