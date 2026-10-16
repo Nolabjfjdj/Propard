@@ -265,7 +265,7 @@ export async function validatePrivateKeyJwk(privateKeyJwk) {
 
   const privateKey = await crypto.subtle.importKey(
     'jwk',
-    privateKeyJwk,
+    { ...privateKeyJwk, key_ops: ['deriveBits'] },
     { name: 'ECDH', namedCurve: CURVE },
     true,
     ['deriveBits']
