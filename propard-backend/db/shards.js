@@ -126,7 +126,9 @@ const refs = {
   Message: { sender: 'User', receiver: 'User' },
   Group: { owner: 'User', 'members.userId': 'User', 'keyPackages.userId': 'User', 'keyPackages.senderId': 'User' },
   GroupMessage: { group: 'Group', sender: 'User' },
-  Report: { reporter: 'User', reportedUser: 'User', messageId: 'Message', groupMessageId: 'GroupMessage', groupId: 'Group' }
+  Report: { reporter: 'User', reportedUser: 'User', messageId: 'Message', groupMessageId: 'GroupMessage', groupId: 'Group' },
+  StaffAuditLog: { actor: 'User', targetUser: 'User' },
+  SupportRequest: { userId: 'User', handledBy: 'User' }
 };
 
 function normalizePopulate(path, select) {
