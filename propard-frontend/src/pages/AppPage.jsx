@@ -933,7 +933,10 @@ export default function AppPage({
           <div
             style={{
               display: 'flex',
-              flexDirection: 'column'
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: '10px',
+              flexWrap: 'wrap'
             }}
           >
             <a
@@ -942,6 +945,15 @@ export default function AppPage({
             >
               help
             </a>
+
+            {['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(user?.staffRole) && (
+              <a
+                href="/staff"
+                style={styles.staffLink}
+              >
+                Staff
+              </a>
+            )}
 
             <span style={styles.appName}>
               Propard
@@ -1687,6 +1699,17 @@ const styles = {
     color: 'var(--text-muted)',
     textDecoration: 'none',
     marginBottom: '2px'
+  },
+
+  staffLink: {
+    fontSize: '11px',
+    fontWeight: '700',
+    color: 'var(--accent)',
+    textDecoration: 'none',
+    border: '1px solid var(--accent)',
+    borderRadius: '6px',
+    padding: '3px 7px',
+    lineHeight: 1.2
   },
 
   discordLink: {
