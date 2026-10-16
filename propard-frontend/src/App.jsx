@@ -5,6 +5,7 @@ import AppPage from './pages/AppPage';
 import HelpPage from './pages/HelpPage';
 import ContactPage from './pages/ContactPage';
 import AdminPage from './pages/AdminPage';
+import StaffPage from './pages/StaffPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import GlobalAnnouncement from './components/GlobalAnnouncement';
@@ -282,6 +283,15 @@ export default function App() {
         <GlobalAnnouncement />
       </>
     );
+  }
+
+  if (path === '/staff') {
+    if (!user) {
+      window.history.replaceState({}, '', '/login');
+      return null;
+    }
+
+    return <StaffPage />;
   }
 
   if (path === '/admin-propard-secret') {
