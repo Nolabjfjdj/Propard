@@ -7,7 +7,6 @@ const User = require('../models/User');
 const Report = require('../models/Report');
 const StaffAuditLog = require('../models/StaffAuditLog');
 const SupportRequest = require('../models/SupportRequest');
-const StaffSettings = require('../models/StaffSettings');
 const authMiddleware = require('../middleware/auth');
 const { ROLE_LEVELS, roleLevel, requireStaffRole, canManageRole } = require('../middleware/staffRoles');
 const { createRateLimiter } = require('../middleware/rateLimit');
@@ -132,12 +131,13 @@ router.get('/account-help/requests', requireStaffRole('support'), async (req, re
       .limit(200)
       .populate('userId', 'username displayName')
       .lean();
-    const settings = await StaffSettings.findOne({ key: 'global' }).lean();
+    const staffUser = await User.findById(req.user.id).select('staffNotificationPreferences').lean();
+    const preferences = staffUser?.staffNotificationPreferences || {};
     return res.json({
       requests,
       notifications: {
-        passwordReset: settings?.passwordResetNotifications !== false,
-        support: settings?.supportNotifications !== false
+        passwordReset: preferences.passwordReset !== false,
+        support: preferences.support !== false
       }
     });
   } catch (error) {
@@ -169,12 +169,13 @@ router.patch('/account-help/requests/:id', requireStaffRole('support'), async (r
   }
 });
 
-router.get('/account-help/settings', requireStaffRole('admin'), async (req, res) => {
+router.get('/account-help/settings', requireStaffRole('support'), async (req, res) => {
   try {
-    const settings = await StaffSettings.findOne({ key: 'global' }).lean();
+    const staffUser = await User.findById(req.user.id).select('staffNotificationPreferences').lean();
+    const preferences = staffUser?.staffNotificationPreferences || {};
     return res.json({
-      passwordResetNotifications: settings?.passwordResetNotifications !== false,
-      supportNotifications: settings?.supportNotifications !== false
+      passwordResetNotifications: preferences.passwordReset !== false,
+      supportNotifications: preferences.support !== false
     });
   } catch (error) {
     console.error('Account help settings retrieval failed:', error);
@@ -182,31 +183,27 @@ router.get('/account-help/settings', requireStaffRole('admin'), async (req, res)
   }
 });
 
-router.patch('/account-help/settings', requireStaffRole('admin'), async (req, res) => {
+router.patch('/account-help/settings', requireStaffRole('support'), async (req, res) => {
   try {
     const { passwordResetNotifications, supportNotifications } = req.body || {};
     if (typeof passwordResetNotifications !== 'boolean' || typeof supportNotifications !== 'boolean') {
       return res.status(400).json({ error: 'Préférences de notification invalides.' });
     }
-    const settings = await StaffSettings.findOneAndUpdate(
-      { key: 'global' },
-      {
-        $set: {
-          passwordResetNotifications,
-          supportNotifications,
-          updatedAt: new Date(),
-          updatedBy: req.user.id
-        },
-        $setOnInsert: { key: 'global' }
-      },
-      { new: true, upsert: true, runValidators: true }
-    );
+    const staffUser = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: {
+        'staffNotificationPreferences.passwordReset': passwordResetNotifications,
+        'staffNotificationPreferences.support': supportNotifications
+      }},
+      { new: true, runValidators: true }
+    ).select('staffNotificationPreferences');
+    if (!staffUser) return res.status(404).json({ error: 'Compte du personnel introuvable.' });
     await audit(req, 'account_help.notifications_updated', {
       details: { passwordResetNotifications, supportNotifications }
     });
     return res.json({
-      passwordResetNotifications: settings.passwordResetNotifications,
-      supportNotifications: settings.supportNotifications
+      passwordResetNotifications: staffUser.staffNotificationPreferences.passwordReset,
+      supportNotifications: staffUser.staffNotificationPreferences.support
     });
   } catch (error) {
     console.error('Account help settings update failed:', error);
