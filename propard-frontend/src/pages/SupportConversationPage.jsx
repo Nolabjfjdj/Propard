@@ -5,7 +5,7 @@ const panel = {
   width: '100%',
   maxWidth: 760,
   border: '1px solid var(--border)',
-  borderRadius: 14,
+  borderRadius: 'var(--radius)',
   background: 'var(--bg-secondary)',
   overflow: 'hidden',
   color: 'var(--text-primary)'
@@ -75,7 +75,7 @@ export default function SupportConversationPage({ reference }) {
     ticket?.status === 'in_progress' ? 'En cours' : 'Résolue';
 
   return (
-    <main style={{ minHeight: '100vh', padding: '24px 14px', background: 'var(--bg-primary)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', color: 'var(--text-primary)' }}>
+    <main style={{ minHeight: '100vh', padding: 'clamp(14px, 4vw, 28px)', background: 'var(--bg-primary)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', color: 'var(--text-primary)' }}>
       <section style={panel}>
         <header style={{ padding: 20, borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
           <div>
