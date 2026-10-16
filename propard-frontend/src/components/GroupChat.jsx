@@ -3227,78 +3227,60 @@ const styles = {
   modalOverlay: {
     position: 'fixed',
     inset: 0,
-    background:
-      'rgba(0,0,0,0.55)',
+    background: 'rgba(0,0,0,0.7)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '20px',
-    zIndex: 1100
+    zIndex: 300,
+    padding: '16px'
   },
 
   modal: {
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    padding: '28px',
     width: '100%',
-    maxWidth: '430px',
-    boxSizing: 'border-box',
-    background:
-      'var(--bg-secondary)',
-    border:
-      '1px solid var(--border)',
-    borderRadius: '14px',
-    padding: '20px',
-    boxShadow:
-      'var(--shadow)'
+    maxWidth: '420px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px'
   },
 
   modalTitle: {
-    margin:
-      '0 0 8px',
-    color:
-      'var(--text-primary)',
-    fontSize: '18px'
+    fontSize: '18px',
+    fontWeight: '700',
+    color: 'var(--text-primary)'
   },
 
   modalDesc: {
-    margin:
-      '0 0 12px',
-    color:
-      'var(--text-muted)',
     fontSize: '13px',
-    lineHeight: '1.45'
+    color: 'var(--text-secondary)',
+    lineHeight: '1.5'
   },
 
   reportedContent: {
-    padding: '10px',
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
     borderRadius: '8px',
-    background:
-      'var(--bg-tertiary)',
-    color:
-      'var(--text-primary)',
+    padding: '10px',
     fontSize: '13px',
+    color: 'var(--text-primary)',
     whiteSpace: 'pre-wrap',
     overflowWrap: 'anywhere',
-    maxHeight: '150px',
-    overflowY: 'auto',
-    marginBottom: '10px'
+    maxHeight: '120px',
+    overflowY: 'auto'
   },
 
   reportTextarea: {
-    width: '100%',
-    boxSizing: 'border-box',
-    minHeight: '90px',
-    resize: 'vertical',
-    padding: '10px',
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
     borderRadius: '8px',
-    border:
-      '1px solid var(--border)',
-    background:
-      'var(--bg-tertiary)',
-    color:
-      'var(--text-primary)',
-    outline: 'none',
+    padding: '10px',
+    color: 'var(--text-primary)',
     fontSize: '13px',
-    fontFamily:
-      'inherit'
+    resize: 'vertical',
+    fontFamily: 'inherit'
   },
 
   modalActions: {
@@ -3309,43 +3291,37 @@ const styles = {
   },
 
   modalBtnDanger: {
-    border: 0,
-    borderRadius: '8px',
-    padding: '9px 13px',
-    background:
-      'var(--danger)',
+    background: 'var(--danger)',
     color: '#fff',
-    cursor: 'pointer',
-    fontWeight: '600'
+    border: 'none',
+    borderRadius: '8px',
+    padding: '10px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer'
   },
 
   modalBtnCancel: {
-    border:
-      '1px solid var(--border)',
+    background: 'transparent',
+    color: 'var(--text-muted)',
+    border: '1px solid var(--border)',
     borderRadius: '8px',
-    padding: '9px 13px',
-    background:
-      'var(--bg-tertiary)',
-    color:
-      'var(--text-primary)',
+    padding: '8px',
+    fontSize: '13px',
     cursor: 'pointer'
   },
 
   modalError: {
-    color:
-      'var(--danger)',
-    fontSize: '12px',
-    margin:
-      '8px 0 0'
-  },
+    color: 'var(--danger)',
+    fontSize: '13px',
+    textAlign: 'center'
+  }
 
   reportSuccess: {
-    color:
-      'var(--text-primary)',
-    fontSize: '14px',
-    lineHeight: '1.5',
-    margin:
-      '0 0 16px'
+    color: 'var(--success)',
+    fontSize: '13px',
+    textAlign: 'center',
+    fontWeight: '600'
   },
 
   spamAlert: {
