@@ -352,7 +352,12 @@ export default function StaffPage() {
     setError('');
     try {
       await request('patch', `/api/staff/users/${encodeURIComponent(roleUserId.trim())}/role`, { staffRole: newRole });
-      setNotice('Rôle du personnel mis à jour.');
+      setLookupResult(previous => previous && previous._id?.toString() === roleUserId.trim()
+        ? { ...previous, staffRole: newRole }
+        : previous);
+      setNotice(newRole === 'user'
+        ? 'Le compte est redevenu un utilisateur normal.'
+        : 'Rôle du personnel mis à jour.');
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier le rôle.');
     }
