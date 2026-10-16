@@ -20,7 +20,7 @@ module.exports = async function(req, res, next) {
       : 0;
 
     const user = await User.findById(decoded.id).select(
-      '_id sessionVersion bannedAt banExpiresAt banReason'
+      '_id sessionVersion staffRole bannedAt banExpiresAt banReason'
     );
 
     if (!user || user.sessionVersion !== tokenSessionVersion) {
@@ -37,7 +37,10 @@ module.exports = async function(req, res, next) {
       return res.status(403).json({ error: 'Compte banni' });
     }
 
-    req.user = decoded;
+    req.user = {
+      ...decoded,
+      staffRole: user.staffRole || 'user'
+    };
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Token invalide' });
