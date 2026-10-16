@@ -263,7 +263,13 @@ export async function validatePrivateKeyJwk(privateKeyJwk) {
     throw new Error('Clé privée E2EE locale invalide');
   }
 
-  const privateKey = await importPrivateKey(privateKeyJwk);
+  const privateKey = await crypto.subtle.importKey(
+    'jwk',
+    privateKeyJwk,
+    { name: 'ECDH', namedCurve: CURVE },
+    true,
+    ['deriveBits']
+  );
   const embeddedPublicKey = await importPublicKey({
     kty: 'EC',
     crv: CURVE,
