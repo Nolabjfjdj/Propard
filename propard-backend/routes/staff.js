@@ -62,7 +62,7 @@ async function findTargetUser(userId) {
 }
 
 function actorCanManageTarget(actorRole, targetRole) {
-  return roleLevel(actorRole) > roleLevel(targetRole || 'user');
+  return canManageRole(actorRole, targetRole || 'user');
 }
 
 router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) => {
