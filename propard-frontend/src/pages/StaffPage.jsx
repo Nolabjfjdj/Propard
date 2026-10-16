@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
+import { enablePushNotifications, disablePushNotifications, isPushEnabled } from '../utils/pushNotifications';
 
 const roles = [
   ['support', 'Support'],
@@ -85,6 +86,8 @@ export default function StaffPage() {
   const [helpNotifications, setHelpNotifications] = useState({ passwordReset: true, support: true });
   const [helpRequestsLoading, setHelpRequestsLoading] = useState(false);
   const [helpSettingsSaving, setHelpSettingsSaving] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushSettingsLoading, setPushSettingsLoading] = useState(false);
   const knownHelpRequestIds = useRef(null);
 
   const request = useCallback(async (method, path, data) => {
@@ -138,18 +141,25 @@ export default function StaffPage() {
     }
   };
 
-  const enableBrowserNotifications = async () => {
-    if (typeof window.Notification === 'undefined') {
-      setError('Ce navigateur ne prend pas en charge les notifications du navigateur.');
-      return;
-    }
+  const configurePushNotifications = async (enable) => {
+    setPushSettingsLoading(true);
+    setError('');
     try {
-      const permission = await window.Notification.requestPermission();
-      setNotice(permission === 'granted'
-        ? 'Notifications du navigateur activées.'
-        : 'Les notifications du navigateur ne sont pas autorisées. Tu peux toujours consulter les demandes dans le panneau.');
-    } catch {
-      setError('Impossible d’activer les notifications du navigateur.');
+      const token = localStorage.getItem('propard_token');
+      if (!token) throw new Error('Connecte-toi à Propard pour configurer les notifications.');
+      if (enable) {
+        await enablePushNotifications(token);
+        setPushEnabled(true);
+        setNotice('Notifications push activées sur cet appareil. Les demandes pourront arriver même lorsque Propard est fermé.');
+      } else {
+        await disablePushNotifications(token);
+        setPushEnabled(false);
+        setNotice('Notifications push désactivées sur cet appareil.');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Impossible de configurer les notifications push.');
+    } finally {
+      setPushSettingsLoading(false);
     }
   };
 
@@ -202,6 +212,19 @@ export default function StaffPage() {
   useEffect(() => {
     loadRole();
   }, [loadRole]);
+
+  useEffect(() => {
+    if (!['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(staffRole)) return;
+    let active = true;
+    isPushEnabled().then(enabled => {
+      if (active) setPushEnabled(enabled);
+    }).catch(() => {
+      if (active) setPushEnabled(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [staffRole]);
 
   useEffect(() => {
     if (!['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(staffRole)) return;
@@ -388,9 +411,15 @@ export default function StaffPage() {
                   <input type="checkbox" checked={helpNotifications.support} disabled={helpSettingsSaving} onChange={event => saveHelpNotifications({ ...helpNotifications, support: event.target.checked })} />
                   Demandes de support
                 </label>
-                <small>Ces préférences sont personnelles : elles ne changent pas celles des autres membres du personnel. Vérification toutes les 30 secondes lorsque cette page reste ouverte.</small>
-                {typeof window.Notification !== 'undefined' && window.Notification.permission !== 'granted' && (
-                  <button style={buttonStyle} onClick={enableBrowserNotifications}>Activer les notifications du navigateur</button>
+                <small>Ces préférences sont personnelles : elles ne changent pas celles des autres membres du personnel. Les notifications push peuvent arriver même lorsque le panneau est fermé, si elles sont activées sur cet appareil et configurées côté serveur.</small>
+                {pushEnabled ? (
+                  <button style={buttonStyle} onClick={() => configurePushNotifications(false)} disabled={pushSettingsLoading}>
+                    {pushSettingsLoading ? 'Mise à jour…' : 'Désactiver les notifications push sur cet appareil'}
+                  </button>
+                ) : (
+                  <button style={buttonStyle} onClick={() => configurePushNotifications(true)} disabled={pushSettingsLoading}>
+                    {pushSettingsLoading ? 'Activation…' : 'Activer les notifications push sur cet appareil'}
+                  </button>
                 )}
               </div>
             )}
