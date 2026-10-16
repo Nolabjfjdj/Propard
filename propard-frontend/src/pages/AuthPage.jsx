@@ -21,6 +21,7 @@ export default function AuthPage({ mode }) {
   const [helpLoading, setHelpLoading] = useState(false);
   const [helpError, setHelpError] = useState('');
   const [helpResult, setHelpResult] = useState('');
+  const [helpTracking, setHelpTracking] = useState(null);
   const captchaRef = useRef(null);
   const captchaWidgetRef = useRef(null);
 
@@ -86,6 +87,7 @@ export default function AuthPage({ mode }) {
     setHelpMessage('');
     setHelpError('');
     setHelpResult('');
+    setHelpTracking(null);
     setHelpOpen(true);
   };
 
@@ -93,6 +95,7 @@ export default function AuthPage({ mode }) {
     event.preventDefault();
     setHelpError('');
     setHelpResult('');
+    setHelpTracking(null);
     if (helpMessage.trim().length < 20) {
       setHelpError('Explique pourquoi tu demandes cette aide en au moins 20 caractères.');
       return;
@@ -105,6 +108,7 @@ export default function AuthPage({ mode }) {
         message: helpMessage.trim()
       });
       setHelpResult(response.data.message || 'Demande transmise au personnel.');
+      setHelpTracking({ reference: response.data.reference, accessToken: response.data.accessToken });
       setHelpMessage('');
     } catch (err) {
       setHelpError(err.response?.data?.error || 'Impossible d’envoyer la demande.');
@@ -392,6 +396,21 @@ export default function AuthPage({ mode }) {
             </p>
             {helpError && <p role="alert" style={{ color: 'var(--danger)', fontSize: 13 }}>{helpError}</p>}
             {helpResult && <p role="status" style={{ color: 'var(--success)', fontSize: 13 }}>{helpResult}</p>}
+            {helpTracking && (
+              <div style={{ padding: 12, border: '1px solid var(--border)', borderRadius: 8, display: 'grid', gap: 8 }}>
+                <strong>Garde ces informations : elles ne seront plus affichées après fermeture.</strong>
+                <label style={styles.helpLabel}>Référence
+                  <code style={{ overflowWrap: 'anywhere' }}>{helpTracking.reference}</code>
+                </label>
+                <label style={styles.helpLabel}>Clé privée de suivi
+                  <code style={{ overflowWrap: 'anywhere' }}>{helpTracking.accessToken}</code>
+                </label>
+                <button type="button" style={{ ...styles.btn, width: '100%' }} onClick={() => navigator.clipboard?.writeText(`Référence : ${helpTracking.reference}\nClé de suivi : ${helpTracking.accessToken}`)}>
+                  Copier les informations de suivi
+                </button>
+                <a href="/account-help-status" style={{ color: 'var(--accent)', textAlign: 'center' }}>Consulter la réponse du personnel</a>
+              </div>
+            )}
             <button type="submit" style={{ ...styles.btn, width: '100%' }} disabled={helpLoading}>
               {helpLoading ? 'Envoi…' : 'Envoyer la demande'}
             </button>
