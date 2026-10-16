@@ -217,6 +217,7 @@ router.post('/account-help', accountHelpLimiter, async (req, res) => {
       username: account?.username || normalizedUsername,
       userId: account?._id || null,
       message: normalizedMessage,
+      messages: [{ senderType: 'user', senderName: account?.username || normalizedUsername, text: normalizedMessage }],
       publicReference,
       accessTokenHash: hashAccountHelpToken(accessToken)
     });
@@ -238,6 +239,45 @@ router.post('/account-help', accountHelpLimiter, async (req, res) => {
   } catch (error) {
     console.error('Account help request failed:', error);
     return res.status(500).json({ error: 'Impossible d’envoyer la demande pour le moment.' });
+  }
+});
+
+router.post('/account-help/message', accountHelpStatusLimiter, async (req, res) => {
+  try {
+    const reference = typeof req.body?.reference === 'string' ? req.body.reference.trim().toUpperCase() : '';
+    const accessToken = typeof req.body?.accessToken === 'string' ? req.body.accessToken.trim() : '';
+    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+    if (!/^[A-F0-9]{16}$/.test(reference) || accessToken.length < 32 || accessToken.length > 100) {
+      return res.status(400).json({ error: 'Lien de conversation invalide.' });
+    }
+    if (message.length < 1 || message.length > 1500) {
+      return res.status(400).json({ error: 'Le message doit contenir entre 1 et 1500 caractères.' });
+    }
+    const supportRequest = await SupportRequest.findOne({ publicReference: reference }).select('+accessTokenHash');
+    if (!supportRequest || !supportRequest.accessTokenHash) {
+      return res.status(404).json({ error: 'Conversation introuvable.' });
+    }
+    const suppliedHash = Buffer.from(hashAccountHelpToken(accessToken), 'hex');
+    const storedHash = Buffer.from(supportRequest.accessTokenHash, 'hex');
+    if (suppliedHash.length !== storedHash.length || !crypto.timingSafeEqual(suppliedHash, storedHash)) {
+      return res.status(404).json({ error: 'Conversation introuvable.' });
+    }
+    if (supportRequest.status === 'resolved') {
+      return res.status(409).json({ error: 'Cette demande est résolue. Contacte à nouveau le support si tu as encore besoin d’aide.' });
+    }
+    supportRequest.messages.push({
+      senderType: 'user',
+      senderName: supportRequest.username,
+      text: message,
+      createdAt: new Date()
+    });
+    supportRequest.updatedAt = new Date();
+    if (supportRequest.status === 'new') supportRequest.status = 'in_progress';
+    await supportRequest.save();
+    return res.status(201).json({ success: true });
+  } catch (error) {
+    console.error('Account help message failed:', error);
+    return res.status(500).json({ error: 'Impossible d’envoyer le message.' });
   }
 });
 
@@ -275,6 +315,12 @@ router.post('/account-help/status', accountHelpStatusLimiter, async (req, res) =
       createdAt: supportRequest.createdAt,
       updatedAt: supportRequest.updatedAt,
       staffReply: supportRequest.staffReply || '',
+      messages: (supportRequest.messages || []).map(item => ({
+        senderType: item.senderType,
+        senderName: item.senderName,
+        text: item.text,
+        createdAt: item.createdAt
+      })),
       recoveryCode,
       recoveryCodeExpiresAt: recoveryCode ? supportRequest.recoveryCodeExpiresAt : null
     });
