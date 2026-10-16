@@ -377,9 +377,9 @@ export default function StaffPage() {
         <>
           <Panel title="Demandes de récupération et support">
             <p>Les demandes envoyées depuis la page de connexion arrivent ici. Aucun e-mail n’est envoyé. Pour les demandes de récupération, lis les explications avant de décider si l’identité du demandeur est suffisamment vérifiée.</p>
-            {['admin', 'owner'].includes(staffRole) && (
+            { (
               <div style={{ display: 'grid', gap: 8, padding: 12, border: '1px solid var(--border-color, #444)', borderRadius: 8, marginBottom: 12 }}>
-                <strong>Notifications du panneau</strong>
+                <strong>Mes notifications</strong>
                 <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input type="checkbox" checked={helpNotifications.passwordReset} disabled={helpSettingsSaving} onChange={event => saveHelpNotifications({ ...helpNotifications, passwordReset: event.target.checked })} />
                   Demandes « Mot de passe oublié »
@@ -388,7 +388,7 @@ export default function StaffPage() {
                   <input type="checkbox" checked={helpNotifications.support} disabled={helpSettingsSaving} onChange={event => saveHelpNotifications({ ...helpNotifications, support: event.target.checked })} />
                   Demandes de support
                 </label>
-                <small>Le panneau vérifie les nouvelles demandes toutes les 30 secondes lorsque cette page reste ouverte.</small>
+                <small>Ces préférences sont personnelles : elles ne changent pas celles des autres membres du personnel. Vérification toutes les 30 secondes lorsque cette page reste ouverte.</small>
                 {typeof window.Notification !== 'undefined' && window.Notification.permission !== 'granted' && (
                   <button style={buttonStyle} onClick={enableBrowserNotifications}>Activer les notifications du navigateur</button>
                 )}
