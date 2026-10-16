@@ -83,6 +83,8 @@ export default function StaffPage() {
   const [newRole, setNewRole] = useState('support');
   const [auditLogs, setAuditLogs] = useState([]);
   const [accountHelpRequests, setAccountHelpRequests] = useState([]);
+  const [helpReplyDrafts, setHelpReplyDrafts] = useState({});
+  const [helpReplySaving, setHelpReplySaving] = useState('');
   const [helpNotifications, setHelpNotifications] = useState({ passwordReset: true, support: true });
   const [helpRequestsLoading, setHelpRequestsLoading] = useState(false);
   const [helpSettingsSaving, setHelpSettingsSaving] = useState(false);
@@ -138,6 +140,37 @@ export default function StaffPage() {
       setNotice('Statut de la demande mis à jour.');
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier la demande.');
+    }
+  };
+
+  const sendHelpReply = async requestId => {
+    const staffReply = (helpReplyDrafts[requestId] || '').trim();
+    if (!staffReply) {
+      setError('Écris une réponse avant de l’envoyer.');
+      return;
+    }
+    setError('');
+    setHelpReplySaving(requestId);
+    try {
+      const response = await request('patch', `/api/staff/account-help/requests/${requestId}`, { staffReply });
+      setAccountHelpRequests(previous => previous.map(item => item._id === requestId ? response.data.request : item));
+      setHelpReplyDrafts(previous => ({ ...previous, [requestId]: '' }));
+      setNotice('Réponse enregistrée. Le demandeur peut la consulter avec sa référence et sa clé de suivi.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible d’envoyer la réponse.');
+    } finally {
+      setHelpReplySaving('');
+    }
+  };
+
+  const issueRequestRecoveryCode = async requestId => {
+    setError('');
+    try {
+      const response = await request('post', `/api/staff/account-help/requests/${requestId}/recovery-code`, {});
+      setNotice(response.data.message || 'Code de récupération créé.');
+      await loadAccountHelpRequests();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de créer le code de récupération.');
     }
   };
 
@@ -435,12 +468,31 @@ export default function StaffPage() {
                   </div>
                   <small style={{ display: 'block', opacity: 0.75, marginTop: 5 }}>{new Date(item.createdAt).toLocaleString()} · {item.userId ? 'Compte trouvé' : 'Compte non trouvé à la réception'}</small>
                   <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginBottom: 10 }}>{item.message}</p>
+                  {item.staffReply && (
+                    <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', padding: 10, borderRadius: 8, background: 'var(--bg-primary, #111)' }}>
+                      <strong>Réponse envoyée :</strong><br />{item.staffReply}
+                    </p>
+                  )}
+                  <label style={{ display: 'block', marginTop: 10 }}>
+                    Réponse visible par le demandeur
+                    <textarea
+                      style={{ ...inputStyle, minHeight: 85, resize: 'vertical' }}
+                      value={helpReplyDrafts[item._id] ?? item.staffReply ?? ''}
+                      onChange={event => setHelpReplyDrafts(previous => ({ ...previous, [item._id]: event.target.value }))}
+                      maxLength={1500}
+                      placeholder="Écris une réponse claire, sans demander le mot de passe."
+                    />
+                  </label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    <button style={buttonStyle} onClick={() => updateHelpRequestStatus(item._id, 'in_progress')}>Prendre en charge</button>
-                    <button style={buttonStyle} onClick={() => updateHelpRequestStatus(item._id, 'resolved')}>Marquer résolue</button>
-                    <button style={buttonStyle} onClick={() => updateHelpRequestStatus(item._id, 'new')}>Remettre en nouvelle</button>
+                    <button type="button" style={buttonStyle} onClick={() => updateHelpRequestStatus(item._id, 'in_progress')}>Prendre en charge</button>
+                    <button type="button" style={buttonStyle} onClick={() => sendHelpReply(item._id)} disabled={helpReplySaving === item._id}>{helpReplySaving === item._id ? 'Envoi…' : 'Envoyer la réponse'}</button>
+                    <button type="button" style={buttonStyle} onClick={() => updateHelpRequestStatus(item._id, 'resolved')}>Marquer résolue</button>
+                    <button type="button" style={buttonStyle} onClick={() => updateHelpRequestStatus(item._id, 'new')}>Remettre en nouvelle</button>
                     {item.kind === 'password_reset' && item.userId && (
-                      <button style={buttonStyle} onClick={() => setResetUserId(item.userId._id)}>Utiliser ce compte pour la récupération</button>
+                      <button type="button" style={buttonStyle} onClick={() => issueRequestRecoveryCode(item._id)}>Valider et envoyer un code temporaire</button>
+                    )}
+                    {item.kind === 'password_reset' && item.userId && (
+                      <button type="button" style={buttonStyle} onClick={() => setResetUserId(item.userId._id)}>Ouvrir la récupération manuelle</button>
                     )}
                   </div>
                 </article>
@@ -543,7 +595,7 @@ export default function StaffPage() {
                 {auditLogs.map(log => (
                   <article key={log._id} style={{ padding: 10, borderRadius: 8, background: 'var(--bg-secondary, #222)' }}>
                     <strong>{log.action}</strong>
-                    <div>{log.actor?.username || 'Personnel inconnu'} → {log.targetUser?.username || 'aucune cible'}</div>
+                    <div>{log.actorUsername || log.actor?.username || log.details?.actorUsername || 'Personnel inconnu'} → {log.targetUsername || log.targetUser?.username || log.details?.username || 'aucune cible'}</div>
                     <small>{new Date(log.createdAt).toLocaleString()}</small>
                   </article>
                 ))}
