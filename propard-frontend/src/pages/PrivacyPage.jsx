@@ -543,6 +543,13 @@ export default function PrivacyPage() {
               sécurité ou au traitement des signalements.
             </li>
             <li>
+              <strong>Demandes d'assistance et de récupération :</strong> jusqu'à leur
+              résolution puis pendant la durée nécessaire au suivi, à la sécurité et
+              aux éventuelles contestations. Le code actuel ne définit pas de suppression
+              automatique à échéance fixe pour ces demandes ; la durée doit être définie
+              et appliquée par l'exploitant.
+            </li>
+                        <li>
               <strong>Abonnements aux notifications Push :</strong> tant que
               les notifications sont activées sur l'appareil concerné. Ils
               peuvent être supprimés lorsque l'utilisateur désactive les
@@ -809,17 +816,7 @@ export default function PrivacyPage() {
           </p>
         </div>
 
-        <p style={styles.text}>
-          Les demandes d'assistance et de récupération sont accessibles au personnel
-          habilité. Elles contiennent les messages envoyés par l'utilisateur et les
-          réponses du personnel. Le code prévoit un statut et des dates de création et
-          de mise à jour, mais ne définit pas dans ce modèle de délai automatique fixe
-          de suppression des demandes ; leur durée de conservation doit donc être
-          déterminée et appliquée par l'exploitant selon la finalité, les besoins de
-          sécurité et les obligations applicables.
-        </p>
-
-                <div style={styles.section}>
+        <div style={styles.section}>
           <h2 style={styles.sectionTitle}>16. Contact</h2>
 
           <p style={styles.text}>
