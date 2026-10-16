@@ -413,6 +413,8 @@ export async function encryptPrivateKeyBackup(privateKeyJwk, password) {
     throw new Error('Clé privée et mot de passe requis');
   }
 
+  await validatePrivateKeyJwk(privateKeyJwk);
+
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveBackupKey(password, salt);
