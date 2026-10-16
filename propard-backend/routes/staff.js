@@ -599,13 +599,36 @@ router.patch('/users/:userId/role', requireStaffRole('admin'), async (req, res) 
 
 router.get('/audit', requireStaffRole('admin'), async (req, res) => {
   try {
-    const logs = await StaffAuditLog.find({})
+    const rawLogs = await StaffAuditLog.find({})
       .sort({ createdAt: -1 })
       .limit(100)
-      .populate('actor', 'username displayName staffRole')
-      .populate('targetUser', 'username displayName staffRole')
       .populate('targetReport', 'status reportScope createdAt')
       .lean();
+
+    const userIds = [...new Set(rawLogs.flatMap(log => [
+      log.actor ? log.actor.toString() : null,
+      log.targetUser ? log.targetUser.toString() : null
+    ]).filter(id => id && mongoose.isValidObjectId(id)))];
+    const users = userIds.length
+      ? await User.find({ _id: { $in: userIds } }).select('username displayName staffRole').lean()
+      : [];
+    const usersById = new Map(users.map(user => [user._id.toString(), user]));
+
+    const logs = rawLogs.map(log => {
+      const actorId = log.actor ? log.actor.toString() : null;
+      const targetUserId = log.targetUser ? log.targetUser.toString() : null;
+      const actor = actorId ? usersById.get(actorId) || null : null;
+      const targetUser = targetUserId ? usersById.get(targetUserId) || null : null;
+      return {
+        ...log,
+        actor,
+        targetUser,
+        actorId,
+        targetUserId,
+        actorUsername: log.actorUsername || actor?.username || null,
+        targetUsername: log.targetUsername || targetUser?.username || log.details?.username || null
+      };
+    });
     return res.json({ logs });
   } catch (error) {
     console.error('Staff audit log retrieval failed:', error);
