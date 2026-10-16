@@ -471,6 +471,14 @@ export default function StaffPage() {
                     <span style={{ fontSize: 12 }}>{item.status === 'new' ? 'Nouvelle' : item.status === 'in_progress' ? 'En cours' : 'Résolue'}</span>
                   </div>
                   <small style={{ display: 'block', opacity: 0.75, marginTop: 5 }}>{new Date(item.createdAt).toLocaleString()} · {item.userId ? 'Compte trouvé' : 'Compte non trouvé à la réception'}</small>
+                  {item.messages?.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10, color: 'var(--text-secondary)', fontSize: 12 }}>
+                      <span>{item.messages.length} message{item.messages.length > 1 ? 's' : ''}</span>
+                      <span>·</span>
+                      <span>Dernier message : {item.messages[item.messages.length - 1].senderType === 'staff' ? 'Personnel' : 'Demandeur'}</span>
+                      {item.messages[item.messages.length - 1].senderType === 'user' && <strong style={{ color: 'var(--accent)' }}>Nouveau message du demandeur</strong>}
+                    </div>
+                  )}
                   <div style={{ display: 'grid', gap: 8, margin: '12px 0' }}>
                     {(item.messages && item.messages.length ? item.messages : [{ senderType: 'user', senderName: item.username, text: item.message, createdAt: item.createdAt }]).map((message, index) => (
                       <div key={message._id || index} style={{ padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: message.senderType === 'staff' ? 'var(--bg-primary, #111)' : 'var(--bg-tertiary)' }}>
