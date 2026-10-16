@@ -39,6 +39,12 @@ function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\\]\\]/g, '\\function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}');
+}
+
 async function audit(req, action, { targetUser = null, targetReport = null, details = null } = {}) {
   await StaffAuditLog.create({
     actor: req.user.id,
@@ -243,6 +249,201 @@ router.patch('/reports/:reportId/status', requireStaffRole('junior_moderator'), 
     return res.json({ success: true, status: report.status, processedAt: report.processedAt });
   } catch (error) {
     console.error('Staff report status update failed:', error);
+    return res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+router.get('/users/search', requireStaffRole('support'), async (req, res) => {
+  try {
+    const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({ error: 'Indique un pseudo de 3 à 20 caractères.' });
+    }
+
+    const target = await User.findOne({
+      username: { $regex: new RegExp('^' + escapeRegex(username) + '
+  try {
+    const target = await findTargetUser(req.params.userId);
+    if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
+    if (!actorCanManageTarget(req.user.staffRole, target.staffRole)) {
+      return res.status(403).json({ error: 'Tu ne peux pas sanctionner un membre du personnel de niveau égal ou supérieur.' });
+    }
+
+    const { duration, reason } = req.body || {};
+    const durations = {
+      '1h': 60 * 60 * 1000,
+      '6h': 6 * 60 * 60 * 1000,
+      '24h': 24 * 60 * 60 * 1000,
+      '7d': 7 * 24 * 60 * 60 * 1000,
+      '30d': 30 * 24 * 60 * 60 * 1000
+    };
+
+    if (typeof reason !== 'string' || reason.trim().length < 3 || reason.trim().length > 500) {
+      return res.status(400).json({ error: 'Un motif de 3 à 500 caractères est requis.' });
+    }
+    if (duration === 'permanent' && roleLevel(req.user.staffRole) < roleLevel('senior_moderator')) {
+      return res.status(403).json({ error: 'Seuls les modérateurs seniors et les administrateurs peuvent appliquer un bannissement permanent.' });
+    }
+    if (duration !== 'permanent' && !Object.prototype.hasOwnProperty.call(durations, duration)) {
+      return res.status(400).json({ error: 'Durée de bannissement invalide.' });
+    }
+
+    const durationMs = duration === 'permanent' ? null : durations[duration];
+    target.bannedAt = new Date();
+    target.banExpiresAt = durationMs === null ? null : new Date(Date.now() + durationMs);
+    target.banReason = reason.trim();
+    target.sessionVersion = (target.sessionVersion || 0) + 1;
+    target.isOnline = false;
+    await target.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      for (const socket of io.sockets.sockets.values()) {
+        if (socket.userId?.toString() === target._id.toString()) {
+          socket.emit('accountBanned', { message: 'Ton compte a été banni de Propard.' });
+          socket.disconnect(true);
+        }
+      }
+    }
+
+    await audit(req, 'user.banned', {
+      targetUser: target._id,
+      details: { duration, reason: reason.trim(), banExpiresAt: target.banExpiresAt }
+    });
+
+    return res.json({
+      success: true,
+      user: {
+        _id: target._id,
+        username: target.username,
+        bannedAt: target.bannedAt,
+        banExpiresAt: target.banExpiresAt,
+        banReason: target.banReason
+      }
+    });
+  } catch (error) {
+    console.error('Staff ban failed:', error);
+    return res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+router.post('/users/:userId/unban', requireStaffRole('moderator'), async (req, res) => {
+  try {
+    const target = await findTargetUser(req.params.userId);
+    if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
+    if (!actorCanManageTarget(req.user.staffRole, target.staffRole)) {
+      return res.status(403).json({ error: 'Tu ne peux pas modifier les sanctions d’un membre du personnel de niveau égal ou supérieur.' });
+    }
+    if (!target.bannedAt) return res.status(400).json({ error: 'Ce compte n’est pas banni.' });
+
+    target.bannedAt = null;
+    target.banExpiresAt = null;
+    target.banReason = null;
+    target.sessionVersion = (target.sessionVersion || 0) + 1;
+    await target.save();
+
+    await audit(req, 'user.unbanned', { targetUser: target._id });
+    return res.json({ success: true, message: 'Compte débanni.' });
+  } catch (error) {
+    console.error('Staff unban failed:', error);
+    return res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+router.post('/users/:userId/password-reset', requireStaffRole('support'), async (req, res) => {
+  try {
+    const target = await findTargetUser(req.params.userId);
+    if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
+    if (!actorCanManageTarget(req.user.staffRole, target.staffRole)) {
+      return res.status(403).json({ error: 'Tu ne peux pas lancer la récupération du compte d’un membre du personnel de niveau égal ou supérieur.' });
+    }
+
+    const token = crypto.randomBytes(32).toString('base64url');
+    target.passwordResetTokenHash = hashToken(token);
+    target.passwordResetExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    target.passwordResetIssuedBy = req.user.id;
+    await target.save();
+
+    await audit(req, 'user.password_reset.issued', {
+      targetUser: target._id,
+      details: { expiresAt: target.passwordResetExpiresAt }
+    });
+
+    return res.json({
+      success: true,
+      resetToken: token,
+      expiresAt: target.passwordResetExpiresAt,
+      warning: 'Ce code est affiché une seule fois. Transmets-le au propriétaire du compte par un canal vérifié.'
+    });
+  } catch (error) {
+    console.error('Staff password reset issuance failed:', error);
+    return res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+router.patch('/users/:userId/role', requireStaffRole('admin'), async (req, res) => {
+  try {
+    const target = await findTargetUser(req.params.userId);
+    if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
+    const { staffRole } = req.body || {};
+
+    if (!Object.prototype.hasOwnProperty.call(ROLE_LEVELS, staffRole) || staffRole === 'user') {
+      return res.status(400).json({ error: 'Rôle du personnel invalide.' });
+    }
+    const canAssignRole = canManageRole(req.user.staffRole, staffRole) ||
+      (req.user.staffRole === 'owner' && staffRole === 'owner');
+    if (!actorCanManageTarget(req.user.staffRole, target.staffRole) || !canAssignRole) {
+      return res.status(403).json({ error: 'Tu ne peux pas attribuer ou modifier ce niveau de rôle.' });
+    }
+
+    const previousRole = target.staffRole || 'user';
+    target.staffRole = staffRole;
+    target.staffRoleUpdatedAt = new Date();
+    target.staffRoleUpdatedBy = new mongoose.Types.ObjectId(req.user.id);
+    await target.save();
+
+    await audit(req, 'staff.role.updated', {
+      targetUser: target._id,
+      details: { previousRole, staffRole }
+    });
+
+    return res.json({ success: true, username: target.username, staffRole });
+  } catch (error) {
+    console.error('Staff role update failed:', error);
+    return res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+router.get('/audit', requireStaffRole('admin'), async (req, res) => {
+  try {
+    const logs = await StaffAuditLog.find({})
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .populate('actor', 'username displayName staffRole')
+      .populate('targetUser', 'username displayName staffRole')
+      .populate('targetReport', 'status reportScope createdAt')
+      .lean();
+    return res.json({ logs });
+  } catch (error) {
+    console.error('Staff audit log retrieval failed:', error);
+    return res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+module.exports = router;
+, 'i') }
+    }).select('_id username displayName staffRole bannedAt banExpiresAt banReason');
+
+    if (!target) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+
+    await audit(req, 'staff.user.lookup', {
+      targetUser: target._id,
+      details: { username: target.username }
+    });
+
+    return res.json({ user: target });
+  } catch (error) {
+    console.error('Staff user lookup failed:', error);
     return res.status(500).json({ error: 'Erreur serveur.' });
   }
 });
