@@ -15,7 +15,7 @@ const router = express.Router();
 
 const actionLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 60,
+  max: 300,
   keyFn: req => req.user && req.user.id ? req.user.id : req.ip || 'unknown',
   message: 'Trop d’actions en peu de temps. Réessaie plus tard.'
 });
@@ -139,10 +139,30 @@ router.get('/account-help/requests', requireStaffRole('support'), async (req, re
       .limit(200)
       .populate('userId', 'username displayName')
       .lean();
+    const normalizedRequests = requests.map(item => {
+      const messages = Array.isArray(item.messages) ? [...item.messages] : [];
+      if (!messages.some(message => message.senderType === 'user') && item.message) {
+        messages.unshift({
+          senderType: 'user',
+          senderName: item.username,
+          text: item.message,
+          createdAt: item.createdAt
+        });
+      }
+      if (item.staffReply && !messages.some(message => message.senderType === 'staff' && message.text === item.staffReply)) {
+        messages.push({
+          senderType: 'staff',
+          senderName: 'Personnel Propard',
+          text: item.staffReply,
+          createdAt: item.staffReplyAt || item.updatedAt || item.createdAt
+        });
+      }
+      return { ...item, messages };
+    });
     const staffUser = await User.findById(req.user.id).select('staffNotificationPreferences').lean();
     const preferences = staffUser?.staffNotificationPreferences || {};
     return res.json({
-      requests,
+      requests: normalizedRequests,
       notifications: {
         passwordReset: preferences.passwordReset !== false,
         support: preferences.support !== false
