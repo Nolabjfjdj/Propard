@@ -174,6 +174,37 @@ router.get('/account-help/requests', requireStaffRole('support'), async (req, re
   }
 });
 
+router.delete('/account-help/requests/:id', requireStaffRole('senior_moderator'), async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ error: 'Demande invalide.' });
+    }
+
+    const supportRequest = await SupportRequest.findById(req.params.id);
+    if (!supportRequest) return res.status(404).json({ error: 'Demande introuvable.' });
+    if (supportRequest.status !== 'resolved') {
+      return res.status(409).json({ error: 'Seules les demandes résolues peuvent être supprimées.' });
+    }
+
+    await audit(req, 'account_help.request_deleted', {
+      targetUser: supportRequest.userId || null,
+      details: {
+        requestId: supportRequest._id.toString(),
+        kind: supportRequest.kind,
+        status: supportRequest.status,
+        createdAt: supportRequest.createdAt,
+        updatedAt: supportRequest.updatedAt
+      }
+    });
+    await SupportRequest.deleteOne({ _id: supportRequest._id });
+
+    return res.json({ success: true, message: 'Demande supprimée manuellement.' });
+  } catch (error) {
+    console.error('Account-help request deletion failed:', error);
+    return res.status(500).json({ error: 'Impossible de supprimer la demande.' });
+  }
+});
+
 router.patch('/account-help/requests/:id', requireStaffRole('support'), async (req, res) => {
   try {
     const body = req.body || {};
