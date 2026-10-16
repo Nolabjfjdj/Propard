@@ -97,7 +97,7 @@ export default function StaffPage() {
   const request = useCallback(async (method, path, data) => {
     const token = localStorage.getItem('propard_token');
     if (!token) throw new Error('Connecte-toi à Propard pour accéder au personnel.');
-    const config = { headers: { Authorization: `Bearer ${token}` } };
+    const config = { headers: { Authorization: `Bearer ${token}`, 'Cache-Control': 'no-cache' } };
     if (method === 'get') return api.get(path, config);
     if (method === 'patch') return api.patch(path, data, config);
     return api.post(path, data, config);
