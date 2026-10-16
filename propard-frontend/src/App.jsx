@@ -7,6 +7,7 @@ import ContactPage from './pages/ContactPage';
 import AdminPage from './pages/AdminPage';
 import StaffPage from './pages/StaffPage';
 import PasswordResetPage from './pages/PasswordResetPage';
+import AccountHelpStatusPage from './pages/AccountHelpStatusPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import GlobalAnnouncement from './components/GlobalAnnouncement';
@@ -284,6 +285,10 @@ export default function App() {
         <GlobalAnnouncement />
       </>
     );
+  }
+
+  if (path === '/account-help-status') {
+    return <AccountHelpStatusPage />;
   }
 
   if (path === '/password-reset') {
