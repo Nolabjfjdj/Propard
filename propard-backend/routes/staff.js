@@ -123,6 +123,19 @@ router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) =
 router.use(authMiddleware);
 router.use(actionLimiter);
 
+router.get('/bootstrap/status', async (req, res) => {
+  try {
+    const staffRoles = Object.keys(ROLE_LEVELS).filter(role => role !== 'user');
+    const existingStaff = await User.countDocuments({
+      staffRole: { $in: staffRoles }
+    });
+    return res.json({ available: existingStaff === 0 });
+  } catch (error) {
+    console.error('Staff bootstrap status check failed:', error);
+    return res.status(500).json({ error: 'Impossible de vérifier la configuration du personnel.' });
+  }
+});
+
 router.post('/bootstrap', async (req, res) => {
   try {
     const expectedSecret = process.env.STAFF_BOOTSTRAP_KEY || process.env.ADMIN_KEY;
