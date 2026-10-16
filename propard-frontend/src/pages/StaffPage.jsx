@@ -138,6 +138,21 @@ export default function StaffPage() {
     }
   };
 
+  const enableBrowserNotifications = async () => {
+    if (typeof window.Notification === 'undefined') {
+      setError('Ce navigateur ne prend pas en charge les notifications du navigateur.');
+      return;
+    }
+    try {
+      const permission = await window.Notification.requestPermission();
+      setNotice(permission === 'granted'
+        ? 'Notifications du navigateur activées.'
+        : 'Les notifications du navigateur ne sont pas autorisées. Tu peux toujours consulter les demandes dans le panneau.');
+    } catch {
+      setError('Impossible d’activer les notifications du navigateur.');
+    }
+  };
+
   const saveHelpNotifications = async (nextSettings) => {
     setHelpSettingsSaving(true);
     setError('');
@@ -373,7 +388,10 @@ export default function StaffPage() {
                   <input type="checkbox" checked={helpNotifications.support} disabled={helpSettingsSaving} onChange={event => saveHelpNotifications({ ...helpNotifications, support: event.target.checked })} />
                   Demandes de support
                 </label>
-                <small>Le panneau vérifie les nouvelles demandes toutes les 30 secondes. Les notifications du navigateur apparaissent seulement si elles sont déjà autorisées dans le navigateur.</small>
+                <small>Le panneau vérifie les nouvelles demandes toutes les 30 secondes lorsque cette page reste ouverte.</small>
+                {typeof window.Notification !== 'undefined' && window.Notification.permission !== 'granted' && (
+                  <button style={buttonStyle} onClick={enableBrowserNotifications}>Activer les notifications du navigateur</button>
+                )}
               </div>
             )}
             <button style={buttonStyle} onClick={() => loadAccountHelpRequests()} disabled={helpRequestsLoading}>
