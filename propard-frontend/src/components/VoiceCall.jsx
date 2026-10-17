@@ -88,6 +88,10 @@ export default function VoiceCall({
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(videoCall);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenShareSettingsOpen, setScreenShareSettingsOpen] = useState(false);
+  const [screenShareError, setScreenShareError] = useState('');
+  const [screenShareSettings, setScreenShareSettings] = useState({ width: 2560, height: 1440, fps: 60, automatic: true, audio: true });
 
   /*
    * Position de la fenêtre flottante.
@@ -105,6 +109,8 @@ export default function VoiceCall({
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteStreamRef = useRef(null);
+  const screenShareRef = useRef(null);
+  const remoteVideoAvailableRef = useRef(false);
   const timerRef = useRef(null);
 
   const hasInitiatedRef = useRef(false);
@@ -528,6 +534,12 @@ export default function VoiceCall({
 
     timerStartedRef.current = false;
 
+    if (screenShareRef.current) {
+      screenShareRef.current.stream.getTracks().forEach(track => track.stop());
+      screenShareRef.current.audioContext?.close().catch(() => {});
+      screenShareRef.current = null;
+    }
+
     if (localStreamRef.current) {
       localStreamRef.current
         .getTracks()
@@ -915,6 +927,10 @@ export default function VoiceCall({
         config
       );
 
+    if (!videoCall && typeof peer.addTransceiver === 'function') {
+      peer.addTransceiver('video', { direction: 'sendrecv' });
+    }
+
     peer.onicecandidate = e => {
       if (!e.candidate) return;
 
@@ -938,6 +954,7 @@ export default function VoiceCall({
 
       const stream = e.streams?.[0];
       if (!stream) return;
+      if (stream.getVideoTracks().length) remoteVideoAvailableRef.current = true;
 
       if (!remoteAudioRef.current) {
         remoteAudioRef.current = new Audio();
@@ -1360,6 +1377,122 @@ export default function VoiceCall({
     setCameraEnabled(nextEnabled);
   };
 
+  const stopScreenShare = async () => {
+    const share = screenShareRef.current;
+    if (!share) return;
+
+    screenShareRef.current = null;
+    share.stream.getTracks().forEach(track => track.stop());
+    share.audioContext?.close().catch(() => {});
+
+    const cameraTrack = localStreamRef.current?.getVideoTracks()[0] || null;
+    const microphoneTrack = localStreamRef.current?.getAudioTracks()[0] || null;
+    const peer = peerRef.current;
+
+    if (peer) {
+      const videoSender = peer.getSenders().find(sender => sender.track?.kind === 'video') ||
+        peer.getTransceivers().find(transceiver => transceiver.receiver?.track?.kind === 'video')?.sender;
+      const audioSender = peer.getSenders().find(sender => sender.track?.kind === 'audio') ||
+        peer.getTransceivers().find(transceiver => transceiver.receiver?.track?.kind === 'audio')?.sender;
+
+      try { if (videoSender) await videoSender.replaceTrack(cameraTrack); } catch (err) { console.error('Restauration vidéo impossible:', err); }
+      try { if (audioSender && microphoneTrack) await audioSender.replaceTrack(microphoneTrack); } catch (err) { console.error('Restauration audio impossible:', err); }
+    }
+
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+      localVideoRef.current.play?.().catch(() => {});
+    }
+
+    setIsScreenSharing(false);
+    setScreenShareError('');
+  };
+
+  const startScreenShare = async () => {
+    setScreenShareError('');
+
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      setScreenShareError('Le partage d’écran n’est pas pris en charge par ce navigateur ou cet appareil.');
+      return;
+    }
+
+    const peer = peerRef.current;
+    if (!peer || peer.connectionState === 'closed') {
+      setScreenShareError('La connexion n’est pas prête pour le partage d’écran.');
+      return;
+    }
+
+    let stream;
+    let audioContext;
+
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: Boolean(screenShareSettings.audio)
+      });
+
+      const videoTrack = stream.getVideoTracks()[0];
+      if (!videoTrack) throw new Error('Aucune vidéo capturée.');
+
+      if (!screenShareSettings.automatic) {
+        try {
+          await videoTrack.applyConstraints({
+            width: { ideal: Number(screenShareSettings.width) },
+            height: { ideal: Number(screenShareSettings.height) },
+            frameRate: { ideal: Number(screenShareSettings.fps), max: Number(screenShareSettings.fps) }
+          });
+        } catch (constraintError) {
+          console.warn('Le navigateur n’a pas accepté tous les paramètres demandés:', constraintError);
+        }
+      }
+
+      const videoSender = peer.getSenders().find(sender => sender.track?.kind === 'video') ||
+        peer.getTransceivers().find(transceiver => transceiver.receiver?.track?.kind === 'video')?.sender;
+      if (!videoSender) throw new Error('Ce navigateur ne permet pas d’ajouter la vidéo à cet appel.');
+      await videoSender.replaceTrack(videoTrack);
+
+      const screenAudioTrack = stream.getAudioTracks()[0];
+      const microphoneTrack = localStreamRef.current?.getAudioTracks()[0];
+      let mixedAudioTrack = null;
+
+      if (screenShareSettings.audio && screenAudioTrack && microphoneTrack) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioContext = new AudioContextClass();
+          await audioContext.resume();
+          const destination = audioContext.createMediaStreamDestination();
+          const micSource = audioContext.createMediaStreamSource(new MediaStream([microphoneTrack]));
+          const screenSource = audioContext.createMediaStreamSource(new MediaStream([screenAudioTrack]));
+          micSource.connect(destination);
+          screenSource.connect(destination);
+          mixedAudioTrack = destination.stream.getAudioTracks()[0];
+
+          const audioSender = peer.getSenders().find(sender => sender.track?.kind === 'audio') ||
+            peer.getTransceivers().find(transceiver => transceiver.receiver?.track?.kind === 'audio')?.sender;
+          if (audioSender && mixedAudioTrack) await audioSender.replaceTrack(mixedAudioTrack);
+        }
+      }
+
+      screenShareRef.current = { stream, audioContext, mixedAudioTrack };
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.play?.().catch(() => {});
+      }
+      videoTrack.onended = () => { void stopScreenShare(); };
+      setIsScreenSharing(true);
+      setScreenShareSettingsOpen(false);
+    } catch (err) {
+      stream?.getTracks().forEach(track => track.stop());
+      audioContext?.close().catch(() => {});
+      console.error('Partage d’écran impossible:', err);
+      setScreenShareError(
+        err?.name === 'NotAllowedError'
+          ? 'Partage annulé ou autorisation refusée.'
+          : (err?.message || 'Impossible de démarrer le partage d’écran.')
+      );
+    }
+  };
+
   const toggleMute = () => {
     if (
       !localStreamRef.current
@@ -1724,7 +1857,7 @@ export default function VoiceCall({
           </div>
         </div>
 
-        {videoCall && (status === 'connected' || status === 'calling') && (
+        {(videoCall || isScreenSharing || remoteVideoAvailableRef.current) && (status === 'connected' || status === 'calling') && (
           <div style={styles.videoArea}>
             <video
               ref={localVideoRef}
@@ -1741,6 +1874,18 @@ export default function VoiceCall({
             />
           </div>
         )}
+
+        {screenShareSettingsOpen && status === 'connected' && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '10px 0', color: 'var(--text-primary)', fontSize: '12px' }}>
+            <label>Largeur (px)<input type="number" min="320" max="7680" step="1" value={screenShareSettings.width} onChange={event => setScreenShareSettings(prev => ({ ...prev, width: Math.max(320, Math.min(7680, Number(event.target.value) || 320)) }))} style={styles.settingInput} /></label>
+            <label>Hauteur (px)<input type="number" min="240" max="4320" step="1" value={screenShareSettings.height} onChange={event => setScreenShareSettings(prev => ({ ...prev, height: Math.max(240, Math.min(4320, Number(event.target.value) || 240)) }))} style={styles.settingInput} /></label>
+            <label>FPS<input type="number" min="1" max="120" value={screenShareSettings.fps} onChange={event => setScreenShareSettings(prev => ({ ...prev, fps: Math.max(1, Math.min(120, Number(event.target.value) || 1)) }))} style={styles.settingInput} /></label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><input type="checkbox" checked={screenShareSettings.automatic} onChange={event => setScreenShareSettings(prev => ({ ...prev, automatic: event.target.checked }))} /> Qualité automatique</label>
+            <label style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '6px' }}><input type="checkbox" checked={screenShareSettings.audio} onChange={event => setScreenShareSettings(prev => ({ ...prev, audio: event.target.checked }))} /> Inclure l’audio du partage (si disponible)</label>
+            <span style={{ gridColumn: '1 / -1', color: 'var(--text-secondary)' }}>Les paramètres sont des objectifs : le navigateur, l’appareil et la connexion peuvent limiter la qualité réelle.</span>
+          </div>
+        )}
+        {screenShareError && <p role="status" style={{ color: 'var(--danger)', fontSize: '12px', margin: '6px 0' }}>{screenShareError}</p>}
 
         <div style={styles.buttons}>
           {status === 'incoming' ? (
@@ -1776,6 +1921,22 @@ export default function VoiceCall({
                     aria-label={muted ? 'Réactiver le micro' : 'Couper le micro'}
                   >
                     {muted ? '🔇' : '🎤'}
+                  </button>
+                  <button
+                    style={{ ...styles.muteBtn, background: isScreenSharing ? 'var(--success)' : 'var(--bg-hover)' }}
+                    onClick={() => isScreenSharing ? void stopScreenShare() : void startScreenShare()}
+                    aria-label={isScreenSharing ? 'Arrêter le partage d’écran' : 'Partager l’écran'}
+                    title={isScreenSharing ? 'Arrêter le partage d’écran' : 'Partager l’écran'}
+                  >
+                    {isScreenSharing ? '⏹️' : '🖥️'}
+                  </button>
+                  <button
+                    style={{ ...styles.muteBtn, background: screenShareSettingsOpen ? 'var(--accent-glow)' : 'var(--bg-hover)' }}
+                    onClick={() => setScreenShareSettingsOpen(value => !value)}
+                    aria-label="Paramètres du partage d’écran"
+                    title="Paramètres du partage d’écran"
+                  >
+                    ⚙️
                   </button>
                   {videoCall && (
                     <button
@@ -1958,6 +2119,18 @@ const styles = {
     height: '100%',
     objectFit: 'cover',
     background: '#111'
+  },
+
+  settingInput: {
+    display: 'block',
+    width: '100%',
+    boxSizing: 'border-box',
+    marginTop: '4px',
+    padding: '6px',
+    borderRadius: '6px',
+    border: '1px solid var(--border)',
+    background: 'var(--bg-primary)',
+    color: 'var(--text-primary)'
   },
 
   muteBtn: {
