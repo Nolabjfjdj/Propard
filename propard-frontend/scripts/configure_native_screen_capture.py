@@ -128,6 +128,7 @@ public class PropardScreenCapturePlugin extends Plugin {
         if (virtualDisplay != null) { virtualDisplay.release(); virtualDisplay = null; }
         if (imageReader != null) { imageReader.setOnImageAvailableListener(null, null); imageReader.close(); imageReader = null; }
         if (projection != null) { MediaProjection old = projection; projection = null; old.stop(); }
+        getContext().stopService(new Intent(getContext(), PropardScreenCaptureService.class));
     }
 }
 """
