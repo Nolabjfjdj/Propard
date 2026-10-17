@@ -65,6 +65,9 @@ jobs:
       - name: Synchroniser Android
         run: npx cap sync android
 
+      - name: Configurer le partage d'écran natif Android
+        run: python3 scripts/configure_native_screen_capture.py
+
       - name: Donner les permissions à Gradle
         working-directory: propard-frontend/android
         run: chmod +x gradlew
@@ -139,6 +142,9 @@ jobs:
 
       - name: Synchroniser iOS
         run: npx cap sync ios
+
+      - name: Configurer le partage d'écran natif iOS
+        run: python3 scripts/configure_native_screen_capture.py
 
       - name: Configurer les notifications Push iOS
         working-directory: propard-frontend
