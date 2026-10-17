@@ -1390,6 +1390,18 @@ export default function VoiceCall({
     setCameraEnabled(nextEnabled);
   };
 
+  const setScreenAudioEnabled = enabled => {
+    setScreenShareSettings(previous => ({ ...previous, audio: enabled }));
+    const share = screenShareRef.current;
+    if (!share?.screenAudioSource || !share.audioDestination) return;
+    try {
+      if (enabled) share.screenAudioSource.connect(share.audioDestination);
+      else share.screenAudioSource.disconnect();
+    } catch (err) {
+      console.error('Impossible de modifier l’audio du partage:', err);
+    }
+  };
+
   const stopScreenShare = async () => {
     const share = screenShareRef.current;
     if (!share) return;
@@ -1467,18 +1479,20 @@ export default function VoiceCall({
       const screenAudioTrack = stream.getAudioTracks()[0];
       const microphoneTrack = localStreamRef.current?.getAudioTracks()[0];
       let mixedAudioTrack = null;
+      let screenAudioSource = null;
+      let audioDestination = null;
 
-      if (screenShareSettings.audio && screenAudioTrack && microphoneTrack) {
+      if (screenAudioTrack && microphoneTrack) {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (AudioContextClass) {
           audioContext = new AudioContextClass();
           await audioContext.resume();
-          const destination = audioContext.createMediaStreamDestination();
+          audioDestination = audioContext.createMediaStreamDestination();
           const micSource = audioContext.createMediaStreamSource(new MediaStream([microphoneTrack]));
-          const screenSource = audioContext.createMediaStreamSource(new MediaStream([screenAudioTrack]));
-          micSource.connect(destination);
-          screenSource.connect(destination);
-          mixedAudioTrack = destination.stream.getAudioTracks()[0];
+          screenAudioSource = audioContext.createMediaStreamSource(new MediaStream([screenAudioTrack]));
+          micSource.connect(audioDestination);
+          if (screenShareSettings.audio) screenAudioSource.connect(audioDestination);
+          mixedAudioTrack = audioDestination.stream.getAudioTracks()[0];
 
           const audioSender = peer.getSenders().find(sender => sender.track?.kind === 'audio') ||
             peer.getTransceivers().find(transceiver => transceiver.receiver?.track?.kind === 'audio')?.sender;
@@ -1486,7 +1500,7 @@ export default function VoiceCall({
         }
       }
 
-      screenShareRef.current = { stream, audioContext, mixedAudioTrack };
+      screenShareRef.current = { stream, audioContext, mixedAudioTrack, screenAudioSource, audioDestination };
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
         localVideoRef.current.play?.().catch(() => {});
@@ -1894,7 +1908,7 @@ export default function VoiceCall({
             <label>Hauteur (px)<input type="number" min="240" max="4320" step="1" value={screenShareSettings.height} onChange={event => setScreenShareSettings(prev => ({ ...prev, height: Math.max(240, Math.min(4320, Number(event.target.value) || 240)) }))} style={styles.settingInput} /></label>
             <label>FPS<input type="number" min="1" max="120" value={screenShareSettings.fps} onChange={event => setScreenShareSettings(prev => ({ ...prev, fps: Math.max(1, Math.min(120, Number(event.target.value) || 1)) }))} style={styles.settingInput} /></label>
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><input type="checkbox" checked={screenShareSettings.automatic} onChange={event => setScreenShareSettings(prev => ({ ...prev, automatic: event.target.checked }))} /> Qualité automatique</label>
-            <label style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '6px' }}><input type="checkbox" checked={screenShareSettings.audio} onChange={event => setScreenShareSettings(prev => ({ ...prev, audio: event.target.checked }))} /> Inclure l’audio du partage (si disponible)</label>
+            <label style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '6px' }}><input type="checkbox" checked={screenShareSettings.audio} onChange={event => setScreenAudioEnabled(event.target.checked)} /> Inclure l’audio du partage (si disponible)</label>
             <span style={{ gridColumn: '1 / -1', color: 'var(--text-secondary)' }}>Les paramètres sont des objectifs : le navigateur, l’appareil et la connexion peuvent limiter la qualité réelle.</span>
           </div>
         )}
