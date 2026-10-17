@@ -164,6 +164,11 @@ if manifest.exists():
         source = source.replace("<manifest ", '<manifest xmlns:tools="http://schemas.android.com/tools" ', 1) if "xmlns:tools=" not in source else source
         source = source.replace("<application", '<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />\n    <application', 1)
         manifest.write_text(source)
+    source = manifest.read_text()
+    if "PropardScreenCaptureService" not in source:
+        service_entry = '<service android:name="site.propard.PropardScreenCaptureService" android:exported="false" android:foregroundServiceType="mediaProjection" />'
+        source = source.replace("</application>", service_entry + "\\n    </application>", 1)
+        manifest.write_text(source)
 
 # iOS plugin: ReplayKit's in-app capture API produces live frames for the WebRTC canvas bridge.
 ios_app = root / "App"
