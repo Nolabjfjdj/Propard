@@ -145,21 +145,35 @@ export default function StaffPage() {
       const response = await request('get', '/api/staff/account-help/requests');
       const incoming = response.data.requests || [];
       const preferences = response.data.notifications || { passwordReset: true, support: true };
+      const requestSignatures = new Map(incoming.map(item => {
+        const lastUserMessage = [...(item.messages || [])].reverse().find(message => message.senderType === 'user');
+        return [item._id, lastUserMessage ? `${lastUserMessage.createdAt || ''}:${lastUserMessage.text || ''}` : ''];
+      }));
       if (notify && knownHelpRequestIds.current) {
-        const fresh = incoming.filter(item =>
-          !knownHelpRequestIds.current.has(item._id) &&
-          item.status === 'new' &&
-          (item.kind === 'password_reset' ? preferences.passwordReset : preferences.support)
-        );
-        if (fresh.length && typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted') {
-          new window.Notification('Nouvelle demande Propard', {
-            body: fresh.length === 1
-              ? `${fresh[0].kind === 'password_reset' ? 'Récupération de compte' : 'Support'} · @${fresh[0].username}`
-              : `${fresh.length} nouvelles demandes reçues.`
-          });
+        const fresh = incoming.flatMap(item => {
+          const previousSignature = knownHelpRequestIds.current.get(item._id);
+          const signature = requestSignatures.get(item._id);
+          const isNewRequest = previousSignature === undefined && item.status === 'new';
+          const isNewUserMessage = previousSignature !== undefined && signature !== previousSignature &&
+            [...(item.messages || [])].reverse().find(message => message.senderType === 'user');
+          const enabled = item.kind === 'password_reset' ? preferences.passwordReset : preferences.support;
+          if (!enabled || (!isNewRequest && !isNewUserMessage)) return [];
+          return [{
+            id: `help:${item._id}:${signature}`,
+            category: item.kind === 'password_reset' ? 'passwordReset' : 'support',
+            title: isNewRequest ? (item.kind === 'password_reset' ? 'Nouvelle demande de récupération' : 'Nouvelle demande de support') : 'Nouveau message de support',
+            message: `@${item.username}${typeof isNewUserMessage === 'object' && isNewUserMessage.text ? ` · ${isNewUserMessage.text.slice(0, 100)}` : ''}`,
+            createdAt: isNewUserMessage?.createdAt || item.createdAt
+          }];
+        });
+        if (fresh.length) {
+          setStaffNotifications(previous => [...fresh, ...previous].slice(0, 40));
+          if (typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted') {
+            fresh.slice(0, 3).forEach(item => new window.Notification(item.title, { body: item.message }));
+          }
         }
       }
-      knownHelpRequestIds.current = new Set(incoming.map(item => item._id));
+      knownHelpRequestIds.current = requestSignatures;
       setAccountHelpRequests(incoming);
       setHelpNotifications(preferences);
     } catch (err) {
