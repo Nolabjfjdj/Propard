@@ -1453,7 +1453,7 @@ export default function VoiceCall({
     try {
       stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
-        audio: Boolean(screenShareSettings.audio)
+        audio: true
       });
 
       const videoTrack = stream.getVideoTracks()[0];
