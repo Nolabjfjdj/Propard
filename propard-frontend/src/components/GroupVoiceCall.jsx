@@ -617,7 +617,7 @@ export default function GroupVoiceCall({
     try {
       stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
-        audio: Boolean(screenShareSettings.audio)
+        audio: true
       });
       const videoTrack = stream.getVideoTracks()[0];
       if (!videoTrack) throw new Error('Aucune vidéo capturée.');
