@@ -111,7 +111,6 @@ export default function VoiceCall({
   const remoteVideoRef = useRef(null);
   const remoteStreamRef = useRef(null);
   const screenShareRef = useRef(null);
-  const remoteVideoAvailableRef = useRef(false);
   const timerRef = useRef(null);
 
   const hasInitiatedRef = useRef(false);
@@ -953,8 +952,9 @@ export default function VoiceCall({
         return;
       }
 
-      const stream = e.streams?.[0];
-      if (!stream) return;
+      let stream = e.streams?.[0] || remoteStreamRef.current;
+      if (!stream) stream = new MediaStream();
+      if (e.track && !stream.getTracks().some(track => track.id === e.track.id)) stream.addTrack(e.track);
       if (stream.getVideoTracks().length) setRemoteVideoAvailable(true);
 
       if (!remoteAudioRef.current) {
