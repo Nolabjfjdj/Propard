@@ -59,6 +59,10 @@ export default function GroupVoiceCall({
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(videoCall);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenShareSettingsOpen, setScreenShareSettingsOpen] = useState(false);
+  const [screenShareError, setScreenShareError] = useState('');
+  const [screenShareSettings, setScreenShareSettings] = useState({ width: 2560, height: 1440, fps: 60, automatic: true, audio: true });
   const [remoteStreams, setRemoteStreams] = useState(new Map());
   const [participants, setParticipants] = useState([]);
   const [windowPosition, setWindowPosition] = useState(null);
@@ -70,6 +74,8 @@ export default function GroupVoiceCall({
   const localStreamRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteAudioRef = useRef(new Map());
+  const remoteMediaStreamsRef = useRef(new Map());
+  const screenShareRef = useRef(null);
   const timerRef = useRef(null);
   const timerStartedRef = useRef(false);
   const callStartedAtRef = useRef(null);
@@ -331,6 +337,9 @@ export default function GroupVoiceCall({
 
     const config = await getIceConfig();
     const peer = new RTCPeerConnection(config);
+    if (!videoCall && typeof peer.addTransceiver === 'function') {
+      peer.addTransceiver('video', { direction: 'sendrecv' });
+    }
 
     peersRef.current.set(id, peer);
 
@@ -350,8 +359,13 @@ export default function GroupVoiceCall({
 
     peer.ontrack = event => {
       if (closedRef.current) return;
-      const stream = event.streams?.[0];
-      if (stream) attachRemoteStream(id, stream);
+      let stream = event.streams?.[0] || remoteMediaStreamsRef.current.get(id);
+      if (!stream) stream = new MediaStream();
+      remoteMediaStreamsRef.current.set(id, stream);
+      if (event.track && !stream.getTracks().some(track => track.id === event.track.id)) {
+        stream.addTrack(event.track);
+      }
+      attachRemoteStream(id, stream);
     };
 
     peer.oniceconnectionstatechange = () => {
@@ -478,6 +492,12 @@ export default function GroupVoiceCall({
     timerRef.current = null;
     timerStartedRef.current = false;
 
+    if (screenShareRef.current) {
+      screenShareRef.current.stream.getTracks().forEach(track => track.stop());
+      screenShareRef.current.audioContext?.close().catch(() => {});
+      screenShareRef.current = null;
+    }
+
     for (const peer of peersRef.current.values()) {
       peer.onicecandidate = null;
       peer.ontrack = null;
@@ -486,6 +506,7 @@ export default function GroupVoiceCall({
     }
 
     peersRef.current.clear();
+    remoteMediaStreamsRef.current.clear();
     pendingCandidatesRef.current.clear();
     restartingRef.current.clear();
 
@@ -529,6 +550,119 @@ export default function GroupVoiceCall({
     });
 
     setCameraEnabled(nextEnabled);
+  };
+
+  const stopScreenShare = async () => {
+    const share = screenShareRef.current;
+    if (!share) return;
+
+    screenShareRef.current = null;
+    share.stream.getTracks().forEach(track => track.stop());
+    share.audioContext?.close().catch(() => {});
+
+    const cameraTrack = localStreamRef.current?.getVideoTracks()[0] || null;
+    const microphoneTrack = localStreamRef.current?.getAudioTracks()[0] || null;
+
+    for (const peer of peersRef.current.values()) {
+      const videoSender = peer.getSenders().find(sender => sender.track?.kind === 'video') ||
+        peer.getTransceivers().find(transceiver => transceiver.receiver?.track?.kind === 'video')?.sender;
+      const audioSender = peer.getSenders().find(sender => sender.track?.kind === 'audio') ||
+        peer.getTransceivers().find(transceiver => transceiver.receiver?.track?.kind === 'audio')?.sender;
+      try { if (videoSender) await videoSender.replaceTrack(cameraTrack); } catch (err) { console.error('Restauration vidéo groupe impossible:', err); }
+      try { if (audioSender && microphoneTrack) await audioSender.replaceTrack(microphoneTrack); } catch (err) { console.error('Restauration audio groupe impossible:', err); }
+    }
+
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+      localVideoRef.current.play?.().catch(() => {});
+    }
+    setIsScreenSharing(false);
+    setScreenShareError('');
+  };
+
+  const startScreenShare = async () => {
+    setScreenShareError('');
+
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      setScreenShareError('Le partage d’écran n’est pas pris en charge par ce navigateur ou cet appareil.');
+      return;
+    }
+    if (!peersRef.current.size) {
+      setScreenShareError('Aucun participant n’est encore connecté.');
+      return;
+    }
+
+    let stream;
+    let audioContext;
+
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: Boolean(screenShareSettings.audio)
+      });
+      const videoTrack = stream.getVideoTracks()[0];
+      if (!videoTrack) throw new Error('Aucune vidéo capturée.');
+
+      if (!screenShareSettings.automatic) {
+        try {
+          await videoTrack.applyConstraints({
+            width: { ideal: Number(screenShareSettings.width) },
+            height: { ideal: Number(screenShareSettings.height) },
+            frameRate: { ideal: Number(screenShareSettings.fps), max: Number(screenShareSettings.fps) }
+          });
+        } catch (constraintError) {
+          console.warn('Le navigateur n’a pas accepté tous les paramètres demandés:', constraintError);
+        }
+      }
+
+      const videoSenders = [];
+      for (const peer of peersRef.current.values()) {
+        const sender = peer.getSenders().find(item => item.track?.kind === 'video') ||
+          peer.getTransceivers().find(transceiver => transceiver.receiver?.track?.kind === 'video')?.sender;
+        if (!sender) throw new Error('Un participant ne permet pas de recevoir la vidéo du partage.');
+        videoSenders.push(sender);
+      }
+      for (const sender of videoSenders) await sender.replaceTrack(videoTrack);
+
+      const screenAudioTrack = stream.getAudioTracks()[0];
+      const microphoneTrack = localStreamRef.current?.getAudioTracks()[0];
+      let mixedAudioTrack = null;
+      if (screenShareSettings.audio && screenAudioTrack && microphoneTrack) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioContext = new AudioContextClass();
+          await audioContext.resume();
+          const destination = audioContext.createMediaStreamDestination();
+          audioContext.createMediaStreamSource(new MediaStream([microphoneTrack])).connect(destination);
+          audioContext.createMediaStreamSource(new MediaStream([screenAudioTrack])).connect(destination);
+          mixedAudioTrack = destination.stream.getAudioTracks()[0];
+
+          for (const peer of peersRef.current.values()) {
+            const audioSender = peer.getSenders().find(item => item.track?.kind === 'audio') ||
+              peer.getTransceivers().find(transceiver => transceiver.receiver?.track?.kind === 'audio')?.sender;
+            if (audioSender && mixedAudioTrack) await audioSender.replaceTrack(mixedAudioTrack);
+          }
+        }
+      }
+
+      screenShareRef.current = { stream, audioContext, mixedAudioTrack };
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.play?.().catch(() => {});
+      }
+      videoTrack.onended = () => { void stopScreenShare(); };
+      setIsScreenSharing(true);
+      setScreenShareSettingsOpen(false);
+    } catch (err) {
+      stream?.getTracks().forEach(track => track.stop());
+      audioContext?.close().catch(() => {});
+      console.error('Partage d’écran groupe impossible:', err);
+      setScreenShareError(
+        err?.name === 'NotAllowedError'
+          ? 'Partage annulé ou autorisation refusée.'
+          : (err?.message || 'Impossible de démarrer le partage d’écran.')
+      );
+    }
   };
 
   const toggleMute = () => {
@@ -972,7 +1106,7 @@ export default function GroupVoiceCall({
           </div>
         </div>
 
-        {videoCall && (status === 'connected' || status === 'calling') && (
+        {(videoCall || isScreenSharing || [...remoteStreams.values()].some(stream => stream.getVideoTracks().length > 0)) && (status === 'connected' || status === 'calling') && (
           <div style={styles.videoGrid}>
             <div style={styles.videoTile}>
               <video
@@ -1037,6 +1171,18 @@ export default function GroupVoiceCall({
           )}
         </div>
 
+        {screenShareSettingsOpen && status === 'connected' && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '10px 0', color: 'var(--text-primary)', fontSize: '12px' }}>
+            <label>Largeur (px)<input type="number" min="320" max="7680" value={screenShareSettings.width} onChange={event => setScreenShareSettings(prev => ({ ...prev, width: Math.max(320, Math.min(7680, Number(event.target.value) || 320)) }))} style={styles.settingInput} /></label>
+            <label>Hauteur (px)<input type="number" min="240" max="4320" value={screenShareSettings.height} onChange={event => setScreenShareSettings(prev => ({ ...prev, height: Math.max(240, Math.min(4320, Number(event.target.value) || 240)) }))} style={styles.settingInput} /></label>
+            <label>FPS<input type="number" min="1" max="120" value={screenShareSettings.fps} onChange={event => setScreenShareSettings(prev => ({ ...prev, fps: Math.max(1, Math.min(120, Number(event.target.value) || 1)) }))} style={styles.settingInput} /></label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><input type="checkbox" checked={screenShareSettings.automatic} onChange={event => setScreenShareSettings(prev => ({ ...prev, automatic: event.target.checked }))} /> Qualité automatique</label>
+            <label style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '6px' }}><input type="checkbox" checked={screenShareSettings.audio} onChange={event => setScreenShareSettings(prev => ({ ...prev, audio: event.target.checked }))} /> Inclure l’audio du partage (si disponible)</label>
+            <span style={{ gridColumn: '1 / -1', color: 'var(--text-secondary)' }}>Les paramètres sont des objectifs : le navigateur, l’appareil et la connexion peuvent limiter la qualité réelle.</span>
+          </div>
+        )}
+        {screenShareError && <p role="status" style={{ color: 'var(--danger)', fontSize: '12px', margin: '6px 0' }}>{screenShareError}</p>}
+
         <div style={styles.buttons}>
           {status === 'incoming' ? (
             <>
@@ -1068,6 +1214,22 @@ export default function GroupVoiceCall({
                     aria-label={muted ? 'Réactiver le micro' : 'Couper le micro'}
                   >
                     {muted ? '🔇' : '🎤'}
+                  </button>
+                  <button
+                    style={{ ...styles.muteBtn, background: isScreenSharing ? 'var(--success)' : 'var(--bg-hover)' }}
+                    onClick={() => isScreenSharing ? void stopScreenShare() : void startScreenShare()}
+                    aria-label={isScreenSharing ? 'Arrêter le partage d’écran' : 'Partager l’écran'}
+                    title={isScreenSharing ? 'Arrêter le partage d’écran' : 'Partager l’écran'}
+                  >
+                    {isScreenSharing ? '⏹️' : '🖥️'}
+                  </button>
+                  <button
+                    style={{ ...styles.muteBtn, background: screenShareSettingsOpen ? 'var(--accent-glow)' : 'var(--bg-hover)' }}
+                    onClick={() => setScreenShareSettingsOpen(value => !value)}
+                    aria-label="Paramètres du partage d’écran"
+                    title="Paramètres du partage d’écran"
+                  >
+                    ⚙️
                   </button>
                   {videoCall && (
                     <button
@@ -1296,6 +1458,18 @@ const styles = {
     fontSize: '20px',
     cursor: 'pointer',
     touchAction: 'manipulation'
+  },
+
+  settingInput: {
+    display: 'block',
+    width: '100%',
+    boxSizing: 'border-box',
+    marginTop: '4px',
+    padding: '6px',
+    borderRadius: '6px',
+    border: '1px solid var(--border)',
+    background: 'var(--bg-primary)',
+    color: 'var(--text-primary)'
   },
 
   muteBtn: {
