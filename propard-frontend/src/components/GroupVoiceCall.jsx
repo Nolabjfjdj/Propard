@@ -366,6 +366,12 @@ export default function GroupVoiceCall({
       if (event.track && !stream.getTracks().some(track => track.id === event.track.id)) {
         stream.addTrack(event.track);
       }
+      if (event.track?.kind === 'video') {
+        const refreshRemoteStreams = () => setRemoteStreams(previous => new Map(previous));
+        event.track.addEventListener('unmute', refreshRemoteStreams);
+        event.track.addEventListener('mute', refreshRemoteStreams);
+        event.track.addEventListener('ended', refreshRemoteStreams);
+      }
       attachRemoteStream(id, stream);
     };
 
@@ -1107,7 +1113,7 @@ export default function GroupVoiceCall({
           </div>
         </div>
 
-        {(videoCall || isScreenSharing || [...remoteStreams.values()].some(stream => stream.getVideoTracks().length > 0)) && (status === 'connected' || status === 'calling') && (
+        {(videoCall || isScreenSharing || [...remoteStreams.values()].some(stream => stream.getVideoTracks().some(track => !track.muted && track.readyState === 'live'))) && (status === 'connected' || status === 'calling') && (
           <div style={styles.videoGrid}>
             <div style={styles.videoTile}>
               <video
