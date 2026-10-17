@@ -92,6 +92,7 @@ export default function VoiceCall({
   const [screenShareSettingsOpen, setScreenShareSettingsOpen] = useState(false);
   const [screenShareError, setScreenShareError] = useState('');
   const [screenShareSettings, setScreenShareSettings] = useState({ width: 2560, height: 1440, fps: 60, automatic: true, audio: true });
+  const [remoteVideoAvailable, setRemoteVideoAvailable] = useState(false);
 
   /*
    * Position de la fenêtre flottante.
@@ -954,7 +955,7 @@ export default function VoiceCall({
 
       const stream = e.streams?.[0];
       if (!stream) return;
-      if (stream.getVideoTracks().length) remoteVideoAvailableRef.current = true;
+      if (stream.getVideoTracks().length) setRemoteVideoAvailable(true);
 
       if (!remoteAudioRef.current) {
         remoteAudioRef.current = new Audio();
@@ -1857,7 +1858,7 @@ export default function VoiceCall({
           </div>
         </div>
 
-        {(videoCall || isScreenSharing || remoteVideoAvailableRef.current) && (status === 'connected' || status === 'calling') && (
+        {(videoCall || isScreenSharing || remoteVideoAvailable) && (status === 'connected' || status === 'calling') && (
           <div style={styles.videoArea}>
             <video
               ref={localVideoRef}
