@@ -204,6 +204,7 @@ export default function StaffPage() {
 
   const loadStaffEvents = useCallback(async ({ notify = false } = {}) => {
     if (!['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(staffRole)) return;
+    if (!notify) setStaffNotificationsLoading(true);
     try {
       const [eventsResponse, preferencesResponse] = await Promise.all([
         request('get', '/api/staff/notifications/events'),
@@ -271,6 +272,8 @@ export default function StaffPage() {
       });
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de charger les notifications du personnel.');
+    } finally {
+      if (!notify) setStaffNotificationsLoading(false);
     }
   }, [request, staffRole]);
 
