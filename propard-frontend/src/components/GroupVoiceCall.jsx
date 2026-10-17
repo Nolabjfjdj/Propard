@@ -1128,7 +1128,7 @@ export default function GroupVoiceCall({
           </div>
         </div>
 
-        {(videoCall || isScreenSharing || [...remoteStreams.values()].some(stream => stream.getVideoTracks().some(track => !track.muted && track.readyState === 'live'))) && (status === 'connected' || status === 'calling') && (
+        {(videoCall || isScreenSharing || [...remoteStreams.values()].some(stream => stream.getVideoTracks().some(track => track.readyState === 'live'))) && (status === 'connected' || status === 'calling') && (
           <div style={styles.videoGrid}>
             <div style={styles.videoTile}>
               <video
