@@ -1471,9 +1471,21 @@ export default function VoiceCall({
         console.warn('Le navigateur n’a pas accepté tous les paramètres demandés:', constraintError);
       }
 
-      const videoSender = peer.getSenders().find(sender => sender.track?.kind === 'video') ||
+      let videoSender = peer.getSenders().find(sender => sender.track?.kind === 'video') ||
         peer.getTransceivers().find(transceiver => transceiver.receiver?.track?.kind === 'video')?.sender;
-      if (!videoSender) throw new Error('Ce navigateur ne permet pas d’ajouter la vidéo à cet appel.');
+
+      if (!videoSender && typeof peer.addTransceiver === 'function') {
+        videoSender = peer.addTransceiver('video', { direction: 'sendrecv' }).sender;
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
+        socket.emit('iceRestartOffer', {
+          receiverId: friend._id,
+          offer,
+          videoCall
+        });
+      }
+
+      if (!videoSender) throw new Error('Impossible de créer une piste vidéo pour cet appel.');
       await videoSender.replaceTrack(videoTrack);
 
       const screenAudioTrack = stream.getAudioTracks()[0];
