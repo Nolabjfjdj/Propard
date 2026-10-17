@@ -116,7 +116,7 @@ export default function StaffPage() {
   const [helpReplyDrafts, setHelpReplyDrafts] = useState({});
   const [helpReplySaving, setHelpReplySaving] = useState('');
   const [helpNotifications, setHelpNotifications] = useState({ passwordReset: true, support: true });
-  const [staffEventPreferences, setStaffEventPreferences] = useState({ reports: true, bans: true, staffActions: true });
+  const [staffEventPreferences, setStaffEventPreferences] = useState({ passwordReset: true, support: true, reports: true, bans: true, staffActions: true });
   const [staffEventPreferencesSaving, setStaffEventPreferencesSaving] = useState(false);
   const [staffNotifications, setStaffNotifications] = useState([]);
   const [staffNotificationsLoading, setStaffNotificationsLoading] = useState(false);
