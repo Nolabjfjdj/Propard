@@ -1902,7 +1902,7 @@ export default function VoiceCall({
           </div>
         )}
 
-        {screenShareSupported && screenShareSettingsOpen && status === 'connected' && (
+        {screenShareSettingsOpen && status === 'connected' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '10px 0', color: 'var(--text-primary)', fontSize: '12px' }}>
             <label>Largeur (px)<input type="number" min="320" max="7680" step="1" value={screenShareSettings.width} onChange={event => setScreenShareSettings(prev => ({ ...prev, width: Math.max(320, Math.min(7680, Number(event.target.value) || 320)) }))} style={styles.settingInput} /></label>
             <label>Hauteur (px)<input type="number" min="240" max="4320" step="1" value={screenShareSettings.height} onChange={event => setScreenShareSettings(prev => ({ ...prev, height: Math.max(240, Math.min(4320, Number(event.target.value) || 240)) }))} style={styles.settingInput} /></label>
@@ -1949,8 +1949,7 @@ export default function VoiceCall({
                   >
                     {muted ? '🔇' : '🎤'}
                   </button>
-                  {screenShareSupported && (
-                    <>
+                  <>
                       <button
                         style={{ ...styles.muteBtn, background: isScreenSharing ? 'var(--success)' : 'var(--bg-hover)' }}
                         onClick={() => isScreenSharing ? void stopScreenShare() : void startScreenShare()}
@@ -1968,7 +1967,6 @@ export default function VoiceCall({
                         ⚙️
                       </button>
                     </>
-                  )}
                   {videoCall && (
                     <button
                       style={{
