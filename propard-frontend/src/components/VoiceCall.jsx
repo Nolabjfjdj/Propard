@@ -959,8 +959,8 @@ export default function VoiceCall({
       if (e.track?.kind === 'video') {
         const refreshVideoAvailability = () => {
           setRemoteVideoAvailable(
-            Boolean(remoteStreamRef.current?.getVideoTracks().some(track => !track.muted && track.readyState === 'live')) ||
-            Boolean(!remoteStreamRef.current && !e.track.muted && e.track.readyState === 'live')
+            Boolean(remoteStreamRef.current?.getVideoTracks().some(track => track.readyState === 'live')) ||
+            Boolean(e.track.readyState === 'live')
           );
         };
         e.track.addEventListener('unmute', refreshVideoAvailability);
@@ -1894,7 +1894,13 @@ export default function VoiceCall({
               style={styles.localVideo}
             />
             <video
-              ref={remoteVideoRef}
+              ref={element => {
+                remoteVideoRef.current = element;
+                if (element && remoteStreamRef.current && element.srcObject !== remoteStreamRef.current) {
+                  element.srcObject = remoteStreamRef.current;
+                  element.play().catch(err => console.error('Impossible de lire le flux vidéo distant:', err));
+                }
+              }}
               autoPlay
               playsInline
               style={styles.remoteVideo}
