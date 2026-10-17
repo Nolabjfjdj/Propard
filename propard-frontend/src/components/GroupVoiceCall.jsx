@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import socket from '../socket';
 import { API_URL } from '../utils/api';
+import { startMobileScreenCapture } from '../utils/mobileScreenCapture';
 
 const POSITION_STORAGE_KEY = 'propard_group_voice_call_position';
 
@@ -51,7 +52,7 @@ export default function GroupVoiceCall({
   videoCall = false
 }) {
   const myId = normalizeId(userId);
-  const screenShareSupported = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getDisplayMedia);
+  const screenShareSupported = typeof navigator !== 'undefined' && (Boolean(navigator.mediaDevices?.getDisplayMedia) || Boolean(window.Capacitor?.isNativePlatform?.()));
   const groupId = normalizeId(group?._id);
 
   const [status, setStatus] = useState(
@@ -577,6 +578,7 @@ export default function GroupVoiceCall({
 
     screenShareRef.current = null;
     share.stream.getTracks().forEach(track => track.stop());
+    await share.stopCapture?.();
     share.audioContext?.close().catch(() => {});
 
     const cameraTrack = localStreamRef.current?.getVideoTracks()[0] || null;
@@ -602,7 +604,7 @@ export default function GroupVoiceCall({
   const startScreenShare = async () => {
     setScreenShareError('');
 
-    if (!navigator.mediaDevices?.getDisplayMedia) {
+    if (!window.Capacitor?.isNativePlatform?.() && !navigator.mediaDevices?.getDisplayMedia) {
       setScreenShareError('Le partage d’écran n’est pas pris en charge par ce navigateur ou cet appareil.');
       return;
     }
@@ -613,9 +615,11 @@ export default function GroupVoiceCall({
 
     let stream;
     let audioContext;
+    let nativeCapture;
 
     try {
-      stream = await navigator.mediaDevices.getDisplayMedia({
+      nativeCapture = await startMobileScreenCapture();
+      stream = nativeCapture?.stream || await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: true
       });
@@ -680,7 +684,7 @@ export default function GroupVoiceCall({
         }
       }
 
-      screenShareRef.current = { stream, audioContext, mixedAudioTrack, screenAudioSource, audioDestination };
+      screenShareRef.current = { stream, audioContext, mixedAudioTrack, screenAudioSource, audioDestination, stopCapture: nativeCapture?.stopCapture };
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
         localVideoRef.current.play?.().catch(() => {});
@@ -690,6 +694,7 @@ export default function GroupVoiceCall({
       setScreenShareSettingsOpen(false);
     } catch (err) {
       stream?.getTracks().forEach(track => track.stop());
+      await nativeCapture?.stopCapture?.();
       audioContext?.close().catch(() => {});
       console.error('Partage d’écran groupe impossible:', err);
       setScreenShareError(
