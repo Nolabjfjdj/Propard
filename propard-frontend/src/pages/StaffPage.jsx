@@ -116,6 +116,11 @@ export default function StaffPage() {
   const [helpReplyDrafts, setHelpReplyDrafts] = useState({});
   const [helpReplySaving, setHelpReplySaving] = useState('');
   const [helpNotifications, setHelpNotifications] = useState({ passwordReset: true, support: true });
+  const [staffEventPreferences, setStaffEventPreferences] = useState({ reports: true, bans: true, staffActions: true });
+  const [staffEventPreferencesSaving, setStaffEventPreferencesSaving] = useState(false);
+  const [staffNotifications, setStaffNotifications] = useState([]);
+  const [staffNotificationsLoading, setStaffNotificationsLoading] = useState(false);
+  const seenStaffEventIds = useRef(null);
   const [helpRequestsLoading, setHelpRequestsLoading] = useState(false);
   const [helpSettingsSaving, setHelpSettingsSaving] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
@@ -161,6 +166,97 @@ export default function StaffPage() {
       setError(err.response?.data?.error || 'Impossible de charger les demandes de support.');
     } finally {
       if (!notify) setHelpRequestsLoading(false);
+    }
+  }, [request, staffRole]);
+
+  const saveStaffEventPreferences = async nextPreferences => {
+    setStaffEventPreferences(nextPreferences);
+    setStaffEventPreferencesSaving(true);
+    setError('');
+    try {
+      const response = await request('patch', '/api/staff/notifications/preferences', { preferences: nextPreferences });
+      setStaffEventPreferences(response.data.preferences || nextPreferences);
+      setNotice('Tes préférences de notifications du personnel ont été enregistrées.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible d’enregistrer les notifications.');
+      try {
+        const response = await request('get', '/api/staff/notifications/preferences');
+        setStaffEventPreferences(response.data.preferences || { reports: true, bans: true, staffActions: true });
+      } catch {}
+    } finally {
+      setStaffEventPreferencesSaving(false);
+    }
+  };
+
+  const loadStaffEvents = useCallback(async ({ notify = false } = {}) => {
+    if (!['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(staffRole)) return;
+    try {
+      const [eventsResponse, preferencesResponse] = await Promise.all([
+        request('get', '/api/staff/notifications/events'),
+        request('get', '/api/staff/notifications/preferences')
+      ]);
+      const events = eventsResponse.data.events || [];
+      const reports = eventsResponse.data.reports || [];
+      const preferences = preferencesResponse.data.preferences || { reports: true, bans: true, staffActions: true };
+      setStaffEventPreferences(preferences);
+      const normalized = [
+        ...reports.map(report => ({
+          id: `report:${report._id}`,
+          category: 'reports',
+          title: 'Nouveau signalement',
+          message: report.reason ? `Motif : ${report.reason}` : (report.reportScope === 'conversation' ? 'Signalement de conversation' : 'Signalement de message'),
+          createdAt: report.createdAt
+        })),
+        ...events.map(event => {
+          const category = ['user.banned', 'user.unbanned'].includes(event.action) ? 'bans' : 'staffActions';
+          const actionLabels = {
+            'user.banned': 'Bannissement appliqué',
+            'user.unbanned': 'Compte débanni',
+            'staff.role.updated': 'Rôle du personnel modifié',
+            'report.status.updated': 'Statut d’un signalement modifié',
+            'report.deleted': 'Signalement supprimé',
+            'account_help.reply_updated': 'Réponse de support envoyée',
+            'account_help.status_updated': 'Demande de support mise à jour',
+            'account_help.request_deleted': 'Demande de support supprimée',
+            'account_help.recovery_code_issued': 'Code de récupération créé',
+            'user.password_reset.issued': 'Code de réinitialisation créé',
+            'user.password_reset.completed': 'Mot de passe réinitialisé',
+            'staff.bootstrap.completed': 'Propriétaire initial configuré'
+          };
+          return {
+            id: `audit:${event._id}`,
+            category,
+            title: actionLabels[event.action] || 'Action du personnel',
+            message: event.targetUsername ? `Compte concerné : @${event.targetUsername} · par @${event.actorUsername}` : `Action effectuée par @${event.actorUsername}`,
+            createdAt: event.createdAt
+          };
+        })
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      if (seenStaffEventIds.current === null) {
+        seenStaffEventIds.current = new Set(normalized.map(item => item.id));
+      } else if (notify) {
+        const fresh = normalized.filter(item =>
+          !seenStaffEventIds.current.has(item.id) &&
+          preferences[item.category] !== false
+        );
+        if (fresh.length) {
+          setStaffNotifications(previous => [...fresh, ...previous].slice(0, 40));
+          if (typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted') {
+            fresh.slice(0, 3).forEach(item => new window.Notification(item.title, { body: item.message }));
+          }
+        }
+        normalized.forEach(item => seenStaffEventIds.current.add(item.id));
+      }
+      setStaffNotifications(previous => {
+        const merged = [...previous];
+        for (const item of normalized) {
+          if (!merged.some(existing => existing.id === item.id)) merged.push(item);
+        }
+        return merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 40);
+      });
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de charger les notifications du personnel.');
     }
   }, [request, staffRole]);
 
@@ -311,6 +407,13 @@ export default function StaffPage() {
     const interval = window.setInterval(() => loadAccountHelpRequests({ notify: true }), 5000);
     return () => window.clearInterval(interval);
   }, [staffRole, loadAccountHelpRequests]);
+
+  useEffect(() => {
+    if (!['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(staffRole)) return;
+    loadStaffEvents();
+    const interval = window.setInterval(() => loadStaffEvents({ notify: true }), 8000);
+    return () => window.clearInterval(interval);
+  }, [staffRole, loadStaffEvents]);
 
   const lookupUser = async () => {
     setError('');
@@ -470,6 +573,58 @@ export default function StaffPage() {
 
       {error && <div role="alert" style={{ padding: 12, borderRadius: 8, background: '#5a2020' }}>{error}</div>}
       {notice && <div role="status" style={{ padding: 12, borderRadius: 8, background: 'var(--bg-tertiary)' }}>{notice}</div>}
+
+      {staffRole && (
+        <Panel title="Notifications du personnel">
+          <p>Configure uniquement tes propres notifications. Les nouveaux signalements, bannissements/débannissements et actions importantes du personnel sont vérifiés automatiquement pendant que le panneau est ouvert.</p>
+          <div style={{ display: 'grid', gap: 8, padding: 12, border: '1px solid var(--border)', borderRadius: 8 }}>
+            {[
+              ['reports', 'Nouveaux signalements'],
+              ['bans', 'Bannissements et débannissements'],
+              ['staffActions', 'Autres actions du personnel']
+            ].map(([key, label]) => (
+              <label key={key} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={staffEventPreferences[key] !== false}
+                  disabled={staffEventPreferencesSaving}
+                  onChange={event => saveStaffEventPreferences({ ...staffEventPreferences, [key]: event.target.checked })}
+                />
+                {label}
+              </label>
+            ))}
+            <button
+              type="button"
+              style={buttonStyle}
+              onClick={() => {
+                if (typeof window.Notification === 'undefined') {
+                  setError('Les notifications système ne sont pas prises en charge par ce navigateur.');
+                  return;
+                }
+                window.Notification.requestPermission().then(permission => {
+                  setNotice(permission === 'granted' ? 'Notifications système autorisées.' : 'Notifications système non autorisées. Les notifications restent visibles dans le panneau staff.');
+                });
+              }}
+            >
+              Autoriser les notifications système
+            </button>
+          </div>
+          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+            <strong>Activité récente</strong>
+            {staffNotifications.slice(0, 12).map(item => (
+              <article key={item.id} style={{ padding: 10, borderRadius: 8, background: 'var(--bg-tertiary)' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 }}>
+                  <strong>{item.title}</strong>
+                  <small>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</small>
+                </div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>{item.message}</div>
+              </article>
+            ))}
+            {!staffNotifications.length && <small style={{ color: 'var(--text-secondary)' }}>Aucune activité récente détectée pour le moment.</small>}
+            <button type="button" style={buttonStyle} onClick={() => loadStaffEvents()} disabled={staffNotificationsLoading}>Actualiser les notifications</button>
+          </div>
+        </Panel>
+      )}
 
       {staffRole && (
         <Panel title="Rechercher un compte">
