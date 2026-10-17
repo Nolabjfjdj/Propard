@@ -956,7 +956,18 @@ export default function VoiceCall({
       let stream = e.streams?.[0] || remoteStreamRef.current;
       if (!stream) stream = new MediaStream();
       if (e.track && !stream.getTracks().some(track => track.id === e.track.id)) stream.addTrack(e.track);
-      if (stream.getVideoTracks().length) setRemoteVideoAvailable(true);
+      if (e.track?.kind === 'video') {
+        const refreshVideoAvailability = () => {
+          setRemoteVideoAvailable(
+            Boolean(remoteStreamRef.current?.getVideoTracks().some(track => !track.muted && track.readyState === 'live')) ||
+            Boolean(!remoteStreamRef.current && !e.track.muted && e.track.readyState === 'live')
+          );
+        };
+        e.track.addEventListener('unmute', refreshVideoAvailability);
+        e.track.addEventListener('mute', refreshVideoAvailability);
+        e.track.addEventListener('ended', refreshVideoAvailability);
+        refreshVideoAvailability();
+      }
 
       if (!remoteAudioRef.current) {
         remoteAudioRef.current = new Audio();
