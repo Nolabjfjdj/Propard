@@ -132,6 +132,98 @@ router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) =
 router.use(authMiddleware);
 router.use(actionLimiter);
 
+router.get('/notifications/preferences', requireStaffRole('support'), async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('staffNotificationPreferences').lean();
+    const preferences = user?.staffNotificationPreferences || {};
+    return res.json({
+      preferences: {
+        passwordReset: preferences.passwordReset !== false,
+        support: preferences.support !== false,
+        reports: preferences.reports !== false,
+        bans: preferences.bans !== false,
+        staffActions: preferences.staffActions !== false
+      }
+    });
+  } catch (error) {
+    console.error('Staff notification preferences retrieval failed:', error);
+    return res.status(500).json({ error: 'Impossible de charger les préférences de notification.' });
+  }
+});
+
+router.patch('/notifications/preferences', requireStaffRole('support'), async (req, res) => {
+  try {
+    const preferences = req.body?.preferences;
+    const keys = ['passwordReset', 'support', 'reports', 'bans', 'staffActions'];
+    if (!preferences || keys.some(key => typeof preferences[key] !== 'boolean')) {
+      return res.status(400).json({ error: 'Toutes les préférences de notification doivent être définies.' });
+    }
+    const update = {};
+    for (const key of keys) update['staffNotificationPreferences.' + key] = preferences[key];
+    await User.updateOne({ _id: req.user.id }, { $set: update });
+    await audit(req, 'staff.notifications.updated', { details: { preferences } });
+    return res.json({ success: true, preferences });
+  } catch (error) {
+    console.error('Staff notification preferences update failed:', error);
+    return res.status(500).json({ error: 'Impossible d’enregistrer les préférences de notification.' });
+  }
+});
+
+router.get('/notifications/events', requireStaffRole('support'), async (req, res) => {
+  try {
+    const eventActions = [
+      'user.banned', 'user.unbanned', 'staff.role.updated',
+      'report.status.updated', 'report.deleted',
+      'account_help.reply_updated', 'account_help.status_updated',
+      'account_help.request_deleted', 'account_help.recovery_code_issued',
+      'user.password_reset.issued', 'user.password_reset.completed',
+      'staff.bootstrap.completed'
+    ];
+    const logs = await StaffAuditLog.find({ action: { $in: eventActions } })
+      .sort({ createdAt: -1 })
+      .limit(60)
+      .select('actor actorUsername action targetUser targetUsername targetReport createdAt')
+      .lean();
+
+    const ids = [...new Set(logs.flatMap(log => [
+      log.actor ? log.actor.toString() : null,
+      log.targetUser ? log.targetUser.toString() : null
+    ]).filter(Boolean))];
+    const users = ids.length
+      ? await User.find({ _id: { $in: ids } }).select('_id username').lean()
+      : [];
+    const usernames = new Map(users.map(user => [user._id.toString(), user.username]));
+    const events = logs.map(log => ({
+      _id: log._id.toString(),
+      action: log.action,
+      actorUsername: log.actorUsername || (log.actor ? usernames.get(log.actor.toString()) : null) || 'Personnel',
+      targetUsername: log.targetUsername || (log.targetUser ? usernames.get(log.targetUser.toString()) : null) || null,
+      createdAt: log.createdAt
+    }));
+
+    let reports = [];
+    if (roleLevel(req.user.staffRole) >= roleLevel('junior_moderator')) {
+      reports = await Report.find({ status: 'new' })
+        .sort({ createdAt: -1 })
+        .limit(40)
+        .select('_id reportScope reason status createdAt')
+        .lean();
+      reports = reports.map(report => ({
+        _id: report._id.toString(),
+        reportScope: report.reportScope,
+        reason: report.reason || '',
+        status: report.status,
+        createdAt: report.createdAt
+      }));
+    }
+
+    return res.json({ events, reports });
+  } catch (error) {
+    console.error('Staff notification events retrieval failed:', error);
+    return res.status(500).json({ error: 'Impossible de charger les notifications du personnel.' });
+  }
+});
+
 router.get('/account-help/requests', requireStaffRole('support'), async (req, res) => {
   try {
     const requests = await SupportRequest.find({})
