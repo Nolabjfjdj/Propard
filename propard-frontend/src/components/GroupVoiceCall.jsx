@@ -635,10 +635,23 @@ export default function GroupVoiceCall({
       }
 
       const videoSenders = [];
-      for (const peer of peersRef.current.values()) {
-        const sender = peer.getSenders().find(item => item.track?.kind === 'video') ||
+      for (const [peerId, peer] of peersRef.current.entries()) {
+        let sender = peer.getSenders().find(item => item.track?.kind === 'video') ||
           peer.getTransceivers().find(transceiver => transceiver.receiver?.track?.kind === 'video')?.sender;
-        if (!sender) throw new Error('Un participant ne permet pas de recevoir la vidéo du partage.');
+
+        if (!sender && typeof peer.addTransceiver === 'function') {
+          sender = peer.addTransceiver('video', { direction: 'sendrecv' }).sender;
+          const offer = await peer.createOffer();
+          await peer.setLocalDescription(offer);
+          socket.emit('groupCallOffer', {
+            groupId,
+            callId: callIdRef.current,
+            receiverId: peerId,
+            offer
+          });
+        }
+
+        if (!sender) throw new Error('Impossible de créer une piste vidéo pour un participant.');
         videoSenders.push(sender);
       }
       for (const sender of videoSenders) await sender.replaceTrack(videoTrack);
