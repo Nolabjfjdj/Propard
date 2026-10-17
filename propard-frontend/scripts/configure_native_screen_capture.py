@@ -50,6 +50,9 @@ public class PropardScreenCapturePlugin extends Plugin {
             return;
         }
         pendingCall = call;
+        Intent serviceIntent = new Intent(getContext(), PropardScreenCaptureService.class);
+        if (android.os.Build.VERSION.SDK_INT >= 26) getContext().startForegroundService(serviceIntent);
+        else getContext().startService(serviceIntent);
         MediaProjectionManager manager = (MediaProjectionManager) getContext()
             .getSystemService(Context.MEDIA_PROJECTION_SERVICE);
         startActivityForResult(call, manager.createScreenCaptureIntent(), "projectionResult");
@@ -131,6 +134,7 @@ public class PropardScreenCapturePlugin extends Plugin {
 # Add required callback import in the generated Java source.
 plugin_java = plugin_java.replace("import com.getcapacitor.ActivityResult;", "import com.getcapacitor.ActivityResult;\nimport com.getcapacitor.annotation.ActivityCallback;")
 (java_root / "PropardScreenCapturePlugin.java").write_text(plugin_java)
+(java_root / "PropardScreenCaptureService.java").write_text(Path("scripts/native/PropardScreenCaptureService.java").read_text())
 
 activity = java_root / "MainActivity.java"
 if not activity.exists():
