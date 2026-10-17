@@ -51,6 +51,7 @@ export default function GroupVoiceCall({
   videoCall = false
 }) {
   const myId = normalizeId(userId);
+  const screenShareSupported = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getDisplayMedia);
   const groupId = normalizeId(group?._id);
 
   const [status, setStatus] = useState(
@@ -603,16 +604,16 @@ export default function GroupVoiceCall({
       const videoTrack = stream.getVideoTracks()[0];
       if (!videoTrack) throw new Error('Aucune vidéo capturée.');
 
-      if (!screenShareSettings.automatic) {
-        try {
-          await videoTrack.applyConstraints({
-            width: { ideal: Number(screenShareSettings.width) },
-            height: { ideal: Number(screenShareSettings.height) },
-            frameRate: { ideal: Number(screenShareSettings.fps), max: Number(screenShareSettings.fps) }
-          });
-        } catch (constraintError) {
-          console.warn('Le navigateur n’a pas accepté tous les paramètres demandés:', constraintError);
-        }
+      try {
+        await videoTrack.applyConstraints({
+          width: { ideal: Number(screenShareSettings.width) },
+          height: { ideal: Number(screenShareSettings.height) },
+          frameRate: screenShareSettings.automatic
+            ? { ideal: Number(screenShareSettings.fps) }
+            : { ideal: Number(screenShareSettings.fps), max: Number(screenShareSettings.fps) }
+        });
+      } catch (constraintError) {
+        console.warn('Le navigateur n’a pas accepté tous les paramètres demandés:', constraintError);
       }
 
       const videoSenders = [];
@@ -1171,7 +1172,7 @@ export default function GroupVoiceCall({
           )}
         </div>
 
-        {screenShareSettingsOpen && status === 'connected' && (
+        {screenShareSupported && screenShareSettingsOpen && status === 'connected' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '10px 0', color: 'var(--text-primary)', fontSize: '12px' }}>
             <label>Largeur (px)<input type="number" min="320" max="7680" value={screenShareSettings.width} onChange={event => setScreenShareSettings(prev => ({ ...prev, width: Math.max(320, Math.min(7680, Number(event.target.value) || 320)) }))} style={styles.settingInput} /></label>
             <label>Hauteur (px)<input type="number" min="240" max="4320" value={screenShareSettings.height} onChange={event => setScreenShareSettings(prev => ({ ...prev, height: Math.max(240, Math.min(4320, Number(event.target.value) || 240)) }))} style={styles.settingInput} /></label>
@@ -1215,22 +1216,26 @@ export default function GroupVoiceCall({
                   >
                     {muted ? '🔇' : '🎤'}
                   </button>
-                  <button
-                    style={{ ...styles.muteBtn, background: isScreenSharing ? 'var(--success)' : 'var(--bg-hover)' }}
-                    onClick={() => isScreenSharing ? void stopScreenShare() : void startScreenShare()}
-                    aria-label={isScreenSharing ? 'Arrêter le partage d’écran' : 'Partager l’écran'}
-                    title={isScreenSharing ? 'Arrêter le partage d’écran' : 'Partager l’écran'}
-                  >
-                    {isScreenSharing ? '⏹️' : '🖥️'}
-                  </button>
-                  <button
-                    style={{ ...styles.muteBtn, background: screenShareSettingsOpen ? 'var(--accent-glow)' : 'var(--bg-hover)' }}
-                    onClick={() => setScreenShareSettingsOpen(value => !value)}
-                    aria-label="Paramètres du partage d’écran"
-                    title="Paramètres du partage d’écran"
-                  >
-                    ⚙️
-                  </button>
+                  {screenShareSupported && (
+                    <>
+                      <button
+                        style={{ ...styles.muteBtn, background: isScreenSharing ? 'var(--success)' : 'var(--bg-hover)' }}
+                        onClick={() => isScreenSharing ? void stopScreenShare() : void startScreenShare()}
+                        aria-label={isScreenSharing ? 'Arrêter le partage d’écran' : 'Partager l’écran'}
+                        title={isScreenSharing ? 'Arrêter le partage d’écran' : 'Partager l’écran'}
+                      >
+                        {isScreenSharing ? '⏹️' : '🖥️'}
+                      </button>
+                      <button
+                        style={{ ...styles.muteBtn, background: screenShareSettingsOpen ? 'var(--accent-glow)' : 'var(--bg-hover)' }}
+                        onClick={() => setScreenShareSettingsOpen(value => !value)}
+                        aria-label="Paramètres du partage d’écran"
+                        title="Paramètres du partage d’écran"
+                      >
+                        ⚙️
+                      </button>
+                    </>
+                  )}
                   {videoCall && (
                     <button
                       style={{
