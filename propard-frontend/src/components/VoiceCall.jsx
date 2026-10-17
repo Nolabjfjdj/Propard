@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import socket from '../socket';
 import { API_URL } from '../utils/api';
+import { startMobileScreenCapture } from '../utils/mobileScreenCapture';
 
 const POSITION_STORAGE_KEY = 'propard_voice_call_position';
 
@@ -92,7 +93,7 @@ export default function VoiceCall({
   const [screenShareSettingsOpen, setScreenShareSettingsOpen] = useState(false);
   const [screenShareError, setScreenShareError] = useState('');
   const [screenShareSettings, setScreenShareSettings] = useState({ width: 2560, height: 1440, fps: 60, automatic: true, audio: true });
-  const screenShareSupported = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getDisplayMedia);
+  const screenShareSupported = typeof navigator !== 'undefined' && (Boolean(navigator.mediaDevices?.getDisplayMedia) || Boolean(window.Capacitor?.isNativePlatform?.()));
   const [remoteVideoAvailable, setRemoteVideoAvailable] = useState(false);
 
   /*
@@ -1408,6 +1409,7 @@ export default function VoiceCall({
 
     screenShareRef.current = null;
     share.stream.getTracks().forEach(track => track.stop());
+    await share.stopCapture?.();
     share.audioContext?.close().catch(() => {});
 
     const cameraTrack = localStreamRef.current?.getVideoTracks()[0] || null;
@@ -1436,7 +1438,7 @@ export default function VoiceCall({
   const startScreenShare = async () => {
     setScreenShareError('');
 
-    if (!navigator.mediaDevices?.getDisplayMedia) {
+    if (!window.Capacitor?.isNativePlatform?.() && !navigator.mediaDevices?.getDisplayMedia) {
       setScreenShareError('Le partage d’écran n’est pas pris en charge par ce navigateur ou cet appareil.');
       return;
     }
@@ -1449,9 +1451,11 @@ export default function VoiceCall({
 
     let stream;
     let audioContext;
+    let nativeCapture;
 
     try {
-      stream = await navigator.mediaDevices.getDisplayMedia({
+      nativeCapture = await startMobileScreenCapture();
+      stream = nativeCapture?.stream || await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: true
       });
@@ -1512,7 +1516,7 @@ export default function VoiceCall({
         }
       }
 
-      screenShareRef.current = { stream, audioContext, mixedAudioTrack, screenAudioSource, audioDestination };
+      screenShareRef.current = { stream, audioContext, mixedAudioTrack, screenAudioSource, audioDestination, stopCapture: nativeCapture?.stopCapture };
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
         localVideoRef.current.play?.().catch(() => {});
@@ -1522,6 +1526,7 @@ export default function VoiceCall({
       setScreenShareSettingsOpen(false);
     } catch (err) {
       stream?.getTracks().forEach(track => track.stop());
+      await nativeCapture?.stopCapture?.();
       audioContext?.close().catch(() => {});
       console.error('Partage d’écran impossible:', err);
       setScreenShareError(
