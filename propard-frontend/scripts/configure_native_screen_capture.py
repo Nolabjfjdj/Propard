@@ -25,7 +25,7 @@ import android.os.Looper;
 import android.util.Base64;
 import android.util.DisplayMetrics;
 import android.view.WindowManager;
-import com.getcapacitor.ActivityResult;
+import androidx.activity.result.ActivityResult;\nimport com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -100,8 +100,9 @@ public class PropardScreenCapturePlugin extends Plugin {
                     Bitmap frame = Bitmap.createBitmap(padded, 0, 0, image.getWidth(), image.getHeight());
                     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
                     frame.compress(Bitmap.CompressFormat.JPEG, 55, bytes);
-                    notifyListeners("screenFrame", java.util.Collections.singletonMap(
-                        "data", Base64.encodeToString(bytes.toByteArray(), Base64.NO_WRAP)));
+                    JSObject payload = new JSObject();
+                    payload.put("data", Base64.encodeToString(bytes.toByteArray(), Base64.NO_WRAP));
+                    notifyListeners("screenFrame", payload);
                     frame.recycle();
                     padded.recycle();
                 } catch (Exception error) {
@@ -213,14 +214,14 @@ public class PropardScreenCapturePlugin: CAPPlugin, CAPBridgedPlugin {
             guard CGImageDestinationFinalize(destination) else { return }
             self.notifyListeners("screenFrame", data: ["data": (data as Data).base64EncodedString()])
         }, completionHandler: { error in
-            if let error = error { call.reject("Impossible de démarrer ReplayKit.", error) }
+            if let error = error { call.reject("Impossible de démarrer ReplayKit: " + error.localizedDescription) }
             else { call.resolve() }
         })
     }
 
     @objc func stop(_ call: CAPPluginCall) {
         recorder.stopCapture { error in
-            if let error = error { call.reject("Impossible d'arrêter ReplayKit.", error) }
+            if let error = error { call.reject("Impossible d'arrêter ReplayKit: " + error.localizedDescription) }
             else { call.resolve() }
         }
     }
