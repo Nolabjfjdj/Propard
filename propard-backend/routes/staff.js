@@ -701,6 +701,93 @@ router.delete('/users/:userId/permanent', requireStaffRole('owner'), async (req,
   }
 });
 
+router.delete('/users/:userId/purge', requireStaffRole('owner'), async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.userId)) {
+      return res.status(400).json({ error: 'Identifiant de compte invalide.' });
+    }
+
+    const target = await User.findById(req.params.userId).select('_id username staffRole');
+    if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
+    if (target._id.toString() === req.user.id) {
+      return res.status(400).json({ error: 'Tu ne peux pas supprimer ton propre compte depuis le panneau staff.' });
+    }
+    if (target.staffRole === 'owner') {
+      return res.status(403).json({ error: 'Le compte propriétaire ne peut pas être supprimé depuis cet outil.' });
+    }
+
+    const userId = target._id;
+    const userIdString = userId.toString();
+    const originalUsername = target.username;
+    const ownedGroups = await Group.find({ owner: userId }).select('_id').lean();
+    const groupIds = ownedGroups.map(group => group._id);
+    const [privateMessages, sentGroupMessages] = await Promise.all([
+      Message.find({ $or: [{ sender: userId }, { receiver: userId }] }).select('_id').lean(),
+      GroupMessage.find({ sender: userId }).select('_id').lean()
+    ]);
+    const privateMessageIds = privateMessages.map(message => message._id);
+    const groupMessageIds = sentGroupMessages.map(message => message._id);
+    const ownedGroupMessages = groupIds.length
+      ? await GroupMessage.find({ group: { $in: groupIds } }).select('_id').lean()
+      : [];
+    groupMessageIds.push(...ownedGroupMessages.map(message => message._id));
+
+    await Message.deleteMany({ $or: [{ sender: userId }, { receiver: userId }] });
+    await GroupMessage.deleteMany({
+      $or: [{ sender: userId }, ...(groupIds.length ? [{ group: { $in: groupIds } }] : [])]
+    });
+    if (groupIds.length) await Group.deleteMany({ _id: { $in: groupIds } });
+
+    await Group.updateMany(
+      { $or: [{ 'members.userId': userId }, { 'keyPackages.userId': userId }, { 'keyPackages.senderId': userId }] },
+      { $pull: { members: { userId }, keyPackages: { $or: [{ userId }, { senderId: userId }] } } }
+    );
+    await User.updateMany(
+      { $or: [{ 'friends.userId': userId }, { 'friendRequests.from': userId }, { blockedUsers: userId }] },
+      { $pull: { friends: { userId }, friendRequests: { from: userId }, blockedUsers: userId } }
+    );
+
+    await Report.deleteMany({
+      $or: [
+        { reporter: userId },
+        { reportedUser: userId },
+        { messageId: { $in: privateMessageIds } },
+        { groupMessageId: { $in: groupMessageIds } },
+        ...(groupIds.length ? [{ groupId: { $in: groupIds } }] : [])
+      ]
+    });
+    await SupportRequest.deleteMany({ $or: [{ userId }, { username: originalUsername }] });
+    await StaffAuditLog.deleteMany({ targetUser: userId });
+    await StaffAuditLog.updateMany({ actor: userId }, { $set: { actorUsername: 'utilisateur_supprimé' + userIdString.slice(-5) } });
+    await User.deleteOne({ _id: userId });
+
+    const io = req.app.get('io');
+    if (io) {
+      const sockets = await io.fetchSockets();
+      for (const socket of sockets) {
+        if (socket.userId?.toString() === userIdString || socket.user?.id?.toString() === userIdString) {
+          socket.disconnect(true);
+        }
+      }
+    }
+
+    await audit(req, 'staff.user.permanently_deleted', {
+      targetUser: userId,
+      targetUsername: 'utilisateur_supprimé' + userIdString.slice(-5),
+      details: { permanent: true, accountDataDeleted: true, messagesPreserved: false, recoveryDisabled: true }
+    });
+
+    return res.json({
+      success: true,
+      username: 'utilisateur_supprimé' + userIdString.slice(-5),
+      message: 'Compte et données associées supprimés définitivement.'
+    });
+  } catch (error) {
+    console.error('Staff full account deletion failed:', error);
+    return res.status(500).json({ error: 'La suppression complète a échoué. Vérifie les données restantes avant de réessayer.' });
+  }
+});
+
 router.post('/users/:userId/ban', requireStaffRole('moderator'), async (req, res) => {
   try {
     const target = await findTargetUser(req.params.userId);
