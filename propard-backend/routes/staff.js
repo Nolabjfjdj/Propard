@@ -648,6 +648,12 @@ router.delete('/users/:userId/permanent', requireStaffRole('owner'), async (req,
 
     const ownedGroups = await Group.find({ owner: deletedUserId }).select('_id');
     const ownedGroupIds = ownedGroups.map(group => group._id);
+    const [privateMessages, groupMessages] = await Promise.all([
+      Message.find({ $or: [{ sender: deletedUserId }, { receiver: deletedUserId }] }).select('_id').lean(),
+      GroupMessage.find({ sender: deletedUserId }).select('_id').lean()
+    ]);
+    const privateMessageIds = privateMessages.map(message => message._id);
+    const groupMessageIds = groupMessages.map(message => message._id);
 
     await Message.deleteMany({
       $or: [{ sender: deletedUserId }, { receiver: deletedUserId }]
@@ -688,6 +694,8 @@ router.delete('/users/:userId/permanent', requireStaffRole('owner'), async (req,
       $or: [
         { reporter: deletedUserId },
         { reportedUser: deletedUserId },
+        { messageId: { $in: privateMessageIds } },
+        { groupMessageId: { $in: groupMessageIds } },
         { groupId: { $in: ownedGroupIds } }
       ]
     });
