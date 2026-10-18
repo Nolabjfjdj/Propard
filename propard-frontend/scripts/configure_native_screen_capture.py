@@ -176,9 +176,10 @@ plugin_java = plugin_java.replace("import com.getcapacitor.ActivityResult;", "im
 (java_root / "PropardScreenCapturePlugin.java").write_text(plugin_java)
 (java_root / "PropardScreenCaptureService.java").write_text(Path("scripts/native/PropardScreenCaptureService.java").read_text())
 
-activity = java_root / "MainActivity.java"
-if not activity.exists():
-    activity.write_text("""package site.propard;
+activity_files = list(android_root.rglob("MainActivity.java"))
+if not activity_files:
+    activity_files = [java_root / "MainActivity.java"]
+    activity_files[0].write_text("""package site.propard;
 
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
@@ -191,10 +192,20 @@ public class MainActivity extends BridgeActivity {
     }
 }
 """)
-else:
+
+for activity in activity_files:
     source = activity.read_text()
     if "PropardScreenCapturePlugin.class" not in source:
-        source = source.replace("super.onCreate(savedInstanceState);", "registerPlugin(PropardScreenCapturePlugin.class);\n        super.onCreate(savedInstanceState);")
+        if "import site.propard.PropardScreenCapturePlugin;" not in source and not source.startswith("package site.propard;"):
+            source = re.sub(r"(package\s+[\w.]+;\s*)", r"\1\nimport site.propard.PropardScreenCapturePlugin;", source, count=1)
+        if "super.onCreate(savedInstanceState);" in source:
+            source = source.replace(
+                "super.onCreate(savedInstanceState);",
+                "registerPlugin(PropardScreenCapturePlugin.class);\n        super.onCreate(savedInstanceState);",
+                1
+            )
+        else:
+            raise RuntimeError(f"Impossible d'enregistrer le plugin natif dans {activity}: super.onCreate introuvable")
         activity.write_text(source)
 
 manifest = android_root / "AndroidManifest.xml"
