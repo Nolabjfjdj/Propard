@@ -1075,9 +1075,9 @@ export default function GroupVoiceCall({
         .catch(err => {
           console.error('Micro appel groupe:', err);
           setError(
-            err?.name === 'NotAllowedError'
+            err?.message || (err?.name === 'NotAllowedError'
               ? 'Accès au microphone refusé.'
-              : 'Impossible d’accéder au microphone.'
+              : 'Impossible d’accéder au microphone.')
           );
           setStatus('error');
         });
