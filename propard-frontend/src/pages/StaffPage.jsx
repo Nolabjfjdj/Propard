@@ -228,6 +228,7 @@ export default function StaffPage() {
           const actionLabels = {
             'user.banned': 'Bannissement appliqué',
             'user.unbanned': 'Compte débanni',
+            'staff.user.permanently_deleted': 'Compte supprimé définitivement',
             'staff.role.updated': 'Rôle du personnel modifié',
             'report.status.updated': 'Statut d’un signalement modifié',
             'report.deleted': 'Signalement supprimé',
