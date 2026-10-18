@@ -553,6 +553,20 @@ export default function StaffPage() {
     }
   };
 
+  const undoAuditAction = async log => {
+    const actor = log.actorUsername || log.actor?.username || 'Personnel';
+    if (!window.confirm(`Annuler l’action « ${log.action} » effectuée par ${actor} ? Cette opération sera elle-même inscrite au journal d’audit.`)) return;
+    setError('');
+    setNotice('');
+    try {
+      const response = await request('post', `/api/staff/audit/${encodeURIComponent(log._id)}/undo`, {});
+      setNotice(response.data.message || 'Action annulée.');
+      await loadAudit();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible d’annuler cette action.');
+    }
+  };
+
   const bootstrap = async () => {
     setError('');
     try {
@@ -874,14 +888,25 @@ export default function StaffPage() {
             <Panel title="Journal d’audit">
               <button style={buttonStyle} onClick={loadAudit}>Charger les dernières actions</button>
               <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Le propriétaire peut annuler certaines actions réversibles. Les annulations sont ajoutées au journal et les actions plus récentes ne sont pas écrasées.</p>
                 <PaginationControls total={auditLogs.length} page={auditPage} pageSize={auditPageSize} onPageChange={setAuditPage} onPageSizeChange={size => { setAuditPageSize(size); setAuditPage(1); }} />
-                {auditLogs.slice((auditPage - 1) * auditPageSize, auditPage * auditPageSize).map(log => (
-                  <article key={log._id} style={{ padding: 10, borderRadius: 8, background: 'var(--bg-tertiary)' }}>
-                    <strong>{log.action}</strong>
-                    <div>{log.actorUsername || log.actor?.username || log.details?.actorUsername || (log.actorId ? `Compte introuvable (${log.actorId.slice(-6)})` : 'Personnel inconnu')} → {log.targetUsername || log.targetUser?.username || log.details?.username || (log.targetUserId ? `Compte introuvable (${log.targetUserId.slice(-6)})` : 'aucune cible')}</div>
-                    <small>{new Date(log.createdAt).toLocaleString()}</small>
-                  </article>
-                ))}
+                {auditLogs.slice((auditPage - 1) * auditPageSize, auditPage * auditPageSize).map(log => {
+                  const undoneIds = new Set(auditLogs.filter(item => item.action === 'audit.action.undone').map(item => item.details?.originalLogId));
+                  const undoable = ['user.banned', 'staff.role.updated', 'report.status.updated'].includes(log.action);
+                  return (
+                    <article key={log._id} style={{ padding: 10, borderRadius: 8, background: 'var(--bg-tertiary)' }}>
+                      <strong>{log.action}</strong>
+                      <div>{log.actorUsername || log.actor?.username || log.details?.actorUsername || (log.actorId ? `Compte introuvable (${log.actorId.slice(-6)})` : 'Personnel inconnu')} → {log.targetUsername || log.targetUser?.username || log.details?.username || (log.targetUserId ? `Compte introuvable (${log.targetUserId.slice(-6)})` : 'aucune cible')}</div>
+                      <small>{new Date(log.createdAt).toLocaleString()}</small>
+                      {staffRole === 'owner' && undoable && !undoneIds.has(log._id) && (
+                        <div style={{ marginTop: 8 }}>
+                          <button type="button" style={{ ...buttonStyle, borderColor: '#b45309' }} onClick={() => undoAuditAction(log)}>Annuler cette action</button>
+                        </div>
+                      )}
+                      {staffRole === 'owner' && undoneIds.has(log._id) && <small style={{ display: 'block', marginTop: 6 }}>Action déjà annulée</small>}
+                    </article>
+                  );
+                })}
               </div>
             </Panel>
           )}
