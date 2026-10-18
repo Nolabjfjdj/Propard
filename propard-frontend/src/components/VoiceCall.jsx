@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import socket from '../socket';
 import { API_URL } from '../utils/api';
 import { startMobileScreenCapture } from '../utils/mobileScreenCapture';
+import { ensureCallMediaPermissions } from '../utils/callMediaPermissions';
 
 const POSITION_STORAGE_KEY = 'propard_voice_call_position';
 
@@ -1157,6 +1158,7 @@ export default function VoiceCall({
 
   const startCall = async () => {
     try {
+      await ensureCallMediaPermissions({ video: videoCall });
       const stream =
         await navigator.mediaDevices
           .getUserMedia({
@@ -1242,6 +1244,7 @@ export default function VoiceCall({
 
   const answerCall = async () => {
     try {
+      await ensureCallMediaPermissions({ video: videoCall });
       isCallerRef.current = false;
 
       const stream =
