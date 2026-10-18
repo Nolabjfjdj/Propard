@@ -7,6 +7,9 @@ const User = require('../models/User');
 const Report = require('../models/Report');
 const StaffAuditLog = require('../models/StaffAuditLog');
 const SupportRequest = require('../models/SupportRequest');
+const Message = require('../models/Message');
+const Group = require('../models/Group');
+const GroupMessage = require('../models/GroupMessage');
 const authMiddleware = require('../middleware/auth');
 const { ROLE_LEVELS, roleLevel, requireStaffRole, canManageRole } = require('../middleware/staffRoles');
 const { createRateLimiter } = require('../middleware/rateLimit');
@@ -620,6 +623,113 @@ router.get('/users/search', requireStaffRole('support'), async (req, res) => {
   } catch (error) {
     console.error('Staff user lookup failed:', error);
     return res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+router.delete('/users/:userId/permanent', requireStaffRole('owner'), async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.userId)) {
+      return res.status(400).json({ error: 'Identifiant de compte invalide.' });
+    }
+
+    const target = await User.findById(req.params.userId).select('_id username displayName staffRole');
+    if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
+    if (target._id.toString() === req.user.id) {
+      return res.status(400).json({ error: 'Tu ne peux pas supprimer ton propre compte depuis le panneau staff.' });
+    }
+    if (target.staffRole === 'owner') {
+      return res.status(403).json({ error: 'Le compte propriétaire ne peut pas être supprimé depuis cet outil.' });
+    }
+
+    const deletedUserId = target._id;
+    const deletedUserIdString = deletedUserId.toString();
+    const deletedUsername = target.username;
+    const anonymizedUsername = `utilisateur_supprimé${deletedUserIdString.slice(-5)}`;
+
+    const ownedGroups = await Group.find({ owner: deletedUserId }).select('_id');
+    const ownedGroupIds = ownedGroups.map(group => group._id);
+
+    await Message.deleteMany({
+      $or: [{ sender: deletedUserId }, { receiver: deletedUserId }]
+    });
+    await GroupMessage.deleteMany({
+      $or: [
+        { sender: deletedUserId },
+        ...(ownedGroupIds.length ? [{ group: { $in: ownedGroupIds } }] : [])
+      ]
+    });
+
+    if (ownedGroupIds.length) {
+      await Group.deleteMany({ _id: { $in: ownedGroupIds } });
+    }
+
+    await Group.updateMany(
+      { $or: [{ 'members.userId': deletedUserId }, { 'keyPackages.userId': deletedUserId }, { 'keyPackages.senderId': deletedUserId }] },
+      {
+        $pull: {
+          members: { userId: deletedUserId },
+          keyPackages: { $or: [{ userId: deletedUserId }, { senderId: deletedUserId }] }
+        }
+      }
+    );
+
+    await User.updateMany(
+      { $or: [{ 'friends.userId': deletedUserId }, { 'friendRequests.from': deletedUserId }, { blockedUsers: deletedUserId }] },
+      {
+        $pull: {
+          friends: { userId: deletedUserId },
+          friendRequests: { from: deletedUserId },
+          blockedUsers: deletedUserId
+        }
+      }
+    );
+
+    await Report.deleteMany({
+      $or: [
+        { reporter: deletedUserId },
+        { reportedUser: deletedUserId },
+        { groupId: { $in: ownedGroupIds } }
+      ]
+    });
+    await SupportRequest.deleteMany({
+      $or: [
+        { userId: deletedUserId },
+        { username: deletedUsername }
+      ]
+    });
+
+    await StaffAuditLog.deleteMany({ targetUser: deletedUserId });
+    await StaffAuditLog.updateMany(
+      { actor: deletedUserId },
+      { $set: { actorUsername: anonymizedUsername } }
+    );
+
+    await User.deleteOne({ _id: deletedUserId });
+
+    await audit(req, 'staff.user.permanently_deleted', {
+      targetUser: deletedUserId,
+      targetUsername: anonymizedUsername,
+      details: { permanent: true, accountDataDeleted: true }
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      const sockets = await io.fetchSockets();
+      for (const socket of sockets) {
+        if (socket.userId?.toString() === deletedUserIdString || socket.user?.id?.toString() === deletedUserIdString) {
+          socket.disconnect(true);
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      username: anonymizedUsername,
+      message: 'Compte supprimé définitivement de la base de données et données associées nettoyées.'
+    });
+  } catch (error) {
+    console.error('Staff permanent account deletion failed:', error);
+    return res.status(500).json({ error: 'La suppression définitive a échoué. Vérifie les données restantes avant de réessayer.' });
   }
 });
 
