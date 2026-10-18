@@ -450,21 +450,21 @@ export default function StaffPage() {
     }
   };
 
-  const permanentlyDeleteAccount = async () => {
+  const anonymizeAccountPermanently = async () => {
     if (!lookupResult?._id) return;
     const expectedUsername = lookupResult.username;
     const confirmation = window.prompt(
-      `Suppression DÉFINITIVE de @${expectedUsername}. Toutes les données du compte seront supprimées, sans délai de 30 jours. Pour confirmer, saisis exactement le pseudo :`
+      `Anonymiser définitivement @${expectedUsername}. Les messages et historiques seront conservés, mais le compte ne pourra plus être récupéré. Saisis exactement le pseudo pour confirmer :`
     );
     if (confirmation !== expectedUsername) {
-      if (confirmation !== null) setError('Confirmation incorrecte. Aucune suppression effectuée.');
+      if (confirmation !== null) setError('Confirmation incorrecte. Aucune modification effectuée.');
       return;
     }
     setError('');
     setNotice('');
     try {
       const response = await request('delete', `/api/staff/users/${encodeURIComponent(lookupResult._id)}/permanent`);
-      setNotice(response.data.message || 'Compte supprimé définitivement.');
+      setNotice(response.data.message || 'Compte anonymisé définitivement. Messages conservés.');
       setLookupResult(null);
       setLookupUsername('');
       setTargetUserId('');
@@ -472,7 +472,35 @@ export default function StaffPage() {
       setRoleUserId('');
       setResetToken('');
     } catch (err) {
-      setError(err.response?.data?.error || 'Impossible de supprimer définitivement ce compte.');
+      setError(err.response?.data?.error || 'Impossible d’anonymiser définitivement ce compte.');
+    }
+  };
+
+  const permanentlyDeleteAccountAndData = async () => {
+    if (!lookupResult?._id) return;
+    const expectedUsername = lookupResult.username;
+    const confirmation = window.prompt(
+      `SUPPRESSION TOTALE ET IRRÉVERSIBLE de @${expectedUsername} : le compte, les messages privés, les messages de groupe et les données associées seront supprimés. Saisis exactement le pseudo pour confirmer :`
+    );
+    if (confirmation !== expectedUsername) {
+      if (confirmation !== null) setError('Confirmation incorrecte. Aucune suppression effectuée.');
+      return;
+    }
+    const secondConfirmation = window.confirm('Dernière confirmation : supprimer aussi les messages et données associées ? Cette action est irréversible.');
+    if (!secondConfirmation) return;
+    setError('');
+    setNotice('');
+    try {
+      const response = await request('delete', `/api/staff/users/${encodeURIComponent(lookupResult._id)}/purge`);
+      setNotice(response.data.message || 'Compte et données associées supprimés définitivement.');
+      setLookupResult(null);
+      setLookupUsername('');
+      setTargetUserId('');
+      setResetUserId('');
+      setRoleUserId('');
+      setResetToken('');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer complètement ce compte.');
     }
   };
 
@@ -696,17 +724,33 @@ export default function StaffPage() {
               <div>@{lookupResult.username} · ID : <code>{lookupResult._id}</code></div>
               <div>Rôle : {lookupResult.staffRole || 'user'} · {lookupResult.bannedAt ? 'Compte banni' : 'Non banni'}</div>
               {staffRole === 'owner' && lookupResult.staffRole !== 'owner' && (
-                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-                  <p style={{ margin: '0 0 8px', color: 'var(--text-secondary)', fontSize: 13 }}>
-                    Suppression immédiate et irréversible. Le compte et ses données associées seront retirés de la base de données, sans période de récupération de 30 jours.
-                  </p>
-                  <button
-                    type="button"
-                    style={{ ...buttonStyle, background: '#a32626', borderColor: '#a32626' }}
-                    onClick={permanentlyDeleteAccount}
-                  >
-                    Supprimer définitivement le compte
-                  </button>
+                <div style={{ display: 'grid', gap: 10, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    <strong>1. Anonymiser définitivement le compte</strong>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 13 }}>
+                      Remplace le pseudo par utilisateur_suppriméXXXXX et bloque toute récupération. Les messages et l’historique restent conservés.
+                    </p>
+                    <button
+                      type="button"
+                      style={{ ...buttonStyle, background: '#8a5a10', borderColor: '#8a5a10' }}
+                      onClick={anonymizeAccountPermanently}
+                    >
+                      Anonymiser le compte (garder les messages)
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', gap: 6, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                    <strong>2. Supprimer définitivement le compte et ses données</strong>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 13 }}>
+                      Supprime le compte, ses messages privés et de groupe, ainsi que les données associées. Action irréversible, sans délai de récupération.
+                    </p>
+                    <button
+                      type="button"
+                      style={{ ...buttonStyle, background: '#a32626', borderColor: '#a32626' }}
+                      onClick={permanentlyDeleteAccountAndData}
+                    >
+                      Supprimer le compte ET ses messages
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
