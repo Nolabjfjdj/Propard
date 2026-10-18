@@ -632,7 +632,7 @@ router.delete('/users/:userId/permanent', requireStaffRole('owner'), async (req,
       return res.status(400).json({ error: 'Identifiant de compte invalide.' });
     }
 
-    const target = await User.findById(req.params.userId).select('_id username displayName staffRole');
+    const target = await User.findById(req.params.userId).select('+password');
     if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
     if (target._id.toString() === req.user.id) {
       return res.status(400).json({ error: 'Tu ne peux pas supprimer ton propre compte depuis le panneau staff.' });
@@ -643,82 +643,36 @@ router.delete('/users/:userId/permanent', requireStaffRole('owner'), async (req,
 
     const deletedUserId = target._id;
     const deletedUserIdString = deletedUserId.toString();
-    const deletedUsername = target.username;
     const anonymizedUsername = `utilisateur_supprimé${deletedUserIdString.slice(-5)}`;
 
-    const ownedGroups = await Group.find({ owner: deletedUserId }).select('_id');
-    const ownedGroupIds = ownedGroups.map(group => group._id);
-    const [privateMessages, groupMessages] = await Promise.all([
-      Message.find({ $or: [{ sender: deletedUserId }, { receiver: deletedUserId }] }).select('_id').lean(),
-      GroupMessage.find({ sender: deletedUserId }).select('_id').lean()
-    ]);
-    const privateMessageIds = privateMessages.map(message => message._id);
-    const groupMessageIds = groupMessages.map(message => message._id);
-
-    await Message.deleteMany({
-      $or: [{ sender: deletedUserId }, { receiver: deletedUserId }]
-    });
-    await GroupMessage.deleteMany({
-      $or: [
-        { sender: deletedUserId },
-        ...(ownedGroupIds.length ? [{ group: { $in: ownedGroupIds } }] : [])
-      ]
-    });
-
-    if (ownedGroupIds.length) {
-      await Group.deleteMany({ _id: { $in: ownedGroupIds } });
+    if (await User.exists({ username: anonymizedUsername, _id: { $ne: deletedUserId } })) {
+      return res.status(409).json({ error: 'Le pseudo anonymisé existe déjà. Aucune modification effectuée.' });
     }
 
-    await Group.updateMany(
-      { $or: [{ 'members.userId': deletedUserId }, { 'keyPackages.userId': deletedUserId }, { 'keyPackages.senderId': deletedUserId }] },
-      {
-        $pull: {
-          members: { userId: deletedUserId },
-          keyPackages: { $or: [{ userId: deletedUserId }, { senderId: deletedUserId }] }
-        }
-      }
-    );
+    let newIpAlias;
+    do {
+      newIpAlias = crypto.randomBytes(16).toString('hex');
+    } while (await User.exists({ ipAlias: newIpAlias, _id: { $ne: deletedUserId } }));
+
+    target.username = anonymizedUsername;
+    target.realUsername = null;
+    target.pendingDeletionAt = null;
+    target.password = await bcrypt.hash(crypto.randomBytes(48).toString('hex'), 10);
+    target.ipAlias = newIpAlias;
+    target.e2eeKeyBackup = null;
+    target.passwordResetTokenHash = null;
+    target.passwordResetExpiresAt = null;
+    target.passwordResetIssuedBy = null;
+    target.sessionVersion = (target.sessionVersion || 0) + 1;
+    target.isOnline = false;
+    target.apnsTokens = [];
+    target.pushSubscriptions = [];
+    await target.save();
 
     await User.updateMany(
-      { $or: [{ 'friends.userId': deletedUserId }, { 'friendRequests.from': deletedUserId }, { blockedUsers: deletedUserId }] },
-      {
-        $pull: {
-          friends: { userId: deletedUserId },
-          friendRequests: { from: deletedUserId },
-          blockedUsers: deletedUserId
-        }
-      }
+      { 'friendRequests.from': deletedUserId },
+      { $pull: { friendRequests: { from: deletedUserId } } }
     );
-
-    await Report.deleteMany({
-      $or: [
-        { reporter: deletedUserId },
-        { reportedUser: deletedUserId },
-        { messageId: { $in: privateMessageIds } },
-        { groupMessageId: { $in: groupMessageIds } },
-        { groupId: { $in: ownedGroupIds } }
-      ]
-    });
-    await SupportRequest.deleteMany({
-      $or: [
-        { userId: deletedUserId },
-        { username: deletedUsername }
-      ]
-    });
-
-    await StaffAuditLog.deleteMany({ targetUser: deletedUserId });
-    await StaffAuditLog.updateMany(
-      { actor: deletedUserId },
-      { $set: { actorUsername: anonymizedUsername } }
-    );
-
-    await User.deleteOne({ _id: deletedUserId });
-
-    await audit(req, 'staff.user.permanently_deleted', {
-      targetUser: deletedUserId,
-      targetUsername: anonymizedUsername,
-      details: { permanent: true, accountDataDeleted: true }
-    });
 
     const io = req.app.get('io');
     if (io) {
@@ -730,14 +684,20 @@ router.delete('/users/:userId/permanent', requireStaffRole('owner'), async (req,
       }
     }
 
+    await audit(req, 'staff.user.permanently_deleted', {
+      targetUser: deletedUserId,
+      targetUsername: anonymizedUsername,
+      details: { permanent: true, accountDataDeleted: false, messagesPreserved: true, recoveryDisabled: true }
+    });
+
     return res.json({
       success: true,
       username: anonymizedUsername,
-      message: 'Compte supprimé définitivement de la base de données et données associées nettoyées.'
+      message: 'Compte anonymisé définitivement. Les messages et historiques sont conservés, sans délai de récupération.'
     });
   } catch (error) {
-    console.error('Staff permanent account deletion failed:', error);
-    return res.status(500).json({ error: 'La suppression définitive a échoué. Vérifie les données restantes avant de réessayer.' });
+    console.error('Staff permanent account anonymization failed:', error);
+    return res.status(500).json({ error: 'La suppression définitive a échoué. Vérifie le compte avant de réessayer.' });
   }
 });
 
