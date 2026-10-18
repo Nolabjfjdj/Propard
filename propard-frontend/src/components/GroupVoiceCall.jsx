@@ -67,6 +67,8 @@ export default function GroupVoiceCall({
   const [screenShareError, setScreenShareError] = useState('');
   const [screenShareSettings, setScreenShareSettings] = useState({ width: 2560, height: 1440, fps: 60, automatic: true, audio: true });
   const [remoteStreams, setRemoteStreams] = useState(new Map());
+  const [viewingStreamId, setViewingStreamId] = useState(null);
+  const remoteViewerRef = useRef(null);
   const [participants, setParticipants] = useState([]);
   const [windowPosition, setWindowPosition] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -1159,22 +1161,62 @@ export default function GroupVoiceCall({
               />
               <span style={styles.videoLabel}>Vous</span>
             </div>
-            {[...remoteStreams.entries()].map(([id, stream]) => (
-              <div key={id} style={styles.videoTile}>
-                <video
-                  autoPlay
-                  playsInline
-                  ref={element => {
-                    if (element && element.srcObject !== stream) {
-                      element.srcObject = stream;
-                      element.play().catch(() => {});
-                    }
-                  }}
-                  style={styles.videoElement}
-                />
-                <span style={styles.videoLabel}>{getMemberName(id)}</span>
-              </div>
-            ))}
+            {[...remoteStreams.entries()].map(([id, stream]) => {
+              const hasVideo = stream.getVideoTracks().some(track => track.readyState === 'live');
+              if (!hasVideo) return null;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setViewingStreamId(id)}
+                  style={{ ...styles.videoTile, border: '1px solid var(--border)', padding: 0, cursor: 'pointer', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '90px' }}
+                  aria-label={`Regarder le stream de ${getMemberName(id)}`}
+                >
+                  <span style={{ fontSize: '28px' }}>🖥️</span>
+                  <span style={styles.videoLabel}>{getMemberName(id)}</span>
+                  <span style={{ fontSize: '12px' }}>Regarder le stream</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {viewingStreamId && remoteStreams.get(viewingStreamId) && (
+          <div
+            ref={remoteViewerRef}
+            style={{ position: 'fixed', inset: 0, zIndex: 100000, background: 'rgba(0,0,0,0.96)', display: 'flex', flexDirection: 'column', padding: '12px', boxSizing: 'border-box' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', paddingBottom: '10px' }}>
+              <button
+                type="button"
+                onClick={() => { try { remoteViewerRef.current?.requestFullscreen?.()?.catch?.(() => {}); } catch {} }}
+                aria-label="Mettre le stream en plein écran"
+                title="Mettre en plein écran"
+                style={{ width: '42px', height: '42px', border: '1px solid #555', borderRadius: '10px', background: '#222', color: '#fff', fontSize: '22px', cursor: 'pointer' }}
+              >⛶</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewingStreamId(null);
+                  if (document.fullscreenElement) document.exitFullscreen?.().catch?.(() => {});
+                }}
+                aria-label="Arrêter de regarder le stream"
+                title="Arrêter de regarder"
+                style={{ width: '42px', height: '42px', border: '1px solid #555', borderRadius: '10px', background: '#b42332', color: '#fff', fontSize: '24px', cursor: 'pointer' }}
+              >×</button>
+            </div>
+            <video
+              autoPlay
+              playsInline
+              ref={element => {
+                const stream = remoteStreams.get(viewingStreamId);
+                if (element && stream && element.srcObject !== stream) {
+                  element.srcObject = stream;
+                  element.play().catch(() => {});
+                }
+              }}
+              style={{ width: '100%', height: 'calc(100% - 54px)', objectFit: 'contain', background: '#000', borderRadius: '8px' }}
+            />
           </div>
         )}
 
