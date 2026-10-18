@@ -843,13 +843,19 @@ router.post('/audit/:logId/undo', requireStaffRole('owner'), async (req, res) =>
     if (original.action === 'user.banned' && original.targetUser) {
       const target = await User.findById(original.targetUser);
       if (!target) return res.status(404).json({ error: 'Le compte concerné n’existe plus.' });
-      if (!target.bannedAt) return res.status(409).json({ error: 'Le compte n’est plus banni. Son état a changé depuis cette action.' });
+      if (!target.bannedAt) return res.status(409).json({ error: 'Ce compte n’est actuellement plus banni. Rien n’a été modifié.', code: 'BAN_ALREADY_INACTIVE', targetUsername: target.username });
       target.bannedAt = null;
       target.banExpiresAt = null;
       target.banReason = null;
       target.sessionVersion = (target.sessionVersion || 0) + 1;
       await target.save();
-      undoDescription = { type: 'unban', targetUserId: target._id.toString() };
+      const io = req.app.get('io');
+      if (io) {
+        for (const socket of io.sockets.sockets.values()) {
+          if (socket.userId && socket.userId.toString() === target._id.toString()) socket.disconnect(true);
+        }
+      }
+      undoDescription = { type: 'unban', targetUserId: target._id.toString(), targetUsername: target.username };
     } else if (original.action === 'staff.role.updated' && original.targetUser &&
       typeof details.previousRole === 'string' && Object.prototype.hasOwnProperty.call(ROLE_LEVELS, details.previousRole) &&
       typeof details.staffRole === 'string' && Object.prototype.hasOwnProperty.call(ROLE_LEVELS, details.staffRole)) {
@@ -893,7 +899,7 @@ router.post('/audit/:logId/undo', requireStaffRole('owner'), async (req, res) =>
     return res.json({ success: true, message: 'Action annulée.', undo: undoDescription });
   } catch (error) {
     console.error('Audit action undo failed:', error);
-    return res.status(500).json({ error: 'Impossible d’annuler cette action.' });
+    return res.status(500).json({ error: 'Erreur serveur pendant l’annulation.', code: 'AUDIT_UNDO_FAILED' });
   }
 });
 
