@@ -9,6 +9,7 @@ java_root.mkdir(parents=True, exist_ok=True)
 
 plugin_java = r"""package site.propard;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -30,12 +31,18 @@ import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 
-@CapacitorPlugin(name = "PropardScreenCapture")
+@CapacitorPlugin(name = "PropardScreenCapture", permissions = {
+    @Permission(alias = "camera", strings = { Manifest.permission.CAMERA }),
+    @Permission(alias = "microphone", strings = { Manifest.permission.RECORD_AUDIO })
+})
 public class PropardScreenCapturePlugin extends Plugin {
     private static final int REQUEST_CODE = 7182;
     private PluginCall pendingCall;
@@ -44,6 +51,35 @@ public class PropardScreenCapturePlugin extends Plugin {
     private ImageReader imageReader;
     private long lastFrameAt = 0;
     private final Handler handler = new Handler(Looper.getMainLooper());
+
+    @PluginMethod
+    public void requestMediaPermissions(PluginCall call) {
+        boolean video = Boolean.TRUE.equals(call.getBoolean("video", false));
+        if (video) {
+            requestPermissionForAliases(new String[] { "microphone", "camera" }, call, "mediaPermissionsCallback");
+        } else {
+            requestPermissionForAliases(new String[] { "microphone" }, call, "mediaPermissionsCallback");
+        }
+    }
+
+    @PermissionCallback
+    private void mediaPermissionsCallback(PluginCall call) {
+        boolean microphoneGranted = getPermissionState("microphone") == PermissionState.GRANTED;
+        boolean cameraGranted = getPermissionState("camera") == PermissionState.GRANTED;
+        boolean video = Boolean.TRUE.equals(call.getBoolean("video", false));
+        if (!microphoneGranted) {
+            call.reject("Propard a besoin de l'autorisation du microphone pour lancer un appel. Autorise le microphone dans les paramètres Android.");
+            return;
+        }
+        if (video && !cameraGranted) {
+            call.reject("Propard a besoin de l'autorisation de la caméra pour lancer un appel vidéo. Autorise la caméra dans les paramètres Android.");
+            return;
+        }
+        JSObject result = new JSObject();
+        result.put("microphone", microphoneGranted);
+        result.put("camera", cameraGranted);
+        call.resolve(result);
+    }
 
     @PluginMethod
     public void start(PluginCall call) {
@@ -164,15 +200,24 @@ else:
 manifest = android_root / "AndroidManifest.xml"
 if manifest.exists():
     source = manifest.read_text()
-    if "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" not in source:
-        source = source.replace("<manifest ", '<manifest xmlns:tools="http://schemas.android.com/tools" ', 1) if "xmlns:tools=" not in source else source
-        source = source.replace("<application", '<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />\n    <application', 1)
-        manifest.write_text(source)
-    source = manifest.read_text()
+    required_permissions = [
+        "android.permission.INTERNET",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION",
+    ]
+    for permission in required_permissions:
+        if f'android:name="{permission}"' not in source:
+            source = source.replace(
+                "<application",
+                f'<uses-permission android:name="{permission}" />\n    <application',
+                1
+            )
     if "PropardScreenCaptureService" not in source:
         service_entry = '<service android:name="site.propard.PropardScreenCaptureService" android:exported="false" android:foregroundServiceType="mediaProjection" />'
         source = source.replace("</application>", service_entry + "\n    </application>", 1)
-        manifest.write_text(source)
+    manifest.write_text(source)
 
 # iOS plugin: ReplayKit's in-app capture API produces live frames for the WebRTC canvas bridge.
 ios_app = root / "App"
