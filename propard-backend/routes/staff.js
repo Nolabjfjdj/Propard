@@ -949,10 +949,10 @@ router.post('/audit/:logId/undo', requireStaffRole('owner'), async (req, res) =>
       return res.status(409).json({ error: 'Une annulation ne peut pas être annulée depuis cette entrée.' });
     }
 
-    const alreadyUndone = await StaffAuditLog.exists({
+    const alreadyUndone = await StaffAuditLog.findOne({
       action: 'audit.action.undone',
       'details.originalLogId': original._id.toString()
-    });
+    }).select('_id').lean();
     if (alreadyUndone) return res.status(409).json({ error: 'Cette action a déjà été annulée.' });
 
     const details = original.details || {};
