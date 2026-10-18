@@ -817,4 +817,84 @@ router.get('/audit', requireStaffRole('admin'), async (req, res) => {
   }
 });
 
+
+router.post('/audit/:logId/undo', requireStaffRole('owner'), async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.logId)) {
+      return res.status(400).json({ error: 'Action invalide.' });
+    }
+
+    const original = await StaffAuditLog.findById(req.params.logId);
+    if (!original) return res.status(404).json({ error: 'Action introuvable.' });
+
+    if (original.action === 'audit.action.undone') {
+      return res.status(409).json({ error: 'Une annulation ne peut pas être annulée depuis cette entrée.' });
+    }
+
+    const alreadyUndone = await StaffAuditLog.exists({
+      action: 'audit.action.undone',
+      'details.originalLogId': original._id.toString()
+    });
+    if (alreadyUndone) return res.status(409).json({ error: 'Cette action a déjà été annulée.' });
+
+    const details = original.details || {};
+    let undoDescription;
+
+    if (original.action === 'user.banned' && original.targetUser) {
+      const target = await User.findById(original.targetUser);
+      if (!target) return res.status(404).json({ error: 'Le compte concerné n’existe plus.' });
+      if (!target.bannedAt) return res.status(409).json({ error: 'Le compte n’est plus banni. Son état a changé depuis cette action.' });
+      target.bannedAt = null;
+      target.banExpiresAt = null;
+      target.banReason = null;
+      target.sessionVersion = (target.sessionVersion || 0) + 1;
+      await target.save();
+      undoDescription = { type: 'unban', targetUserId: target._id.toString() };
+    } else if (original.action === 'staff.role.updated' && original.targetUser &&
+      typeof details.previousRole === 'string' && Object.prototype.hasOwnProperty.call(ROLE_LEVELS, details.previousRole) &&
+      typeof details.staffRole === 'string' && Object.prototype.hasOwnProperty.call(ROLE_LEVELS, details.staffRole)) {
+      const target = await User.findById(original.targetUser);
+      if (!target) return res.status(404).json({ error: 'Le compte concerné n’existe plus.' });
+      if ((target.staffRole || 'user') !== details.staffRole) {
+        return res.status(409).json({ error: 'Le rôle a changé depuis cette action. Annulation refusée pour éviter d’écraser une modification plus récente.' });
+      }
+      target.staffRole = details.previousRole;
+      target.staffRoleUpdatedAt = new Date();
+      target.staffRoleUpdatedBy = new mongoose.Types.ObjectId(req.user.id);
+      await target.save();
+      undoDescription = { type: 'role_restore', targetUserId: target._id.toString(), restoredRole: details.previousRole };
+    } else if (original.action === 'report.status.updated' && original.targetReport &&
+      ['new', 'processed', 'rejected'].includes(details.previousStatus) &&
+      ['new', 'processed', 'rejected'].includes(details.status)) {
+      const report = await Report.findById(original.targetReport);
+      if (!report) return res.status(404).json({ error: 'Le signalement concerné n’existe plus.' });
+      if (report.status !== details.status) {
+        return res.status(409).json({ error: 'Le statut du signalement a changé depuis cette action. Annulation refusée.' });
+      }
+      report.status = details.previousStatus;
+      report.processedAt = details.previousStatus === 'new' ? null : new Date();
+      await report.save();
+      undoDescription = { type: 'report_status_restore', targetReportId: report._id.toString(), restoredStatus: details.previousStatus };
+    } else {
+      return res.status(409).json({
+        error: 'Cette action n’est pas encore annulable automatiquement. Les suppressions définitives, réinitialisations de mot de passe et actions sans état précédent sauvegardé ne peuvent pas être restaurées en sécurité.'
+      });
+    }
+
+    await audit(req, 'audit.action.undone', {
+      details: {
+        originalLogId: original._id.toString(),
+        originalAction: original.action,
+        originalActor: original.actor ? original.actor.toString() : null,
+        undo: undoDescription
+      }
+    });
+
+    return res.json({ success: true, message: 'Action annulée.', undo: undoDescription });
+  } catch (error) {
+    console.error('Audit action undo failed:', error);
+    return res.status(500).json({ error: 'Impossible d’annuler cette action.' });
+  }
+});
+
 module.exports = router;
