@@ -449,6 +449,32 @@ export default function StaffPage() {
     }
   };
 
+  const permanentlyDeleteAccount = async () => {
+    if (!lookupResult?._id) return;
+    const expectedUsername = lookupResult.username;
+    const confirmation = window.prompt(
+      `Suppression DÉFINITIVE de @${expectedUsername}. Toutes les données du compte seront supprimées, sans délai de 30 jours. Pour confirmer, saisis exactement le pseudo :`
+    );
+    if (confirmation !== expectedUsername) {
+      if (confirmation !== null) setError('Confirmation incorrecte. Aucune suppression effectuée.');
+      return;
+    }
+    setError('');
+    setNotice('');
+    try {
+      const response = await request('delete', `/api/staff/users/${encodeURIComponent(lookupResult._id)}/permanent`);
+      setNotice(response.data.message || 'Compte supprimé définitivement.');
+      setLookupResult(null);
+      setLookupUsername('');
+      setTargetUserId('');
+      setResetUserId('');
+      setRoleUserId('');
+      setResetToken('');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer définitivement ce compte.');
+    }
+  };
+
   const loadReports = async () => {
     setError('');
     try {
@@ -668,6 +694,20 @@ export default function StaffPage() {
               <strong>{lookupResult.displayName || lookupResult.username}</strong>
               <div>@{lookupResult.username} · ID : <code>{lookupResult._id}</code></div>
               <div>Rôle : {lookupResult.staffRole || 'user'} · {lookupResult.bannedAt ? 'Compte banni' : 'Non banni'}</div>
+              {staffRole === 'owner' && lookupResult.staffRole !== 'owner' && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                  <p style={{ margin: '0 0 8px', color: 'var(--text-secondary)', fontSize: 13 }}>
+                    Suppression immédiate et irréversible. Le compte et ses données associées seront retirés de la base de données, sans période de récupération de 30 jours.
+                  </p>
+                  <button
+                    type="button"
+                    style={{ ...buttonStyle, background: '#a32626', borderColor: '#a32626' }}
+                    onClick={permanentlyDeleteAccount}
+                  >
+                    Supprimer définitivement le compte
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </Panel>
