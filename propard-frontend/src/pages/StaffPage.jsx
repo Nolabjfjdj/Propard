@@ -110,6 +110,7 @@ export default function StaffPage() {
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditPage, setAuditPage] = useState(1);
   const [auditPageSize, setAuditPageSize] = useState(5);
+  const [expandedAuditLogId, setExpandedAuditLogId] = useState('');
   const [accountHelpRequests, setAccountHelpRequests] = useState([]);
   const [helpPage, setHelpPage] = useState(1);
   const [helpPageSize, setHelpPageSize] = useState(5);
@@ -563,7 +564,7 @@ export default function StaffPage() {
       setNotice(response.data.message || 'Action annulée.');
       await loadAudit();
     } catch (err) {
-      setError(err.response?.data?.error || 'Impossible d’annuler cette action.');
+      setError(err.response?.data?.error || err.message || 'Impossible d’annuler cette action.');
     }
   };
 
@@ -897,7 +898,22 @@ export default function StaffPage() {
                     <article key={log._id} style={{ padding: 10, borderRadius: 8, background: 'var(--bg-tertiary)' }}>
                       <strong>{log.action}</strong>
                       <div>{log.actorUsername || log.actor?.username || log.details?.actorUsername || (log.actorId ? `Compte introuvable (${log.actorId.slice(-6)})` : 'Personnel inconnu')} → {log.targetUsername || log.targetUser?.username || log.details?.username || (log.targetUserId ? `Compte introuvable (${log.targetUserId.slice(-6)})` : 'aucune cible')}</div>
-                      <small>{new Date(log.createdAt).toLocaleString()}</small>
+                      <small style={{ display: 'block' }}>{new Date(log.createdAt).toLocaleString()}</small>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                        <button type="button" style={{ ...buttonStyle, marginTop: 0, padding: '4px 8px', fontSize: 12, fontWeight: 500, background: 'transparent', color: 'var(--text-primary)' }} onClick={() => setExpandedAuditLogId(current => current === log._id ? '' : log._id)}>{expandedAuditLogId === log._id ? 'Masquer les infos' : 'Plus d’infos'}</button>
+                      </div>
+                      {expandedAuditLogId === log._id && (
+                        <div style={{ marginTop: 8, padding: 10, border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, overflowWrap: 'anywhere' }}>
+                          <div><strong>ID de l’action :</strong> {log._id}</div>
+                          <div><strong>Action :</strong> {log.action}</div>
+                          <div><strong>Acteur :</strong> {log.actorUsername || log.actor?.username || 'Inconnu'} {log.actorId ? '(' + log.actorId + ')' : ''}</div>
+                          <div><strong>Cible :</strong> {log.targetUsername || log.targetUser?.username || log.details?.username || 'Aucune'} {log.targetUserId ? '(' + log.targetUserId + ')' : ''}</div>
+                          {log.targetReport && <div><strong>ID du signalement :</strong> {typeof log.targetReport === 'object' ? log.targetReport._id : log.targetReport}</div>}
+                          {log.ip && <div><strong>Adresse IP enregistrée :</strong> {log.ip}</div>}
+                          {log.userAgent && <div><strong>Appareil / navigateur :</strong> {log.userAgent}</div>}
+                          {log.details && <div style={{ marginTop: 6 }}><strong>Détails techniques :</strong><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 12, marginBottom: 0 }}>{JSON.stringify(log.details, null, 2)}</pre></div>}
+                        </div>
+                      )}
                       {staffRole === 'owner' && undoable && !undoneIds.has(log._id) && (
                         <div style={{ marginTop: 8 }}>
                           <button type="button" style={{ ...buttonStyle, borderColor: '#b45309' }} onClick={() => undoAuditAction(log)}>Annuler cette action</button>
