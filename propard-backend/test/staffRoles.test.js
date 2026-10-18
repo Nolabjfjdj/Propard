@@ -32,7 +32,9 @@ test('a staff member cannot manage a role at the same or higher level', () => {
   assert.equal(canManageRole('moderator', 'senior_moderator'), false);
   assert.equal(canManageRole('senior_moderator', 'moderator'), true);
   assert.equal(canManageRole('owner', 'admin'), true);
+  assert.equal(canManageRole('owner', 'owner'), false);
   assert.equal(canManageRole('admin', 'owner'), false);
+  assert.equal(canManageRole('owner', 'user'), true);
 });
 
 test('role middleware denies ordinary users and allows qualifying staff', () => {
