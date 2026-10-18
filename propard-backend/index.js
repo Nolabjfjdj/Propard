@@ -316,9 +316,9 @@ io.on('connection',socket=>{
         ? decoded.sessionVersion
         : 0;
 
-      const authenticatedUser=await User.findById(decoded.id).select('_id sessionVersion');
+      const authenticatedUser=await User.findById(decoded.id).select('_id sessionVersion bannedAt');
 
-      if(!authenticatedUser || authenticatedUser.sessionVersion!==tokenSessionVersion){
+      if(!authenticatedUser || authenticatedUser.bannedAt || authenticatedUser.sessionVersion!==tokenSessionVersion){
         throw new Error('Session expirée');
       }
 
