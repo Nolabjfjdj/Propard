@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const { registerModel } = require('../db/shards');
 
 const userSchema = new mongoose.Schema({
-  username:{type:String,required:true,unique:true,trim:true,minlength:3,maxlength:20},
+  username:{type:String,required:true,unique:true,trim:true,minlength:3,maxlength:32},
   displayName:{type:String,default:null,trim:true,maxlength:32},
   avatar:{type:String,default:null},
   password:{type:String,required:true},
