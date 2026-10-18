@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import socket from '../socket';
 import { API_URL } from '../utils/api';
 import { startMobileScreenCapture } from '../utils/mobileScreenCapture';
+import { ensureCallMediaPermissions } from '../utils/callMediaPermissions';
 
 const POSITION_STORAGE_KEY = 'propard_group_voice_call_position';
 
