@@ -204,8 +204,17 @@ for activity in activity_files:
                 "registerPlugin(PropardScreenCapturePlugin.class);\n        super.onCreate(savedInstanceState);",
                 1
             )
+        elif re.search(r"public\s+class\s+MainActivity\s+extends\s+BridgeActivity", source):
+            source = re.sub(
+                r"(public\s+class\s+MainActivity\s+extends\s+BridgeActivity\s*\{)",
+                r"\1\n    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        registerPlugin(PropardScreenCapturePlugin.class);\n        super.onCreate(savedInstanceState);\n    }",
+                source,
+                count=1
+            )
+            if "import android.os.Bundle;" not in source:
+                source = source.replace("package site.propard;", "package site.propard;\n\nimport android.os.Bundle;", 1)
         else:
-            raise RuntimeError(f"Impossible d'enregistrer le plugin natif dans {activity}: super.onCreate introuvable")
+            raise RuntimeError(f"Impossible d'enregistrer le plugin natif dans {activity}: point d'enregistrement introuvable")
         activity.write_text(source)
 
 manifest = android_root / "AndroidManifest.xml"
@@ -287,14 +296,47 @@ public class PropardScreenCapturePlugin: CAPPlugin, CAPBridgedPlugin {
 """)
 
 view_controller = ios_app / "ViewController.swift"
-if view_controller.exists():
+if not view_controller.exists():
+    view_controller.write_text("""import UIKit
+import Capacitor
+
+class ViewController: CAPBridgeViewController {
+    override func capacitorDidLoad() {
+        super.capacitorDidLoad()
+        bridge?.registerPluginInstance(PropardScreenCapturePlugin())
+    }
+}
+""")
+else:
     source = view_controller.read_text()
     if "registerPluginInstance(PropardScreenCapturePlugin())" not in source:
         if "override func capacitorDidLoad()" in source:
-            source = source.replace("override func capacitorDidLoad() {", "override func capacitorDidLoad() {\n        bridge?.registerPluginInstance(PropardScreenCapturePlugin())")
+            source = source.replace(
+                "override func capacitorDidLoad() {",
+                "override func capacitorDidLoad() {\n        super.capacitorDidLoad()\n        bridge?.registerPluginInstance(PropardScreenCapturePlugin())",
+                1
+            )
+        elif "class ViewController: CAPBridgeViewController {" in source:
+            source = source.replace(
+                "class ViewController: CAPBridgeViewController {",
+                "class ViewController: CAPBridgeViewController {\n    override func capacitorDidLoad() {\n        super.capacitorDidLoad()\n        bridge?.registerPluginInstance(PropardScreenCapturePlugin())\n    }",
+                1
+            )
         else:
-            source = source.replace("class ViewController: CAPBridgeViewController {", "class ViewController: CAPBridgeViewController {\n    override func capacitorDidLoad() {\n        super.capacitorDidLoad()\n        bridge?.registerPluginInstance(PropardScreenCapturePlugin())\n    }")
+            raise RuntimeError("Impossible d'enregistrer le plugin iOS: classe ViewController inattendue")
         view_controller.write_text(source)
+
+storyboard = ios_app / "Base.lproj" / "Main.storyboard"
+if storyboard.exists():
+    source = storyboard.read_text()
+    if 'customClass="ViewController"' not in source:
+        source = re.sub(
+            r'customClass="(?:CAPBridgeViewController|UIViewController)"',
+            'customClass="ViewController"',
+            source,
+            count=1
+        )
+        storyboard.write_text(source)
 
 # Ensure the new Swift source is part of the Xcode target.
 project = root / "App.xcodeproj" / "project.pbxproj"
