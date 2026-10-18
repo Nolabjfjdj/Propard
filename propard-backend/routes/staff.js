@@ -755,8 +755,7 @@ router.patch('/users/:userId/role', requireStaffRole('admin'), async (req, res) 
       return res.status(400).json({ error: 'Rôle du personnel invalide.' });
     }
 
-    const canAssignRole = canManageRole(req.user.staffRole, staffRole) ||
-      (req.user.staffRole === 'owner' && staffRole === 'owner');
+    const canAssignRole = canManageRole(req.user.staffRole, staffRole);
     if (!actorCanManageTarget(req.user.staffRole, target.staffRole) || !canAssignRole) {
       return res.status(403).json({ error: 'Tu ne peux pas attribuer ou modifier ce niveau de rôle.' });
     }
