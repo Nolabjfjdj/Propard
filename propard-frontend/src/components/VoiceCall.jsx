@@ -1909,6 +1909,17 @@ export default function VoiceCall({
           </div>
         </div>
 
+        {(videoCall || isScreenSharing) && (status === 'connected' || status === 'calling') && (
+          <video
+            ref={localVideoRef}
+            autoPlay
+            muted
+            playsInline
+            style={{ width: '100%', maxHeight: '110px', objectFit: 'contain', background: '#111', borderRadius: '8px' }}
+            aria-label="Aperçu local"
+          />
+        )}
+
         {remoteVideoAvailable && (status === 'connected' || status === 'calling') && !isWatchingRemoteStream && (
           <button
             type="button"
