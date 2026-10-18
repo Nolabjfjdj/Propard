@@ -97,6 +97,8 @@ export default function VoiceCall({
   const [screenShareSettings, setScreenShareSettings] = useState({ width: 2560, height: 1440, fps: 60, automatic: true, audio: true });
   const screenShareSupported = typeof navigator !== 'undefined' && (Boolean(navigator.mediaDevices?.getDisplayMedia) || Boolean(window.Capacitor?.isNativePlatform?.()));
   const [remoteVideoAvailable, setRemoteVideoAvailable] = useState(false);
+  const [isWatchingRemoteStream, setIsWatchingRemoteStream] = useState(false);
+  const remoteViewerRef = useRef(null);
 
   /*
    * Position de la fenêtre flottante.
@@ -1907,15 +1909,40 @@ export default function VoiceCall({
           </div>
         </div>
 
-        {(videoCall || isScreenSharing || remoteVideoAvailable) && (status === 'connected' || status === 'calling') && (
-          <div style={styles.videoArea}>
-            <video
-              ref={localVideoRef}
-              autoPlay
-              muted
-              playsInline
-              style={styles.localVideo}
-            />
+        {remoteVideoAvailable && (status === 'connected' || status === 'calling') && !isWatchingRemoteStream && (
+          <button
+            type="button"
+            onClick={() => setIsWatchingRemoteStream(true)}
+            style={{ width: '100%', padding: '12px', border: '1px solid var(--border)', borderRadius: '10px', background: 'var(--bg-hover)', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
+          >
+            🖥️ Regarder le partage d’écran / le stream
+          </button>
+        )}
+
+        {isWatchingRemoteStream && remoteVideoAvailable && (
+          <div
+            ref={remoteViewerRef}
+            style={{ position: 'fixed', inset: 0, zIndex: 100000, background: 'rgba(0,0,0,0.96)', display: 'flex', flexDirection: 'column', padding: '12px', boxSizing: 'border-box' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', paddingBottom: '10px' }}>
+              <button
+                type="button"
+                onClick={() => { try { remoteViewerRef.current?.requestFullscreen?.()?.catch?.(() => {}); } catch {} }}
+                aria-label="Mettre le stream en plein écran"
+                title="Mettre en plein écran"
+                style={{ width: '42px', height: '42px', border: '1px solid #555', borderRadius: '10px', background: '#222', color: '#fff', fontSize: '22px', cursor: 'pointer' }}
+              >⛶</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsWatchingRemoteStream(false);
+                  if (document.fullscreenElement) document.exitFullscreen?.().catch?.(() => {});
+                }}
+                aria-label="Arrêter de regarder le stream"
+                title="Arrêter de regarder"
+                style={{ width: '42px', height: '42px', border: '1px solid #555', borderRadius: '10px', background: '#b42332', color: '#fff', fontSize: '24px', cursor: 'pointer' }}
+              >×</button>
+            </div>
             <video
               ref={element => {
                 remoteVideoRef.current = element;
@@ -1926,7 +1953,7 @@ export default function VoiceCall({
               }}
               autoPlay
               playsInline
-              style={styles.remoteVideo}
+              style={{ width: '100%', height: 'calc(100% - 54px)', objectFit: 'contain', background: '#000', borderRadius: '8px' }}
             />
           </div>
         )}
