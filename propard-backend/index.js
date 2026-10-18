@@ -222,7 +222,7 @@ const callState=createCallStateManager({
         const receiver = call.receiverId;
         const content = status === 'missed'
           ? '📵 Appel manqué'
-          : `📞 Appel Terminé — Durée : ${Math.floor(durationSeconds / 60).toString().padStart(2,'0')}:${(durationSeconds % 60).toString().padStart(2,'0')}`;
+          : `📞 Appel Terminé - Durée : ${Math.floor(durationSeconds / 60).toString().padStart(2,'0')}:${(durationSeconds % 60).toString().padStart(2,'0')}`;
         const message = await Message.create({ sender, receiver, content, encrypted: false, read: false });
         const populated = await Message.findById(message._id)
           .populate('sender', 'username displayName avatar ipAlias');
@@ -234,7 +234,7 @@ const callState=createCallStateManager({
       if (type === 'group') {
         const content = status === 'missed'
           ? '📵 Appel de groupe manqué'
-          : `📞 Appel de groupe Terminé — Durée : ${Math.floor(durationSeconds / 60).toString().padStart(2,'0')}:${(durationSeconds % 60).toString().padStart(2,'0')}`;
+          : `📞 Appel de groupe Terminé - Durée : ${Math.floor(durationSeconds / 60).toString().padStart(2,'0')}:${(durationSeconds % 60).toString().padStart(2,'0')}`;
         const message = await GroupMessage.create({ group: call.groupId, sender: call.callerId, content, encrypted: false });
         await Group.findByIdAndUpdate(call.groupId, { lastMessageAt: message.createdAt });
         const populated = await GroupMessage.findById(message._id)
