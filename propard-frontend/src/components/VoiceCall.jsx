@@ -86,6 +86,7 @@ export default function VoiceCall({
   const [status, setStatus] = useState(
     incomingOffer ? 'incoming' : 'calling'
   );
+  const [callError, setCallError] = useState('');
 
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
@@ -1237,6 +1238,7 @@ export default function VoiceCall({
       );
 
       if (!closedRef.current) {
+        setCallError(err?.message || 'Impossible d’accéder au microphone ou à la caméra.');
         setStatus('error');
       }
     }
@@ -1350,6 +1352,7 @@ export default function VoiceCall({
       );
 
       if (!closedRef.current) {
+        setCallError(err?.message || 'Impossible d’accéder au microphone ou à la caméra.');
         setStatus('error');
       }
     }
@@ -1899,7 +1902,7 @@ export default function VoiceCall({
                 '❌ Appel échoué'}
 
               {status === 'error' &&
-                '❌ Caméra ou micro inaccessible'}
+                `❌ ${callError || 'Caméra ou micro inaccessible'}`}
             </p>
           </div>
         </div>
