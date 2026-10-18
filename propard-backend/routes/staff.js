@@ -176,7 +176,7 @@ router.get('/notifications/events', requireStaffRole('support'), async (req, res
   try {
     const eventActions = [
       'user.banned', 'user.unbanned', 'staff.role.updated',
-      'report.status.updated', 'report.deleted',
+      'staff.user.permanently_deleted', 'report.status.updated', 'report.deleted',
       'account_help.reply_updated', 'account_help.status_updated',
       'account_help.request_deleted', 'account_help.recovery_code_issued',
       'user.password_reset.issued', 'user.password_reset.completed',
