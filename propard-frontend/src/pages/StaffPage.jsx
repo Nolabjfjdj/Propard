@@ -723,7 +723,8 @@ export default function StaffPage() {
               <strong>{lookupResult.displayName || lookupResult.username}</strong>
               <div>@{lookupResult.username} · ID : <code>{lookupResult._id}</code></div>
               <div>Rôle : {lookupResult.staffRole || 'user'} · {lookupResult.bannedAt ? 'Compte banni' : 'Non banni'}</div>
-              {staffRole === 'owner' && lookupResult.staffRole !== 'owner' && (
+              {['admin', 'owner'].includes(staffRole) &&
+                roles.findIndex(([role]) => role === (lookupResult.staffRole || 'user')) < roles.findIndex(([role]) => role === staffRole) && (
                 <div style={{ display: 'grid', gap: 10, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
                   <div style={{ display: 'grid', gap: 6 }}>
                     <strong>1. Anonymiser définitivement le compte</strong>
