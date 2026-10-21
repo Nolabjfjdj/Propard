@@ -626,7 +626,7 @@ router.get('/users/search', requireStaffRole('support'), async (req, res) => {
   }
 });
 
-router.delete('/users/:userId/permanent', requireStaffRole('owner'), async (req, res) => {
+router.delete('/users/:userId/permanent', requireStaffRole('admin'), async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.userId)) {
       return res.status(400).json({ error: 'Identifiant de compte invalide.' });
@@ -639,6 +639,12 @@ router.delete('/users/:userId/permanent', requireStaffRole('owner'), async (req,
     }
     if (target.staffRole === 'owner') {
       return res.status(403).json({ error: 'Le compte propriétaire ne peut pas être supprimé depuis cet outil.' });
+    }
+    if (!actorCanManageTarget(req.user.staffRole, target.staffRole || 'user')) {
+      return res.status(403).json({ error: 'Tu ne peux pas supprimer un compte du personnel de niveau égal ou supérieur.' });
+    }
+    if (!actorCanManageTarget(req.user.staffRole, target.staffRole || 'user')) {
+      return res.status(403).json({ error: 'Tu ne peux pas supprimer un compte du personnel de niveau égal ou supérieur.' });
     }
 
     const deletedUserId = target._id;
@@ -696,12 +702,12 @@ router.delete('/users/:userId/permanent', requireStaffRole('owner'), async (req,
       message: 'Compte anonymisé définitivement. Les messages et historiques sont conservés, sans délai de récupération.'
     });
   } catch (error) {
-    console.error('Staff permanent account anonymization failed:', error);
+    console.error('Staff permanent account anonymization failed:', error?.name, error?.message, error?.code, error?.keyValue);
     return res.status(500).json({ error: 'La suppression définitive a échoué. Vérifie le compte avant de réessayer.' });
   }
 });
 
-router.delete('/users/:userId/purge', requireStaffRole('owner'), async (req, res) => {
+router.delete('/users/:userId/purge', requireStaffRole('admin'), async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.userId)) {
       return res.status(400).json({ error: 'Identifiant de compte invalide.' });
@@ -783,7 +789,7 @@ router.delete('/users/:userId/purge', requireStaffRole('owner'), async (req, res
       message: 'Compte et données associées supprimés définitivement.'
     });
   } catch (error) {
-    console.error('Staff full account deletion failed:', error);
+    console.error('Staff full account deletion failed:', error?.name, error?.message, error?.code, error?.keyValue);
     return res.status(500).json({ error: 'La suppression complète a échoué. Vérifie les données restantes avant de réessayer.' });
   }
 });
