@@ -648,14 +648,14 @@ router.delete('/users/:userId/permanent', requireStaffRole('admin'), async (req,
     const deletedUserIdString = deletedUserId.toString();
     const anonymizedUsername = `utilisateur_supprimé${deletedUserIdString.slice(-5)}`;
 
-    if (await User.exists({ username: anonymizedUsername, _id: { $ne: deletedUserId } })) {
+    if (await User.findOne({ username: anonymizedUsername, _id: { $ne: deletedUserId } }).select('_id').lean()) {
       return res.status(409).json({ error: 'Le pseudo anonymisé existe déjà. Aucune modification effectuée.' });
     }
 
     let newIpAlias;
     do {
       newIpAlias = crypto.randomBytes(16).toString('hex');
-    } while (await User.exists({ ipAlias: newIpAlias, _id: { $ne: deletedUserId } }));
+    } while (await User.findOne({ ipAlias: newIpAlias, _id: { $ne: deletedUserId } }).select('_id').lean());
 
     const anonymizedPassword = await bcrypt.hash(crypto.randomBytes(48).toString('hex'), 10);
     const updateResult = await User.updateOne(
