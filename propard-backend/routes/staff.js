@@ -657,20 +657,30 @@ router.delete('/users/:userId/permanent', requireStaffRole('admin'), async (req,
       newIpAlias = crypto.randomBytes(16).toString('hex');
     } while (await User.exists({ ipAlias: newIpAlias, _id: { $ne: deletedUserId } }));
 
-    target.username = anonymizedUsername;
-    target.realUsername = null;
-    target.pendingDeletionAt = null;
-    target.password = await bcrypt.hash(crypto.randomBytes(48).toString('hex'), 10);
-    target.ipAlias = newIpAlias;
-    target.e2eeKeyBackup = null;
-    target.passwordResetTokenHash = null;
-    target.passwordResetExpiresAt = null;
-    target.passwordResetIssuedBy = null;
-    target.sessionVersion = (target.sessionVersion || 0) + 1;
-    target.isOnline = false;
-    target.apnsTokens = [];
-    target.pushSubscriptions = [];
-    await target.save();
+    const anonymizedPassword = await bcrypt.hash(crypto.randomBytes(48).toString('hex'), 10);
+    const updateResult = await User.updateOne(
+      { _id: deletedUserId },
+      {
+        $set: {
+          username: anonymizedUsername,
+          realUsername: null,
+          pendingDeletionAt: null,
+          password: anonymizedPassword,
+          ipAlias: newIpAlias,
+          e2eeKeyBackup: null,
+          passwordResetTokenHash: null,
+          passwordResetExpiresAt: null,
+          passwordResetIssuedBy: null,
+          sessionVersion: (target.sessionVersion || 0) + 1,
+          isOnline: false,
+          apnsTokens: [],
+          pushSubscriptions: []
+        }
+      }
+    );
+    if (updateResult.matchedCount !== 1) {
+      return res.status(404).json({ error: 'Le compte a disparu avant la confirmation de la suppression.' });
+    }
 
     await User.updateMany(
       { 'friendRequests.from': deletedUserId },
