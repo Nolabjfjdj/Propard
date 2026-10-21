@@ -643,9 +643,6 @@ router.delete('/users/:userId/permanent', requireStaffRole('admin'), async (req,
     if (!actorCanManageTarget(req.user.staffRole, target.staffRole || 'user')) {
       return res.status(403).json({ error: 'Tu ne peux pas supprimer un compte du personnel de niveau égal ou supérieur.' });
     }
-    if (!actorCanManageTarget(req.user.staffRole, target.staffRole || 'user')) {
-      return res.status(403).json({ error: 'Tu ne peux pas supprimer un compte du personnel de niveau égal ou supérieur.' });
-    }
 
     const deletedUserId = target._id;
     const deletedUserIdString = deletedUserId.toString();
@@ -720,6 +717,9 @@ router.delete('/users/:userId/purge', requireStaffRole('admin'), async (req, res
     }
     if (target.staffRole === 'owner') {
       return res.status(403).json({ error: 'Le compte propriétaire ne peut pas être supprimé depuis cet outil.' });
+    }
+    if (!actorCanManageTarget(req.user.staffRole, target.staffRole || 'user')) {
+      return res.status(403).json({ error: 'Tu ne peux pas supprimer un compte du personnel de niveau égal ou supérieur.' });
     }
 
     const userId = target._id;
