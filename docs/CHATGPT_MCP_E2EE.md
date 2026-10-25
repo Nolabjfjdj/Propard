@@ -14,6 +14,12 @@ Ce document définit les exigences de sécurité avant toute modification du sys
 - Le modèle `Message` stocke le contenu et un indicateur `encrypted`.
 - Les routes de messagerie privée exigent que les deux utilisateurs soient amis.
 
+## Format E2EE observé dans le client actuel
+
+Le fichier `propard-frontend/src/utils/crypto.js` utilise ECDH sur la courbe P-256 pour dériver une clé partagée à partir de la clé privée locale de l'expéditeur et de la clé publique du destinataire, puis AES-256-GCM pour chiffrer chaque message. Le champ `content` contient une chaîne JSON avec `v: 1`, `iv` et `ct` encodés en Base64. La clé privée est conservée côté navigateur dans le stockage local sécurisé; elle ne doit pas être copiée dans l'intégration ChatGPT.
+
+Une intégration ne doit pas réimplémenter ce protocole à l'aveugle. Elle doit réutiliser un composant de chiffrement approuvé et testé avec les clients existants, ou définir puis tester une migration de protocole distincte. Le serveur MCP ne peut pas produire une enveloppe compatible tout en restant aveugle au texte clair si le texte lui est envoyé comme argument d'outil.
+
 ## Règles de sécurité obligatoires
 
 1. Ne jamais envoyer une clé privée E2EE à ChatGPT, au serveur MCP, au backend Propard ou à un journal serveur.
