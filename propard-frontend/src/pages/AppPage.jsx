@@ -1400,6 +1400,13 @@ export default function AppPage({
             </p>
           </div>
         )}
+
+        <footer style={styles.legalFooter}>
+          <span>© 2026 Propard</span>
+          <a href="/privacy" style={styles.legalFooterLink}>Confidentialité</a>
+          <a href="/terms" style={styles.legalFooterLink}>CGU</a>
+          <a href="/copyright" style={styles.legalFooterLink}>Copyright</a>
+        </footer>
       </div>
 
       {showAddFriend && (
@@ -1970,6 +1977,24 @@ const styles = {
     flexDirection: 'column',
     minWidth: 0,
     overflow: 'hidden'
+  },
+
+  legalFooter: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: '10px',
+    padding: '10px 12px',
+    borderTop: '1px solid var(--border)',
+    color: 'var(--text-muted)',
+    fontSize: '11px',
+    flexShrink: 0
+  },
+
+  legalFooterLink: {
+    color: 'var(--text-muted)',
+    textDecoration: 'none'
   },
 
   mobileHeader: {
