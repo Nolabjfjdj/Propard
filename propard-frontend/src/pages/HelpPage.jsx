@@ -42,6 +42,7 @@ export default function HelpPage() {
         <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <a href="/privacy" style={styles.legalLink}>Politique de confidentialité</a>
           <a href="/terms" style={styles.legalLink}>Conditions Générales d'Utilisation</a>
+          <a href="/copyright" style={styles.legalLink}>Copyright</a>
         </div>
       </div>
     </div>
