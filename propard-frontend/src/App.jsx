@@ -11,6 +11,7 @@ import AccountHelpStatusPage from './pages/AccountHelpStatusPage';
 import SupportConversationPage from './pages/SupportConversationPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
+import CopyrightPage from './pages/CopyrightPage';
 import GlobalAnnouncement from './components/GlobalAnnouncement';
 import OfflineGame from './components/OfflineGame';
 import api from './utils/api';
@@ -323,6 +324,10 @@ export default function App() {
 
   if (path === '/terms') {
     return <TermsPage />;
+  }
+
+  if (path === '/copyright') {
+    return <CopyrightPage />;
   }
 
   if (path === '/') {
