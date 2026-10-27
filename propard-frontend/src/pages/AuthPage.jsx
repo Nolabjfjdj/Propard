@@ -415,6 +415,14 @@ export default function AuthPage({ mode }) {
           </form>
         </div>
       )}
+
+      <footer style={styles.legalFooter}>
+        <span>© 2026 Propard</span>
+        <a href="/privacy" style={styles.legalFooterLink}>Confidentialité</a>
+        <a href="/terms" style={styles.legalFooterLink}>CGU</a>
+        <a href="/copyright" style={styles.legalFooterLink}>Copyright</a>
+        <a href="/help" style={styles.legalFooterLink}>Aide</a>
+      </footer>
     </div>
   );
 }
@@ -438,6 +446,26 @@ const styles = {
     borderRadius: '8px',
     padding: '8px 12px',
     fontSize: '18px'
+  },
+
+  legalFooter: {
+    position: 'absolute',
+    bottom: 'max(12px, env(safe-area-inset-bottom))',
+    left: 0,
+    right: 0,
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '12px',
+    padding: '8px 16px',
+    fontSize: '12px',
+    color: 'var(--text-muted)'
+  },
+
+  legalFooterLink: {
+    color: 'var(--text-muted)',
+    textDecoration: 'none'
   },
 
   card: {
