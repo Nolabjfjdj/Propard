@@ -15,6 +15,16 @@ const { createRateLimiter } = require('../middleware/rateLimit');
 const lastReportTimes = new Map();
 const REPORT_COOLDOWN_MS = 15000;
 
+const reportCooldownCleanup = setInterval(() => {
+  const now = Date.now();
+  for (const [reporterId, timestamp] of lastReportTimes) {
+    if (now - timestamp >= REPORT_COOLDOWN_MS) {
+      lastReportTimes.delete(reporterId);
+    }
+  }
+}, 5 * 60 * 1000);
+reportCooldownCleanup.unref?.();
+
 const reportRateLimiter = createRateLimiter({
   windowMs: 60 * 60 * 1000,
   max: 10,
