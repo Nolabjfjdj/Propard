@@ -1353,7 +1353,7 @@ router.post('/logout-all', authMiddleware, logoutAllLimiter, async (req, res) =>
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id)
-      .select('-password -realUsername')
+      .select('_id username displayName avatar ipAlias publicKey isOnline friends friendRequests pendingDeletionAt')
       .populate(
         'friends.userId',
         'username displayName avatar ipAlias isOnline publicKey'
@@ -1365,16 +1365,26 @@ router.get('/me', authMiddleware, async (req, res) => {
       });
     }
 
-    const userObj = user.toObject();
-
-    userObj.pendingDeletion = !!user.pendingDeletionAt;
-    userObj.deletionExpiresAt = user.pendingDeletionAt
+    const pendingDeletion = !!user.pendingDeletionAt;
+    const deletionExpiresAt = user.pendingDeletionAt
       ? new Date(
           user.pendingDeletionAt.getTime() + THIRTY_DAYS_MS
         )
       : null;
 
-    res.json(userObj);
+    res.json({
+      _id: user._id,
+      username: user.username,
+      displayName: user.displayName,
+      avatar: user.avatar,
+      ipAlias: user.ipAlias,
+      publicKey: user.publicKey,
+      isOnline: user.isOnline,
+      friends: user.friends,
+      friendRequests: user.friendRequests,
+      pendingDeletion,
+      deletionExpiresAt
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erreur serveur' });
