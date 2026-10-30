@@ -797,6 +797,13 @@ router.patch(
 
       const encryptedContent =
         req.body?.content;
+      const currentKeyVersion = Number.isSafeInteger(group.keyVersion) && group.keyVersion > 0 ? group.keyVersion : 1;
+
+      if (req.body?.keyVersion !== currentKeyVersion) {
+        return res.status(409).json({
+          error: 'La clé du groupe a changé. Recharge le groupe avant de modifier ce message.'
+        });
+      }
 
       /*
        * Le contenu reste chiffrÃ© cÃ´tÃ©
@@ -848,6 +855,7 @@ router.patch(
       message.content =
         encryptedContent.trim();
       message.encrypted = true;
+      message.keyVersion = currentKeyVersion;
 
       message.edited =
         true;
@@ -867,6 +875,8 @@ router.patch(
             message.content,
           encrypted:
             true,
+          keyVersion:
+            message.keyVersion,
           edited:
             true
         }
@@ -886,6 +896,8 @@ router.patch(
             message.content,
           encrypted:
             message.encrypted,
+          keyVersion:
+            message.keyVersion,
           edited:
             message.edited,
           deleted:
