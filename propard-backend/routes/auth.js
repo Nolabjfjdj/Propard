@@ -1343,6 +1343,11 @@ router.post('/logout-all', authMiddleware, logoutAllLimiter, async (req, res) =>
       return res.status(404).json({ error: 'Utilisateur introuvable' });
     }
 
+    const disconnectUserSockets = req.app.get('disconnectUserSockets');
+    if (typeof disconnectUserSockets === 'function') {
+      disconnectUserSockets(req.user.id);
+    }
+
     res.json({ success: true });
   } catch (e) {
     console.error(e);
