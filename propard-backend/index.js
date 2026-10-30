@@ -7,6 +7,7 @@ const jwt=require('jsonwebtoken');
 const path=require('path');
 const {randomUUID}=require('crypto');
 const {createCallStateManager}=require('./services/callState');
+const {createSocketRateLimiter}=require('./services/socketRateLimit');
 const {connectShards}=require('./db/shards');
 const {
   isEncryptedMessagePayload,
@@ -58,6 +59,38 @@ const databaseReady=connectShards();
 
 const connectedUsers=new Map();
 const activeConversations=new Map();
+const socketRateLimiter=createSocketRateLimiter();
+
+const socketRateLimitCleanup=setInterval(()=>{
+  socketRateLimiter.cleanup();
+},60000);
+socketRateLimitCleanup.unref?.();
+
+function allowSocketEvent(socket,event,max,windowMs){
+  return socketRateLimiter.allow(
+    socket.userId || `socket:${socket.id}`,
+    event,
+    max,
+    windowMs
+  );
+}
+
+function getActivePrivateCall(userA,userB){
+  const call=privateCalls.get(getPrivateCallKey(userA,userB));
+  if(!call) return null;
+
+  const a=userA.toString();
+  const b=userB.toString();
+
+  if(
+    (call.callerId===a && call.receiverId===b) ||
+    (call.callerId===b && call.receiverId===a)
+  ){
+    return call;
+  }
+
+  return null;
+}
 
 function addConnection(userId,socketId){
   if(!connectedUsers.has(userId)){
@@ -312,6 +345,10 @@ io.on('connection',socket=>{
   console.log(`🔌 Socket connecté: ${socket.id}`);
 
   socket.on('authenticate',async token=>{
+    if(!allowSocketEvent(socket,'authenticate',5,60000)){
+      return socket.emit('authenticated',false);
+    }
+
     if(socket.userId){
       socket.emit('authenticated',true);
       return;
@@ -365,7 +402,7 @@ io.on('connection',socket=>{
   });
 
   socket.on('requestPendingCalls',()=>{
-    if(!socket.userId) return;
+    if(!socket.userId || !allowSocketEvent(socket,'requestPendingCalls',10,60000)) return;
 
     const pendingPrivateCall = callState.getPendingPrivateCall(socket.userId);
 
@@ -406,7 +443,7 @@ io.on('connection',socket=>{
   // ─────────────────────────────────────
 
   socket.on('setActiveConversation',({type,id,active=true}={})=>{
-    if(!socket.userId) return;
+    if(!socket.userId || !allowSocketEvent(socket,'setActiveConversation',30,10000)) return;
 
     setActiveConversation(
       socket.userId,
@@ -418,6 +455,9 @@ io.on('connection',socket=>{
   socket.on('sendMessage',async({receiverId,content}={})=>{
     try{
       if(!socket.userId) return;
+      if(!allowSocketEvent(socket,'sendMessage',20,10000)){
+        return socket.emit('messageError',{message:'Trop de messages envoyés. Patiente un instant.'});
+      }
 
       if(
         !content ||
@@ -519,6 +559,9 @@ io.on('connection',socket=>{
   socket.on('sendGroupMessage',async({groupId,content}={})=>{
     try{
       if(!socket.userId) return;
+      if(!allowSocketEvent(socket,'sendGroupMessage',20,10000)){
+        return socket.emit('groupMessageError',{message:'Trop de messages envoyés. Patiente un instant.'});
+      }
 
       if(
         !mongoose.isValidObjectId(groupId) ||
@@ -633,8 +676,11 @@ io.on('connection',socket=>{
 
   socket.on('callUser',async({receiverId,offer,videoCall=false}={})=>{
     if(!socket.userId) return;
+    if(!allowSocketEvent(socket,'callUser',3,30000)){
+      return socket.emit('callFailed',{message:'Trop de tentatives d’appel. Patiente un instant.'});
+    }
 
-    if(!mongoose.isValidObjectId(receiverId) || !isSessionDescription(offer,'offer')) return;
+    if(!mongoose.isValidObjectId(receiverId) || receiverId.toString()===socket.userId.toString() || !isSessionDescription(offer,'offer')) return;
 
     if(!(await areFriends(socket.userId,receiverId))){
       return socket.emit(
@@ -645,6 +691,10 @@ io.on('connection',socket=>{
 
     const key=getPrivateCallKey(socket.userId,receiverId);
     let call=privateCalls.get(key);
+
+    if(call){
+      return socket.emit('callFailed',{message:'Un appel est déjà en cours avec cet utilisateur.'});
+    }
 
     if(!call){
       call={
@@ -701,40 +751,36 @@ io.on('connection',socket=>{
 
   socket.on('answerCall',async({callerId,answer}={})=>{
     if(!socket.userId) return;
+    if(!allowSocketEvent(socket,'answerCall',5,10000)) return;
 
     if(!mongoose.isValidObjectId(callerId) || !isSessionDescription(answer,'answer')) return;
 
     if(!(await areFriends(socket.userId,callerId))) return;
 
     const key=getPrivateCallKey(socket.userId,callerId);
-    let call=privateCalls.get(key);
+    const call=privateCalls.get(key);
 
-    if(!call){
-      call={
-        callerId:callerId.toString(),
-        receiverId:socket.userId.toString(),
-        startedAt:Date.now(),
-        answered:true,
-        pendingIceCandidates:[]
-      };
-      privateCalls.set(key,call);
-    }else{
-      callState.markPrivateCallAnswered(
-        callerId,
-        socket.userId
-      );
-
-      for(const candidate of call.pendingIceCandidates || []){
-        emitToUser(
-          io,
-          socket.userId,
-          'iceCandidate',
-          {candidate}
-        );
-      }
-
-      call.pendingIceCandidates=[];
+    if(
+      !call ||
+      call.callerId!==callerId.toString() ||
+      call.receiverId!==socket.userId.toString() ||
+      call.answered
+    ){
+      return;
     }
+
+    if(!callState.markPrivateCallAnswered(callerId,socket.userId)) return;
+
+    for(const candidate of call.pendingIceCandidates || []){
+      emitToUser(
+        io,
+        socket.userId,
+        'iceCandidate',
+        {candidate}
+      );
+    }
+
+    call.pendingIceCandidates=[];
 
     emitToUser(
       io,
@@ -748,14 +794,16 @@ io.on('connection',socket=>{
   });
 
   socket.on('iceCandidate',async({receiverId,candidate}={})=>{
-    if(!socket.userId) return;
+    if(!socket.userId || !allowSocketEvent(socket,'iceCandidate',120,10000)) return;
 
     if(!mongoose.isValidObjectId(receiverId) || !isIceCandidate(candidate)) return;
 
     if(!(await areFriends(socket.userId,receiverId))) return;
 
     const key=getPrivateCallKey(socket.userId,receiverId);
-    const call=privateCalls.get(key);
+    const call=getActivePrivateCall(socket.userId,receiverId);
+    if(!call) return;
+
     const delivered=emitToUser(
       io,
       receiverId,
@@ -772,11 +820,13 @@ io.on('connection',socket=>{
   });
 
   socket.on('iceRestartOffer',async({receiverId,offer}={})=>{
-    if(!socket.userId) return;
+    if(!socket.userId || !allowSocketEvent(socket,'iceRestartOffer',10,10000)) return;
 
     if(!mongoose.isValidObjectId(receiverId) || !isSessionDescription(offer,'offer')) return;
 
     if(!(await areFriends(socket.userId,receiverId))) return;
+    const call=getActivePrivateCall(socket.userId,receiverId);
+    if(!call || !call.answered) return;
 
     emitToUser(
       io,
@@ -790,11 +840,13 @@ io.on('connection',socket=>{
   });
 
   socket.on('iceRestartAnswer',async({callerId,answer}={})=>{
-    if(!socket.userId) return;
+    if(!socket.userId || !allowSocketEvent(socket,'iceRestartAnswer',10,10000)) return;
 
     if(!mongoose.isValidObjectId(callerId) || !isSessionDescription(answer,'answer')) return;
 
     if(!(await areFriends(socket.userId,callerId))) return;
+    const call=getActivePrivateCall(socket.userId,callerId);
+    if(!call || !call.answered) return;
 
     emitToUser(
       io,
@@ -805,7 +857,7 @@ io.on('connection',socket=>{
   });
 
   socket.on('endCall',async({receiverId}={})=>{
-    if(!socket.userId) return;
+    if(!socket.userId || !allowSocketEvent(socket,'endCall',5,10000)) return;
 
     if(!mongoose.isValidObjectId(receiverId)) return;
 
@@ -823,7 +875,7 @@ io.on('connection',socket=>{
 
   socket.on('groupCallStart',async({groupId,videoCall=false}={})=>{
     try{
-      if(!socket.userId) return;
+      if(!socket.userId || !allowSocketEvent(socket,'groupCallStart',3,30000)) return;
 
       const group=await getGroupForMember(
         groupId,
@@ -958,7 +1010,7 @@ io.on('connection',socket=>{
 
   socket.on('groupCallJoin',async({groupId,callId}={})=>{
     try{
-      if(!socket.userId) return;
+      if(!socket.userId || !allowSocketEvent(socket,'groupCallJoin',10,10000)) return;
 
       const group=await getGroupForMember(
         groupId,
@@ -1019,7 +1071,7 @@ io.on('connection',socket=>{
       candidate
     }
   )=>{
-    if(!socket.userId) return;
+    if(!socket.userId || !allowSocketEvent(socket,eventName,180,10000)) return;
 
     const key=groupId?.toString();
     const call=groupCalls.get(key);
