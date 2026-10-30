@@ -145,7 +145,12 @@ async function populateDocs(docs, sourceName, options) {
     const ids = [...new Set(list.flatMap(doc => getValue(doc, option.path).map(v => v?.toString()).filter(Boolean)))];
     if (!ids.length) continue;
 
-    const target = await execute(targetName, 'find', [{ _id: { $in: ids } }], {});
+    const target = await execute(
+      targetName,
+      'find',
+      [{ _id: { $in: ids } }],
+      { select: option.select }
+    );
     const byId = new Map(target.map(doc => [doc._id.toString(), doc]));
 
     for (const doc of list) {
