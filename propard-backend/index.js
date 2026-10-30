@@ -556,7 +556,7 @@ io.on('connection',socket=>{
   // MESSAGES DE GROUPE
   // ─────────────────────────────────────
 
-  socket.on('sendGroupMessage',async({groupId,content}={})=>{
+  socket.on('sendGroupMessage',async({groupId,content,keyVersion}={})=>{
     try{
       if(!socket.userId) return;
       if(!allowSocketEvent(socket,'sendGroupMessage',20,10000)){
@@ -581,6 +581,10 @@ io.on('connection',socket=>{
         );
       }
 
+      if(!Number.isSafeInteger(keyVersion) || keyVersion<1){
+        return socket.emit('groupMessageError',{message:'Version de clé invalide. Recharge le groupe.'});
+      }
+
       const group=await Group.findOne({
         _id:groupId,
         'members.userId':socket.userId
@@ -593,11 +597,17 @@ io.on('connection',socket=>{
         );
       }
 
+      const currentKeyVersion=Number.isSafeInteger(group.keyVersion) && group.keyVersion>0 ? group.keyVersion : 1;
+      if(keyVersion!==currentKeyVersion){
+        return socket.emit('groupMessageError',{message:'La clé du groupe a changé. Recharge le groupe avant d’envoyer un message.'});
+      }
+
       const message=await GroupMessage.create({
         group:groupId,
         sender:socket.userId,
         content:content.trim(),
-        encrypted:true
+        encrypted:true,
+        keyVersion:currentKeyVersion
       });
 
       group.lastMessageAt=message.createdAt;
@@ -613,6 +623,7 @@ io.on('connection',socket=>{
         senderInfo:sender,
         content:message.content,
         encrypted:true,
+        keyVersion:message.keyVersion,
         createdAt:message.createdAt
       };
 
