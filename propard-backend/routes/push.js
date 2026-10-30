@@ -4,6 +4,7 @@ const authMiddleware = require('../middleware/auth');
 const User = require('../models/User');
 const { getPublicKey } = require('../services/push');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { isAllowedPushEndpoint } = require('../services/pushEndpoint');
 
 const webPushSubscribeLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
@@ -42,7 +43,7 @@ router.post('/subscribe', authMiddleware, webPushSubscribeLimiter, async (req, r
 
     if (
       !subscription ||
-      typeof subscription.endpoint !== 'string' ||
+      !isAllowedPushEndpoint(subscription.endpoint) ||
       !subscription.keys ||
       typeof subscription.keys.p256dh !== 'string' ||
       typeof subscription.keys.auth !== 'string'
