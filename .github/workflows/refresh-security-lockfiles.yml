@@ -1,0 +1,51 @@
+name: Refresh security lockfiles
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - propard-backend/package.json
+      - propard-frontend/package.json
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-security-lockfiles
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Regenerate backend lockfile
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+        working-directory: propard-backend
+
+      - name: Regenerate frontend lockfile
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+        working-directory: propard-frontend
+
+      - name: Commit updated lockfiles
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add propard-backend/package-lock.json propard-frontend/package-lock.json
+          if git diff --cached --quiet; then
+            echo "Lockfiles are already up to date."
+            exit 0
+          fi
+          git commit -m "security: refresh Socket.IO dependency lockfiles"
+          git push origin main
