@@ -740,6 +740,10 @@ router.delete('/users/:userId/purge', requireStaffRole('admin'), async (req, res
     const userId = target._id;
     const userIdString = userId.toString();
     const originalUsername = target.username;
+    const disconnectUserSockets = req.app.get('disconnectUserSockets');
+    if (typeof disconnectUserSockets === 'function') {
+      disconnectUserSockets(userId);
+    }
     const ownedGroups = await Group.find({ owner: userId }).select('_id').lean();
     const groupIds = ownedGroups.map(group => group._id);
     const [privateMessages, sentGroupMessages] = await Promise.all([
@@ -781,16 +785,6 @@ router.delete('/users/:userId/purge', requireStaffRole('admin'), async (req, res
     await StaffAuditLog.deleteMany({ targetUser: userId });
     await StaffAuditLog.updateMany({ actor: userId }, { $set: { actorUsername: 'utilisateur_supprimé' + userIdString.slice(-5) } });
     await User.deleteOne({ _id: userId });
-
-    const io = req.app.get('io');
-    if (io) {
-      const sockets = await io.fetchSockets();
-      for (const socket of sockets) {
-        if (socket.userId?.toString() === userIdString || socket.user?.id?.toString() === userIdString) {
-          socket.disconnect(true);
-        }
-      }
-    }
 
     await audit(req, 'staff.user.permanently_deleted', {
       targetUser: userId,
