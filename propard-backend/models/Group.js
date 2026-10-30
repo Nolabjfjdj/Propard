@@ -12,7 +12,8 @@ const keyPackageSchema = new mongoose.Schema({
   userId:{type:mongoose.Schema.Types.ObjectId,ref:'User',required:true},
   senderId:{type:mongoose.Schema.Types.ObjectId,ref:'User',required:true},
   version:{type:Number,required:true,min:1},
-  encryptedKey:{type:String,required:true,maxlength:10000}
+  encryptedKey:{type:String,required:true,maxlength:10000},
+  senderPublicKey:{type:String,default:null,maxlength:2000}
 },{_id:false});
 
 const groupSchema = new mongoose.Schema({
