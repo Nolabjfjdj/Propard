@@ -355,11 +355,11 @@ export default function GroupChat({
   }, []);
 
   /*
-   * Recharge le groupe.
+   * Recharge le groupe et synchronise sa clé active.
    */
   const loadGroup = async () => {
-    if (!initialGroup?._id) {
-      return;
+    if (!initialGroup?._id || !token || !myId) {
+      return null;
     }
 
     try {
@@ -377,18 +377,80 @@ export default function GroupChat({
           }
         );
 
-      setGroup(res.data);
+      const loadedGroup = res.data;
+      const keyVersion = loadedGroup.keyVersion || 1;
 
-      return res.data;
+      let groupKey = await getStoredGroupKey(
+        loadedGroup._id,
+        keyVersion
+      );
+
+      if (!groupKey) {
+        const packageData = loadedGroup.keyPackage;
+
+        if (!packageData?.encryptedKey || !packageData?.senderId) {
+          throw new Error(
+            'Paquet de clé du groupe indisponible pour cette version.'
+          );
+        }
+
+        const senderId = packageData.senderId.toString();
+        const sender = loadedGroup.members?.find(
+          member => member._id?.toString() === senderId
+        );
+
+        if (!sender?.publicKey) {
+          throw new Error(
+            'Clé publique du distributeur indisponible.'
+          );
+        }
+
+        const privateKey = await getStoredPrivateKeyJwk(myId);
+
+        if (!privateKey) {
+          throw new Error(
+            'Clé privée locale introuvable.'
+          );
+        }
+
+        const senderPublicKey =
+          typeof sender.publicKey === 'string'
+            ? JSON.parse(sender.publicKey)
+            : sender.publicKey;
+
+        groupKey = await decryptGroupKeyPackage(
+          packageData.encryptedKey,
+          privateKey,
+          senderPublicKey
+        );
+
+        if (!groupKey) {
+          throw new Error(
+            'Impossible de déchiffrer la nouvelle clé du groupe.'
+          );
+        }
+
+        await storeGroupKey(
+          loadedGroup._id,
+          keyVersion,
+          groupKey
+        );
+      }
+
+      setGroup(loadedGroup);
+      setKey(groupKey);
+
+      return loadedGroup;
     } catch (err) {
       console.error(
-        'Erreur chargement groupe:',
+        'Erreur synchronisation groupe et clé:',
         err
       );
 
       setLoadError(
         err.response?.data?.error ||
-        'Impossible de charger le groupe.'
+        err.message ||
+        'Impossible de synchroniser la clé du groupe.'
       );
 
       return null;
