@@ -10,7 +10,6 @@ import api from '../utils/api';
 import {
   encryptGroupKeyForMember,
   generateGroupKey,
-  getStoredGroupKey,
   storeGroupKey
 } from '../utils/groupCrypto';
 
