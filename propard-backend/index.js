@@ -152,7 +152,26 @@ function emitToUser(ioInstance,userId,event,payload){
   return true;
 }
 
+function disconnectUserSockets(userId,event='sessionExpired',payload={message:'Session expirée. Reconnecte-toi.'}){
+  const set=connectedUsers.get(userId?.toString());
+  if(!set || set.size===0) return 0;
+
+  let disconnected=0;
+
+  for(const socketId of [...set]){
+    const socket=io.sockets.sockets.get(socketId);
+    if(!socket) continue;
+
+    socket.emit(event,payload);
+    socket.disconnect(true);
+    disconnected++;
+  }
+
+  return disconnected;
+}
+
 app.set('io',io);
+app.set('disconnectUserSockets',disconnectUserSockets);
 app.set('connectedUsers',connectedUsers);
 app.set('emitToUser',emitToUser);
 
