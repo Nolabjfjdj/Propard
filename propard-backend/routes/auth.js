@@ -967,6 +967,10 @@ router.post('/cancel-deletion', authMiddleware, accountRestoreLimiter, async (re
 router.delete('/delete', authMiddleware, accountDeletionLimiter, async (req, res) => {
   try {
     const userId = req.user.id;
+    const disconnectUserSockets = req.app.get('disconnectUserSockets');
+    if (typeof disconnectUserSockets === 'function') {
+      disconnectUserSockets(userId);
+    }
 
     await Message.deleteMany({
       $or: [
