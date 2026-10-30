@@ -896,6 +896,9 @@ export default function StaffPage() {
                   <p>Type : {selectedReport.reportScope || 'message'} · Statut : {selectedReport.status}</p>
                   <p>Signalé par : {selectedReport.reporter?.username || 'Compte indisponible'}</p>
                   <p>Motif : {selectedReport.reason || 'Non précisé'}</p>
+                  <p style={{ padding: 10, borderRadius: 8, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
+                    Le contenu affiché est fourni par le signalant. Avec le chiffrement E2EE, le serveur ne peut pas vérifier cryptographiquement qu’il correspond exactement au message chiffré d’origine. Il doit être examiné comme un élément transmis par le signalant, pas comme une preuve cryptographique.
+                  </p>
                   {selectedReport.reportScope === 'conversation' ? (
                     <div style={{ display: 'grid', gap: 8 }}>
                       <strong>Conversation fournie avec le signalement</strong>
