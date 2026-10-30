@@ -462,7 +462,7 @@ router.get('/bootstrap/status', async (req, res) => {
   }
 });
 
-router.post('/bootstrap', async (req, res) => {
+router.post('/bootstrap', authMiddleware, async (req, res) => {
   try {
     const expectedSecret = process.env.STAFF_BOOTSTRAP_KEY || process.env.ADMIN_KEY;
     if (!safeEqual(req.body && req.body.bootstrapKey, expectedSecret)) {
