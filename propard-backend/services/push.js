@@ -1,6 +1,7 @@
 const webpush = require('web-push');
 const User = require('../models/User');
 const { configured: apnsConfigured, sendApnsNotification } = require('./apns');
+const { isAllowedPushEndpoint } = require('./pushEndpoint');
 
 const publicKey = process.env.VAPID_PUBLIC_KEY;
 const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -35,6 +36,12 @@ async function sendWebPush(user, payload) {
 
   await Promise.all(
     user.pushSubscriptions.map(async subscription => {
+      if (!isAllowedPushEndpoint(subscription.endpoint)) {
+        staleEndpoints.push(subscription.endpoint);
+        console.warn('🔔 Web Push ignoré : endpoint non autorisé.');
+        return;
+      }
+
       try {
         await webpush.sendNotification(
           {
