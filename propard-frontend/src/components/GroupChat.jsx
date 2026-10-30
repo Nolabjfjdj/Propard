@@ -395,11 +395,13 @@ export default function GroupChat({
         }
 
         const senderId = packageData.senderId.toString();
-        const sender = loadedGroup.members?.find(
-          member => member._id?.toString() === senderId
-        );
+        const senderPublicKeyValue =
+          packageData.senderPublicKey ||
+          loadedGroup.members?.find(
+            member => member._id?.toString() === senderId
+          )?.publicKey;
 
-        if (!sender?.publicKey) {
+        if (!senderPublicKeyValue) {
           throw new Error(
             'Clé publique du distributeur indisponible.'
           );
@@ -414,9 +416,9 @@ export default function GroupChat({
         }
 
         const senderPublicKey =
-          typeof sender.publicKey === 'string'
-            ? JSON.parse(sender.publicKey)
-            : sender.publicKey;
+          typeof senderPublicKeyValue === 'string'
+            ? JSON.parse(senderPublicKeyValue)
+            : senderPublicKeyValue;
 
         groupKey = await decryptGroupKeyPackage(
           packageData.encryptedKey,
@@ -531,14 +533,15 @@ export default function GroupChat({
               ? packageData.senderId.toString()
               : null;
 
-          const sender =
+          const senderPublicKeyValue =
+            packageData.senderPublicKey ||
             loadedGroup.members?.find(
               member =>
                 member._id?.toString() ===
                 senderId
-            );
+            )?.publicKey;
 
-          if (!sender?.publicKey) {
+          if (!senderPublicKeyValue) {
             throw new Error(
               'Clé publique du distributeur indisponible.'
             );
@@ -556,12 +559,12 @@ export default function GroupChat({
           }
 
           const senderPublicKey =
-            typeof sender.publicKey ===
+            typeof senderPublicKeyValue ===
             'string'
               ? JSON.parse(
-                  sender.publicKey
+                  senderPublicKeyValue
                 )
-              : sender.publicKey;
+              : senderPublicKeyValue;
 
           groupKey =
             await decryptGroupKeyPackage(
@@ -2077,8 +2080,11 @@ export default function GroupChat({
               myId
           );
 
+        const currentVersion =
+          group.keyVersion || 1;
+
         const nextVersion =
-          group.keyVersion + 1;
+          currentVersion + 1;
 
         const keyPackages = [];
 
@@ -2121,6 +2127,7 @@ export default function GroupChat({
         await api.post(
           `/api/groups/${group._id}/leave`,
           {
+            expectedKeyVersion: currentVersion,
             keyPackages,
             ...(captchaToken ? { captchaToken } : {})
           },
