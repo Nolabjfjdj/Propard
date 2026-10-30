@@ -116,6 +116,11 @@ router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) =
     user.sessionVersion = (user.sessionVersion || 0) + 1;
     await user.save();
 
+    const disconnectUserSockets = req.app.get('disconnectUserSockets');
+    if (typeof disconnectUserSockets === 'function') {
+      disconnectUserSockets(user._id);
+    }
+
     await audit(req, 'user.password_reset.completed', {
       actor: resetIssuedBy,
       targetUser: user._id,
