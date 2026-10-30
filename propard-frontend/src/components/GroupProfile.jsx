@@ -532,8 +532,6 @@ export default function GroupProfile({
       if (!publicKey) throw new Error('La clé publique de cet ami est indisponible.');
       const currentVersion = group.keyVersion || 1;
       const nextVersion = currentVersion + 1;
-      const currentKey = await getStoredGroupKey(group._id, currentVersion);
-      if (!currentKey) throw new Error('La clé actuelle du groupe est introuvable sur cet appareil. Recharge le groupe depuis un appareil qui peut encore lire ses messages avant d’ajouter un membre.');
       const nextKey = await generateGroupKey();
       const keyPackages = [];
       for (const member of [...group.members, { _id: friendId, publicKey }]) {
@@ -541,9 +539,9 @@ export default function GroupProfile({
         if (!id || !member.publicKey) throw new Error('Une clé publique de membre est indisponible.');
         keyPackages.push({ userId: id, senderId: myId, version: nextVersion, encryptedKey: await encryptGroupKeyForMember(nextKey, privateKey, typeof member.publicKey === 'string' ? JSON.parse(member.publicKey) : member.publicKey) });
       }
+      await storeGroupKey(group._id, nextVersion, nextKey);
       const res = await api.post(`/api/groups/${group._id}/members`, { memberId: friendId, expectedKeyVersion: currentVersion, keyPackages, ...(captchaToken ? { captchaToken } : {}) }, { headers: { Authorization: `Bearer ${token}` } });
       const updated = res.data?.group || res.data;
-      await storeGroupKey(group._id, nextVersion, nextKey);
       setGroup(updated); setName(updated.name || ''); setAvatar(updated.avatar || '');
       setCaptchaRequired(false); setCaptchaToken(''); setShowAddMembers(false); onUpdated?.(updated);
     } catch (err) {
