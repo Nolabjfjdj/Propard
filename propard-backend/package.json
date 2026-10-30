@@ -24,5 +24,10 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
+  },
+  "overrides": {
+    "engine.io": "^6.6.11",
+    "socket.io-parser": "^4.2.7",
+    "ws": "^8.21.0"
   }
 }
