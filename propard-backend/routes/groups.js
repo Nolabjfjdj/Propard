@@ -7,7 +7,7 @@ const GroupMessage = require('../models/GroupMessage');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
-const { MAX_AVATAR_LENGTH, MAX_GROUP_NAME_LENGTH } = require('../utils/inputValidation');
+const { MAX_AVATAR_LENGTH, MAX_GROUP_NAME_LENGTH, isEncryptedMessagePayload } = require('../utils/inputValidation');
 const { parseMessagePagination } = require('../utils/messagePagination');
 
 router.use(authMiddleware);
@@ -804,11 +804,8 @@ router.patch(
        * jamais le texte en clair.
        */
       if (
-        typeof encryptedContent !==
-          'string' ||
-        !encryptedContent.trim() ||
-        encryptedContent.length >
-          20000
+        typeof encryptedContent !== 'string' ||
+        !isEncryptedMessagePayload(encryptedContent)
       ) {
         return res.status(400).json({
           error:
