@@ -1314,14 +1314,14 @@ router.post('/:groupId/members', createRateLimiter({
     const isFriend = (owner.friends || []).some(friend => { const id = friend.userId?._id || friend.userId; return id && id.toString() === memberId.toString(); });
     if (!isFriend) return res.status(403).json({ error: 'Tu peux uniquement ajouter un ami.' });
     if ((owner.blockedUsers || []).some(id => id.toString() === memberId.toString())) return res.status(403).json({ error: 'Impossible d’ajouter une personne bloquée.' });
-    // Ajouter un membre ne doit pas faire tourner la clé du groupe :
-    // les anciens messages sont chiffrés avec la version actuelle.
-    // Une rotation sans version de clé par message rendrait l'historique illisible.
-    const currentVersion = group.keyVersion || 1;
+    const currentVersion = Number.isSafeInteger(group.keyVersion) && group.keyVersion > 0 ? group.keyVersion : 1;
+    if (req.body?.expectedKeyVersion !== currentVersion) return res.status(409).json({ error: 'La clé du groupe a changé. Recharge le groupe avant d’ajouter ce membre.' });
+    const nextVersion = currentVersion + 1;
     const memberIds = new Set([...group.members.map(member => (member.userId?._id || member.userId).toString()), memberId.toString()]);
-    if (!validPackages(req.body?.keyPackages, memberIds, currentVersion)) return res.status(400).json({ error: 'Paquets de clés invalides pour la clé actuelle du groupe.' });
+    if (!validPackages(req.body?.keyPackages, memberIds, nextVersion)) return res.status(400).json({ error: 'Paquets de nouvelle clé invalides.' });
     if (req.body.keyPackages.some(item => item.senderId.toString() !== req.user.id.toString())) return res.status(400).json({ error: 'Émetteur de clé invalide.' });
     group.members.push({ userId: memberId, role: 'member' });
+    group.keyVersion = nextVersion;
     group.keyPackages = req.body.keyPackages;
     await group.save();
     const populated = await Group.findById(group._id).populate('members.userId', 'username displayName avatar publicKey');
