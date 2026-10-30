@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
   username:{type:String,required:true,unique:true,trim:true,minlength:3,maxlength:32},
   displayName:{type:String,default:null,trim:true,maxlength:32},
   avatar:{type:String,default:null},
-  password:{type:String,required:true},
+  password:{type:String,required:true,select:false},
   sessionVersion:{type:Number,default:0},
   staffRole:{type:String,enum:['user','support','junior_moderator','moderator','senior_moderator','admin','owner'],default:'user',index:true},
   staffRoleUpdatedAt:{type:Date,default:null},
