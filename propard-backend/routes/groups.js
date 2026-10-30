@@ -1782,6 +1782,30 @@ router.post(
         });
       }
 
+      const currentVersion =
+        Number.isSafeInteger(group.keyVersion) && group.keyVersion > 0
+          ? group.keyVersion
+          : 1;
+
+      if (req.body?.expectedKeyVersion !== currentVersion) {
+        return res.status(409).json({
+          error: 'La clé du groupe a changé. Recharge le groupe avant de quitter.'
+        });
+      }
+
+      const leavingMember = group.members.find(member => {
+        const memberId = member.userId?._id || member.userId;
+        return memberId.toString() === req.user.id.toString();
+      });
+
+      const leavingPublicKey = leavingMember?.userId?.publicKey;
+
+      if (!leavingPublicKey) {
+        return res.status(400).json({
+          error: 'Clé publique indisponible pour effectuer la rotation.'
+        });
+      }
+
       const remaining =
         group.members.filter(
           member => {
@@ -1809,8 +1833,7 @@ router.post(
           )
         );
 
-      const nextVersion =
-        group.keyVersion + 1;
+      const nextVersion = currentVersion + 1;
 
       if (
         !validPackages(
@@ -1825,6 +1848,12 @@ router.post(
         });
       }
 
+      if (req.body.keyPackages.some(item => item.senderId.toString() !== req.user.id.toString())) {
+        return res.status(400).json({
+          error: 'Émetteur de clé invalide.'
+        });
+      }
+
       group.members =
         remaining;
 
@@ -1832,7 +1861,10 @@ router.post(
         nextVersion;
 
       group.keyPackages =
-        req.body.keyPackages;
+        req.body.keyPackages.map(item => ({
+          ...item,
+          senderPublicKey: leavingPublicKey
+        }));
 
       await group.save();
 
