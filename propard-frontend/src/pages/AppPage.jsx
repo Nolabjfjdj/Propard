@@ -710,7 +710,8 @@ export default function AppPage({
       const encryptedContent = await encryptMessage(groupKey, g.msg.content);
       socket.emit('sendGroupMessage', {
         groupId: targetGroup._id,
-        content: encryptedContent
+        content: encryptedContent,
+        keyVersion: targetGroup.keyVersion || 1
       });
     } catch (err) {
       console.error('Erreur transfert de message vers un groupe (Grab & Send):', err);
