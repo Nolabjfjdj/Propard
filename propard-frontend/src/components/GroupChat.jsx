@@ -1320,7 +1320,8 @@ export default function GroupChat({
           `/api/groups/${group._id}/messages/${messageId}`,
           {
             content:
-              encryptedContent
+              encryptedContent,
+            keyVersion: group.keyVersion || 1
           },
           {
             headers: {
@@ -1682,7 +1683,8 @@ export default function GroupChat({
 
         socket.emit('sendGroupMessage', {
           groupId: group._id,
-          content: encryptedContent
+          content: encryptedContent,
+          keyVersion: group.keyVersion || 1
         });
 
         setInput('');
