@@ -141,6 +141,12 @@ router.post('/reset-password', authMiddleware, requireStaffRole('admin'), adminS
     user.sessionVersion = (user.sessionVersion || 0) + 1;
 
     await user.save();
+
+    const disconnectUserSockets = req.app.get('disconnectUserSockets');
+    if (typeof disconnectUserSockets === 'function') {
+      disconnectUserSockets(user._id);
+    }
+
     await auditAdminAction(req, 'user.password_reset.admin_override', user._id, {
       method: 'legacy-admin-reset',
       e2eeBackupCleared
