@@ -10,6 +10,7 @@ const reportSchema = new mongoose.Schema({
   groupId:{type:mongoose.Schema.Types.ObjectId,ref:'Group',required:false,default:null,index:true},
   content:{type:String,required:true,maxlength:1000000},
   reportScope:{type:String,enum:['message','conversation'],default:'message',index:true},
+  evidenceIntegrity:{type:String,enum:['message_references_verified_content_unverified'],default:null},
   conversationSnapshot:{type:[mongoose.Schema.Types.Mixed],default:undefined},
   reason:{type:String,default:null,maxlength:500},
   messageCreatedAt:{type:Date,default:null},
