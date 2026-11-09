@@ -1509,6 +1509,7 @@ export default function GroupChat({
           ? 'Moi'
           : (message.sender?.displayName || message.sender?.username || friendNicknames.get(senderId) || 'Membre du groupe');
         return {
+          messageId: message._id?.toString(),
           senderId,
           senderName,
           content: message.content,
