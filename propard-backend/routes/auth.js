@@ -148,7 +148,8 @@ function signToken(user) {
     {
       id: user._id,
       username: user.username,
-      sessionVersion: user.sessionVersion || 0
+      sessionVersion: user.sessionVersion || 0,
+      jti: crypto.randomUUID()
     },
     process.env.JWT_SECRET,
     { algorithm: 'HS256', expiresIn: '30d' }
@@ -476,6 +477,51 @@ router.post('/login', loginRateLimiter, async (req, res) => {
   }
 });
 
+
+router.post('/logout', authMiddleware, async (req, res) => {
+  try {
+    if (typeof req.user.jti === 'string' && req.user.jti.length >= 16) {
+      const expiresAt = new Date((req.user.exp || Math.floor(Date.now() / 1000) + 1) * 1000);
+
+      await User.updateOne(
+        { _id: req.user.id },
+        { $pull: { revokedSessions: { expiresAt: { $lte: new Date() } } } }
+      );
+
+      await User.updateOne(
+        { _id: req.user.id },
+        {
+          $push: {
+            revokedSessions: {
+              jti: req.user.jti,
+              expiresAt
+            }
+          }
+        }
+      );
+    } else {
+      const user = await User.findByIdAndUpdate(
+        req.user.id,
+        { $inc: { sessionVersion: 1 } },
+        { new: true, select: '_id sessionVersion' }
+      );
+
+      if (!user) {
+        return res.status(404).json({ error: 'Utilisateur introuvable' });
+      }
+
+      const disconnectUserSockets = req.app.get('disconnectUserSockets');
+      if (typeof disconnectUserSockets === 'function') {
+        disconnectUserSockets(req.user.id);
+      }
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Logout failed:', error);
+    return res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
 
 router.post('/logout-all', authMiddleware, logoutAllLimiter, async (req, res) => {
   try {
