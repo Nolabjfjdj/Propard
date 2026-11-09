@@ -31,6 +31,10 @@ const io=new Server(server,{
   cors:{
     origin:frontendOrigin,
     methods:['GET','POST']
+  },
+  allowRequest:(req,callback)=>{
+    const origin=req.headers.origin;
+    callback(null,!origin || origin===frontendOrigin);
   }
 });
 
