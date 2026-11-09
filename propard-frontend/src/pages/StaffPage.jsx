@@ -897,7 +897,7 @@ export default function StaffPage() {
                   <p>Signalé par : {selectedReport.reporter?.username || 'Compte indisponible'}</p>
                   <p>Motif : {selectedReport.reason || 'Non précisé'}</p>
                   <p style={{ padding: 10, borderRadius: 8, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
-                    Le contenu affiché est fourni par le signalant. Avec le chiffrement E2EE, le serveur ne peut pas vérifier cryptographiquement qu’il correspond exactement au message chiffré d’origine. Il doit être examiné comme un élément transmis par le signalant, pas comme une preuve cryptographique.
+                    Les références des messages, leurs expéditeurs et leurs dates sont vérifiés à partir de la base de données. En revanche, le texte déchiffré est fourni par le signalant : avec le chiffrement E2EE, le serveur ne peut pas vérifier cryptographiquement qu’il correspond au contenu chiffré d’origine. Il doit être examiné comme un élément transmis par le signalant, pas comme une preuve cryptographique.
                   </p>
                   {selectedReport.reportScope === 'conversation' ? (
                     <div style={{ display: 'grid', gap: 8 }}>
