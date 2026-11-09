@@ -358,7 +358,7 @@ io.use(async(socket,next)=>{
       return next(new Error('Unauthorized'));
     }
 
-    const decoded=jwt.verify(token,process.env.JWT_SECRET);
+    const decoded=jwt.verify(token,process.env.JWT_SECRET,{ algorithms:['HS256'] });
 
     if(!decoded?.id){
       return next(new Error('Unauthorized'));
