@@ -510,6 +510,23 @@ export function AuthProvider({ children }) {
           error
         );
       }
+
+      try {
+        await api.post(
+          '/api/auth/logout',
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${currentToken}`
+            }
+          }
+        );
+      } catch (error) {
+        console.error(
+          'Server-side session revocation failed:',
+          error
+        );
+      }
     }
 
     setUser(null);
