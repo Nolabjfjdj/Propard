@@ -716,6 +716,7 @@ export default function Chat({
       .map(msg => {
         const senderId = (msg.sender?._id || msg.sender)?.toString();
         return {
+          messageId: msg._id?.toString(),
           senderId,
           senderName: senderId === myId ? 'Moi' : friendName,
           content: msg.content,
