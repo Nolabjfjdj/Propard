@@ -21,15 +21,21 @@ const server=http.createServer(app);
 
 app.set('trust proxy',1);
 
+const frontendOrigin = process.env.FRONTEND_ORIGIN || 'https://propard.site';
+
+if (frontendOrigin.trim() === '*') {
+  throw new Error('FRONTEND_ORIGIN doit définir une origine précise, jamais *');
+}
+
 const io=new Server(server,{
   cors:{
-    origin:process.env.FRONTEND_ORIGIN || '*',
+    origin:frontendOrigin,
     methods:['GET','POST']
   }
 });
 
 app.use(cors({
-  origin:process.env.FRONTEND_ORIGIN || '*'
+  origin:frontendOrigin
 }));
 
 app.use(express.json({limit:'1.5mb'}));
