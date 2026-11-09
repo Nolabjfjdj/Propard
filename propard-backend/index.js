@@ -350,66 +350,61 @@ function isCallMember(call,userId){
     call.members.has(userId.toString());
 }
 
-io.on('connection',socket=>{
+io.use(async(socket,next)=>{
+  try{
+    const token=socket.handshake.auth?.token;
+
+    if(typeof token!=='string' || !token.trim()){
+      return next(new Error('Unauthorized'));
+    }
+
+    const decoded=jwt.verify(token,process.env.JWT_SECRET);
+
+    if(!decoded?.id){
+      return next(new Error('Unauthorized'));
+    }
+
+    const tokenSessionVersion=Number.isInteger(decoded.sessionVersion)
+      ? decoded.sessionVersion
+      : 0;
+
+    const authenticatedUser=await User.findById(decoded.id)
+      .select('_id sessionVersion bannedAt');
+
+    if(
+      !authenticatedUser ||
+      authenticatedUser.bannedAt ||
+      authenticatedUser.sessionVersion!==tokenSessionVersion
+    ){
+      return next(new Error('Unauthorized'));
+    }
+
+    socket.userId=decoded.id;
+    next();
+  }catch{
+    next(new Error('Unauthorized'));
+  }
+});
+
+io.on('connection',async socket=>{
 
   console.log(`🔌 Socket connecté: ${socket.id}`);
 
-  socket.on('authenticate',async token=>{
-    if(!allowSocketEvent(socket,'authenticate',5,60000)){
-      return socket.emit('authenticated',false);
-    }
+  const wasOffline=!connectedUsers.has(socket.userId);
 
-    if(socket.userId){
-      socket.emit('authenticated',true);
-      return;
-    }
+  addConnection(
+    socket.userId,
+    socket.id
+  );
 
-    try{
-      if(typeof token!=='string' || !token.trim()){
-        throw new Error('Token manquant');
-      }
+  if(wasOffline){
+    await User.findByIdAndUpdate(
+      socket.userId,
+      {isOnline:true}
+    );
+  }
 
-      const decoded=jwt.verify(
-        token,
-        process.env.JWT_SECRET
-      );
-
-      if(!decoded?.id){
-        throw new Error('Session invalide');
-      }
-
-      const tokenSessionVersion=Number.isInteger(decoded.sessionVersion)
-        ? decoded.sessionVersion
-        : 0;
-
-      const authenticatedUser=await User.findById(decoded.id).select('_id sessionVersion bannedAt');
-
-      if(!authenticatedUser || authenticatedUser.bannedAt || authenticatedUser.sessionVersion!==tokenSessionVersion){
-        throw new Error('Session expirée');
-      }
-
-      socket.userId=decoded.id;
-
-      const wasOffline=!connectedUsers.has(decoded.id);
-
-      addConnection(
-        decoded.id,
-        socket.id
-      );
-
-      if(wasOffline){
-        await User.findByIdAndUpdate(
-          decoded.id,
-          {isOnline:true}
-        );
-      }
-
-      socket.emit('authenticated',true);
-
-    }catch{
-      socket.emit('authenticated',false);
-    }
-  });
+  socket.emit('authenticated',true);
 
   socket.on('requestPendingCalls',()=>{
     if(!socket.userId || !allowSocketEvent(socket,'requestPendingCalls',10,60000)) return;
