@@ -905,6 +905,7 @@ export default function StaffPage() {
                       {(selectedReport.conversationSnapshot || []).map((message, index) => (
                         <article key={`${selectedReport._id}-${index}`} style={{ padding: 10, borderRadius: 8, background: 'var(--bg-tertiary)' }}>
                           <small>{message.senderName || message.senderId} · {message.createdAt ? new Date(message.createdAt).toLocaleString() : 'Date inconnue'}</small>
+                          {message.messageId && <small style={{ display: 'block', opacity: 0.65, overflowWrap: 'anywhere' }}>Référence vérifiée : {message.messageId} · Empreinte du contenu stocké : {message.storedContentHash || 'Indisponible'}</small>
                           <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{message.content}</div>
                         </article>
                       ))}
