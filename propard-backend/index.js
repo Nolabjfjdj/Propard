@@ -369,12 +369,13 @@ io.use(async(socket,next)=>{
       : 0;
 
     const authenticatedUser=await User.findById(decoded.id)
-      .select('_id sessionVersion bannedAt');
+      .select('_id sessionVersion bannedAt +revokedSessions');
 
     if(
       !authenticatedUser ||
       authenticatedUser.bannedAt ||
-      authenticatedUser.sessionVersion!==tokenSessionVersion
+      authenticatedUser.sessionVersion!==tokenSessionVersion ||
+      (decoded.jti && (authenticatedUser.revokedSessions || []).some(session => session.jti === decoded.jti))
     ){
       return next(new Error('Unauthorized'));
     }
