@@ -101,19 +101,15 @@ export default function AppPage({
   }, []);
 
   useEffect(() => {
-    const authenticate = () =>
-      socket.emit('authenticate', token);
-
-    socket.on('connect', authenticate);
-
-    socket.connect();
-
-    if (socket.connected) {
-      authenticate();
+    if (!token) {
+      socket.disconnect();
+      return;
     }
 
+    socket.auth = { token };
+    socket.connect();
+
     return () => {
-      socket.off('connect', authenticate);
       socket.disconnect();
     };
   }, [token]);
