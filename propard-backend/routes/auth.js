@@ -152,7 +152,7 @@ function signToken(user) {
       jti: crypto.randomUUID()
     },
     process.env.JWT_SECRET,
-    { algorithm: 'HS256', expiresIn: '30d' }
+    { algorithm: 'HS256', expiresIn: '7d' }
   );
 }
 
