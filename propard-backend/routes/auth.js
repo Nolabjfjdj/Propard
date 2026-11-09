@@ -164,7 +164,7 @@ const escapeRegExp = value =>
 const loginRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  keyFn: (req) => `${req.ip}:${typeof req.body?.username === 'string' ? req.body.username.toLowerCase() : ''}`,
+  keyFn: (req) => `login:${req.ip || 'unknown'}`,
   message: 'Trop de tentatives de connexion, réessaie dans quelques minutes.',
   captcha: true
 });
