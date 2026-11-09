@@ -36,17 +36,9 @@ function createRateLimiter({ windowMs, max, keyFn, message, captcha = false, res
 
     if (!bucket) {
       if (buckets.size >= MAX_BUCKETS) {
-        for (const [storedKey, storedBucket] of buckets) {
-          if (now - storedBucket.start > storedBucket.windowMs) {
-            buckets.delete(storedKey);
-          }
-        }
-
-        if (buckets.size >= MAX_BUCKETS) {
-          return res.status(429).json({
-            error: 'Limite temporaire de capacité du service atteinte. Réessaie plus tard.'
-          });
-        }
+        return res.status(429).json({
+          error: 'Limite temporaire de capacité du service atteinte. Réessaie plus tard.'
+        });
       }
 
       bucket = { start: now, count: 0, windowMs };
