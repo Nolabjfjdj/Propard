@@ -494,21 +494,19 @@ router.post(
         }
       );
 
+      const response = populated.toObject();
+      const keyPackage = response.keyPackages.find(
+        packageData =>
+          packageData.userId.toString() ===
+          req.user.id.toString()
+      ) || null;
+      delete response.keyPackages;
+
       res.status(201).json({
-        ...populated.toObject(),
-
-        members:
-          safeMembers(populated),
-
-        memberCount:
-          populated.members.length,
-
-        keyPackage:
-          populated.keyPackages.find(
-            packageData =>
-              packageData.userId.toString() ===
-              req.user.id.toString()
-          )
+        ...response,
+        members: safeMembers(populated),
+        memberCount: populated.members.length,
+        keyPackage
       });
     } catch (e) {
       console.error(
