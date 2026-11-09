@@ -1,8 +1,8 @@
-// Rate limiting générique en mémoire (Map). Suffisant pour un seul
-// processus Node (cas actuel sur Render) — voir les limites de cette
-// approche expliquées à l'utilisateur : pas de partage d'état entre
-// plusieurs instances si le projet scale horizontalement un jour.
+// Rate limiting générique en mémoire pour un processus Node.
+// Les compteurs ne sont pas partagés entre plusieurs instances du serveur.
 const buckets = new Map();
+const MAX_BUCKETS = 50000;
+let nextLimiterId = 0;
 
 async function verifyTurnstile(token, remoteip) {
   const secret = process.env.TURNSTILE_SECRET_KEY;
@@ -25,12 +25,33 @@ async function verifyTurnstile(token, remoteip) {
 }
 
 function createRateLimiter({ windowMs, max, keyFn, message, captcha = false, resetOnCaptcha = false }) {
+  const limiterId = nextLimiterId++;
+
   return async (req, res, next) => {
-    const key = keyFn ? keyFn(req) : req.ip;
+    const rawKey = keyFn ? keyFn(req) : req.ip;
+    const key = `${limiterId}:${String(rawKey ?? 'unknown')}`;
     const now = Date.now();
 
     let bucket = buckets.get(key);
-    if (!bucket || now - bucket.start > windowMs) {
+
+    if (!bucket) {
+      if (buckets.size >= MAX_BUCKETS) {
+        for (const [storedKey, storedBucket] of buckets) {
+          if (now - storedBucket.start > storedBucket.windowMs) {
+            buckets.delete(storedKey);
+          }
+        }
+
+        if (buckets.size >= MAX_BUCKETS) {
+          return res.status(429).json({
+            error: 'Limite temporaire de capacité du service atteinte. Réessaie plus tard.'
+          });
+        }
+      }
+
+      bucket = { start: now, count: 0, windowMs };
+      buckets.set(key, bucket);
+    } else if (now - bucket.start > windowMs) {
       bucket = { start: now, count: 0, windowMs };
       buckets.set(key, bucket);
     }
@@ -41,8 +62,6 @@ function createRateLimiter({ windowMs, max, keyFn, message, captcha = false, res
       if (captcha) {
         const captchaToken = req.body?.captchaToken || req.get('x-captcha-token');
         if (await verifyTurnstile(captchaToken, req.ip)) {
-          // Le CAPTCHA autorise cette tentative, mais conserve le compteur au seuil :
-          // les prochaines tentatives devront aussi être vérifiées si elles dépassent la limite.
           if (resetOnCaptcha) {
             bucket.start = now;
             bucket.count = 0;
@@ -65,8 +84,7 @@ function createRateLimiter({ windowMs, max, keyFn, message, captcha = false, res
   };
 }
 
-// Nettoyage des compteurs uniquement après l'expiration de leur fenêtre réelle.
-// Ne pas utiliser une durée fixe : certaines limites durent 15 ou 60 minutes.
+// Nettoyage des compteurs après expiration de leur fenêtre réelle.
 setInterval(() => {
   const now = Date.now();
   for (const [key, bucket] of buckets) {
