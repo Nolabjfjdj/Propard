@@ -550,7 +550,7 @@ router.post('/logout-all', authMiddleware, logoutAllLimiter, async (req, res) =>
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id)
-      .select('_id username displayName avatar ipAlias publicKey isOnline friends friendRequests pendingDeletionAt')
+      .select('_id username displayName avatar ipAlias publicKey staffRole isOnline friends friendRequests pendingDeletionAt')
       .populate(
         'friends.userId',
         'username displayName avatar ipAlias isOnline publicKey'
@@ -574,6 +574,7 @@ router.get('/me', authMiddleware, async (req, res) => {
       avatar: user.avatar,
       ipAlias: user.ipAlias,
       publicKey: user.publicKey,
+      staffRole: user.staffRole || 'user',
       isOnline: user.isOnline,
       friends: user.friends,
       friendRequests: user.friendRequests,
