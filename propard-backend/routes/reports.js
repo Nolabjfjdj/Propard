@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 
 const User = require('../models/User');
 const Message = require('../models/Message');
@@ -94,25 +95,71 @@ router.post('/conversation', authMiddleware, reportRateLimiter, async (req, res)
       }).filter(Boolean);
     }
 
+    const messageIds = conversationSnapshot.map(item => item?.messageId);
+    if (
+      messageIds.some(id => typeof id !== 'string' || !mongoose.isValidObjectId(id)) ||
+      new Set(messageIds.map(id => id.toLowerCase())).size !== messageIds.length
+    ) {
+      return res.status(400).json({ error: 'Chaque message doit posséder une référence valide et unique.' });
+    }
+
+    const storedMessages = conversationType === 'private'
+      ? await Message.find({
+          _id: { $in: messageIds },
+          $or: [
+            { sender: reporterId, receiver: conversationId },
+            { sender: conversationId, receiver: reporterId }
+          ]
+        }).select('_id sender content createdAt edited').lean()
+      : await GroupMessage.find({
+          _id: { $in: messageIds },
+          group: conversationId
+        }).select('_id sender content createdAt edited').lean();
+
+    if (storedMessages.length !== messageIds.length) {
+      return res.status(400).json({ error: 'Un ou plusieurs messages ne correspondent pas à cette conversation.' });
+    }
+
+    const storedById = new Map(storedMessages.map(message => [message._id.toString(), message]));
+    const participantUsers = await User.find({
+      _id: { $in: participants }
+    }).select('_id username displayName').lean();
+    const usersById = new Map(participantUsers.map(user => [user._id.toString(), user]));
+
     const snapshot = [];
     let totalChars = 0;
     for (const item of conversationSnapshot) {
-      if (!item || typeof item.content !== 'string' ||
-          typeof item.senderId !== 'string' ||
-          !participants.includes(item.senderId) ||
-          item.content.length > 20000) {
-        return res.status(400).json({ error: 'Historique de conversation invalide' });
+      const stored = storedById.get(item.messageId);
+      if (
+        !item ||
+        typeof item.content !== 'string' ||
+        typeof item.senderId !== 'string' ||
+        !participants.includes(item.senderId) ||
+        !stored ||
+        stored.sender.toString() !== item.senderId ||
+        item.content.length > 20000
+      ) {
+        return res.status(400).json({ error: 'Historique invalide : message absent, expéditeur incorrect ou contenu trop long.' });
       }
+
       totalChars += item.content.length;
       if (totalChars > 1000000) {
         return res.status(400).json({ error: 'Historique trop volumineux' });
       }
+
+      const sender = usersById.get(item.senderId);
       snapshot.push({
-        senderId: item.senderId,
-        senderName: typeof item.senderName === 'string' ? item.senderName.slice(0, 80) : 'Utilisateur',
+        messageId: stored._id.toString(),
+        senderId: stored.sender.toString(),
+        senderName: stored.sender.toString() === reporterId
+          ? 'Moi'
+          : (sender?.displayName || sender?.username || 'Utilisateur'),
         content: item.content,
-        createdAt: item.createdAt ? new Date(item.createdAt) : null,
-        edited: item.edited === true
+        createdAt: stored.createdAt || null,
+        edited: stored.edited === true,
+        storedContentHash: crypto.createHash('sha256')
+          .update(typeof stored.content === 'string' ? stored.content : '')
+          .digest('hex')
       });
     }
 
@@ -126,6 +173,7 @@ router.post('/conversation', authMiddleware, reportRateLimiter, async (req, res)
       reason: reason?.trim() || null,
       messageType,
       reportScope: 'conversation',
+      evidenceIntegrity: 'message_references_verified_content_unverified',
       conversationSnapshot: snapshot,
       groupId,
       status: 'new'
