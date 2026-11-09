@@ -151,7 +151,7 @@ function signToken(user) {
       sessionVersion: user.sessionVersion || 0
     },
     process.env.JWT_SECRET,
-    { expiresIn: '30d' }
+    { algorithm: 'HS256', expiresIn: '30d' }
   );
 }
 
