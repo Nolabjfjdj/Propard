@@ -90,6 +90,8 @@ const PSEUDOS_INTERDITS = ['owner','admin','administrator','superadmin','sysadmi
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10);
+
 function isBase64(value, expectedBytes = null) {
   if (
     typeof value !== 'string' ||
@@ -433,7 +435,12 @@ router.post('/login', loginRateLimiter, async (req, res) => {
       ]
     }).select('+password');
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    const passwordMatches = await bcrypt.compare(
+      password,
+      user ? user.password : DUMMY_PASSWORD_HASH
+    );
+
+    if (!user || !passwordMatches) {
       return res.status(400).json({
         error: 'Pseudo ou mot de passe incorrect'
       });
