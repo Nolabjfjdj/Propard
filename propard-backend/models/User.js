@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema({
   avatar:{type:String,default:null},
   password:{type:String,required:true,select:false},
   sessionVersion:{type:Number,default:0},
+  revokedSessions:{type:[{jti:{type:String,required:true},expiresAt:{type:Date,required:true}}],default:[],select:false},
   staffRole:{type:String,enum:['user','support','junior_moderator','moderator','senior_moderator','admin','owner'],default:'user',index:true},
   staffRoleUpdatedAt:{type:Date,default:null},
   staffRoleUpdatedBy:{type:mongoose.Schema.Types.ObjectId,ref:'User',default:null},
