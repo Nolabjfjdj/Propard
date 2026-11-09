@@ -20,10 +20,14 @@ module.exports = async function(req, res, next) {
       : 0;
 
     const user = await User.findById(decoded.id).select(
-      '_id sessionVersion staffRole bannedAt banExpiresAt banReason'
+      '_id sessionVersion staffRole bannedAt banExpiresAt banReason +revokedSessions'
     );
 
-    if (!user || user.sessionVersion !== tokenSessionVersion) {
+    if (
+      !user ||
+      user.sessionVersion !== tokenSessionVersion ||
+      (decoded.jti && (user.revokedSessions || []).some(session => session.jti === decoded.jti))
+    ) {
       return res.status(401).json({ error: 'Session expirée' });
     }
 
