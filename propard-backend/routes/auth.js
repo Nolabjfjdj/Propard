@@ -750,14 +750,16 @@ router.get('/user/:id', authMiddleware, async (req, res) => {
       }
     }
 
+    const canViewPrivateDetails = isOwnProfile || isFriend;
+
     res.json({
       _id: profile._id,
       username: profile.username,
       displayName: profile.displayName,
       avatar: profile.avatar,
-      ipAlias: profile.ipAlias,
-      publicKey: profile.publicKey,
-      isOnline: profile.isOnline,
+      ipAlias: canViewPrivateDetails ? profile.ipAlias : null,
+      publicKey: canViewPrivateDetails ? profile.publicKey : null,
+      isOnline: canViewPrivateDetails ? profile.isOnline : false,
 
       isOwnProfile,
       isFriend,
