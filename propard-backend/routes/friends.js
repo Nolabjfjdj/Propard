@@ -31,15 +31,26 @@ router.post('/add', createRateLimiter({
 
     let targetUser = null;
 
-    if (userId) {
-      if (!mongoose.isValidObjectId(userId)) {
+    if (userId !== undefined && userId !== null && userId !== '') {
+      if (typeof userId !== 'string' || !mongoose.isValidObjectId(userId)) {
         return res.status(400).json({
           error: 'ID invalide'
         });
       }
 
       targetUser = await User.findById(userId);
-    } else if (ipAlias) {
+    } else if (ipAlias !== undefined && ipAlias !== null && ipAlias !== '') {
+      if (
+        typeof ipAlias !== 'string' ||
+        ipAlias.length > 15 ||
+        !/^(?:\d{1,3}\.){3}\d{1,3}$/.test(ipAlias) ||
+        ipAlias.split('.').some(part => Number(part) > 254 || Number(part) < 1)
+      ) {
+        return res.status(400).json({
+          error: 'Alias IP invalide'
+        });
+      }
+
       targetUser = await User.findOne({ ipAlias });
     } else {
       return res.status(400).json({
@@ -162,7 +173,7 @@ router.post('/accept', createRateLimiter({
   try {
     const { fromUserId } = req.body;
 
-    if (!mongoose.isValidObjectId(fromUserId)) {
+    if (typeof fromUserId !== 'string' || !mongoose.isValidObjectId(fromUserId)) {
       return res.status(400).json({
         error: 'ID invalide'
       });
@@ -305,7 +316,7 @@ router.patch('/nickname', createRateLimiter({
   try {
     const { friendId, nickname } = req.body;
 
-    if (!mongoose.isValidObjectId(friendId)) {
+    if (typeof friendId !== 'string' || !mongoose.isValidObjectId(friendId)) {
       return res.status(400).json({
         error: 'ID invalide'
       });
