@@ -88,11 +88,9 @@ function Panel({ title, children }) {
 
 export default function StaffPage() {
   const [staffRole, setStaffRole] = useState('');
-  const [bootstrapAvailable, setBootstrapAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [bootstrapKey, setBootstrapKey] = useState('');
   const [lookupUsername, setLookupUsername] = useState('');
   const [lookupResult, setLookupResult] = useState(null);
   const [reports, setReports] = useState([]);
@@ -384,20 +382,8 @@ export default function StaffPage() {
       setStaffRole(response.data.staffRole || '');
       setError('');
     } catch (err) {
-      if (err.response?.status === 403) {
-        setStaffRole('');
-        try {
-          const status = await request('get', '/api/staff/bootstrap/status');
-          setBootstrapAvailable(status.data.available === true);
-          setError('');
-        } catch (statusError) {
-          setBootstrapAvailable(false);
-          setError(statusError.response?.data?.error || statusError.message || 'Impossible de vérifier la configuration du personnel.');
-        }
-      } else {
-        setBootstrapAvailable(false);
-        setError(err.response?.data?.error || err.message || 'Impossible de charger le rôle.');
-      }
+      setStaffRole('');
+      setError(err.response?.data?.error || err.message || 'Impossible de charger le rôle.');
     } finally {
       setLoading(false);
     }
@@ -623,18 +609,6 @@ export default function StaffPage() {
     }
   };
 
-  const bootstrap = async () => {
-    setError('');
-    try {
-      const response = await request('post', '/api/staff/bootstrap', { bootstrapKey });
-      setStaffRole(response.data.staffRole || 'owner');
-      setBootstrapKey('');
-      setNotice('Le compte propriétaire est configuré.');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Configuration initiale impossible.');
-    }
-  };
-
   if (loading) {
     return <main style={{ padding: 24, color: 'var(--text-primary)' }}>Chargement du panneau de modération…</main>;
   }
@@ -760,18 +734,10 @@ export default function StaffPage() {
       )}
 
       {!staffRole ? (
-        bootstrapAvailable ? (
-          <Panel title="Configuration initiale du propriétaire">
-            <p>Aucun rôle du personnel n’est encore attribué. Utilise la clé de configuration définie côté serveur pour faire de ce compte le propriétaire initial.</p>
-            <Field label="Clé de configuration" value={bootstrapKey} onChange={setBootstrapKey} type="password" />
-            <button style={buttonStyle} onClick={bootstrap}>Configurer ce compte comme propriétaire</button>
-          </Panel>
-        ) : (
-          <Panel title="Accès au personnel">
-            <p>Ce compte n’a pas de rôle du personnel. La configuration initiale est désactivée car un rôle existe déjà, ou l’état de configuration n’a pas pu être vérifié. Connecte-toi avec le compte propriétaire ou demande à un propriétaire de gérer les rôles.</p>
-            <button style={buttonStyle} onClick={loadRole}>Réessayer</button>
-          </Panel>
-        )
+        <Panel title="Accès au personnel">
+          <p>Ce compte n’a pas de rôle du personnel. Connecte-toi avec un compte autorisé ou demande à un propriétaire de gérer les rôles.</p>
+          <button style={buttonStyle} onClick={loadRole}>Réessayer</button>
+        </Panel>
       ) : (
         <>
           <Panel title="Demandes de récupération et support">
