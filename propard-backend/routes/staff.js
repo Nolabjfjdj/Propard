@@ -71,12 +71,13 @@ async function audit(req, action, options = {}) {
 
 async function findTargetUser(userId) {
   if (!mongoose.isValidObjectId(userId)) return null;
-  const target = await User.findById(userId).select('_id username displayName staffRole bannedAt banExpiresAt banReason sessionVersion isOnline');
-  if (target) target.staffRole = effectiveStaffRole(target._id, target.staffRole);
-  return target;
+  return User.findById(userId).select('_id username displayName staffRole bannedAt banExpiresAt banReason sessionVersion isOnline');
 }
 
-function actorCanManageTarget(actorRole, targetRole) {
+function actorCanManageTarget(actorRole, targetUser) {
+  const targetRole = targetUser && targetUser._id
+    ? effectiveStaffRole(targetUser._id, targetUser.staffRole)
+    : targetUser;
   return canManageRole(actorRole, targetRole || 'user');
 }
 
@@ -371,7 +372,7 @@ router.post('/account-help/requests/:id/recovery-code', requireStaffRole('suppor
     }
     const target = await findTargetUser(supportRequest.userId.toString());
     if (!target) return res.status(404).json({ error: 'Compte Propard introuvable.' });
-    if (!actorCanManageTarget(req.user.staffRole, target.staffRole)) {
+    if (!actorCanManageTarget(req.user.staffRole, target)) {
       return res.status(403).json({ error: 'Tu ne peux pas lancer la récupération de ce compte du personnel.' });
     }
 
@@ -643,13 +644,14 @@ router.delete('/users/:userId/permanent', requireStaffRole('admin'), async (req,
 
     const target = await User.findById(req.params.userId).select('+password');
     if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
+    const targetAuthorizedRole = effectiveStaffRole(target._id, target.staffRole);
     if (target._id.toString() === req.user.id) {
       return res.status(400).json({ error: 'Tu ne peux pas supprimer ton propre compte depuis le panneau staff.' });
     }
-    if (target.staffRole === 'owner') {
+    if (targetAuthorizedRole === 'owner') {
       return res.status(403).json({ error: 'Le compte propriétaire ne peut pas être supprimé depuis cet outil.' });
     }
-    if (!actorCanManageTarget(req.user.staffRole, target.staffRole || 'user')) {
+    if (!actorCanManageTarget(req.user.staffRole, target)) {
       return res.status(403).json({ error: 'Tu ne peux pas supprimer un compte du personnel de niveau égal ou supérieur.' });
     }
 
@@ -731,14 +733,14 @@ router.delete('/users/:userId/purge', requireStaffRole('admin'), async (req, res
 
     const target = await User.findById(req.params.userId).select('_id username staffRole');
     if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
-    target.staffRole = effectiveStaffRole(target._id, target.staffRole);
+    const targetAuthorizedRole = effectiveStaffRole(target._id, target.staffRole);
     if (target._id.toString() === req.user.id) {
       return res.status(400).json({ error: 'Tu ne peux pas supprimer ton propre compte depuis le panneau staff.' });
     }
-    if (target.staffRole === 'owner') {
+    if (effectiveStaffRole(target._id, target.staffRole) === 'owner') {
       return res.status(403).json({ error: 'Le compte propriétaire ne peut pas être supprimé depuis cet outil.' });
     }
-    if (!actorCanManageTarget(req.user.staffRole, target.staffRole || 'user')) {
+    if (!actorCanManageTarget(req.user.staffRole, target)) {
       return res.status(403).json({ error: 'Tu ne peux pas supprimer un compte du personnel de niveau égal ou supérieur.' });
     }
 
@@ -812,7 +814,7 @@ router.post('/users/:userId/ban', requireStaffRole('moderator'), async (req, res
   try {
     const target = await findTargetUser(req.params.userId);
     if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
-    if (!actorCanManageTarget(req.user.staffRole, target.staffRole)) {
+    if (!actorCanManageTarget(req.user.staffRole, target)) {
       return res.status(403).json({ error: 'Tu ne peux pas sanctionner un membre du personnel de niveau égal ou supérieur.' });
     }
 
@@ -880,7 +882,7 @@ router.post('/users/:userId/unban', requireStaffRole('moderator'), async (req, r
   try {
     const target = await findTargetUser(req.params.userId);
     if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
-    if (!actorCanManageTarget(req.user.staffRole, target.staffRole)) {
+    if (!actorCanManageTarget(req.user.staffRole, target)) {
       return res.status(403).json({ error: 'Tu ne peux pas modifier les sanctions d’un membre du personnel de niveau égal ou supérieur.' });
     }
     if (!target.bannedAt) return res.status(400).json({ error: 'Ce compte n’est pas banni.' });
@@ -903,7 +905,7 @@ router.post('/users/:userId/password-reset', requireStaffRole('support'), async 
   try {
     const target = await findTargetUser(req.params.userId);
     if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
-    if (!actorCanManageTarget(req.user.staffRole, target.staffRole)) {
+    if (!actorCanManageTarget(req.user.staffRole, target)) {
       return res.status(403).json({ error: 'Tu ne peux pas lancer la récupération du compte d’un membre du personnel de niveau égal ou supérieur.' });
     }
 
@@ -941,7 +943,7 @@ router.patch('/users/:userId/role', requireStaffRole('admin'), async (req, res) 
     }
 
     const canAssignRole = canManageRole(req.user.staffRole, staffRole);
-    if (!actorCanManageTarget(req.user.staffRole, target.staffRole) || !canAssignRole) {
+    if (!actorCanManageTarget(req.user.staffRole, target) || !canAssignRole) {
       return res.status(403).json({ error: 'Tu ne peux pas attribuer ou modifier ce niveau de rôle.' });
     }
 
