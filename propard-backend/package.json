@@ -15,9 +15,9 @@
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1",
+    "express": "^5.3.0",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.4.1",
+    "mongoose": "^9.11.4",
     "nodemailer": "^6.9.16",
     "socket.io": "^4.8.4",
     "web-push": "^3.6.7"
@@ -26,7 +26,10 @@
     "nodemon": "^3.1.14"
   },
   "overrides": {
+    "body-parser": "^2.4.0",
     "engine.io": "^6.6.11",
+    "proxy-addr": "^2.0.8",
+    "qs": "^6.16.0",
     "socket.io-parser": "^4.2.7",
     "ws": "^8.21.0"
   }
