@@ -1920,4 +1920,69 @@ router.post(
 );
 
 
+
+router.post('/:groupId/messages/:messageId/reactions', createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 120,
+  keyFn: req => `group-message-reaction:${req.user.id}`,
+  message: 'Trop de réactions. Réessaie plus tard.'
+}), async (req, res) => {
+  try {
+    const { groupId, messageId } = req.params;
+    const { emoji } = req.body || {};
+    const allowed = new Set(["👍","❤️","😂","😮","😢","🎉","🔥","👀"]);
+
+    if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(messageId) || typeof emoji !== 'string' || !allowed.has(emoji)) {
+      return res.status(400).json({ error: 'Réaction invalide.' });
+    }
+
+    const group = await Group.findById(groupId).select('members');
+    if (!group || !memberOf(group, req.user.id)) {
+      return res.status(403).json({ error: 'Accès refusé.' });
+    }
+
+    const message = await GroupMessage.findOne({
+      _id: messageId,
+      group: groupId,
+      deleted: { $ne: true }
+    });
+
+    if (!message) {
+      return res.status(404).json({ error: 'Message introuvable.' });
+    }
+
+    const userId = req.user.id.toString();
+    const existingIndex = message.reactions.findIndex(reaction =>
+      reaction.userId.toString() === userId && reaction.emoji === emoji
+    );
+
+    if (existingIndex >= 0) {
+      message.reactions.splice(existingIndex, 1);
+    } else {
+      if (message.reactions.length >= 500) {
+        return res.status(409).json({ error: 'Trop de réactions sur ce message.' });
+      }
+      message.reactions.push({ userId, emoji });
+    }
+
+    await message.save();
+    const reactions = message.reactions.map(reaction => ({
+      userId: reaction.userId.toString(),
+      emoji: reaction.emoji
+    }));
+
+    emitGroupEvent(req, group, 'groupMessageReactionsUpdated', {
+      groupId: groupId.toString(),
+      messageId: messageId.toString(),
+      reactions
+    });
+
+    res.json({ success: true, reactions });
+  } catch (e) {
+    console.error('Group message reaction error:', e);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+
 module.exports = router;
