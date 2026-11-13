@@ -12,6 +12,7 @@ const Group = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
 const authMiddleware = require('../middleware/auth');
 const { ROLE_LEVELS, roleLevel, requireStaffRole, canManageRole } = require('../middleware/staffRoles');
+const { effectiveStaffRole } = require('../utils/staffAllowlist');
 const { createRateLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
@@ -70,7 +71,9 @@ async function audit(req, action, options = {}) {
 
 async function findTargetUser(userId) {
   if (!mongoose.isValidObjectId(userId)) return null;
-  return User.findById(userId).select('_id username displayName staffRole bannedAt banExpiresAt banReason sessionVersion isOnline');
+  const target = await User.findById(userId).select('_id username displayName staffRole bannedAt banExpiresAt banReason sessionVersion isOnline');
+  if (target) target.staffRole = effectiveStaffRole(target._id, target.staffRole);
+  return target;
 }
 
 function actorCanManageTarget(actorRole, targetRole) {
@@ -618,6 +621,7 @@ router.get('/users/search', requireStaffRole('support'), async (req, res) => {
     }).select('_id username displayName staffRole bannedAt banExpiresAt banReason');
 
     if (!target) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    target.staffRole = effectiveStaffRole(target._id, target.staffRole);
 
     await audit(req, 'staff.user.lookup', {
       targetUser: target._id,
@@ -727,6 +731,7 @@ router.delete('/users/:userId/purge', requireStaffRole('admin'), async (req, res
 
     const target = await User.findById(req.params.userId).select('_id username staffRole');
     if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
+    target.staffRole = effectiveStaffRole(target._id, target.staffRole);
     if (target._id.toString() === req.user.id) {
       return res.status(400).json({ error: 'Tu ne peux pas supprimer ton propre compte depuis le panneau staff.' });
     }
