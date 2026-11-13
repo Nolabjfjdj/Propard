@@ -737,7 +737,7 @@ router.delete('/users/:userId/purge', requireStaffRole('admin'), async (req, res
     if (target._id.toString() === req.user.id) {
       return res.status(400).json({ error: 'Tu ne peux pas supprimer ton propre compte depuis le panneau staff.' });
     }
-    if (effectiveStaffRole(target._id, target.staffRole) === 'owner') {
+    if (targetAuthorizedRole === 'owner') {
       return res.status(403).json({ error: 'Le compte propriétaire ne peut pas être supprimé depuis cet outil.' });
     }
     if (!actorCanManageTarget(req.user.staffRole, target)) {
