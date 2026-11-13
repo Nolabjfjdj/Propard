@@ -101,8 +101,6 @@ export default function StaffPage() {
   const [targetUserId, setTargetUserId] = useState('');
   const [banReason, setBanReason] = useState('');
   const [banDuration, setBanDuration] = useState('24h');
-  const [resetUserId, setResetUserId] = useState('');
-  const [resetToken, setResetToken] = useState('');
   const [roleUserId, setRoleUserId] = useState('');
   const [newRole, setNewRole] = useState('support');
   const [auditLogs, setAuditLogs] = useState([]);
@@ -125,7 +123,6 @@ export default function StaffPage() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSettingsLoading, setPushSettingsLoading] = useState(false);
   const knownHelpRequestIds = useRef(null);
-  const manualRecoveryRef = useRef(null);
 
   const request = useCallback(async (method, path, data) => {
     const token = localStorage.getItem('propard_token');
@@ -557,18 +554,6 @@ export default function StaffPage() {
     }
   };
 
-  const issueReset = async () => {
-    setError('');
-    setResetToken('');
-    try {
-      const response = await request('post', `/api/staff/users/${encodeURIComponent(resetUserId.trim())}/password-reset`, {});
-      setResetToken(response.data.resetToken || '');
-      setNotice(response.data.warning || 'Code de récupération créé.');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Impossible de créer le code de récupération.');
-    }
-  };
-
   const changeRole = async () => {
     setError('');
     try {
@@ -820,21 +805,6 @@ export default function StaffPage() {
                         Supprimer la demande résolue
                       </button>
                     )}
-                    {item.userId && (
-                      <button
-                        type="button"
-                        style={buttonStyle}
-                        onClick={() => {
-                          setResetUserId(item.userId._id || item.userId);
-                          setResetToken('');
-                          setError('');
-                          setNotice(`Récupération manuelle ouverte pour @${item.username}. Vérifie l’identité du demandeur avant de créer un code.`);
-                          manualRecoveryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }}
-                      >
-                        Ouvrir la récupération manuelle
-                      </button>
-                    )}
                   </div>
                 </article>
               ))}
@@ -912,22 +882,6 @@ export default function StaffPage() {
             </Panel>
           )}
 
-          {['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(staffRole) && (
-            <div ref={manualRecoveryRef}>
-            <Panel title="Aide à la récupération de compte">
-              <p>Utilise cet outil pour une demande de mot de passe oublié ou pour aider manuellement un utilisateur qui t’a contacté via le support. Le personnel ne choisit pas et ne voit jamais le nouveau mot de passe. Le code est à usage unique et expire après 15 minutes. Remets le code au propriétaire du compte par un canal vérifié et demande-lui d’ouvrir <code>/password-reset</code>. La réinitialisation peut supprimer la sauvegarde E2EE chiffrée avec l’ancien mot de passe.</p>
-              <Field label="ID du compte" value={resetUserId} onChange={setResetUserId} placeholder="Identifiant utilisateur" />
-              <button style={buttonStyle} onClick={issueReset}>Créer un code temporaire</button>
-              {resetToken && (
-                <div style={{ marginTop: 12 }}>
-                  <strong>Code affiché une seule fois</strong>
-                  <code style={{ display: 'block', overflowWrap: 'anywhere', padding: 12, marginTop: 6, background: 'var(--bg-tertiary)' }}>{resetToken}</code>
-                  <button style={buttonStyle} onClick={() => navigator.clipboard?.writeText(resetToken)}>Copier le code</button>
-                </div>
-              )}
-            </Panel>
-            </div>
-          )}
 
           {['admin', 'owner'].includes(staffRole) && (
             <Panel title="Gestion du personnel">
