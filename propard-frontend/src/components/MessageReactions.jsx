@@ -68,7 +68,7 @@ export default function MessageReactions({ reactions = [], userId, onReact, show
             onChange={event => setEmoji(event.target.value)}
             placeholder="Choisir un emoji..."
             aria-label="Emoji à envoyer"
-            maxLength={16}
+            maxLength={32}
             style={{
               width: 150,
               minWidth: 0,
