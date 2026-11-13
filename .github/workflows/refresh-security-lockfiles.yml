@@ -1,10 +1,12 @@
 name: Refresh security lockfiles
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
     paths:
+      - .github/workflows/refresh-security-lockfiles.yml
       - propard-backend/package.json
       - propard-frontend/package.json
 
