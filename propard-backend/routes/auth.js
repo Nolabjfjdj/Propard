@@ -120,12 +120,23 @@ function isP256Coordinate(value) {
 }
 
 function hashAccountHelpToken(token) {
-  return crypto.createHash('sha256').update(token).digest('hex');
+  const secret = process.env.TOKEN_HMAC_SECRET;
+  if (typeof secret !== 'string' || Buffer.byteLength(secret, 'utf8') < 32) {
+    throw new Error('TOKEN_HMAC_SECRET must contain at least 32 bytes');
+  }
+  return crypto.createHmac('sha256', secret).update(token).digest('hex');
+}
+
+function getRecoveryCodeKey() {
+  const secret = process.env.RECOVERY_CODE_SECRET;
+  if (typeof secret !== 'string' || Buffer.byteLength(secret, 'utf8') < 32) {
+    throw new Error('RECOVERY_CODE_SECRET must contain at least 32 bytes');
+  }
+  return crypto.createHash('sha256').update(secret).digest();
 }
 
 function encryptRecoveryCode(token) {
-  if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is not configured');
-  const key = crypto.createHash('sha256').update(process.env.JWT_SECRET).digest();
+  const key = getRecoveryCodeKey();
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   const encrypted = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
@@ -133,11 +144,11 @@ function encryptRecoveryCode(token) {
 }
 
 function decryptRecoveryCode(value) {
-  if (!value || !process.env.JWT_SECRET) return null;
+  if (!value) return null;
   try {
     const payload = Buffer.from(value, 'base64url');
     if (payload.length < 29) return null;
-    const key = crypto.createHash('sha256').update(process.env.JWT_SECRET).digest();
+    const key = getRecoveryCodeKey();
     const decipher = crypto.createDecipheriv('aes-256-gcm', key, payload.subarray(0, 12));
     decipher.setAuthTag(payload.subarray(12, 28));
     return Buffer.concat([decipher.update(payload.subarray(28)), decipher.final()]).toString('utf8');
