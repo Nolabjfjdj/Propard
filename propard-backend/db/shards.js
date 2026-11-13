@@ -243,7 +243,9 @@ function facade(name) {
       if (property === 'updateMany') return async (...args) => {
         let matchedCount = 0, modifiedCount = 0;
         for (const index of readyIndexes()) {
-          const result = await rawModel(index, name).updateMany(...args);
+          const model = rawModel(index, name);
+          if (!await model.exists(args[0] || {})) continue;
+          const result = await model.updateMany(...args);
           matchedCount += result.matchedCount ?? result.n ?? 0;
           modifiedCount += result.modifiedCount ?? result.nModified ?? 0;
         }
@@ -251,20 +253,27 @@ function facade(name) {
       };
       if (property === 'updateOne') return async (...args) => {
         for (const index of readyIndexes()) {
-          const result = await rawModel(index, name).updateOne(...args);
-          if ((result.matchedCount ?? result.n ?? 0) > 0) return result;
+          const model = rawModel(index, name);
+          if (!await model.exists(args[0] || {})) continue;
+          return model.updateOne(...args);
         }
         return { acknowledged: true, matchedCount: 0, modifiedCount: 0 };
       };
       if (property === 'deleteMany') return async (...args) => {
         let deletedCount = 0;
-        for (const index of readyIndexes()) deletedCount += (await rawModel(index, name).deleteMany(...args)).deletedCount ?? 0;
+        for (const index of readyIndexes()) {
+          const model = rawModel(index, name);
+          if (!await model.exists(args[0] || {})) continue;
+          const result = await model.deleteMany(...args);
+          deletedCount += result.deletedCount ?? 0;
+        }
         return { acknowledged: true, deletedCount };
       };
       if (property === 'deleteOne') return async (...args) => {
         for (const index of readyIndexes()) {
-          const result = await rawModel(index, name).deleteOne(...args);
-          if ((result.deletedCount ?? 0) > 0) return result;
+          const model = rawModel(index, name);
+          if (!await model.exists(args[0] || {})) continue;
+          return model.deleteOne(...args);
         }
         return { acknowledged: true, deletedCount: 0 };
       };
