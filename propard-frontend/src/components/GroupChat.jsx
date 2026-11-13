@@ -2695,7 +2695,6 @@ export default function GroupChat({
                         <MessageReactions
                           reactions={message.reactions}
                           userId={myId}
-                          onReact={emoji => toggleGroupMessageReaction(message._id, emoji)}
                         />
 
                       </div>
@@ -2730,6 +2729,24 @@ export default function GroupChat({
             e.stopPropagation()
           }
         >
+          <button
+            type="button"
+            style={styles.contextItem}
+            onClick={() => setContextMenu(current => ({ ...current, showReactions: !current.showReactions }))}
+          >
+            😀 Réagir
+          </button>
+          {contextMenu.showReactions && (
+            <MessageReactions
+              reactions={contextMenu.message.reactions}
+              userId={myId}
+              showPicker
+              onReact={emoji => {
+                toggleGroupMessageReaction(contextMenu.message._id, emoji);
+                setContextMenu(null);
+              }}
+            />
+          )}
           <button
             type="button"
             style={styles.contextItem}
