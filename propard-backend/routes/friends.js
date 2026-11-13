@@ -42,9 +42,8 @@ router.post('/add', createRateLimiter({
     } else if (ipAlias !== undefined && ipAlias !== null && ipAlias !== '') {
       if (
         typeof ipAlias !== 'string' ||
-        ipAlias.length > 15 ||
-        !/^(?:\d{1,3}\.){3}\d{1,3}$/.test(ipAlias) ||
-        ipAlias.split('.').some(part => Number(part) > 254 || Number(part) < 1)
+        ipAlias.length > 23 ||
+        !/^\d{1,5}(?:\.\d{1,5}){3}$/.test(ipAlias)
       ) {
         return res.status(400).json({
           error: 'Alias IP invalide'
