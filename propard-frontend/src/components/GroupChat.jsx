@@ -9,6 +9,7 @@ import api from '../utils/api';
 import socket from '../socket';
 
 import GroupProfile from './GroupProfile';
+import MessageReactions from './MessageReactions';
 import GroupVoiceCall from './GroupVoiceCall';
 
 import {
@@ -888,6 +889,25 @@ export default function GroupChat({
       handleGroupDeleted
     );
 
+    const handleGroupReactionsUpdated = data => {
+      if (
+        data?.groupId?.toString() !== groupId ||
+        !data?.messageId ||
+        !Array.isArray(data.reactions)
+      ) return;
+
+      setMessages(prev => prev.map(message =>
+        message._id?.toString() === data.messageId.toString()
+          ? { ...message, reactions: data.reactions }
+          : message
+      ));
+    };
+
+    socket.on(
+      'groupMessageReactionsUpdated',
+      handleGroupReactionsUpdated
+    );
+
     socket.on(
       'groupMessageDeleted',
       handleGroupMessageDeleted
@@ -917,6 +937,11 @@ export default function GroupChat({
       socket.off(
         'groupDeleted',
         handleGroupDeleted
+      );
+
+      socket.off(
+        'groupMessageReactionsUpdated',
+        handleGroupReactionsUpdated
       );
 
       socket.off(
@@ -1327,6 +1352,23 @@ export default function GroupChat({
         senderId === myId
       );
     };
+
+  const toggleGroupMessageReaction = async (messageId, emoji) => {
+    try {
+      const res = await api.post(
+        `/api/groups/${initialGroup._id}/messages/${messageId}/reactions`,
+        { emoji },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setMessages(prev => prev.map(message =>
+        message._id?.toString() === messageId?.toString()
+          ? { ...message, reactions: res.data.reactions }
+          : message
+      ));
+    } catch (err) {
+      console.error('Erreur réaction message de groupe:', err);
+    }
+  };
 
   const startEditGroupMessage =
     message => {
@@ -2650,6 +2692,11 @@ export default function GroupChat({
                           </p>
 
                         </div>
+                        <MessageReactions
+                          reactions={message.reactions}
+                          userId={myId}
+                          onReact={emoji => toggleGroupMessageReaction(message._id, emoji)}
+                        />
 
                       </div>
 
