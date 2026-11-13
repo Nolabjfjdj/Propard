@@ -371,7 +371,14 @@ router.post('/account-help/requests/:id/recovery-code', requireStaffRole('suppor
       return res.status(403).json({ error: 'Tu ne peux pas lancer la récupération de ce compte du personnel.' });
     }
 
-    if (!process.env.JWT_SECRET) {
+    const tokenHmacSecret = process.env.TOKEN_HMAC_SECRET;
+    const recoveryCodeSecret = process.env.RECOVERY_CODE_SECRET;
+    if (
+      typeof tokenHmacSecret !== 'string' ||
+      Buffer.byteLength(tokenHmacSecret, 'utf8') < 32 ||
+      typeof recoveryCodeSecret !== 'string' ||
+      Buffer.byteLength(recoveryCodeSecret, 'utf8') < 32
+    ) {
       return res.status(503).json({ error: 'Le service de récupération n’est pas configuré côté serveur.' });
     }
     const token = crypto.randomBytes(32).toString('base64url');
@@ -381,8 +388,7 @@ router.post('/account-help/requests/:id/recovery-code', requireStaffRole('suppor
     target.passwordResetIssuedBy = req.user.id;
     await target.save();
 
-    if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is not configured');
-    const key = crypto.createHash('sha256').update(process.env.JWT_SECRET).digest();
+    const key = crypto.createHash('sha256').update(recoveryCodeSecret).digest();
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
     const encrypted = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
