@@ -952,12 +952,24 @@ router.post('/keybackup', authMiddleware, keyBackupLimiter, async (req, res) => 
 router.delete('/anonymize', authMiddleware, accountDeletionLimiter, async (req, res) => {
   try {
     const userId = req.user.id;
-    const user = await User.findById(userId);
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+
+    if (!password || password.length > 128) {
+      return res.status(400).json({ error: 'Mot de passe requis.' });
+    }
+
+    const user = await User.findById(userId).select('+password');
+    const passwordMatches = await bcrypt.compare(
+      password,
+      user?.password || DUMMY_PASSWORD_HASH
+    );
 
     if (!user) {
-      return res.status(404).json({
-        error: 'Compte introuvable'
-      });
+      return res.status(404).json({ error: 'Compte introuvable' });
+    }
+
+    if (!passwordMatches) {
+      return res.status(401).json({ error: 'Mot de passe incorrect.' });
     }
 
     if (!user.pendingDeletionAt) {
@@ -1035,6 +1047,26 @@ router.post('/cancel-deletion', authMiddleware, accountRestoreLimiter, async (re
 router.delete('/delete', authMiddleware, accountDeletionLimiter, async (req, res) => {
   try {
     const userId = req.user.id;
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+
+    if (!password || password.length > 128) {
+      return res.status(400).json({ error: 'Mot de passe requis.' });
+    }
+
+    const user = await User.findById(userId).select('+password');
+    const passwordMatches = await bcrypt.compare(
+      password,
+      user?.password || DUMMY_PASSWORD_HASH
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'Compte introuvable' });
+    }
+
+    if (!passwordMatches) {
+      return res.status(401).json({ error: 'Mot de passe incorrect.' });
+    }
+
     const disconnectUserSockets = req.app.get('disconnectUserSockets');
     if (typeof disconnectUserSockets === 'function') {
       disconnectUserSockets(userId);
