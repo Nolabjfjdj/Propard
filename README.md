@@ -379,6 +379,15 @@ FRONTEND_ORIGIN=
 PORT=
 ```
 
+### Sécurité des jetons et codes de récupération
+
+```env
+TOKEN_HMAC_SECRET=
+RECOVERY_CODE_SECRET=
+```
+
+Ces deux secrets doivent être différents et contenir au moins 32 octets chacun. Ils doivent être définis uniquement dans l’environnement du serveur, jamais dans le frontend ni dans le dépôt. Leur remplacement invalide les anciens liens d’aide et codes de récupération.
+
 ### Administration
 
 ```env
