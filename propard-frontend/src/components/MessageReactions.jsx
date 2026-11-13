@@ -1,30 +1,32 @@
 import React, { useState } from 'react';
 
-const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🎉', '🔥', '👀'];
-
-export default function MessageReactions({ reactions = [], userId, onReact }) {
-  const [open, setOpen] = useState(false);
+export default function MessageReactions({ reactions = [], userId, onReact, showPicker = false }) {
+  const [emoji, setEmoji] = useState('');
   const safeReactions = Array.isArray(reactions) ? reactions : [];
-  const grouped = EMOJIS.map(emoji => ({
-    emoji,
-    users: safeReactions.filter(item => item.emoji === emoji)
-  })).filter(item => item.users.length > 0);
+  const grouped = safeReactions.reduce((items, reaction) => {
+    const current = items.find(item => item.emoji === reaction.emoji);
+    if (current) current.users.push(reaction);
+    else items.push({ emoji: reaction.emoji, users: [reaction] });
+    return items;
+  }, []);
 
-  const react = emoji => {
-    setOpen(false);
-    onReact?.(emoji);
+  const react = value => {
+    const normalized = value.trim();
+    if (!normalized) return;
+    onReact?.(normalized);
+    setEmoji('');
   };
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 5, marginTop: 7 }}>
-      {grouped.map(({ emoji, users }) => {
+      {grouped.map(({ emoji: reactionEmoji, users }) => {
         const selected = users.some(item => (item.userId?._id || item.userId)?.toString() === userId?.toString());
         return (
           <button
-            key={emoji}
+            key={reactionEmoji}
             type="button"
-            aria-label={`${emoji}, ${users.length} réaction(s)`}
-            onClick={() => react(emoji)}
+            aria-label={`${reactionEmoji}, ${users.length} réaction(s)`}
+            onClick={() => react(reactionEmoji)}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -38,68 +40,61 @@ export default function MessageReactions({ reactions = [], userId, onReact }) {
               cursor: 'pointer'
             }}
           >
-            <span>{emoji}</span>
+            <span>{reactionEmoji}</span>
             <span>{users.length}</span>
           </button>
         );
       })}
-      <div style={{ position: 'relative' }}>
-        <button
-          type="button"
-          aria-label="Ajouter une réaction"
-          aria-expanded={open}
-          onClick={() => setOpen(value => !value)}
+      {showPicker && (
+        <form
+          onSubmit={event => {
+            event.preventDefault();
+            react(emoji);
+          }}
           style={{
-            width: 27,
-            height: 25,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 5,
+            padding: 7,
             border: '1px solid var(--border)',
-            borderRadius: 14,
-            background: 'var(--bg-secondary)',
-            color: 'var(--text-secondary)',
-            fontSize: 16,
-            lineHeight: 1,
-            cursor: 'pointer'
+            borderRadius: 10,
+            background: 'var(--bg-secondary)'
           }}
         >
-          +
-        </button>
-        {open && (
-          <div
+          <input
+            type="text"
+            value={emoji}
+            onChange={event => setEmoji(event.target.value)}
+            placeholder="Choisir un emoji..."
+            aria-label="Emoji à envoyer"
+            maxLength={16}
             style={{
-              position: 'absolute',
-              zIndex: 30,
-              bottom: 'calc(100% + 6px)',
-              left: 0,
-              display: 'flex',
-              gap: 3,
-              padding: 5,
+              width: 150,
+              minWidth: 0,
               border: '1px solid var(--border)',
-              borderRadius: 12,
-              background: 'var(--bg-secondary)',
-              boxShadow: 'var(--shadow)'
+              borderRadius: 7,
+              padding: '7px 9px',
+              color: 'var(--text-primary)',
+              background: 'var(--bg-primary)'
+            }}
+          />
+          <button
+            type="submit"
+            disabled={!emoji.trim()}
+            style={{
+              border: 0,
+              borderRadius: 7,
+              padding: '7px 10px',
+              background: 'var(--accent)',
+              color: '#fff',
+              cursor: 'pointer'
             }}
           >
-            {EMOJIS.map(emoji => (
-              <button
-                key={emoji}
-                type="button"
-                aria-label={`Réagir avec ${emoji}`}
-                onClick={() => react(emoji)}
-                style={{
-                  border: 0,
-                  borderRadius: 7,
-                  padding: 4,
-                  background: 'transparent',
-                  fontSize: 18,
-                  cursor: 'pointer'
-                }}
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+            Réagir
+          </button>
+        </form>
+      )}
     </div>
   );
 }
