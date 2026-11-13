@@ -12,7 +12,7 @@ const messageSchema = new mongoose.Schema({
   read:{type:Boolean,default:false},
   reactions: [{
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    emoji: { type: String, required: true, maxlength: 8 },
+    emoji: { type: String, required: true, maxlength: 32 },
     createdAt: { type: Date, default: Date.now }
   }],
   createdAt:{type:Date,default:Date.now}
