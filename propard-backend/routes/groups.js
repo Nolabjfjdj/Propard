@@ -1931,10 +1931,10 @@ router.post('/:groupId/messages/:messageId/reactions', createRateLimiter({
     const { groupId, messageId } = req.params;
     const { emoji } = req.body || {};
     const isSingleEmoji = value => {
-      if (typeof value !== 'string' || value.length > 32 || /[\\u0000-\\u001F\\u007F]/.test(value)) return false;
+      if (typeof value !== 'string' || value.length > 32 || /[\u0000-\u001F\u007F]/.test(value)) return false;
       if (typeof Intl.Segmenter !== 'function') return false;
       const segments = [...new Intl.Segmenter('fr', { granularity: 'grapheme' }).segment(value)];
-      return segments.length === 1 && /(?:\\p{Extended_Pictographic}|\\p{Regional_Indicator}|\\u20E3)/u.test(value);
+      return segments.length === 1 && /(?:\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3)/u.test(value);
     };
 
     if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(messageId) || !isSingleEmoji(emoji)) {
