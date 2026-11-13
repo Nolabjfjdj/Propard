@@ -9,6 +9,11 @@ const groupMessageSchema = new mongoose.Schema({
   keyVersion:{type:Number,min:1,default:null},
   edited:{type:Boolean,default:false},
   deleted:{type:Boolean,default:false},
+  reactions: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    emoji: { type: String, required: true, maxlength: 8 },
+    createdAt: { type: Date, default: Date.now }
+  }],
   createdAt:{type:Date,default:Date.now}
 });
 
