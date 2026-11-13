@@ -490,6 +490,10 @@ export default function AppPage({
   };
 
   const handleDeleteTotal = async () => {
+    if (!deletePassword || deletePassword.length > 128) {
+      setDeleteError('Entre ton mot de passe actuel.');
+      return;
+    }
     if (captchaRequired && captchaContext === 'delete' && !captchaToken) {
       setDeleteError('Valide le CAPTCHA avant de continuer.');
       return;
