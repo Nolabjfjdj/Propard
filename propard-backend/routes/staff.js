@@ -353,7 +353,7 @@ router.patch('/account-help/requests/:id', requireStaffRole('support'), async (r
   }
 });
 
-router.post('/account-help/requests/:id/recovery-code', requireStaffRole('support'), async (req, res) => {
+router.post('/account-help/requests/:id/recovery-code', requireStaffRole('moderator'), async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(400).json({ error: 'Demande invalide.' });
