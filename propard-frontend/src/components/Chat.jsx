@@ -1466,7 +1466,7 @@ export default function Chat({
               style={styles.contextItem}
               onClick={() => setContextMenu(current => ({ ...current, showReactions: !current.showReactions }))}
             >
-              😀 Réagir
+              Réagir
             </button>
             {contextMenu.showReactions && (
               <MessageReactions
@@ -1485,7 +1485,7 @@ export default function Chat({
                 copyMessage(contextMenu.msg)
               }
             >
-              📋 Copier
+              Copier
             </button>
 
             {isMe ? (
@@ -1498,7 +1498,7 @@ export default function Chat({
                     )
                   }
                 >
-                  ✏️ Modifier
+                  Modifier
                 </button>
 
                 <button
@@ -1512,7 +1512,7 @@ export default function Chat({
                     )
                   }
                 >
-                  🗑️ Supprimer
+                  Supprimer
                 </button>
               </>
             ) : (
@@ -1527,7 +1527,7 @@ export default function Chat({
                   )
                 }
               >
-                🚩 Signaler
+                Signaler
               </button>
             )}
           </div>
