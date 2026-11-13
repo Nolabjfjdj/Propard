@@ -74,6 +74,7 @@ export default function AppPage({
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [deleteError, setDeleteError] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
 
   const [cancelLoading, setCancelLoading] = useState(false);
 
@@ -446,12 +447,17 @@ export default function AppPage({
     setShowDeleteModal(false);
     setConfirmAction(null);
     setDeleteError('');
+    setDeletePassword('');
     setCaptchaRequired(false);
     setCaptchaContext(null);
     setCaptchaToken('');
   };
 
   const handleAnonymize = async () => {
+    if (!deletePassword || deletePassword.length > 128) {
+      setDeleteError('Entre ton mot de passe actuel.');
+      return;
+    }
     if (captchaRequired && captchaContext === 'delete' && !captchaToken) {
       setDeleteError('Valide le CAPTCHA avant de continuer.');
       return;
@@ -461,7 +467,7 @@ export default function AppPage({
 
     try {
       await api.delete('/api/auth/anonymize', {
-        data: { ...(captchaToken ? { captchaToken } : {}) },
+        data: { password: deletePassword, ...(captchaToken ? { captchaToken } : {}) },
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -493,7 +499,7 @@ export default function AppPage({
 
     try {
       await api.delete('/api/auth/delete', {
-        data: { ...(captchaToken ? { captchaToken } : {}) },
+        data: { password: deletePassword, ...(captchaToken ? { captchaToken } : {}) },
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -1639,6 +1645,25 @@ export default function AppPage({
                   : 'Cette action supprime immédiatement et irréversiblement ton compte et tous tes messages.'}
               </p>
 
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={e => setDeletePassword(e.target.value)}
+                placeholder="Mot de passe actuel"
+                autoComplete="current-password"
+                maxLength={128}
+                disabled={deleteLoading}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '11px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '14px'
+                }}
+              />
               {captchaRequired && captchaContext === 'delete' && <div ref={deleteCaptchaRef} style={{ marginTop: 12 }} />}
 
               {deleteError && (
@@ -1676,6 +1701,7 @@ export default function AppPage({
                 onClick={() => {
                   setConfirmAction(null);
                   setDeleteError('');
+                  setDeletePassword('');
                 }}
                 disabled={deleteLoading}
               >
