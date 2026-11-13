@@ -939,4 +939,79 @@ router.post('/unblock/:userId', createRateLimiter({
   }
 });
 
+
+router.post('/messages/:messageId/reactions', createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 120,
+  keyFn: req => `message-reaction:${req.user.id}`,
+  message: 'Trop de réactions. Réessaie plus tard.'
+}), async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body || {};
+    const allowed = new Set(["👍","❤️","😂","😮","😢","🎉","🔥","👀"]);
+
+    if (!mongoose.isValidObjectId(messageId) || typeof emoji !== 'string' || !allowed.has(emoji)) {
+      return res.status(400).json({ error: 'Réaction invalide.' });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message || message.deleted) {
+      return res.status(404).json({ error: 'Message introuvable.' });
+    }
+
+    const userId = req.user.id.toString();
+    const senderId = message.sender.toString();
+    const receiverId = message.receiver.toString();
+
+    if (userId !== senderId && userId !== receiverId) {
+      return res.status(403).json({ error: 'Accès refusé.' });
+    }
+
+    const otherId = userId === senderId ? receiverId : senderId;
+    if (!await areFriends(userId, otherId)) {
+      return res.status(403).json({ error: 'Cette conversation n’est plus accessible.' });
+    }
+
+    const participants = await User.find({ _id: { $in: [userId, otherId] } }).select('blockedUsers');
+    if (participants.some(user => (user.blockedUsers || []).some(id => id.toString() === (user._id.toString() === userId ? otherId : userId)))) {
+      return res.status(403).json({ error: 'Cette interaction n’est pas autorisée.' });
+    }
+
+    const existingIndex = message.reactions.findIndex(reaction =>
+      reaction.userId.toString() === userId && reaction.emoji === emoji
+    );
+
+    if (existingIndex >= 0) {
+      message.reactions.splice(existingIndex, 1);
+    } else {
+      if (message.reactions.length >= 500) {
+        return res.status(409).json({ error: 'Trop de réactions sur ce message.' });
+      }
+      message.reactions.push({ userId, emoji });
+    }
+
+    await message.save();
+    const reactions = message.reactions.map(reaction => ({
+      userId: reaction.userId.toString(),
+      emoji: reaction.emoji
+    }));
+    const payload = { messageId, reactions };
+    const io = req.app.get('io');
+    const emitToUser = req.app.get('emitToUser');
+
+    if (io && emitToUser) {
+      for (const participantId of new Set([senderId, receiverId])) {
+        emitToUser(io, participantId, 'messageReactionsUpdated', payload);
+      }
+    }
+
+    res.json({ success: true, reactions });
+  } catch (e) {
+    console.error('Message reaction error:', e);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+
 module.exports = router;
