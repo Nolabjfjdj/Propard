@@ -949,9 +949,14 @@ router.post('/messages/:messageId/reactions', createRateLimiter({
   try {
     const { messageId } = req.params;
     const { emoji } = req.body || {};
-    const allowed = new Set(["👍","❤️","😂","😮","😢","🎉","🔥","👀"]);
+    const isSingleEmoji = value => {
+      if (typeof value !== 'string' || value.length > 32 || /[\\u0000-\\u001F\\u007F]/.test(value)) return false;
+      if (typeof Intl.Segmenter !== 'function') return false;
+      const segments = [...new Intl.Segmenter('fr', { granularity: 'grapheme' }).segment(value)];
+      return segments.length === 1 && /(?:\\p{Extended_Pictographic}|\\p{Regional_Indicator}|\\u20E3)/u.test(value);
+    };
 
-    if (!mongoose.isValidObjectId(messageId) || typeof emoji !== 'string' || !allowed.has(emoji)) {
+    if (!mongoose.isValidObjectId(messageId) || !isSingleEmoji(emoji)) {
       return res.status(400).json({ error: 'Réaction invalide.' });
     }
 
@@ -981,6 +986,7 @@ router.post('/messages/:messageId/reactions', createRateLimiter({
     const existingIndex = message.reactions.findIndex(reaction =>
       reaction.userId.toString() === userId && reaction.emoji === emoji
     );
+    const isAddingReaction = existingIndex < 0;
 
     if (existingIndex >= 0) {
       message.reactions.splice(existingIndex, 1);
@@ -997,6 +1003,18 @@ router.post('/messages/:messageId/reactions', createRateLimiter({
       emoji: reaction.emoji
     }));
     const payload = { messageId, reactions };
+    if (isAddingReaction && senderId !== userId) {
+      const actor = await User.findById(userId).select('displayName username');
+      const actorName = actor?.displayName || actor?.username || 'Quelqu’un';
+      const { sendPushNotification } = require('../services/push');
+      void sendPushNotification(senderId, {
+        title: 'Nouvelle réaction',
+        body: `${actorName} a réagi ${emoji} à ton message`,
+        url: '/',
+        tag: `message-reaction-${messageId}`,
+        data: { type: 'message-reaction', messageId, conversationId: otherId }
+      }).catch(error => console.error('Message reaction notification error:', error));
+    }
     const io = req.app.get('io');
     const emitToUser = req.app.get('emitToUser');
 
