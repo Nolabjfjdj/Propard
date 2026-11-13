@@ -858,37 +858,6 @@ router.post('/users/:userId/unban', requireStaffRole('moderator'), async (req, r
   }
 });
 
-router.post('/users/:userId/password-reset', requireStaffRole('support'), async (req, res) => {
-  try {
-    const target = await findTargetUser(req.params.userId);
-    if (!target) return res.status(404).json({ error: 'Compte introuvable.' });
-    if (!actorCanManageTarget(req.user.staffRole, target)) {
-      return res.status(403).json({ error: 'Tu ne peux pas lancer la récupération du compte d’un membre du personnel de niveau égal ou supérieur.' });
-    }
-
-    const token = crypto.randomBytes(32).toString('base64url');
-    target.passwordResetTokenHash = hashToken(token);
-    target.passwordResetExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    target.passwordResetIssuedBy = req.user.id;
-    await target.save();
-
-    await audit(req, 'user.password_reset.issued', {
-      targetUser: target._id,
-      details: { expiresAt: target.passwordResetExpiresAt }
-    });
-
-    return res.json({
-      success: true,
-      resetToken: token,
-      expiresAt: target.passwordResetExpiresAt,
-      warning: 'Ce code est affiché une seule fois. Transmets-le au propriétaire du compte par un canal vérifié.'
-    });
-  } catch (error) {
-    console.error('Staff password reset issuance failed:', error);
-    return res.status(500).json({ error: 'Erreur serveur.' });
-  }
-});
-
 router.patch('/users/:userId/role', requireStaffRole('admin'), async (req, res) => {
   try {
     const target = await findTargetUser(req.params.userId);
