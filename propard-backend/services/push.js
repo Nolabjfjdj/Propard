@@ -2,6 +2,7 @@ const webpush = require('web-push');
 const User = require('../models/User');
 const { configured: apnsConfigured, sendApnsNotification } = require('./apns');
 const { isAllowedPushEndpoint } = require('./pushEndpoint');
+const { effectiveStaffRole } = require('../utils/staffAllowlist');
 
 const publicKey = process.env.VAPID_PUBLIC_KEY;
 const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -135,6 +136,9 @@ async function sendStaffHelpNotification({ kind, username, requestId }) {
     staffRole: { $in: staffRoles },
     [`staffNotificationPreferences.${preferenceKey}`]: { $ne: false }
   }).select('_id staffRole staffNotificationPreferences pushSubscriptions apnsTokens');
+  const authorizedStaffUsers = staffUsers.filter(
+    user => effectiveStaffRole(user._id, user.staffRole) !== 'user'
+  );
 
   const requestLabel = kind === 'password_reset' ? 'Mot de passe oublié' : 'Support';
   const payload = {
@@ -150,7 +154,7 @@ async function sendStaffHelpNotification({ kind, username, requestId }) {
     }
   };
 
-  await Promise.all(staffUsers.map(async user => {
+  await Promise.all(authorizedStaffUsers.map(async user => {
     try {
       await Promise.all([
         sendWebPush(user, payload),
