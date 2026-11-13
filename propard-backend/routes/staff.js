@@ -31,17 +31,12 @@ const resetCompleteLimiter = createRateLimiter({
   message: 'Trop de tentatives de récupération. Réessaie plus tard.'
 });
 
-function safeEqual(left, right) {
-  if (typeof left !== 'string' || typeof right !== 'string' || !left || !right) {
-    return false;
-  }
-  const a = Buffer.from(left);
-  const b = Buffer.from(right);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
-
 function hashToken(token) {
-  return crypto.createHash('sha256').update(token).digest('hex');
+  const secret = process.env.TOKEN_HMAC_SECRET;
+  if (typeof secret !== 'string' || Buffer.byteLength(secret, 'utf8') < 32) {
+    throw new Error('TOKEN_HMAC_SECRET must contain at least 32 bytes');
+  }
+  return crypto.createHmac('sha256', secret).update(token).digest('hex');
 }
 
 function escapeRegex(value) {
@@ -450,50 +445,6 @@ router.patch('/account-help/settings', requireStaffRole('support'), async (req, 
   } catch (error) {
     console.error('Account help settings update failed:', error);
     return res.status(500).json({ error: 'Impossible d’enregistrer les préférences.' });
-  }
-});
-
-router.get('/bootstrap/status', async (req, res) => {
-  try {
-    const staffRoles = Object.keys(ROLE_LEVELS).filter(role => role !== 'user');
-    const existingStaff = await User.countDocuments({
-      staffRole: { $in: staffRoles }
-    });
-    return res.json({ available: existingStaff === 0 });
-  } catch (error) {
-    console.error('Staff bootstrap status check failed:', error);
-    return res.status(500).json({ error: 'Impossible de vérifier la configuration du personnel.' });
-  }
-});
-
-router.post('/bootstrap', authMiddleware, async (req, res) => {
-  try {
-    const expectedSecret = process.env.STAFF_BOOTSTRAP_KEY || process.env.ADMIN_KEY;
-    if (!safeEqual(req.body && req.body.bootstrapKey, expectedSecret)) {
-      return res.status(403).json({ error: 'Clé de configuration invalide.' });
-    }
-
-    const existingStaff = await User.countDocuments({
-      staffRole: { $in: Object.keys(ROLE_LEVELS).filter(role => role !== 'user') }
-    });
-    if (existingStaff > 0) {
-      return res.status(409).json({ error: 'Le personnel est déjà configuré.' });
-    }
-
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ error: 'Compte introuvable.' });
-
-    user.staffRole = 'owner';
-    user.staffRoleUpdatedAt = new Date();
-    user.staffRoleUpdatedBy = user._id;
-    await user.save();
-
-    req.user.staffRole = 'owner';
-    await audit(req, 'staff.bootstrap.completed', { targetUser: user._id });
-    return res.json({ success: true, staffRole: 'owner' });
-  } catch (error) {
-    console.error('Staff bootstrap failed:', error);
-    return res.status(500).json({ error: 'Erreur serveur.' });
   }
 });
 
