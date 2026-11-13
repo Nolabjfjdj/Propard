@@ -1245,11 +1245,11 @@ export default function GroupChat({
     (x, y) => ({
       x: Math.min(
         Math.max(8, x),
-        Math.max(8, window.innerWidth - 178)
+        Math.max(8, window.innerWidth - 280)
       ),
       y: Math.min(
         Math.max(8, y),
-        Math.max(8, window.innerHeight - 125)
+        Math.max(8, window.innerHeight - 240)
       )
     });
 
