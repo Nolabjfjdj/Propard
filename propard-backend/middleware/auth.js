@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { effectiveStaffRole } = require('../utils/staffAllowlist');
 
 module.exports = async function(req, res, next) {
   const token = req.header('Authorization')?.replace(/^Bearer\s+/i, '');
@@ -43,7 +44,8 @@ module.exports = async function(req, res, next) {
 
     req.user = {
       ...decoded,
-      staffRole: user.staffRole || 'user'
+      // Rôle en base plafonné par la liste blanche des variables d'environnement
+      staffRole: effectiveStaffRole(user._id, user.staffRole)
     };
     next();
   } catch (err) {
