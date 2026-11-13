@@ -2734,7 +2734,7 @@ export default function GroupChat({
             style={styles.contextItem}
             onClick={() => setContextMenu(current => ({ ...current, showReactions: !current.showReactions }))}
           >
-            😀 Réagir
+            Réagir
           </button>
           {contextMenu.showReactions && (
             <MessageReactions
@@ -2754,7 +2754,7 @@ export default function GroupChat({
               copyMessage(contextMenu.message)
             }
           >
-            📋 Copier
+            Copier
           </button>
 
           {isOwnGroupMessage(
@@ -2772,7 +2772,7 @@ export default function GroupChat({
                   )
                 }
               >
-                ✏️ Modifier
+                Modifier
               </button>
 
               <button
@@ -2786,7 +2786,7 @@ export default function GroupChat({
                   )
                 }
               >
-                🗑️ Supprimer
+                Supprimer
               </button>
             </>
           ) : (
@@ -2801,7 +2801,7 @@ export default function GroupChat({
                 )
               }
             >
-              🚩 Signaler
+              Signaler
             </button>
           )}
         </div>
