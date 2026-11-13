@@ -389,6 +389,21 @@ io.use(async(socket,next)=>{
 
 io.on('connection',async socket=>{
 
+  const originalSocketOn=socket.on.bind(socket);
+  const registerSocketHandler=(event,handler)=>{
+    originalSocketOn(event,async(payload,...args)=>{
+      const safePayload=payload && typeof payload==='object' && !Array.isArray(payload)
+        ? payload
+        : {};
+
+      try{
+        await handler(safePayload,...args);
+      }catch(error){
+        console.error(`Socket event "${event}" failed:`,error);
+      }
+    });
+  };
+
   console.log(`🔌 Socket connecté: ${socket.id}`);
 
   const wasOffline=!connectedUsers.has(socket.userId);
@@ -407,7 +422,7 @@ io.on('connection',async socket=>{
 
   socket.emit('authenticated',true);
 
-  socket.on('requestPendingCalls',()=>{
+  registerSocketHandler('requestPendingCalls',()=>{
     if(!socket.userId || !allowSocketEvent(socket,'requestPendingCalls',10,60000)) return;
 
     const pendingPrivateCall = callState.getPendingPrivateCall(socket.userId);
@@ -448,7 +463,7 @@ io.on('connection',async socket=>{
   // MESSAGES
   // ─────────────────────────────────────
 
-  socket.on('setActiveConversation',({type,id,active=true}={})=>{
+  registerSocketHandler('setActiveConversation',({type,id,active=true}={})=>{
     if(!socket.userId || !allowSocketEvent(socket,'setActiveConversation',30,10000)) return;
 
     setActiveConversation(
@@ -458,7 +473,7 @@ io.on('connection',async socket=>{
     );
   });
 
-  socket.on('sendMessage',async({receiverId,content}={})=>{
+  registerSocketHandler('sendMessage',async({receiverId,content}={})=>{
     try{
       if(!socket.userId) return;
       if(!allowSocketEvent(socket,'sendMessage',20,10000)){
@@ -562,7 +577,7 @@ io.on('connection',async socket=>{
   // MESSAGES DE GROUPE
   // ─────────────────────────────────────
 
-  socket.on('sendGroupMessage',async({groupId,content,keyVersion}={})=>{
+  registerSocketHandler('sendGroupMessage',async({groupId,content,keyVersion}={})=>{
     try{
       if(!socket.userId) return;
       if(!allowSocketEvent(socket,'sendGroupMessage',20,10000)){
@@ -691,7 +706,7 @@ io.on('connection',async socket=>{
   // WEBRTC PRIVÉ
   // ─────────────────────────────────────
 
-  socket.on('callUser',async({receiverId,offer,videoCall=false}={})=>{
+  registerSocketHandler('callUser',async({receiverId,offer,videoCall=false}={})=>{
     if(!socket.userId) return;
     if(!allowSocketEvent(socket,'callUser',3,30000)){
       return socket.emit('callFailed',{message:'Trop de tentatives d’appel. Patiente un instant.'});
@@ -766,7 +781,7 @@ io.on('connection',async socket=>{
     }
   });
 
-  socket.on('answerCall',async({callerId,answer}={})=>{
+  registerSocketHandler('answerCall',async({callerId,answer}={})=>{
     if(!socket.userId) return;
     if(!allowSocketEvent(socket,'answerCall',5,10000)) return;
 
@@ -810,7 +825,7 @@ io.on('connection',async socket=>{
     );
   });
 
-  socket.on('iceCandidate',async({receiverId,candidate}={})=>{
+  registerSocketHandler('iceCandidate',async({receiverId,candidate}={})=>{
     if(!socket.userId || !allowSocketEvent(socket,'iceCandidate',120,10000)) return;
 
     if(!mongoose.isValidObjectId(receiverId) || !isIceCandidate(candidate)) return;
@@ -836,7 +851,7 @@ io.on('connection',async socket=>{
     }
   });
 
-  socket.on('iceRestartOffer',async({receiverId,offer}={})=>{
+  registerSocketHandler('iceRestartOffer',async({receiverId,offer}={})=>{
     if(!socket.userId || !allowSocketEvent(socket,'iceRestartOffer',10,10000)) return;
 
     if(!mongoose.isValidObjectId(receiverId) || !isSessionDescription(offer,'offer')) return;
@@ -856,7 +871,7 @@ io.on('connection',async socket=>{
     );
   });
 
-  socket.on('iceRestartAnswer',async({callerId,answer}={})=>{
+  registerSocketHandler('iceRestartAnswer',async({callerId,answer}={})=>{
     if(!socket.userId || !allowSocketEvent(socket,'iceRestartAnswer',10,10000)) return;
 
     if(!mongoose.isValidObjectId(callerId) || !isSessionDescription(answer,'answer')) return;
@@ -873,7 +888,7 @@ io.on('connection',async socket=>{
     );
   });
 
-  socket.on('endCall',async({receiverId}={})=>{
+  registerSocketHandler('endCall',async({receiverId}={})=>{
     if(!socket.userId || !allowSocketEvent(socket,'endCall',5,10000)) return;
 
     if(!mongoose.isValidObjectId(receiverId)) return;
@@ -890,7 +905,7 @@ io.on('connection',async socket=>{
   // APPELS DE GROUPE — SIGNALISATION
   // ─────────────────────────────────────
 
-  socket.on('groupCallStart',async({groupId,videoCall=false}={})=>{
+  registerSocketHandler('groupCallStart',async({groupId,videoCall=false}={})=>{
     try{
       if(!socket.userId || !allowSocketEvent(socket,'groupCallStart',3,30000)) return;
 
@@ -1025,7 +1040,7 @@ io.on('connection',async socket=>{
     }
   });
 
-  socket.on('groupCallJoin',async({groupId,callId}={})=>{
+  registerSocketHandler('groupCallJoin',async({groupId,callId}={})=>{
     try{
       if(!socket.userId || !allowSocketEvent(socket,'groupCallJoin',10,10000)) return;
 
@@ -1153,7 +1168,7 @@ io.on('connection',async socket=>{
     );
   };
 
-  socket.on(
+  registerSocketHandler(
     'groupCallOffer',
     payload=>relayGroupCallEvent(
       'groupCallOffer',
@@ -1161,7 +1176,7 @@ io.on('connection',async socket=>{
     )
   );
 
-  socket.on(
+  registerSocketHandler(
     'groupCallAnswer',
     payload=>relayGroupCallEvent(
       'groupCallAnswer',
@@ -1169,7 +1184,7 @@ io.on('connection',async socket=>{
     )
   );
 
-  socket.on(
+  registerSocketHandler(
     'groupCallIceCandidate',
     payload=>relayGroupCallEvent(
       'groupCallIceCandidate',
@@ -1177,7 +1192,7 @@ io.on('connection',async socket=>{
     )
   );
 
-  socket.on(
+  registerSocketHandler(
     'groupCallIceRestartOffer',
     payload=>relayGroupCallEvent(
       'groupCallIceRestartOffer',
@@ -1185,7 +1200,7 @@ io.on('connection',async socket=>{
     )
   );
 
-  socket.on(
+  registerSocketHandler(
     'groupCallIceRestartAnswer',
     payload=>relayGroupCallEvent(
       'groupCallIceRestartAnswer',
@@ -1193,7 +1208,7 @@ io.on('connection',async socket=>{
     )
   );
 
-  socket.on('groupCallLeave',async({groupId,callId}={})=>{
+  registerSocketHandler('groupCallLeave',async({groupId,callId}={})=>{
     try{
       if(!socket.userId) return;
 
@@ -1222,7 +1237,7 @@ io.on('connection',async socket=>{
   // DÉCONNEXION
   // ─────────────────────────────────────
 
-  socket.on('disconnect',async()=>{
+  registerSocketHandler('disconnect',async()=>{
     if(socket.userId){
       removeActiveConversation(
         socket.userId,
