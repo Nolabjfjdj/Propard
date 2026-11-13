@@ -866,8 +866,8 @@ export default function Chat({
     y,
     isTouch = false
   ) => {
-    const menuWidth = 160;
-    const menuHeight = 90;
+    const menuWidth = 280;
+    const menuHeight = 240;
     const margin = 8;
 
     let left = isTouch
