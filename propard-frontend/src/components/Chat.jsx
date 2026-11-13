@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import api from '../utils/api';
 import socket from '../socket';
 import VoiceCall from './VoiceCall';
+import MessageReactions from './MessageReactions';
 import {
   deriveSharedKey,
   encryptMessage,
@@ -51,6 +52,23 @@ export default function Chat({
 
    const normalize = id => id?.toString();
   const myId = normalize(userId);
+
+  const toggleMessageReaction = async (messageId, emoji) => {
+    try {
+      const res = await api.post(
+        `/api/friends/messages/${messageId}/reactions`,
+        { emoji },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setMessages(prev => prev.map(message =>
+        message._id?.toString() === messageId?.toString()
+          ? { ...message, reactions: res.data.reactions }
+          : message
+      ));
+    } catch (err) {
+      console.error('Erreur réaction message:', err);
+    }
+  };
 
   const friendName =
     friend.nickname?.trim() ||
@@ -493,6 +511,20 @@ export default function Chat({
       handleNewMessage
     );
 
+    const handleReactionsUpdated = data => {
+      if (!data?.messageId || !Array.isArray(data.reactions)) return;
+      setMessages(prev => prev.map(message =>
+        message._id?.toString() === data.messageId.toString()
+          ? { ...message, reactions: data.reactions }
+          : message
+      ));
+    };
+
+    socket.on(
+      'messageReactionsUpdated',
+      handleReactionsUpdated
+    );
+
     socket.on(
       'messageDeleted',
       handleDeleted
@@ -512,6 +544,11 @@ export default function Chat({
       socket.off(
         'messageSent',
         handleNewMessage
+      );
+
+      socket.off(
+        'messageReactionsUpdated',
+        handleReactionsUpdated
       );
 
       socket.off(
@@ -1392,6 +1429,11 @@ export default function Chat({
                                 : ''}
                             </p>
                           </div>
+                          <MessageReactions
+                            reactions={msg.reactions}
+                            userId={myId}
+                            onReact={emoji => toggleMessageReaction(msg._id, emoji)}
+                          />
                         </>
                       )}
                     </div>
