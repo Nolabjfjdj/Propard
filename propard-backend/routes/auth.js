@@ -13,6 +13,7 @@ const GroupMessage = require('../models/GroupMessage');
 const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { MAX_AVATAR_LENGTH } = require('../utils/inputValidation');
+const { effectiveStaffRole } = require('../utils/staffAllowlist');
 
 const accountHelpLimiter = createRateLimiter({
   windowMs: 30 * 60 * 1000,
@@ -581,7 +582,7 @@ router.get('/me', authMiddleware, async (req, res) => {
       avatar: user.avatar,
       ipAlias: user.ipAlias,
       publicKey: user.publicKey,
-      staffRole: user.staffRole || 'user',
+      staffRole: effectiveStaffRole(user._id, user.staffRole),
       isOnline: user.isOnline,
       friends: user.friends,
       friendRequests: user.friendRequests,
