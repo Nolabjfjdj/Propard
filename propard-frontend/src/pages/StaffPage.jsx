@@ -726,7 +726,7 @@ export default function StaffPage() {
       ) : (
         <>
           <Panel title="Demandes de récupération et support">
-            <p>Les demandes envoyées depuis la page de connexion arrivent ici. Aucun e-mail n’est envoyé. Pour les demandes de récupération, lis les explications avant de décider si l’identité du demandeur est suffisamment vérifiée.</p>
+            <p>Les demandes envoyées depuis la page de connexion arrivent ici. Aucun e-mail n’est envoyé. Pour les demandes de récupération, ne délivre jamais de code sur la seule base d’un pseudo, d’une référence ou d’un message. Vérifie l’identité par un canal indépendant déjà associé au compte. Seuls les modérateurs et les rôles supérieurs peuvent délivrer un code.</p>
             { (
               <div style={{ display: 'grid', gap: 8, padding: 12, border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12 }}>
                 <strong>Mes notifications</strong>
@@ -793,7 +793,7 @@ export default function StaffPage() {
                     <button type="button" style={buttonStyle} onClick={() => sendHelpReply(item._id)} disabled={helpReplySaving === item._id}>{helpReplySaving === item._id ? 'Envoi…' : 'Envoyer la réponse'}</button>
                     <button type="button" style={buttonStyle} onClick={() => updateHelpRequestStatus(item._id, 'resolved')}>Marquer résolue</button>
                     <button type="button" style={buttonStyle} onClick={() => updateHelpRequestStatus(item._id, 'new')}>Remettre en nouvelle</button>
-                    {item.kind === 'password_reset' && item.userId && (
+                    {['moderator', 'senior_moderator', 'admin', 'owner'].includes(staffRole) && item.kind === 'password_reset' && item.userId && (
                       <button type="button" style={buttonStyle} onClick={() => issueRequestRecoveryCode(item._id)}>Valider et envoyer un code temporaire</button>
                     )}
                     {['senior_moderator', 'admin', 'owner'].includes(staffRole) && item.status === 'resolved' && (
