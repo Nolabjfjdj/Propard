@@ -1930,9 +1930,14 @@ router.post('/:groupId/messages/:messageId/reactions', createRateLimiter({
   try {
     const { groupId, messageId } = req.params;
     const { emoji } = req.body || {};
-    const allowed = new Set(["👍","❤️","😂","😮","😢","🎉","🔥","👀"]);
+    const isSingleEmoji = value => {
+      if (typeof value !== 'string' || value.length > 32 || /[\\u0000-\\u001F\\u007F]/.test(value)) return false;
+      if (typeof Intl.Segmenter !== 'function') return false;
+      const segments = [...new Intl.Segmenter('fr', { granularity: 'grapheme' }).segment(value)];
+      return segments.length === 1 && /(?:\\p{Extended_Pictographic}|\\p{Regional_Indicator}|\\u20E3)/u.test(value);
+    };
 
-    if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(messageId) || typeof emoji !== 'string' || !allowed.has(emoji)) {
+    if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(messageId) || !isSingleEmoji(emoji)) {
       return res.status(400).json({ error: 'Réaction invalide.' });
     }
 
@@ -1955,6 +1960,7 @@ router.post('/:groupId/messages/:messageId/reactions', createRateLimiter({
     const existingIndex = message.reactions.findIndex(reaction =>
       reaction.userId.toString() === userId && reaction.emoji === emoji
     );
+    const isAddingReaction = existingIndex < 0;
 
     if (existingIndex >= 0) {
       message.reactions.splice(existingIndex, 1);
@@ -1970,6 +1976,20 @@ router.post('/:groupId/messages/:messageId/reactions', createRateLimiter({
       userId: reaction.userId.toString(),
       emoji: reaction.emoji
     }));
+
+    const messageSenderId = message.sender.toString();
+    if (isAddingReaction && messageSenderId !== userId) {
+      const actor = await User.findById(userId).select('displayName username');
+      const actorName = actor?.displayName || actor?.username || 'Quelqu’un';
+      const { sendPushNotification } = require('../services/push');
+      void sendPushNotification(messageSenderId, {
+        title: 'Nouvelle réaction dans un groupe',
+        body: `${actorName} a réagi ${emoji} à ton message`,
+        url: '/',
+        tag: `group-message-reaction-${messageId}`,
+        data: { type: 'group-message-reaction', messageId: messageId.toString(), groupId: groupId.toString() }
+      }).catch(error => console.error('Group message reaction notification error:', error));
+    }
 
     emitGroupEvent(req, group, 'groupMessageReactionsUpdated', {
       groupId: groupId.toString(),
