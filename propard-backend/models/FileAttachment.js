@@ -72,21 +72,21 @@ const fileAttachmentSchema = new mongoose.Schema({
   cleanupPending: { type: Boolean, default: false, index: true }
 });
 
-fileAttachmentSchema.pre('validate', function validateFileConversation(next) {
+fileAttachmentSchema.pre('validate', function validateFileConversation() {
   const isPrivate = this.scope === 'private';
   const hasRecipient = this.recipient != null;
   const hasGroup = this.group != null;
 
   if (isPrivate && (!hasRecipient || hasGroup || this.groupKeyVersion != null)) {
-    return next(new Error('Conversation privée de fichier invalide.'));
+    throw new Error('Conversation privée de fichier invalide.');
   }
 
   if (!isPrivate && (hasRecipient || !hasGroup || !Number.isSafeInteger(this.groupKeyVersion) || this.groupKeyVersion < 1)) {
-    return next(new Error('Conversation de groupe de fichier invalide.'));
+    throw new Error('Conversation de groupe de fichier invalide.');
   }
 
   if (this.chunks.length > this.chunkCount) {
-    return next(new Error('Le manifeste contient trop de morceaux.'));
+    throw new Error('Le manifeste contient trop de morceaux.');
   }
 
   const indexes = new Set();
@@ -100,7 +100,7 @@ fileAttachmentSchema.pre('validate', function validateFileConversation(next) {
       indexes.has(chunk.index) ||
       storedObjects.has(storedObject)
     ) {
-      return next(new Error('Morceau de fichier dupliqué.'));
+      throw new Error('Morceau de fichier dupliqué.');
     }
 
     indexes.add(chunk.index);
@@ -108,19 +108,18 @@ fileAttachmentSchema.pre('validate', function validateFileConversation(next) {
   }
 
   if (this.status === 'ready' && this.chunks.length !== this.chunkCount) {
-    return next(new Error('Le manifeste du fichier est incomplet.'));
+    throw new Error('Le manifeste du fichier est incomplet.');
   }
 
   const packageUsers = new Set();
   for (const item of this.keyPackages) {
     const userId = item.userId.toString();
     if (packageUsers.has(userId)) {
-      return next(new Error('Paquet de clé de fichier dupliqué.'));
+      throw new Error('Paquet de clé de fichier dupliqué.');
     }
     packageUsers.add(userId);
   }
 
-  next();
 });
 
 fileAttachmentSchema.index({ sender: 1, createdAt: -1 });
