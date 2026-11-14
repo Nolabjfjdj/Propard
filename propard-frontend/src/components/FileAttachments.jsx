@@ -213,12 +213,12 @@ export default function FileAttachments({ attachments, token, userId }) {
               />
             ) : null}
 
-            <div style={styles.fileRow}>\n              <span style={styles.label}>{file.name || 'Nom du fichier indisponible'}</span>\n            </div>\n\n            {(!isImage || !file.url) && (!isVideo || !file.url) && (
+            <div style={styles.fileRow}>
+              <span style={styles.label}>{file.name || 'Nom du fichier indisponible'}</span>
+            </div>
+
+            {(!isImage || !file.url) && (!isVideo || !file.url) && (
               <div style={styles.fileRow}>
-                <span style={styles.icon}>{isImage ? '🖼️' : isVideo ? '🎬' : '📎'}</span>
-                <span style={styles.label}>
-                  {isImage ? 'Image jointe' : isVideo ? 'Vidéo jointe' : 'Fichier joint'}
-                </span>
                 {file.loading ? (
                   <span style={styles.status}>Chargement...</span>
                 ) : null}
@@ -295,9 +295,6 @@ const styles = {
     gap: 8,
     minWidth: 0,
     flexWrap: 'wrap'
-  },
-  icon: {
-    flexShrink: 0
   },
   label: {
     flex: 1,
