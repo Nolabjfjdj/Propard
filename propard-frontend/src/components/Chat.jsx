@@ -3,6 +3,9 @@ import api from '../utils/api';
 import socket from '../socket';
 import VoiceCall from './VoiceCall';
 import MessageReactions from './MessageReactions';
+import FileAttachments from './FileAttachments';
+import FileUploadButton from './FileUploadButton';
+import { uploadConversationFile } from '../utils/fileUpload';
 import {
   deriveSharedKey,
   encryptMessage,
@@ -23,6 +26,8 @@ export default function Chat({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [input, setInput] = useState('');
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState('');
   const [contextMenu, setContextMenu] = useState(null);
@@ -638,6 +643,66 @@ export default function Chat({
       setLoadError(
         'Impossible de chiffrer le message.'
       );
+    }
+  };
+
+
+  const handleFilesSelected = async files => {
+    if (!sharedKey || !friendPublicKey) {
+      setLoadError('Chiffrement indisponible pour cette conversation.');
+      return;
+    }
+
+    const totalSize = files.reduce((total, file) => total + file.size, 0);
+    const maxBatchSize = 2 * 1024 * 1024 * 1024;
+
+    if (files.length > 10 || totalSize > maxBatchSize) {
+      setLoadError('La sélection est limitée à 10 fichiers et 2 Go au total.');
+      return;
+    }
+
+    setUploadingFiles(true);
+    setUploadProgress(0);
+
+    const uploadedIds = [];
+    let completedBytes = 0;
+
+    try {
+      for (const file of files) {
+        const fileId = await uploadConversationFile({
+          file,
+          scope: 'private',
+          recipientId: friend._id,
+          recipientPublicKey: friendPublicKey,
+          userId,
+          token,
+          onProgress: progress => {
+            setUploadProgress(Math.min(
+              99,
+              Math.round((completedBytes + file.size * progress / 100) / totalSize * 100)
+            ));
+          }
+        });
+
+        uploadedIds.push(fileId);
+        completedBytes += file.size;
+      }
+
+      const encryptedContent = await encryptMessage(sharedKey, input.trim());
+
+      socket.emit('sendMessage', {
+        receiverId: friend._id,
+        content: encryptedContent,
+        attachmentIds: uploadedIds
+      });
+
+      setInput('');
+    } catch (error) {
+      console.error('Erreur envoi fichiers:', error);
+      setLoadError(error.response?.data?.error || error.message || 'Impossible d’envoyer les fichiers.');
+    } finally {
+      setUploadingFiles(false);
+      setUploadProgress(0);
     }
   };
 
@@ -1379,14 +1444,21 @@ export default function Chat({
                         </div>
                       ) : (
                         <>
-                          <p
-                            style={{
-                              ...styles.text,
-                              color: isMe ? '#fff' : 'var(--text-primary)'
-                            }}
-                          >
-                            {content}
-                          </p>
+                          {content && (
+                            <p
+                              style={{
+                                ...styles.text,
+                                color: isMe ? '#fff' : 'var(--text-primary)'
+                              }}
+                            >
+                              {content}
+                            </p>
+                          )}
+                          <FileAttachments
+                            attachments={msg.attachments}
+                            token={token}
+                            userId={userId}
+                          />
 
                           <div
                             style={{
@@ -1535,8 +1607,15 @@ export default function Chat({
       })()}
 
        <div style={styles.inputBar}>
+        <FileUploadButton
+          onFilesSelected={handleFilesSelected}
+          disabled={!sharedKey}
+          uploading={uploadingFiles}
+          progress={uploadProgress}
+        />
         <input
           value={input}
+          disabled={uploadingFiles}
           onChange={e =>
             setInput(e.target.value)
           }
@@ -1553,6 +1632,7 @@ export default function Chat({
         <button
           onClick={sendMessage}
           style={styles.btn}
+          disabled={uploadingFiles}
         >
           ➤
         </button>
