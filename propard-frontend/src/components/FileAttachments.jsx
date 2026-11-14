@@ -11,6 +11,80 @@ function getAttachmentId(value) {
   return typeof id === 'string' ? id : id?.toString?.() || '';
 }
 
+function formatTime(value) {
+  if (!Number.isFinite(value) || value < 0) return '0:00';
+  const seconds = Math.floor(value);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function AudioPlayer({ src }) {
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const togglePlayback = async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (audio.paused) {
+      try {
+        await audio.play();
+        setPlaying(true);
+      } catch {
+        setPlaying(false);
+      }
+    } else {
+      audio.pause();
+      setPlaying(false);
+    }
+  };
+
+  const seek = value => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const nextTime = Number(value);
+    audio.currentTime = nextTime;
+    setCurrentTime(nextTime);
+  };
+
+  return (
+    <div style={styles.audioPlayer}>
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onLoadedMetadata={event => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}
+        onDurationChange={event => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}
+        onTimeUpdate={event => setCurrentTime(event.currentTarget.currentTime || 0)}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+      />
+      <button type="button" style={styles.audioPlayButton} onClick={togglePlayback} aria-label={playing ? 'Mettre en pause' : 'Lire le fichier audio'}>
+        {playing ? 'Ⅱ' : '▶'}
+      </button>
+      <div style={styles.audioTimeline}>
+        <input
+          type="range"
+          min="0"
+          max={duration || 0}
+          step="0.1"
+          value={Math.min(currentTime, duration || 0)}
+          onChange={event => seek(event.target.value)}
+          disabled={!duration}
+          aria-label="Position dans le fichier audio"
+          style={styles.audioProgress}
+        />
+        <div style={styles.audioTimes}>
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function FileAttachments({ attachments, token, userId }) {
   const [files, setFiles] = useState({});
   const objectUrlsRef = useRef([]);
@@ -25,14 +99,17 @@ export default function FileAttachments({ attachments, token, userId }) {
 
     try {
       const result = await downloadConversationFile(fileId, { userId, token });
-      const expectedType = category === 'image' ? 'image/' : 'video/';
       const filename = String(result.name || '').toLowerCase();
-      const isSvg = filename.endsWith('.svg') || result.type?.toLowerCase() === 'image/svg+xml';
+      const mimeType = String(result.type || '').toLowerCase();
+      const isSvg = filename.endsWith('.svg') || mimeType === 'image/svg+xml';
       const extensionMatches = category === 'image'
         ? /\.(jpg|jpeg|jpe|png|gif|webp|avif|bmp)$/.test(filename)
-        : /\.(mp4|m4v|webm|mov|ogv)$/.test(filename);
+        : category === 'video'
+          ? /\.(mp4|m4v|webm|mov|ogv)$/.test(filename)
+          : /\.(mp3|wav|ogg|oga|m4a|aac|flac|opus|weba)$/.test(filename);
+      const expectedType = category === 'image' ? 'image/' : category === 'video' ? 'video/' : 'audio/';
 
-      if (isSvg || (!result.type?.startsWith(expectedType) && !extensionMatches)) {
+      if (isSvg || (!mimeType.startsWith(expectedType) && !extensionMatches)) {
         throw new Error('Le type réel du fichier ne correspond pas à son aperçu.');
       }
 
@@ -102,7 +179,7 @@ export default function FileAttachments({ attachments, token, userId }) {
             }
           }));
 
-          if ((info.category === 'image' || info.category === 'video') && info.size <= MAX_AUTO_PREVIEW) {
+          if (['image', 'video', 'audio'].includes(info.category) && info.size <= MAX_AUTO_PREVIEW) {
             await loadPreview(fileId, info.category, generation);
           }
         } catch (err) {
@@ -175,7 +252,8 @@ export default function FileAttachments({ attachments, token, userId }) {
         const file = files[fileId] || {};
         const isImage = file.category === 'image';
         const isVideo = file.category === 'video';
-        const previewTooLarge = (isImage || isVideo) && file.size > MAX_AUTO_PREVIEW;
+        const isAudio = file.category === 'audio';
+        const previewTooLarge = (isImage || isVideo || isAudio) && file.size > MAX_AUTO_PREVIEW;
 
         return (
           <div key={fileId} style={styles.item}>
@@ -213,19 +291,23 @@ export default function FileAttachments({ attachments, token, userId }) {
               />
             ) : null}
 
-            <div style={styles.fileRow}>
-              <span style={styles.label}>{file.name || 'Nom du fichier indisponible'}</span>
-            </div>
+            {isAudio && file.url ? <AudioPlayer src={file.url} /> : null}
 
-            {(!isImage || !file.url) && (!isVideo || !file.url) && (
+            {!isAudio ? (
+              <div style={styles.fileRow}>
+                <span style={styles.label}>{file.name || 'Nom du fichier indisponible'}</span>
+              </div>
+            ) : null}
+
+            {(!isImage || !file.url) && (!isVideo || !file.url) && (!isAudio || !file.url) && (
               <div style={styles.fileRow}>
                 {file.loading ? (
                   <span style={styles.status}>Chargement...</span>
                 ) : null}
-                {(isImage || isVideo) && !file.url && !file.loading && !file.error && !previewTooLarge ? (
+                {(isImage || isVideo || isAudio) && !file.url && !file.loading && !file.error && !previewTooLarge ? (
                   <span style={styles.status}>Préparation de l’aperçu</span>
                 ) : null}
-                {(isImage || isVideo) && !file.url && !file.loading ? (
+                {(isImage || isVideo || isAudio) && !file.url && !file.loading ? (
                   <button
                     type="button"
                     style={styles.button}
@@ -248,7 +330,7 @@ export default function FileAttachments({ attachments, token, userId }) {
               </div>
             )}
 
-            {(isImage || isVideo) && file.url ? (
+            {(isImage || isVideo || isAudio) && file.url ? (
               <div style={styles.mediaActions}>
                 <button
                   type="button"
@@ -330,6 +412,53 @@ const styles = {
     maxHeight: 360,
     background: '#000',
     borderRadius: 7
+  },
+  audioPlayer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+    maxWidth: 360,
+    minWidth: 0,
+    padding: '8px 10px',
+    borderRadius: 10,
+    background: 'var(--bg-secondary)'
+  },
+  audioPlayButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 34,
+    height: 34,
+    flexShrink: 0,
+    border: 'none',
+    borderRadius: '50%',
+    background: '#2583ed',
+    color: '#fff',
+    fontSize: 15,
+    cursor: 'pointer'
+  },
+  audioTimeline: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    minWidth: 0,
+    gap: 2
+  },
+  audioProgress: {
+    display: 'block',
+    width: '100%',
+    height: 5,
+    margin: '7px 0',
+    accentColor: '#2583ed',
+    cursor: 'pointer'
+  },
+  audioTimes: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: 10,
+    color: 'var(--text-secondary)',
+    fontVariantNumeric: 'tabular-nums'
   },
   mediaActions: {
     display: 'flex',
