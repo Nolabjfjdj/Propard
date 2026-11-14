@@ -189,6 +189,11 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
     }).select('originalSize');
 
     const batchSize = batchFiles.reduce((total, item) => total + item.originalSize, 0);
+    const senderAccount = await User.findById(req.user.id).select('publicKey');
+
+    if (!senderAccount?.publicKey || typeof senderAccount.publicKey !== 'string' || senderAccount.publicKey.length > 2000) {
+      return res.status(400).json({ error: 'Clé publique E2EE de l’émetteur indisponible.' });
+    }
 
     if (
       batchFiles.length >= 10 ||
@@ -288,6 +293,7 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
       group: group?._id || null,
       groupKeyVersion: scope === 'group' ? currentKeyVersion : null,
       storageId,
+      senderPublicKey: senderAccount.publicKey,
       batchId,
       encryptedMetadata,
       cryptoVersion: 1,
@@ -582,6 +588,7 @@ router.get('/:fileId', signedUrlRateLimit, async (req, res) => {
         keyVersion: keyPackage.keyVersion
       },
       senderId: file.sender.toString(),
+      senderPublicKey: file.senderPublicKey,
       chunks
     });
   } catch (error) {
