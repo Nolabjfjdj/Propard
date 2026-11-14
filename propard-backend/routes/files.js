@@ -644,6 +644,7 @@ router.get('/:fileId', signedUrlRateLimit, async (req, res) => {
 
     res.json({
       fileId: file._id.toString(),
+      category: file.category,
       encryptedMetadata: file.encryptedMetadata,
       originalSize: file.originalSize,
       chunkSize: file.chunkSize,
