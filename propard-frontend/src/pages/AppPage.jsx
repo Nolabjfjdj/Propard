@@ -89,6 +89,7 @@ export default function AppPage({
   const restoreCaptchaWidgetRef = useRef(null);
 
   const grabRef = useRef(null);
+  const sidebarRef = useRef(null);
 
   const [grabVisual, setGrabVisual] = useState(null);
 
@@ -578,6 +579,13 @@ export default function AppPage({
       g.pointerId != null &&
       e.pointerId !== g.pointerId
     ) {
+      if (e.pointerId === g.scrollPointerId) {
+        const deltaY = g.scrollLastY - e.clientY;
+        g.scrollLastY = e.clientY;
+        if (sidebarRef.current && deltaY !== 0) {
+          sidebarRef.current.scrollTop += deltaY;
+        }
+      }
       return;
     }
 
@@ -759,6 +767,10 @@ export default function AppPage({
       e &&
       e.pointerId !== g.pointerId
     ) {
+      if (e.pointerId === g.scrollPointerId) {
+        g.scrollPointerId = null;
+        g.scrollLastY = null;
+      }
       return;
     }
 
@@ -766,6 +778,14 @@ export default function AppPage({
       'pointermove',
       g.moveHandler
     );
+
+    if (g.secondPointerDownHandler) {
+      window.removeEventListener(
+        'pointerdown',
+        g.secondPointerDownHandler,
+        true
+      );
+    }
 
     window.removeEventListener(
       'pointerup',
@@ -858,6 +878,14 @@ export default function AppPage({
     const moveHandler = e =>
       handleGrabMoveImpl(e);
 
+    const secondPointerDownHandler = e => {
+      const g = grabRef.current;
+      if (!g || e.pointerType !== 'touch') return;
+      if (g.pointerId != null && e.pointerId === g.pointerId) return;
+      g.scrollPointerId = e.pointerId;
+      g.scrollLastY = e.clientY;
+    };
+
     const endHandler = e =>
       handleGrabEndImpl(e);
 
@@ -870,6 +898,8 @@ export default function AppPage({
         pointerId != null
           ? pointerId
           : null,
+      scrollPointerId: null,
+      scrollLastY: null,
       raw: {
         x: clientX,
         y: clientY
@@ -888,6 +918,7 @@ export default function AppPage({
       forcedSidebarOpen:
         wasSidebarHidden,
       moveHandler,
+      secondPointerDownHandler,
       endHandler,
       rafId: null
     };
@@ -910,6 +941,12 @@ export default function AppPage({
       {
         passive: false
       }
+    );
+
+    window.addEventListener(
+      'pointerdown',
+      secondPointerDownHandler,
+      true
     );
 
     window.addEventListener(
@@ -998,6 +1035,7 @@ export default function AppPage({
         )}
 
       <div
+        ref={sidebarRef}
         style={{
           ...styles.sidebar,
           position: isMobile
