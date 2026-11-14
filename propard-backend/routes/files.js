@@ -105,12 +105,19 @@ async function getAuthorizedFile(file, userId) {
     const recipientHasSender = (recipient.friends || []).some(
       item => item.userId?.toString() === senderId
     );
-    const blocked = [
-      ...(sender.blockedUsers || []),
-      ...(recipient.blockedUsers || [])
-    ].some(id => id.toString() === currentUserId);
+    const senderBlockedRecipient = (sender.blockedUsers || []).some(
+      id => id.toString() === recipientId
+    );
+    const recipientBlockedSender = (recipient.blockedUsers || []).some(
+      id => id.toString() === senderId
+    );
 
-    if (!senderHasRecipient || !recipientHasSender || blocked) return null;
+    if (
+      !senderHasRecipient ||
+      !recipientHasSender ||
+      senderBlockedRecipient ||
+      recipientBlockedSender
+    ) return null;
     return file.keyPackages.find(item => item.userId.toString() === currentUserId) || null;
   }
 
@@ -120,7 +127,7 @@ async function getAuthorizedFile(file, userId) {
       'members.userId': userId
     }).select('members keyVersion');
 
-    if (!group || group.keyVersion !== file.groupKeyVersion) return null;
+    if (!group) return null;
 
     return file.keyPackages.find(item => item.userId.toString() === currentUserId) || null;
   }
@@ -201,12 +208,19 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
       const recipientHasSender = (recipientUser.friends || []).some(
         item => item.userId?.toString() === req.user.id.toString()
       );
-      const blocked = [
-        ...(senderUser.blockedUsers || []),
-        ...(recipientUser.blockedUsers || [])
-      ].some(id => id.toString() === req.user.id.toString() || id.toString() === recipientId.toString());
+      const senderBlockedRecipient = (senderUser.blockedUsers || []).some(
+        id => id.toString() === recipientId.toString()
+      );
+      const recipientBlockedSender = (recipientUser.blockedUsers || []).some(
+        id => id.toString() === req.user.id.toString()
+      );
 
-      if (!senderHasRecipient || !recipientHasSender || blocked) {
+      if (
+        !senderHasRecipient ||
+        !recipientHasSender ||
+        senderBlockedRecipient ||
+        recipientBlockedSender
+      ) {
         return res.status(403).json({ error: 'Cette conversation ne permet pas l’envoi de fichiers.' });
       }
 
@@ -265,7 +279,8 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
         encryptedKey: item.encryptedKey,
         keyVersion: item.keyVersion
       })),
-      status: 'uploading'
+      status: 'uploading',
+      uploadExpiresAt: new Date(Date.now() + 60 * 60 * 1000)
     });
 
     res.status(201).json({
@@ -296,7 +311,8 @@ router.post(
       const file = await FileAttachment.findOne({
         _id: fileId,
         sender: req.user.id,
-        status: 'uploading'
+        status: 'uploading',
+        uploadExpiresAt: { $gt: new Date() }
       });
 
       if (!file || chunkIndex < 0 || chunkIndex >= file.chunkCount) {
@@ -402,7 +418,8 @@ router.post('/uploads/:fileId/finalize', signedUrlRateLimit, async (req, res) =>
     const file = await FileAttachment.findOne({
       _id: fileId,
       sender: req.user.id,
-      status: 'uploading'
+      status: 'uploading',
+      uploadExpiresAt: { $gt: new Date() }
     });
 
     if (!file) {
