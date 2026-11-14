@@ -34,6 +34,7 @@ const fileAttachmentSchema = new mongoose.Schema({
     index: true
   },
   groupKeyVersion: { type: Number, default: null, min: 1 },
+  storageId: { type: Number, required: true, min: 1, max: 100, default: 1 },
   encryptedMetadata: { type: String, required: true, maxlength: 20000 },
   cryptoVersion: { type: Number, enum: [1], default: 1, required: true },
   originalSize: { type: Number, required: true, min: 1 },
