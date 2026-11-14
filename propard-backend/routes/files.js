@@ -121,7 +121,11 @@ async function getAuthorizedFile(file, userId) {
       senderBlockedRecipient ||
       recipientBlockedSender
     ) return null;
-    return file.keyPackages.find(item => item.userId.toString() === currentUserId) || null;
+    const keyPackage = file.keyPackages.find(
+      item => item.userId.toString() === currentUserId
+    );
+
+    return keyPackage?.keyVersion === 1 ? keyPackage : null;
   }
 
   if (file.scope === 'group') {
@@ -144,7 +148,11 @@ async function getAuthorizedFile(file, userId) {
       return null;
     }
 
-    return file.keyPackages.find(item => item.userId.toString() === currentUserId) || null;
+    const keyPackage = file.keyPackages.find(
+      item => item.userId.toString() === currentUserId
+    );
+
+    return keyPackage?.keyVersion === file.groupKeyVersion ? keyPackage : null;
   }
 
   return null;
