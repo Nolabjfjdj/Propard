@@ -170,7 +170,7 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
       !['private', 'group'].includes(scope) ||
       !['image', 'video', 'document'].includes(category) ||
       typeof batchId !== 'string' ||
-      !/^[a-f0-9-]{36}$/i.test(batchId) ||
+      !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(batchId) ||
       !Number.isSafeInteger(originalSize) ||
       originalSize < 1 ||
       originalSize > MAX_FILE_SIZE ||
