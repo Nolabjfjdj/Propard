@@ -236,6 +236,7 @@ const Message=require('./models/Message');
 const User=require('./models/User');
 const Group=require('./models/Group');
 const GroupMessage=require('./models/GroupMessage');
+const FileAttachment=require('./models/FileAttachment');
 const {sendPushNotification}=require('./services/push');
 
 async function areFriends(userId,friendId){
@@ -474,7 +475,7 @@ io.on('connection',async socket=>{
     );
   });
 
-  registerSocketHandler('sendMessage',async({receiverId,content}={})=>{
+  registerSocketHandler('sendMessage',async({receiverId,content,attachmentIds=[]}={})=>{
     try{
       if(!socket.userId) return;
       if(!allowSocketEvent(socket,'sendMessage',20,10000)){
@@ -506,10 +507,34 @@ io.on('connection',async socket=>{
         );
       }
 
+      if(
+        !Array.isArray(attachmentIds) ||
+        attachmentIds.length > 10 ||
+        attachmentIds.some(id=>!mongoose.isValidObjectId(id)) ||
+        new Set(attachmentIds.map(id=>id.toString())).size !== attachmentIds.length
+      ){
+        return socket.emit('messageError',{message:'Pièces jointes invalides.'});
+      }
+
+      if(attachmentIds.length){
+        const readyAttachments=await FileAttachment.find({
+          _id:{$in:attachmentIds},
+          sender:socket.userId,
+          recipient:receiverId,
+          scope:'private',
+          status:'ready'
+        }).select('_id');
+
+        if(readyAttachments.length!==attachmentIds.length){
+          return socket.emit('messageError',{message:'Une pièce jointe est indisponible ou non autorisée.'});
+        }
+      }
+
       const message=await Message.create({
         sender:socket.userId,
         receiver:receiverId,
         content:content.trim(),
+        attachments:attachmentIds,
         originalContent:null,
         encrypted:true
       });
@@ -524,6 +549,7 @@ io.on('connection',async socket=>{
         senderInfo:sender,
         receiver:receiverId,
         content:message.content,
+        attachments:message.attachments.map(id=>id.toString()),
         encrypted:true,
         createdAt:message.createdAt
       };
@@ -578,7 +604,7 @@ io.on('connection',async socket=>{
   // MESSAGES DE GROUPE
   // ─────────────────────────────────────
 
-  registerSocketHandler('sendGroupMessage',async({groupId,content,keyVersion}={})=>{
+  registerSocketHandler('sendGroupMessage',async({groupId,content,keyVersion,attachmentIds=[]}={})=>{
     try{
       if(!socket.userId) return;
       if(!allowSocketEvent(socket,'sendGroupMessage',20,10000)){
@@ -624,10 +650,35 @@ io.on('connection',async socket=>{
         return socket.emit('groupMessageError',{message:'La clé du groupe a changé. Recharge le groupe avant d’envoyer un message.'});
       }
 
+      if(
+        !Array.isArray(attachmentIds) ||
+        attachmentIds.length > 10 ||
+        attachmentIds.some(id=>!mongoose.isValidObjectId(id)) ||
+        new Set(attachmentIds.map(id=>id.toString())).size !== attachmentIds.length
+      ){
+        return socket.emit('groupMessageError',{message:'Pièces jointes invalides.'});
+      }
+
+      if(attachmentIds.length){
+        const readyAttachments=await FileAttachment.find({
+          _id:{$in:attachmentIds},
+          sender:socket.userId,
+          group:groupId,
+          scope:'group',
+          groupKeyVersion:currentKeyVersion,
+          status:'ready'
+        }).select('_id');
+
+        if(readyAttachments.length!==attachmentIds.length){
+          return socket.emit('groupMessageError',{message:'Une pièce jointe est indisponible ou non autorisée.'});
+        }
+      }
+
       const message=await GroupMessage.create({
         group:groupId,
         sender:socket.userId,
         content:content.trim(),
+        attachments:attachmentIds,
         encrypted:true,
         keyVersion:currentKeyVersion
       });
@@ -644,6 +695,7 @@ io.on('connection',async socket=>{
         sender:socket.userId,
         senderInfo:sender,
         content:message.content,
+        attachments:message.attachments.map(id=>id.toString()),
         encrypted:true,
         keyVersion:message.keyVersion,
         createdAt:message.createdAt
