@@ -643,7 +643,8 @@ router.post('/uploads/:fileId/finalize', signedUrlRateLimit, async (req, res) =>
               }
             }
           }
-        ]
+        ],
+        { updatePipeline: true }
       );
     } catch (quotaError) {
       await FileAttachment.updateOne(
@@ -695,7 +696,8 @@ router.post('/uploads/:fileId/finalize', signedUrlRateLimit, async (req, res) =>
               }
             }
           }
-        ]
+        ],
+        { updatePipeline: true }
       );
     } else {
       await User.updateOne(
