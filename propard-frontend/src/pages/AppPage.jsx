@@ -581,8 +581,6 @@ export default function AppPage({
       return;
     }
 
-    e.preventDefault();
-
     g.raw = {
       x: e.clientX,
       y: e.clientY
