@@ -7,18 +7,28 @@ const {
 } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
-let client = null;
-let clientFingerprint = null;
+const clients = new Map();
+const MAX_STORAGE_CONFIGS = 100;
 
-function getFilebaseConfig() {
-  const accessKeyId = process.env.FILEBASE_KEY;
-  const secretAccessKey = process.env.FILEBASE_SECRET;
-  const bucket = process.env.FILEBASE_BUCKET;
+function validateStorageId(storageId) {
+  if (!Number.isSafeInteger(storageId) || storageId < 1 || storageId > MAX_STORAGE_CONFIGS) {
+    throw new Error('Identifiant de stockage Filebase invalide.');
+  }
+
+  return storageId;
+}
+
+function getFilebaseConfig(storageId = 1) {
+  const id = validateStorageId(storageId);
+  const suffix = id === 1 ? '' : String(id);
+  const accessKeyId = process.env[`FILEBASE_KEY${suffix}`];
+  const secretAccessKey = process.env[`FILEBASE_SECRET${suffix}`];
+  const bucket = process.env[`FILEBASE_BUCKET${suffix}`];
   const endpoint = process.env.FILEBASE_ENDPOINT || 'https://s3.filebase.io';
   const region = process.env.FILEBASE_REGION || 'auto';
 
   if (!accessKeyId || !secretAccessKey || !bucket) {
-    throw new Error('Configuration Filebase incomplète.');
+    throw new Error(`Configuration Filebase ${id} incomplète.`);
   }
 
   let parsedEndpoint;
@@ -41,18 +51,18 @@ function getFilebaseConfig() {
   }
 
   if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket)) {
-    throw new Error('Nom de bucket Filebase invalide.');
+    throw new Error(`Nom de bucket Filebase ${id} invalide.`);
   }
 
   if (typeof region !== 'string' || !/^[a-z0-9-]{2,32}$/.test(region)) {
     throw new Error('Région Filebase invalide.');
   }
 
-  return { accessKeyId, secretAccessKey, bucket, endpoint, region };
+  return { id, accessKeyId, secretAccessKey, bucket, endpoint, region };
 }
 
-function getFilebaseClient() {
-  const config = getFilebaseConfig();
+function getFilebaseClient(storageId = 1) {
+  const config = getFilebaseConfig(storageId);
   const fingerprint = [
     config.accessKeyId,
     config.secretAccessKey,
@@ -60,9 +70,9 @@ function getFilebaseClient() {
     config.region
   ].join('\u0000');
 
-  if (!client || clientFingerprint !== fingerprint) {
-    if (client) client.destroy();
+  let client = clients.get(fingerprint);
 
+  if (!client) {
     client = new S3Client({
       endpoint: config.endpoint,
       region: config.region,
@@ -73,10 +83,33 @@ function getFilebaseClient() {
       maxAttempts: 2
     });
 
-    clientFingerprint = fingerprint;
+    clients.set(fingerprint, client);
   }
 
-  return { client, bucket: config.bucket };
+  return { client, bucket: config.bucket, storageId: config.id };
+}
+
+function getConfiguredFilebaseStorageIds() {
+  const ids = [];
+
+  for (let id = 1; id <= MAX_STORAGE_CONFIGS; id += 1) {
+    const suffix = id === 1 ? '' : String(id);
+    const accessKeyId = process.env[`FILEBASE_KEY${suffix}`];
+    const secretAccessKey = process.env[`FILEBASE_SECRET${suffix}`];
+    const bucket = process.env[`FILEBASE_BUCKET${suffix}`];
+    const hasAnyValue = Boolean(accessKeyId || secretAccessKey || bucket);
+
+    if (!hasAnyValue) continue;
+
+    if (!accessKeyId || !secretAccessKey || !bucket) {
+      throw new Error(`Configuration Filebase ${id} incomplète.`);
+    }
+
+    getFilebaseConfig(id);
+    ids.push(id);
+  }
+
+  return ids;
 }
 
 function validateObjectKey(objectKey) {
@@ -95,13 +128,13 @@ function validateObjectKey(objectKey) {
   return objectKey;
 }
 
-async function createPresignedUploadUrl(objectKey, expiresIn = 300) {
+async function createPresignedUploadUrl(objectKey, expiresIn = 300, storageId = 1) {
   const key = validateObjectKey(objectKey);
   if (!Number.isInteger(expiresIn) || expiresIn < 60 || expiresIn > 600) {
     throw new Error('Durée de signature invalide.');
   }
 
-  const { client: s3, bucket } = getFilebaseClient();
+  const { client: s3, bucket } = getFilebaseClient(storageId);
   const command = new PutObjectCommand({
     Bucket: bucket,
     Key: key,
@@ -111,13 +144,13 @@ async function createPresignedUploadUrl(objectKey, expiresIn = 300) {
   return getSignedUrl(s3, command, { expiresIn });
 }
 
-async function createPresignedDownloadUrl(objectKey, expiresIn = 300) {
+async function createPresignedDownloadUrl(objectKey, expiresIn = 300, storageId = 1) {
   const key = validateObjectKey(objectKey);
   if (!Number.isInteger(expiresIn) || expiresIn < 60 || expiresIn > 600) {
     throw new Error('Durée de signature invalide.');
   }
 
-  const { client: s3, bucket } = getFilebaseClient();
+  const { client: s3, bucket } = getFilebaseClient(storageId);
   const command = new GetObjectCommand({
     Bucket: bucket,
     Key: key
@@ -126,9 +159,9 @@ async function createPresignedDownloadUrl(objectKey, expiresIn = 300) {
   return getSignedUrl(s3, command, { expiresIn });
 }
 
-async function headStoredObject(objectKey) {
+async function headStoredObject(objectKey, storageId = 1) {
   const key = validateObjectKey(objectKey);
-  const { client: s3, bucket } = getFilebaseClient();
+  const { client: s3, bucket } = getFilebaseClient(storageId);
   const result = await s3.send(new HeadObjectCommand({
     Bucket: bucket,
     Key: key
@@ -142,9 +175,9 @@ async function headStoredObject(objectKey) {
   };
 }
 
-async function deleteStoredObject(objectKey) {
+async function deleteStoredObject(objectKey, storageId = 1) {
   const key = validateObjectKey(objectKey);
-  const { client: s3, bucket } = getFilebaseClient();
+  const { client: s3, bucket } = getFilebaseClient(storageId);
   await s3.send(new DeleteObjectCommand({
     Bucket: bucket,
     Key: key
@@ -152,6 +185,7 @@ async function deleteStoredObject(objectKey) {
 }
 
 module.exports = {
+  getConfiguredFilebaseStorageIds,
   createPresignedUploadUrl,
   createPresignedDownloadUrl,
   headStoredObject,
