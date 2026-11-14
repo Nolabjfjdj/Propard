@@ -4,7 +4,6 @@ const { registerModel } = require('../db/shards');
 const chunkSchema = new mongoose.Schema({
   index: { type: Number, required: true, min: 0 },
   storageId: { type: Number, required: true, min: 1, max: 100, default: 1 },
-  senderPublicKey: { type: String, required: true, maxlength: 2000 },
   objectKey: { type: String, required: true, maxlength: 1024 },
   encryptedSize: { type: Number, required: true, min: 17 },
   iv: { type: String, required: true, match: /^[A-Za-z0-9+/]{16}$/ },
@@ -36,6 +35,7 @@ const fileAttachmentSchema = new mongoose.Schema({
   },
   groupKeyVersion: { type: Number, default: null, min: 1 },
   storageId: { type: Number, required: true, min: 1, max: 100, default: 1 },
+  senderPublicKey: { type: String, required: true, maxlength: 2000 },
   batchId: { type: String, required: true, minlength: 36, maxlength: 36, match: /^[a-f0-9-]{36}$/i, index: true },
   encryptedMetadata: { type: String, required: true, maxlength: 20000 },
   cryptoVersion: { type: Number, enum: [1], default: 1, required: true },
