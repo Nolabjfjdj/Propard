@@ -362,6 +362,10 @@ router.post(
         return res.status(404).json({ error: 'Envoi introuvable ou expiré.' });
       }
 
+      if (!(await getAuthorizedFile(file, req.user.id))) {
+        return res.status(403).json({ error: 'Tu n’es plus autorisé à envoyer ce fichier dans cette conversation.' });
+      }
+
       const { iv, sha256, encryptedSize } = req.body || {};
       const expectedPlainSize = Math.min(
         file.chunkSize,
@@ -467,6 +471,10 @@ router.post('/uploads/:fileId/finalize', signedUrlRateLimit, async (req, res) =>
 
     if (!file) {
       return res.status(404).json({ error: 'Envoi introuvable ou déjà finalisé.' });
+    }
+
+    if (!(await getAuthorizedFile(file, req.user.id))) {
+      return res.status(403).json({ error: 'Tu n’es plus autorisé à finaliser ce fichier.' });
     }
 
     if (file.chunks.length !== file.chunkCount) {
