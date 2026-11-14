@@ -7,6 +7,7 @@ const authMiddleware = require('../middleware/auth');
 const { isEncryptedMessagePayload } = require('../utils/inputValidation');
 const { parseMessagePagination } = require('../utils/messagePagination');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { deleteMessageAttachments } = require('../services/fileCleanup');
 
 router.use(authMiddleware);
 
@@ -577,6 +578,8 @@ router.delete('/messages/:messageId', createRateLimiter({
     await Message.deleteOne({
       _id: message._id
     });
+
+    await deleteMessageAttachments(message.attachments || [], req.user.id);
 
     const io = req.app.get('io');
     const emitToUser = req.app.get('emitToUser');
