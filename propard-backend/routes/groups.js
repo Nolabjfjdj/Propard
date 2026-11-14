@@ -1651,12 +1651,12 @@ router.delete(
         });
       }
 
-      await deleteFilesForGroup(group._id);
-
       await GroupMessage.deleteMany({
         group:
           group._id
       });
+
+      await deleteFilesForGroup(group._id);
 
       const memberIds =
         group.members.map(
