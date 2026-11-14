@@ -112,6 +112,18 @@ function getConfiguredFilebaseStorageIds() {
   return ids;
 }
 
+let nextStorageIndex = 0;
+
+function selectFilebaseStorageId() {
+  const ids = getConfiguredFilebaseStorageIds();
+  if (ids.length === 0) {
+    throw new Error('Aucun stockage Filebase configuré.');
+  }
+  const storageId = ids[nextStorageIndex % ids.length];
+  nextStorageIndex = (nextStorageIndex + 1) % ids.length;
+  return storageId;
+}
+
 function validateObjectKey(objectKey) {
   if (
     typeof objectKey !== 'string' ||
@@ -186,6 +198,7 @@ async function deleteStoredObject(objectKey, storageId = 1) {
 
 module.exports = {
   getConfiguredFilebaseStorageIds,
+  selectFilebaseStorageId,
   createPresignedUploadUrl,
   createPresignedDownloadUrl,
   headStoredObject,
