@@ -12,7 +12,8 @@ const {
   selectFilebaseStorageId,
   createPresignedUploadUrl,
   createPresignedDownloadUrl,
-  headStoredObject
+  headStoredObject,
+  deleteStoredObject
 } = require('../services/filebase');
 
 const CHUNK_SIZE = 8 * 1024 * 1024;
@@ -534,6 +535,55 @@ router.get('/:fileId', signedUrlRateLimit, async (req, res) => {
   } catch (error) {
     console.error('File download manifest error:', error);
     res.status(500).json({ error: 'Impossible de préparer le téléchargement.' });
+  }
+});
+
+
+router.delete('/:fileId', signedUrlRateLimit, async (req, res) => {
+  try {
+    const { fileId } = req.params;
+
+    if (!mongoose.isValidObjectId(fileId)) {
+      return res.status(400).json({ error: 'Identifiant de fichier invalide.' });
+    }
+
+    const file = await FileAttachment.findOneAndUpdate(
+      {
+        _id: fileId,
+        sender: req.user.id,
+        status: { $in: ['uploading', 'ready', 'failed'] }
+      },
+      {
+        $set: {
+          status: 'deleted',
+          deletedAt: new Date()
+        }
+      },
+      { new: true }
+    );
+
+    if (!file) {
+      return res.status(404).json({ error: 'Fichier introuvable ou déjà supprimé.' });
+    }
+
+    let cleanupPending = false;
+
+    for (const chunk of file.chunks) {
+      try {
+        await deleteStoredObject(chunk.objectKey, chunk.storageId);
+      } catch (error) {
+        cleanupPending = true;
+        console.error('File object cleanup error:', error);
+      }
+    }
+
+    res.json({
+      deleted: true,
+      cleanupPending
+    });
+  } catch (error) {
+    console.error('File deletion error:', error);
+    res.status(500).json({ error: 'Impossible de supprimer le fichier.' });
   }
 });
 
