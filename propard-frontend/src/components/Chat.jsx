@@ -1114,8 +1114,6 @@ export default function Chat({
   const handleBubblePointerDown = (e, msg) => {
     if (msg.deleted || msg.decryptionError) return;
 
-    e.preventDefault();
-
     const now = Date.now();
     const wasDoubleTap =
       lastTapRef.current.id === msg._id &&
