@@ -80,7 +80,8 @@ app.use((req,res,next)=>{
     "script-src-elem 'self' https://challenges.cloudflare.com; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "font-src 'self' https://fonts.gstatic.com data:; " +
-    "img-src 'self' data:; " +
+    "img-src 'self' data: blob:; " +
+    "media-src 'self' blob:; " +
     "connect-src 'self' https: wss: turn: turns: stun: https://challenges.cloudflare.com; " +
     "frame-src 'self' https://challenges.cloudflare.com; " +
     "frame-ancestors 'none'; " +
