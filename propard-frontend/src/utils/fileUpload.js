@@ -7,6 +7,7 @@ import {
   wrapFileKeyForUser,
   unwrapFileKeyForUser,
   storeFileKeyLocally,
+  getStoredFileKey,
   encryptFileMetadata,
   decryptFileMetadata
 } from './fileCrypto';
@@ -267,11 +268,16 @@ export async function downloadConversationFile(fileId, { userId, token }) {
 
   const senderPublicKey = parsePublicKey(manifest.senderPublicKey);
 
-  const fileKey = await unwrapFileKeyForUser(
-    manifest.keyPackage?.encryptedKey,
-    privateKeyJwk,
-    senderPublicKey
-  );
+  let fileKey = await getStoredFileKey(fileId);
+
+  if (!fileKey) {
+    fileKey = await unwrapFileKeyForUser(
+      manifest.keyPackage?.encryptedKey,
+      privateKeyJwk,
+      senderPublicKey
+    );
+    await storeFileKeyLocally(fileId, fileKey);
+  }
 
   const metadata = await decryptFileMetadata(
     fileKey,
