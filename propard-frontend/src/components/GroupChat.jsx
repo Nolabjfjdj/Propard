@@ -2730,6 +2730,13 @@ export default function GroupChat({
                                 ✕
                               </button>
                             </div>
+                            {!message.deleted && (
+                              <FileAttachments
+                                attachments={message.attachments}
+                                token={token}
+                                userId={myId}
+                              />
+                            )}
                           </div>
                         ) : (
                           <>
