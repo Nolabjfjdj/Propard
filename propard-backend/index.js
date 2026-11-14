@@ -525,15 +525,34 @@ io.on('connection',async socket=>{
       }
 
       if(attachmentIds.length){
-        const readyAttachments=await FileAttachment.find({
-          _id:{$in:attachmentIds},
-          sender:socket.userId,
-          recipient:receiverId,
-          scope:'private',
-          status:'ready'
-        }).select('_id');
+        const [readyAttachments, recipientAccount, senderAccount]=await Promise.all([
+          FileAttachment.find({
+            _id:{$in:attachmentIds},
+            sender:socket.userId,
+            recipient:receiverId,
+            scope:'private',
+            status:'ready'
+          }).select('_id'),
+          User.findById(receiverId).select('friends blockedUsers'),
+          User.findById(socket.userId).select('blockedUsers')
+        ]);
 
-        if(readyAttachments.length!==attachmentIds.length){
+        const recipientStillAllowsSender=(recipientAccount?.friends || []).some(
+          item=>item.userId?.toString()===socket.userId.toString()
+        );
+        const senderBlockedRecipient=(senderAccount?.blockedUsers || []).some(
+          id=>id.toString()===receiverId.toString()
+        );
+        const recipientBlockedSender=(recipientAccount?.blockedUsers || []).some(
+          id=>id.toString()===socket.userId.toString()
+        );
+
+        if(
+          readyAttachments.length!==attachmentIds.length ||
+          !recipientStillAllowsSender ||
+          senderBlockedRecipient ||
+          recipientBlockedSender
+        ){
           return socket.emit('messageError',{message:'Une pièce jointe est indisponible ou non autorisée.'});
         }
       }
