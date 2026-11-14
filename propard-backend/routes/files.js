@@ -163,6 +163,7 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
       chunkCount,
       encryptedMetadata,
       keyPackages,
+      senderPublicKey: claimedSenderPublicKey,
       batchId
     } = req.body || {};
 
@@ -219,9 +220,29 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
       senderPublicKey.crv !== 'P-256' ||
       typeof senderPublicKey.x !== 'string' ||
       typeof senderPublicKey.y !== 'string' ||
-      senderAccount.publicKey.length > 2000
+      senderAccount.publicKey.length > 2000 ||
+      !claimedSenderPublicKey ||
+      typeof claimedSenderPublicKey !== 'string' ||
+      claimedSenderPublicKey.length > 2000
     ) {
       return res.status(400).json({ error: 'Clé publique E2EE de l’émetteur indisponible.' });
+    }
+
+    let claimedPublicKey;
+    try {
+      claimedPublicKey = JSON.parse(claimedSenderPublicKey);
+    } catch {
+      claimedPublicKey = null;
+    }
+
+    if (
+      !claimedPublicKey ||
+      claimedPublicKey.kty !== 'EC' ||
+      claimedPublicKey.crv !== 'P-256' ||
+      claimedPublicKey.x !== senderPublicKey.x ||
+      claimedPublicKey.y !== senderPublicKey.y
+    ) {
+      return res.status(409).json({ error: 'Ta clé privée E2EE ne correspond plus à la clé publique du compte.' });
     }
 
     if (
