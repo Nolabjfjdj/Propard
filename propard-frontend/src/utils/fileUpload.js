@@ -54,7 +54,7 @@ function getMemberPublicKey(member) {
 }
 
 function getFileMimeType(type, name) {
-  if (typeof type === 'string' && /^(image|video|audio)\\//i.test(type)) {
+  if (typeof type === 'string' && ['image/', 'video/', 'audio/'].some(prefix => type.toLowerCase().startsWith(prefix))) {
     return type.toLowerCase();
   }
 
