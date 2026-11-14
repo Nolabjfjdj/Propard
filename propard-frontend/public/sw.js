@@ -215,13 +215,19 @@ self.addEventListener('push', event => {
         return true;
       }
 
-      if (type === 'private-message' && senderId) {
+      if (
+        (type === 'private-message' || type === 'message-reaction') &&
+        senderId
+      ) {
         return parts.length === 2 &&
           parts[0] === 'chat' &&
           parts[1] === senderId;
       }
 
-      if (type === 'group-message' && groupId) {
+      if (
+        (type === 'group-message' || type === 'group-message-reaction') &&
+        groupId
+      ) {
         return parts.length === 2 &&
           parts[0] === 'group' &&
           parts[1] === groupId;
@@ -261,7 +267,7 @@ self.addEventListener('notificationclick', event => {
 
     if (
       (!targetPath || targetPath === '/') &&
-      notificationData.type === 'private-message' &&
+      ['private-message', 'message-reaction'].includes(notificationData.type) &&
       notificationData.senderId
     ) {
       targetPath =
@@ -270,7 +276,7 @@ self.addEventListener('notificationclick', event => {
 
     if (
       (!targetPath || targetPath === '/') &&
-      notificationData.type === 'group-message' &&
+      ['group-message', 'group-message-reaction'].includes(notificationData.type) &&
       notificationData.groupId
     ) {
       targetPath =
