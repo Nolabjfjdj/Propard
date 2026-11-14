@@ -310,7 +310,11 @@ export async function downloadConversationFile(fileId, { userId, token }) {
         throw new Error('Ordre des morceaux invalide.');
       }
 
-      const downloadResponse = await fetch(chunk.downloadUrl);
+      const signed = await api.get(
+        `/api/files/${fileId}/chunks/${position}/url`,
+        authConfig(token)
+      );
+      const downloadResponse = await fetch(signed.data.downloadUrl);
       if (!downloadResponse.ok) {
         throw new Error(`Impossible de télécharger le morceau ${position + 1}.`);
       }
