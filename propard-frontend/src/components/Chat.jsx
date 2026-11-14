@@ -27,6 +27,7 @@ export default function Chat({
   const [loadError, setLoadError] = useState(null);
   const [input, setInput] = useState('');
   const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [awaitingAttachmentAck, setAwaitingAttachmentAck] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const pendingAttachmentIdsRef = useRef([]);
   const [editingId, setEditingId] = useState(null);
@@ -398,6 +399,7 @@ export default function Chat({
 
       if (senderId === myId && Array.isArray(msg.attachments) && msg.attachments.length) {
         pendingAttachmentIdsRef.current = [];
+        setAwaitingAttachmentAck(false);
       }
 
       let decryptedMessage = msg.encrypted === false
@@ -549,6 +551,7 @@ export default function Chat({
       setLoadError(data?.message || 'Impossible d’envoyer le message.');
       const pendingIds = pendingAttachmentIdsRef.current;
       pendingAttachmentIdsRef.current = [];
+      setAwaitingAttachmentAck(false);
       Promise.all(pendingIds.map(id =>
         api.delete(`/api/files/${id}`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -713,6 +716,7 @@ export default function Chat({
       const encryptedContent = await encryptMessage(sharedKey, input.trim());
 
       pendingAttachmentIdsRef.current = uploadedIds;
+      setAwaitingAttachmentAck(true);
       socket.emit('sendMessage', {
         receiverId: friend._id,
         content: encryptedContent,
@@ -1666,7 +1670,7 @@ export default function Chat({
        <div style={styles.inputBar}>
         <FileUploadButton
           onFilesSelected={handleFilesSelected}
-          disabled={!sharedKey}
+          disabled={!sharedKey || awaitingAttachmentAck}
           uploading={uploadingFiles}
           progress={uploadProgress}
         />
