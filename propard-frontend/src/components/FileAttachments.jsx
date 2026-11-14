@@ -167,7 +167,7 @@ export default function FileAttachments({ attachments, token, userId }) {
   return (
     <div style={styles.container}>
       {attachments.map(rawId => {
-        const fileId = rawId?.toString();
+        const fileId = getAttachmentId(rawId);
         const file = files[fileId] || {};
         const isImage = file.category === 'image';
         const isVideo = file.category === 'video';
