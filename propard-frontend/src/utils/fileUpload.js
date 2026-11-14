@@ -54,7 +54,7 @@ function getMemberPublicKey(member) {
 }
 
 function getFileMimeType(type, name) {
-  if (typeof type === 'string' && /^(image|video)\//i.test(type)) {
+  if (typeof type === 'string' && /^(image|video)\\//i.test(type)) {
     return type.toLowerCase();
   }
 
@@ -80,7 +80,7 @@ function getFileMimeType(type, name) {
 
 function getFileCategory(file) {
   const mimeType = getFileMimeType(file.type, file.name);
-  if (mimeType.startsWith('image/') && mimeType !== 'image/svg+xml' && !/\.svg$/i.test(String(file.name || ''))) return 'image';
+  if (mimeType.startsWith('image/') && mimeType !== 'image/svg+xml' && !/\\.svg$/i.test(String(file.name || ''))) return 'image';
   if (mimeType.startsWith('video/')) return 'video';
   return 'document';
 }
@@ -278,8 +278,8 @@ export async function uploadConversationFile({
 }
 
 
-export async function getConversationFileInfo(fileId, { token }) {
-  if (!fileId || !token) {
+export async function getConversationFileInfo(fileId, { token, userId }) {
+  if (!fileId || !token || !userId) {
     throw new Error('Paramètres de fichier invalides.');
   }
 
@@ -288,8 +288,9 @@ export async function getConversationFileInfo(fileId, { token }) {
     authConfig(token)
   );
 
-  const category = response.data?.category;
-  const size = response.data?.originalSize;
+  const manifest = response.data;
+  const category = manifest?.category;
+  const size = manifest?.originalSize;
 
   if (
     !['image', 'video', 'document'].includes(category) ||
@@ -299,7 +300,36 @@ export async function getConversationFileInfo(fileId, { token }) {
     throw new Error('Informations du fichier invalides.');
   }
 
-  return { category, size };
+  const privateKeyJwk = await getStoredPrivateKeyJwk(userId);
+  if (!privateKeyJwk) {
+    throw new Error('Clé privée E2EE locale introuvable.');
+  }
+
+  const senderPublicKey = parsePublicKey(manifest.senderPublicKey);
+  let fileKey = null;
+
+  try {
+    fileKey = await getStoredFileKey(fileId);
+  } catch {
+    fileKey = null;
+  }
+
+  if (!fileKey) {
+    fileKey = await unwrapFileKeyForUser(
+      manifest.keyPackage?.encryptedKey,
+      privateKeyJwk,
+      senderPublicKey
+    );
+    await storeFileKeyLocally(fileId, fileKey).catch(() => {});
+  }
+
+  const metadata = await decryptFileMetadata(fileKey, manifest.encryptedMetadata);
+
+  if (metadata.size !== size || typeof metadata.name !== 'string' || !metadata.name) {
+    throw new Error('Métadonnées du fichier invalides.');
+  }
+
+  return { category, size, name: metadata.name };
 }
 
 export async function downloadConversationMedia(fileIds, { userId, token }) {
@@ -313,7 +343,7 @@ export async function downloadConversationMedia(fileIds, { userId, token }) {
     const fileId = (rawId?._id || rawId?.fileId || rawId)?.toString();
     if (!fileId) continue;
 
-    const info = await getConversationFileInfo(fileId, { token });
+    const info = await getConversationFileInfo(fileId, { token, userId });
     if (info.category === 'image' || info.category === 'video') {
       mediaIds.push(fileId);
     }
