@@ -204,6 +204,94 @@ export async function unwrapFileKeyForUser(encryptedPackage, recipientPrivateKey
   return importFileKey(encodedKey);
 }
 
+export async function encryptFileMetadata(fileKey, metadata) {
+  if (
+    !fileKey ||
+    !metadata ||
+    typeof metadata.name !== 'string' ||
+    metadata.name.length < 1 ||
+    metadata.name.length > 255 ||
+    typeof metadata.type !== 'string' ||
+    metadata.type.length > 255 ||
+    !Number.isSafeInteger(metadata.size) ||
+    metadata.size < 1
+  ) {
+    throw new Error('Métadonnées de fichier invalides.');
+  }
+
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plaintext = new TextEncoder().encode(JSON.stringify({
+    name: metadata.name,
+    type: metadata.type || 'application/octet-stream',
+    size: metadata.size,
+    lastModified: Number.isSafeInteger(metadata.lastModified) ? metadata.lastModified : null
+  }));
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, tagLength: 128 },
+    fileKey,
+    plaintext
+  );
+
+  return JSON.stringify({
+    v: 1,
+    iv: bytesToBase64(iv),
+    ct: bytesToBase64(encrypted)
+  });
+}
+
+export async function decryptFileMetadata(fileKey, encryptedMetadata) {
+  if (!fileKey || typeof encryptedMetadata !== 'string' || encryptedMetadata.length > 20000) {
+    throw new Error('Métadonnées chiffrées invalides.');
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(encryptedMetadata);
+  } catch {
+    throw new Error('Métadonnées chiffrées illisibles.');
+  }
+
+  if (
+    !payload ||
+    payload.v !== 1 ||
+    typeof payload.iv !== 'string' ||
+    typeof payload.ct !== 'string'
+  ) {
+    throw new Error('Format des métadonnées invalide.');
+  }
+
+  const iv = base64ToBytes(payload.iv, 12);
+  const ciphertext = base64ToBytes(payload.ct);
+
+  if (ciphertext.length < 16 || ciphertext.length > 10000) {
+    throw new Error('Taille des métadonnées invalide.');
+  }
+
+  const plaintext = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv, tagLength: 128 },
+    fileKey,
+    ciphertext
+  );
+
+  const metadata = JSON.parse(new TextDecoder().decode(plaintext));
+
+  if (
+    !metadata ||
+    typeof metadata.name !== 'string' ||
+    metadata.name.length < 1 ||
+    metadata.name.length > 255 ||
+    typeof metadata.type !== 'string' ||
+    metadata.type.length > 255 ||
+    !Number.isSafeInteger(metadata.size) ||
+    metadata.size < 1
+  ) {
+    throw new Error('Métadonnées déchiffrées invalides.');
+  }
+
+  return metadata;
+}
+
 export async function storeFileKeyLocally(fileId, fileKey) {
   validateFileContext(fileId, 0);
   await storeSecureLocalValue(
