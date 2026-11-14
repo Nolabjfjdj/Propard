@@ -21,17 +21,6 @@ const server=http.createServer(app);
 
 app.set('trust proxy',1);
 
-app.get('/api/_ip-diagnostic',(req,res)=>{
-  res.setHeader('Cache-Control','no-store');
-  res.json({
-    expressIp:req.ip || null,
-    socketRemoteAddress:req.socket.remoteAddress || null,
-    forwardedFor:req.get('x-forwarded-for') || null,
-    cloudflareConnectingIp:req.get('cf-connecting-ip') || null,
-    cloudflareRay:req.get('cf-ray') || null
-  });
-});
-
 const frontendOrigins = new Set(
   (process.env.FRONTEND_ORIGINS || process.env.FRONTEND_ORIGIN || 'https://propard.site')
     .split(',')
