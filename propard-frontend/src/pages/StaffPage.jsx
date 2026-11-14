@@ -115,6 +115,10 @@ export default function StaffPage() {
   const [helpNotifications, setHelpNotifications] = useState({ passwordReset: true, support: true });
   const [staffEventPreferences, setStaffEventPreferences] = useState({ passwordReset: true, support: true, reports: true, bans: true, staffActions: true });
   const [staffEventPreferencesSaving, setStaffEventPreferencesSaving] = useState(false);
+  const [systemNotificationsEnabled, setSystemNotificationsEnabled] = useState(() => {
+    const token = localStorage.getItem('propard_token');
+    return token ? localStorage.getItem(`propard_staff_system_notifications_${token}`) !== 'false' : true;
+  });
   const [staffNotifications, setStaffNotifications] = useState([]);
   const [staffNotificationsLoading, setStaffNotificationsLoading] = useState(false);
   const seenStaffEventIds = useRef(null);
@@ -123,6 +127,21 @@ export default function StaffPage() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSettingsLoading, setPushSettingsLoading] = useState(false);
   const knownHelpRequestIds = useRef(null);
+
+  const toggleSystemNotifications = async () => {
+    const nextEnabled = !systemNotificationsEnabled;
+    if (nextEnabled && typeof window.Notification !== 'undefined' && window.Notification.permission !== 'granted') {
+      const permission = await window.Notification.requestPermission();
+      if (permission !== 'granted') {
+        setNotice('Autorisation système non accordée. Les notifications resteront visibles dans le panneau staff.');
+        return;
+      }
+    }
+    const token = localStorage.getItem('propard_token');
+    if (token) localStorage.setItem(`propard_staff_system_notifications_${token}`, String(nextEnabled));
+    setSystemNotificationsEnabled(nextEnabled);
+    setNotice(nextEnabled ? 'Notifications système activées dans Propard.' : 'Notifications système désactivées dans Propard. La permission du navigateur reste inchangée.');
+  };
 
   const request = useCallback(async (method, path, data) => {
     const token = localStorage.getItem('propard_token');
@@ -164,7 +183,7 @@ export default function StaffPage() {
         });
         if (fresh.length) {
           setStaffNotifications(previous => [...fresh, ...previous].slice(0, 40));
-          if (typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted') {
+          if (systemNotificationsEnabled && typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted') {
             fresh.slice(0, 3).forEach(item => new window.Notification(item.title, { body: item.message }));
           }
         }
@@ -254,7 +273,7 @@ export default function StaffPage() {
         );
         if (fresh.length) {
           setStaffNotifications(previous => [...fresh, ...previous].slice(0, 40));
-          if (typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted') {
+          if (systemNotificationsEnabled && typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted') {
             fresh.slice(0, 3).forEach(item => new window.Notification(item.title, { body: item.message }));
           }
         }
@@ -642,18 +661,17 @@ export default function StaffPage() {
             <button
               type="button"
               style={buttonStyle}
-              onClick={() => {
-                if (typeof window.Notification === 'undefined') {
-                  setError('Les notifications système ne sont pas prises en charge par ce navigateur.');
-                  return;
-                }
-                window.Notification.requestPermission().then(permission => {
-                  setNotice(permission === 'granted' ? 'Notifications système autorisées.' : 'Notifications système non autorisées. Les notifications restent visibles dans le panneau staff.');
-                });
-              }}
+              onClick={toggleSystemNotifications}
+              disabled={typeof window.Notification === 'undefined'}
             >
-              Autoriser les notifications système
+              {systemNotificationsEnabled ? 'Désactiver les notifications système' : 'Activer les notifications système'}
             </button>
+            <small style={{ color: 'var(--text-secondary)' }}>
+              {systemNotificationsEnabled
+                ? 'Les notifications système sont activées dans Propard.'
+                : 'Les notifications système sont désactivées dans Propard. Les notifications restent visibles dans le panneau staff.'}
+              {' '}Pour retirer l’autorisation du navigateur, utilise les réglages de ton appareil.
+            </small>
           </div>
           <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
             <strong>Activité récente</strong>
