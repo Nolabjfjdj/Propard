@@ -27,6 +27,9 @@ const MAX_KEY_PACKAGES = 50;
 const LARGE_FILE_THRESHOLD = 200 * 1024 * 1024;
 const MAX_CONSECUTIVE_LARGE_FILES = 3;
 const LARGE_FILE_COOLDOWN_MS = 30 * 60 * 1000;
+const FILE_UPLOAD_WINDOW_MS = 5 * 60 * 1000;
+const MAX_FILES_PER_WINDOW = 10;
+const MAX_BYTES_PER_WINDOW = 2 * 1024 * 1024 * 1024;
 
 router.use(authMiddleware);
 
@@ -586,6 +589,80 @@ router.post('/uploads/:fileId/finalize', signedUrlRateLimit, async (req, res) =>
     }
 
     const completedAt = new Date();
+    const windowStart = new Date(completedAt.getTime() - FILE_UPLOAD_WINDOW_MS);
+    const recentEvents = {
+      $filter: {
+        input: { $ifNull: ['$fileUploadEvents', []] },
+        as: 'event',
+        cond: { $gt: ['$event.completedAt', windowStart] }
+      }
+    };
+
+    let quotaReservation;
+    try {
+      quotaReservation = await User.updateOne(
+        {
+          _id: req.user.id,
+          $expr: {
+            $and: [
+              { $lt: [{ $size: recentEvents }, MAX_FILES_PER_WINDOW] },
+              {
+                $lte: [
+                  {
+                    $add: [
+                      {
+                        $sum: {
+                          $map: {
+                            input: recentEvents,
+                            as: 'event',
+                            in: '$event.size'
+                          }
+                        }
+                      },
+                      updated.originalSize
+                    ]
+                  },
+                  MAX_BYTES_PER_WINDOW
+                ]
+              }
+            ]
+          }
+        },
+        [
+          {
+            $set: {
+              fileUploadEvents: {
+                $concatArrays: [
+                  recentEvents,
+                  [{
+                    fileId: updated._id,
+                    size: updated.originalSize,
+                    completedAt
+                  }]
+                ]
+              }
+            }
+          }
+        ]
+      );
+    } catch (quotaError) {
+      await FileAttachment.updateOne(
+        { _id: updated._id, status: 'ready' },
+        { $set: { status: 'failed', cleanupPending: true } }
+      );
+      throw quotaError;
+    }
+
+    if (quotaReservation.modifiedCount !== 1) {
+      await FileAttachment.updateOne(
+        { _id: updated._id, status: 'ready' },
+        { $set: { status: 'failed', cleanupPending: true } }
+      );
+      return res.status(429).json({
+        error: 'Limite atteinte : 10 fichiers ou 2 Go maximum sur une période glissante de 5 minutes.',
+        retryAfterSeconds: Math.ceil(FILE_UPLOAD_WINDOW_MS / 1000)
+      });
+    }
 
     if (updated.originalSize >= LARGE_FILE_THRESHOLD) {
       const cooldownUntil = new Date(completedAt.getTime() + LARGE_FILE_COOLDOWN_MS);
