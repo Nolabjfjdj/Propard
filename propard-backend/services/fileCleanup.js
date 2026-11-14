@@ -63,6 +63,25 @@ async function deleteMessageAttachments(fileIds, senderId) {
 }
 
 async function retryPendingFileCleanup(limit = 100) {
+  const orphanedReadyFiles = await FileAttachment.find({
+    status: 'ready',
+    attachedAt: null,
+    createdAt: { $lte: new Date(Date.now() - 60 * 60 * 1000) }
+  }).limit(limit);
+
+  for (const file of orphanedReadyFiles) {
+    await FileAttachment.updateOne(
+      { _id: file._id, status: 'ready', attachedAt: null },
+      {
+        $set: {
+          status: 'deleted',
+          deletedAt: new Date(),
+          cleanupPending: true
+        }
+      }
+    );
+  }
+
   const expiredUploads = await FileAttachment.find({
     status: 'uploading',
     uploadExpiresAt: { $lte: new Date() }
@@ -91,6 +110,7 @@ async function retryPendingFileCleanup(limit = 100) {
   }
 
   return {
+    orphanedReadyFiles: orphanedReadyFiles.length,
     expiredUploads: expiredUploads.length,
     retried: pendingFiles.length
   };
