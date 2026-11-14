@@ -76,9 +76,10 @@ export async function uploadConversationFile({
   groupMembers,
   userId,
   token,
+  batchId,
   onProgress
 }) {
-  if (!(file instanceof File) || file.size < 1 || !token || !userId) {
+  if (!(file instanceof File) || file.size < 1 || !token || !userId || typeof batchId !== 'string') {
     throw new Error('Fichier ou session invalide.');
   }
 
@@ -168,6 +169,7 @@ export async function uploadConversationFile({
     chunkCount,
     encryptedMetadata,
     keyPackages,
+    batchId,
     ...(scope === 'private' ? { recipientId: recipientId.toString() } : {
       groupId: groupId.toString(),
       groupKeyVersion
