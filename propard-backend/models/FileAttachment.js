@@ -67,6 +67,7 @@ const fileAttachmentSchema = new mongoose.Schema({
   },
   createdAt: { type: Date, default: Date.now, immutable: true },
   completedAt: { type: Date, default: null },
+  attachedAt: { type: Date, default: null, index: true },
   deletedAt: { type: Date, default: null },
   cleanupPending: { type: Boolean, default: false, index: true }
 });
