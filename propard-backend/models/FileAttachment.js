@@ -21,6 +21,7 @@ const fileKeyPackageSchema = new mongoose.Schema({
 const fileAttachmentSchema = new mongoose.Schema({
   sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   scope: { type: String, enum: ['private', 'group'], required: true },
+  category: { type: String, enum: ['image', 'video', 'document'], required: true },
   recipient: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
