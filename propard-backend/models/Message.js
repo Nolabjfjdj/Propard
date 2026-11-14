@@ -5,6 +5,7 @@ const messageSchema = new mongoose.Schema({
   sender:{type:mongoose.Schema.Types.ObjectId,ref:'User',required:true},
   receiver:{type:mongoose.Schema.Types.ObjectId,ref:'User',required:true},
   content:{type:String,default:null},
+  attachments:{type:[{type:mongoose.Schema.Types.ObjectId,ref:'FileAttachment'}],default:[],validate:v=>Array.isArray(v)&&v.length<=10},
   originalContent:{type:String,default:null},
   encrypted:{type:Boolean,default:true},
   edited:{type:Boolean,default:false},
