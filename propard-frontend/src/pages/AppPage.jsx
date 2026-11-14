@@ -578,16 +578,7 @@ export default function AppPage({
     if (
       g.pointerId != null &&
       e.pointerId !== g.pointerId
-    ) {
-      if (e.pointerId === g.scrollPointerId) {
-        const deltaY = g.scrollLastY - e.clientY;
-        g.scrollLastY = e.clientY;
-        if (sidebarRef.current && deltaY !== 0) {
-          sidebarRef.current.scrollTop += deltaY;
-        }
-      }
-      return;
-    }
+    ) return;
 
     g.raw = {
       x: e.clientX,
@@ -766,26 +757,17 @@ export default function AppPage({
       g.pointerId != null &&
       e &&
       e.pointerId !== g.pointerId
-    ) {
-      if (e.pointerId === g.scrollPointerId) {
-        g.scrollPointerId = null;
-        g.scrollLastY = null;
-      }
-      return;
-    }
+    ) return;
 
     window.removeEventListener(
       'pointermove',
       g.moveHandler
     );
 
-    if (g.secondPointerDownHandler) {
-      window.removeEventListener(
-        'pointerdown',
-        g.secondPointerDownHandler,
-        true
-      );
-    }
+    window.removeEventListener('touchstart', g.touchStartHandler, true);
+    window.removeEventListener('touchmove', g.touchMoveHandler, true);
+    window.removeEventListener('touchend', g.touchEndHandler, true);
+    window.removeEventListener('touchcancel', g.touchEndHandler, true);
 
     window.removeEventListener(
       'pointerup',
@@ -878,12 +860,42 @@ export default function AppPage({
     const moveHandler = e =>
       handleGrabMoveImpl(e);
 
-    const secondPointerDownHandler = e => {
+    const touchStartHandler = e => {
       const g = grabRef.current;
-      if (!g || e.pointerType !== 'touch') return;
-      if (g.pointerId != null && e.pointerId === g.pointerId) return;
-      g.scrollPointerId = e.pointerId;
-      g.scrollLastY = e.clientY;
+      if (!g || g.secondaryTouchId != null) return;
+      const touch = Array.from(e.changedTouches || []).find(item =>
+        item.identifier !== g.primaryTouchId
+      );
+      if (!touch) return;
+      g.secondaryTouchId = touch.identifier;
+      g.scrollLastY = touch.clientY;
+    };
+
+    const touchMoveHandler = e => {
+      const g = grabRef.current;
+      if (!g || g.secondaryTouchId == null) return;
+      const touch = Array.from(e.touches || []).find(item =>
+        item.identifier === g.secondaryTouchId
+      );
+      if (!touch) return;
+      const deltaY = g.scrollLastY - touch.clientY;
+      g.scrollLastY = touch.clientY;
+      if (deltaY !== 0 && sidebarRef.current) {
+        e.preventDefault();
+        sidebarRef.current.scrollTop += deltaY;
+      }
+    };
+
+    const touchEndHandler = e => {
+      const g = grabRef.current;
+      if (!g || g.secondaryTouchId == null) return;
+      const ended = Array.from(e.changedTouches || []).some(item =>
+        item.identifier === g.secondaryTouchId
+      );
+      if (ended) {
+        g.secondaryTouchId = null;
+        g.scrollLastY = null;
+      }
     };
 
     const endHandler = e =>
@@ -898,7 +910,8 @@ export default function AppPage({
         pointerId != null
           ? pointerId
           : null,
-      scrollPointerId: null,
+      primaryTouchId: null,
+      secondaryTouchId: null,
       scrollLastY: null,
       raw: {
         x: clientX,
@@ -918,7 +931,9 @@ export default function AppPage({
       forcedSidebarOpen:
         wasSidebarHidden,
       moveHandler,
-      secondPointerDownHandler,
+      touchStartHandler,
+      touchMoveHandler,
+      touchEndHandler,
       endHandler,
       rafId: null
     };
@@ -943,11 +958,10 @@ export default function AppPage({
       }
     );
 
-    window.addEventListener(
-      'pointerdown',
-      secondPointerDownHandler,
-      true
-    );
+    window.addEventListener('touchstart', touchStartHandler, true);
+    window.addEventListener('touchmove', touchMoveHandler, { capture: true, passive: false });
+    window.addEventListener('touchend', touchEndHandler, true);
+    window.addEventListener('touchcancel', touchEndHandler, true);
 
     window.addEventListener(
       'pointerup',
