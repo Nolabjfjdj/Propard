@@ -252,7 +252,7 @@ export async function uploadConversationFile({
 }
 
 
-export async function getConversationFileCategory(fileId, { token }) {
+export async function getConversationFileInfo(fileId, { token }) {
   if (!fileId || !token) {
     throw new Error('Paramètres de fichier invalides.');
   }
@@ -263,11 +263,17 @@ export async function getConversationFileCategory(fileId, { token }) {
   );
 
   const category = response.data?.category;
-  if (!['image', 'video', 'document'].includes(category)) {
-    throw new Error('Catégorie de fichier invalide.');
+  const size = response.data?.originalSize;
+
+  if (
+    !['image', 'video', 'document'].includes(category) ||
+    !Number.isSafeInteger(size) ||
+    size < 1
+  ) {
+    throw new Error('Informations du fichier invalides.');
   }
 
-  return category;
+  return { category, size };
 }
 
 export async function downloadConversationFile(fileId, { userId, token }) {
