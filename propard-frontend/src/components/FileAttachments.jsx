@@ -4,7 +4,7 @@ import {
   getConversationFileInfo
 } from '../utils/fileUpload';
 
-const MAX_INLINE_VIDEO_SIZE = 100 * 1024 * 1024;
+const MAX_AUTO_PREVIEW = 10 * 1024 * 1024;
 
 function getAttachmentId(value) {
   const id = value?._id || value?.fileId || value?.id || value;
@@ -15,7 +15,7 @@ export default function FileAttachments({ attachments, token, userId }) {
   const [files, setFiles] = useState({});
   const objectUrlsRef = useRef([]);
 
-  const loadPreview = useCallback(async (fileId, category, cancelled = false) => {
+  const loadPreview = useCallback(async (fileId, category, isCancelled = () => false) => {
     setFiles(previous => ({
       ...previous,
       [fileId]: { ...previous[fileId], category, loading: true, error: '' }
@@ -25,16 +25,17 @@ export default function FileAttachments({ attachments, token, userId }) {
       const result = await downloadConversationFile(fileId, { userId, token });
       const expectedType = category === 'image' ? 'image/' : 'video/';
       const filename = String(result.name || '').toLowerCase();
+      const isSvg = filename.endsWith('.svg') || result.type?.toLowerCase() === 'image/svg+xml';
       const extensionMatches = category === 'image'
-        ? /\.(jpg|jpeg|jpe|png|gif|webp|avif|bmp|svg)$/.test(filename)
+        ? /\.(jpg|jpeg|jpe|png|gif|webp|avif|bmp)$/.test(filename)
         : /\.(mp4|m4v|webm|mov|ogv)$/.test(filename);
 
-      if (!result.type?.startsWith(expectedType) && !extensionMatches) {
+      if (isSvg || (!result.type?.startsWith(expectedType) && !extensionMatches)) {
         throw new Error('Le type réel du fichier ne correspond pas à son aperçu.');
       }
 
       const url = URL.createObjectURL(result.blob);
-      if (cancelled) {
+      if (isCancelled()) {
         URL.revokeObjectURL(url);
         return;
       }
@@ -53,7 +54,7 @@ export default function FileAttachments({ attachments, token, userId }) {
         }
       }));
     } catch (err) {
-      if (!cancelled) {
+      if (!isCancelled()) {
         setFiles(previous => ({
           ...previous,
           [fileId]: {
@@ -98,10 +99,8 @@ export default function FileAttachments({ attachments, token, userId }) {
             }
           }));
 
-          if (info.category === 'image') {
-            await loadPreview(fileId, 'image', cancelled);
-          } else if (info.category === 'video' && info.size <= MAX_INLINE_VIDEO_SIZE) {
-            await loadPreview(fileId, 'video', cancelled);
+          if ((info.category === 'image' || info.category === 'video') && info.size <= MAX_AUTO_PREVIEW) {
+            await loadPreview(fileId, info.category, () => cancelled);
           }
         } catch (err) {
           if (!cancelled) {
@@ -173,7 +172,7 @@ export default function FileAttachments({ attachments, token, userId }) {
         const file = files[fileId] || {};
         const isImage = file.category === 'image';
         const isVideo = file.category === 'video';
-        const videoTooLarge = isVideo && file.size > MAX_INLINE_VIDEO_SIZE;
+        const previewTooLarge = (isImage || isVideo) && file.size > MAX_AUTO_PREVIEW;
 
         return (
           <div key={fileId} style={styles.item}>
@@ -220,20 +219,20 @@ export default function FileAttachments({ attachments, token, userId }) {
                 {file.loading ? (
                   <span style={styles.status}>Chargement...</span>
                 ) : null}
-                {isImage && !file.loading && !file.error ? (
+                {(isImage || isVideo) && !file.url && !file.loading && !file.error && !previewTooLarge ? (
                   <span style={styles.status}>Préparation de l’aperçu</span>
                 ) : null}
-                {isVideo && !file.url && !file.loading && !videoTooLarge ? (
+                {(isImage || isVideo) && !file.url && !file.loading ? (
                   <button
                     type="button"
                     style={styles.button}
-                    onClick={() => loadPreview(fileId, 'video')}
+                    onClick={() => loadPreview(fileId, file.category)}
                   >
-                    Lire
+                    Afficher
                   </button>
                 ) : null}
-                {videoTooLarge ? (
-                  <span style={styles.status}>Vidéo trop volumineuse pour la lecture intégrée</span>
+                {previewTooLarge ? (
+                  <span style={styles.status}>Aperçu manuel pour éviter un téléchargement automatique volumineux</span>
                 ) : null}
                 <button
                   type="button"
