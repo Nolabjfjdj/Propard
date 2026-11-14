@@ -33,8 +33,8 @@ for (const origin of frontendOrigins) {
 
   try {
     parsedOrigin = new URL(origin);
-  } catch {
-    throw new Error('FRONTEND_ORIGINS contient une origine invalide.');
+  } catch (error) {
+    throw new Error(`FRONTEND_ORIGINS contient une origine invalide: ${JSON.stringify(origin)} (${error.message})`);
   }
 
   if (
