@@ -21,25 +21,50 @@ const server=http.createServer(app);
 
 app.set('trust proxy',1);
 
-const frontendOrigin = process.env.FRONTEND_ORIGIN || 'https://propard.site';
+const frontendOrigins = new Set(
+  (process.env.FRONTEND_ORIGINS || process.env.FRONTEND_ORIGIN || 'https://propard.site')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean)
+);
 
-if (frontendOrigin.trim() === '*') {
-  throw new Error('FRONTEND_ORIGIN doit définir une origine précise, jamais *');
+for (const origin of frontendOrigins) {
+  let parsedOrigin;
+
+  try {
+    parsedOrigin = new URL(origin);
+  } catch {
+    throw new Error('FRONTEND_ORIGINS contient une origine invalide.');
+  }
+
+  if (
+    origin === '*' ||
+    parsedOrigin.origin !== origin ||
+    !['https:', 'http:'].includes(parsedOrigin.protocol)
+  ) {
+    throw new Error('FRONTEND_ORIGINS doit contenir uniquement des origines exactes, jamais *.');
+  }
 }
+
+const isAllowedFrontendOrigin = origin =>
+  !origin || frontendOrigins.has(origin);
 
 const io=new Server(server,{
   cors:{
-    origin:frontendOrigin,
+    origin:(origin,callback)=>{
+      callback(null,isAllowedFrontendOrigin(origin));
+    },
     methods:['GET','POST']
   },
   allowRequest:(req,callback)=>{
-    const origin=req.headers.origin;
-    callback(null,!origin || origin===frontendOrigin);
+    callback(null,isAllowedFrontendOrigin(req.headers.origin));
   }
 });
 
 app.use(cors({
-  origin:frontendOrigin
+  origin:(origin,callback)=>{
+    callback(null,isAllowedFrontendOrigin(origin));
+  }
 }));
 
 app.use(express.json({limit:'1.5mb'}));
