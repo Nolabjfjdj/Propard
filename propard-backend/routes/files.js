@@ -346,90 +346,27 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
     }
 
     const uploadNow = new Date();
+    const uploadAccount = await User.findById(req.user.id)
+      .select('largeFileUploadBlockedUntil');
 
-    if (originalSize >= LARGE_FILE_THRESHOLD) {
-      const cooldownUntil = new Date(uploadNow.getTime() + LARGE_FILE_COOLDOWN_MS);
-      const uploadAccount = await User.findOneAndUpdate(
-        {
-          _id: req.user.id,
-          $or: [
-            { largeFileUploadBlockedUntil: null },
-            { largeFileUploadBlockedUntil: { $exists: false } },
-            { largeFileUploadBlockedUntil: { $lte: uploadNow } }
-          ]
-        },
-        [
-          {
-            $set: {
-              largeFileUploadStreak: {
-                $add: [
-                  {
-                    $cond: [
-                      {
-                        $lte: [
-                          { $ifNull: ['$largeFileUploadBlockedUntil', uploadNow] },
-                          uploadNow
-                        ]
-                      },
-                      0,
-                      { $ifNull: ['$largeFileUploadStreak', 0] }
-                    ]
-                  },
-                  1
-                ]
-              }
-            }
-          },
-          {
-            $set: {
-              largeFileUploadBlockedUntil: {
-                $cond: [
-                  { $gte: ['$largeFileUploadStreak', MAX_CONSECUTIVE_LARGE_FILES] },
-                  cooldownUntil,
-                  null
-                ]
-              }
-            }
-          }
-        ],
-        { new: true }
-      ).select('largeFileUploadStreak largeFileUploadBlockedUntil');
+    if (!uploadAccount) {
+      return res.status(404).json({ error: 'Compte introuvable.' });
+    }
 
-      if (!uploadAccount) {
-        const currentAccount = await User.findById(req.user.id)
-          .select('largeFileUploadBlockedUntil');
-
-        if (!currentAccount) {
-          return res.status(404).json({ error: 'Compte introuvable.' });
-        }
-
-        const blockedUntil = currentAccount.largeFileUploadBlockedUntil;
-        if (blockedUntil && blockedUntil > uploadNow) {
-          const retryAfterSeconds = Math.max(
-            1,
-            Math.ceil((blockedUntil.getTime() - uploadNow.getTime()) / 1000)
-          );
-
-          return res.status(429).json({
-            error: 'Tu as envoyé 3 fichiers volumineux à la suite. Réessaie dans 30 minutes.',
-            retryAfterSeconds
-          });
-        }
-
-        return res.status(409).json({ error: 'Impossible de vérifier la limite des fichiers volumineux. Réessaie.' });
-      }
-    } else {
-      await User.updateOne(
-        {
-          _id: req.user.id,
-          $or: [
-            { largeFileUploadBlockedUntil: null },
-            { largeFileUploadBlockedUntil: { $exists: false } },
-            { largeFileUploadBlockedUntil: { $lte: uploadNow } }
-          ]
-        },
-        { $set: { largeFileUploadStreak: 0, largeFileUploadBlockedUntil: null } }
+    if (
+      originalSize >= LARGE_FILE_THRESHOLD &&
+      uploadAccount.largeFileUploadBlockedUntil &&
+      uploadAccount.largeFileUploadBlockedUntil > uploadNow
+    ) {
+      const retryAfterSeconds = Math.max(
+        1,
+        Math.ceil((uploadAccount.largeFileUploadBlockedUntil.getTime() - uploadNow.getTime()) / 1000)
       );
+
+      return res.status(429).json({
+        error: 'Tu as envoyé 3 fichiers volumineux terminés à la suite. Réessaie dans 30 minutes.',
+        retryAfterSeconds
+      });
     }
 
     const storageId = selectFilebaseStorageId();
@@ -646,6 +583,48 @@ router.post('/uploads/:fileId/finalize', signedUrlRateLimit, async (req, res) =>
 
     if (!updated) {
       return res.status(409).json({ error: 'Le fichier a déjà changé d’état.' });
+    }
+
+    const completedAt = new Date();
+
+    if (updated.originalSize >= LARGE_FILE_THRESHOLD) {
+      const cooldownUntil = new Date(completedAt.getTime() + LARGE_FILE_COOLDOWN_MS);
+
+      await User.updateOne(
+        {
+          _id: req.user.id,
+          $or: [
+            { largeFileUploadBlockedUntil: null },
+            { largeFileUploadBlockedUntil: { $exists: false } },
+            { largeFileUploadBlockedUntil: { $lte: completedAt } }
+          ]
+        },
+        [
+          {
+            $set: {
+              largeFileUploadStreak: {
+                $add: [{ $ifNull: ['$largeFileUploadStreak', 0] }, 1]
+              }
+            }
+          },
+          {
+            $set: {
+              largeFileUploadBlockedUntil: {
+                $cond: [
+                  { $gte: ['$largeFileUploadStreak', MAX_CONSECUTIVE_LARGE_FILES] },
+                  cooldownUntil,
+                  null
+                ]
+              }
+            }
+          }
+        ]
+      );
+    } else {
+      await User.updateOne(
+        { _id: req.user.id },
+        { $set: { largeFileUploadStreak: 0, largeFileUploadBlockedUntil: null } }
+      );
     }
 
     res.json({
