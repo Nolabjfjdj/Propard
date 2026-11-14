@@ -339,7 +339,15 @@ export async function getConversationFileInfo(fileId, { token, userId }) {
     throw new Error('Métadonnées du fichier invalides.');
   }
 
-  return { category, size, name: metadata.name };
+  const metadataCategory = getFileCategory({
+    type: metadata.type,
+    name: metadata.name
+  });
+  const resolvedCategory = metadataCategory === 'document'
+    ? category
+    : metadataCategory;
+
+  return { category: resolvedCategory, size, name: metadata.name };
 }
 
 export async function downloadConversationMedia(fileIds, { userId, token }) {
