@@ -347,6 +347,7 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
     const file = await FileAttachment.create({
       sender: req.user.id,
       scope,
+      category,
       recipient,
       group: group?._id || null,
       groupKeyVersion: scope === 'group' ? currentKeyVersion : null,
