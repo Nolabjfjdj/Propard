@@ -816,12 +816,6 @@ export default function GroupChat({
               ]
         );
 
-        const senderId =
-          (
-            message.sender?._id ||
-            message.sender
-          )?.toString();
-
         if (
           senderId &&
           senderId !== myId
