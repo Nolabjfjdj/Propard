@@ -1469,6 +1469,11 @@ export default function Chat({
                               ✕
                             </button>
                           </div>
+                          <FileAttachments
+                            attachments={msg.attachments}
+                            token={token}
+                            userId={userId}
+                          />
                         </div>
                       ) : (
                         <>
