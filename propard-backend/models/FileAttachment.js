@@ -4,7 +4,8 @@ const { registerModel } = require('../db/shards');
 const chunkSchema = new mongoose.Schema({
   index: { type: Number, required: true, min: 0 },
   objectKey: { type: String, required: true, maxlength: 1024 },
-  encryptedSize: { type: Number, required: true, min: 1 },
+  encryptedSize: { type: Number, required: true, min: 17 },
+  iv: { type: String, required: true, match: /^[A-Za-z0-9+/]{16}$/ },
   sha256: { type: String, required: true, match: /^[a-f0-9]{64}$/ },
   provider: { type: String, enum: ['filebase'], default: 'filebase', required: true },
   uploadedAt: { type: Date, default: null }
@@ -33,6 +34,7 @@ const fileAttachmentSchema = new mongoose.Schema({
   },
   groupKeyVersion: { type: Number, default: null, min: 1 },
   encryptedMetadata: { type: String, required: true, maxlength: 20000 },
+  cryptoVersion: { type: Number, enum: [1], default: 1, required: true },
   originalSize: { type: Number, required: true, min: 1 },
   chunkSize: { type: Number, required: true, min: 1 },
   chunkCount: { type: Number, required: true, min: 1, max: 640 },
@@ -84,11 +86,15 @@ fileAttachmentSchema.pre('validate', function validateFileConversation(next) {
   const objectKeys = new Set();
 
   for (const chunk of this.chunks) {
-    if (indexes.has(chunk.index) || objectKeys.has(chunk.objectKey)) {
+    if (chunk.index >= this.chunkCount || indexes.has(chunk.index) || objectKeys.has(chunk.objectKey)) {
       return next(new Error('Morceau de fichier dupliqué.'));
     }
     indexes.add(chunk.index);
     objectKeys.add(chunk.objectKey);
+  }
+
+  if (this.status === 'ready' && this.chunks.length !== this.chunkCount) {
+    return next(new Error('Le manifeste du fichier est incomplet.'));
   }
 
   const packageUsers = new Set();
