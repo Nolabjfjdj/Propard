@@ -501,7 +501,7 @@ router.get('/:fileId/chunks/:index/url', signedUrlRateLimit, async (req, res) =>
   try {
     const { fileId, index } = req.params;
 
-    if (!mongoose.isValidObjectId(fileId) || !/^\\d{1,3}$/.test(index)) {
+    if (!mongoose.isValidObjectId(fileId) || !/^\d{1,3}$/.test(index)) {
       return res.status(400).json({ error: 'Identifiant de fichier ou index invalide.' });
     }
 
