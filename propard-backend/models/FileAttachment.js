@@ -56,6 +56,7 @@ const fileAttachmentSchema = new mongoose.Schema({
       message: 'Trop de destinataires pour ce fichier.'
     }
   },
+  uploadExpiresAt: { type: Date, default: null, index: true },
   status: {
     type: String,
     enum: ['uploading', 'ready', 'deleted', 'failed'],
