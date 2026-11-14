@@ -13,9 +13,9 @@ const {
   selectFilebaseStorageId,
   createPresignedUploadUrl,
   createPresignedDownloadUrl,
-  headStoredObject,
-  deleteStoredObject
+  headStoredObject
 } = require('../services/filebase');
+const { deleteMessageAttachments } = require('../services/fileCleanup');
 
 const CHUNK_SIZE = 8 * 1024 * 1024;
 const IMAGE_MAX_SIZE = 50 * 1024 * 1024;
@@ -822,45 +822,29 @@ router.delete('/:fileId', signedUrlRateLimit, async (req, res) => {
       return res.status(400).json({ error: 'Identifiant de fichier invalide.' });
     }
 
-    const file = await FileAttachment.findOneAndUpdate(
-      {
-        _id: fileId,
-        sender: req.user.id,
-        status: { $in: ['uploading', 'ready', 'failed'] }
-      },
-      {
-        $set: {
-          status: 'deleted',
-          deletedAt: new Date(),
-          cleanupPending: true
-        }
-      },
-      { new: true }
-    );
+    const result = await deleteMessageAttachments([fileId], req.user.id);
 
-    if (!file) {
-      return res.status(404).json({ error: 'Fichier introuvable ou déjà supprimé.' });
+    if (result.stillReferenced > 0) {
+      return res.status(409).json({
+        error: 'Ce fichier est encore utilisé par un ou plusieurs messages.'
+      });
     }
 
-    let cleanupPending = false;
+    if (result.deleted === 0 && result.cleanupPending === 0) {
+      const existing = await FileAttachment.findOne({
+        _id: fileId,
+        sender: req.user.id,
+        status: 'deleted'
+      }).select('_id cleanupPending');
 
-    for (const chunk of file.chunks) {
-      try {
-        await deleteStoredObject(chunk.objectKey, chunk.storageId);
-      } catch (error) {
-        cleanupPending = true;
-        console.error('File object cleanup error:', error);
+      if (!existing) {
+        return res.status(404).json({ error: 'Fichier introuvable ou déjà supprimé.' });
       }
     }
 
-    await FileAttachment.updateOne(
-      { _id: file._id, status: 'deleted' },
-      { $set: { cleanupPending } }
-    );
-
     res.json({
-      deleted: true,
-      cleanupPending
+      deleted: result.deleted > 0,
+      cleanupPending: result.cleanupPending > 0
     });
   } catch (error) {
     console.error('File deletion error:', error);
