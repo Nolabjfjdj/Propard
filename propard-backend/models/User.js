@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema({
   sessionVersion:{type:Number,default:0},
   largeFileUploadStreak:{type:Number,default:0,min:0,max:3},
   largeFileUploadBlockedUntil:{type:Date,default:null},
+  fileUploadEvents:{type:[{fileId:{type:mongoose.Schema.Types.ObjectId,required:true},size:{type:Number,required:true,min:1},completedAt:{type:Date,required:true}}],default:[],select:false},
   revokedSessions:{type:[{jti:{type:String,required:true},expiresAt:{type:Date,required:true}}],default:[],select:false},
   staffRole:{type:String,enum:['user','support','junior_moderator','moderator','senior_moderator','admin','owner'],default:'user',index:true},
   staffRoleUpdatedAt:{type:Date,default:null},
