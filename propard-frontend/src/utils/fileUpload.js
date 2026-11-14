@@ -251,6 +251,25 @@ export async function uploadConversationFile({
   }
 }
 
+
+export async function getConversationFileCategory(fileId, { token }) {
+  if (!fileId || !token) {
+    throw new Error('Paramètres de fichier invalides.');
+  }
+
+  const response = await api.get(
+    `/api/files/${fileId}`,
+    authConfig(token)
+  );
+
+  const category = response.data?.category;
+  if (!['image', 'video', 'document'].includes(category)) {
+    throw new Error('Catégorie de fichier invalide.');
+  }
+
+  return category;
+}
+
 export async function downloadConversationFile(fileId, { userId, token }) {
   if (!fileId || !userId || !token) {
     throw new Error('Paramètres de téléchargement invalides.');
