@@ -21,6 +21,7 @@ import {
   getStoredGroupKey,
   storeGroupKey
 } from '../utils/groupCrypto';
+import { downloadConversationFile, uploadConversationFile } from '../utils/fileUpload';
 
 export default function AppPage({
   initialFriendId,
@@ -618,68 +619,64 @@ export default function AppPage({
       : null;
   };
 
-  const forwardGrabbedMessage = async (
-    g,
-    targetId
-  ) => {
+  const forwardGrabbedMessage = async (g, targetId) => {
+    const uploadedIds = [];
     try {
-      const res = await api.get(
+      const response = await api.get(
         `/api/auth/user/${targetId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
+      const rawPublicKey = response.data?.publicKey;
+      if (!rawPublicKey) throw new Error('Clé publique du destinataire indisponible.');
+      const recipientPublicKey = typeof rawPublicKey === 'string'
+        ? JSON.parse(rawPublicKey)
+        : rawPublicKey;
+      const attachments = Array.isArray(g.msg.attachments) ? g.msg.attachments : [];
+      if (attachments.length > 10) throw new Error('Ce message contient trop de fichiers pour être transféré.');
+      const batchId = crypto.randomUUID();
 
-      const rawPublicKey =
-        res.data?.publicKey;
-
-      if (!rawPublicKey) {
-        throw new Error(
-          'Clé publique du destinataire indisponible.'
-        );
+      for (const rawAttachment of attachments) {
+        const fileId = (rawAttachment?._id || rawAttachment?.fileId || rawAttachment)?.toString();
+        if (!fileId) continue;
+        const downloaded = await downloadConversationFile(fileId, { userId: user?.id, token });
+        const file = new File([downloaded.blob], downloaded.name, {
+          type: downloaded.type,
+          lastModified: Date.now()
+        });
+        const newFileId = await uploadConversationFile({
+          file,
+          scope: 'private',
+          recipientId: targetId,
+          recipientPublicKey,
+          userId: user?.id,
+          token,
+          batchId
+        });
+        uploadedIds.push(newFileId);
       }
 
-      const targetPublicKey =
-        typeof rawPublicKey === 'string'
-          ? JSON.parse(rawPublicKey)
-          : rawPublicKey;
-
-      const myPrivateKeyJwk =
-        await getStoredPrivateKeyJwk(user?.id);
-
-      if (!myPrivateKeyJwk) {
-        throw new Error(
-          'Clé privée locale introuvable.'
-        );
-      }
-
-      const sharedKey =
-        await deriveSharedKey(
-          myPrivateKeyJwk,
-          targetPublicKey
-        );
-
-      const encryptedContent =
-        await encryptMessage(
-          sharedKey,
-          g.msg.content
-        );
-
+      const myPrivateKeyJwk = await getStoredPrivateKeyJwk(user?.id);
+      if (!myPrivateKeyJwk) throw new Error('Clé privée locale introuvable.');
+      const sharedKey = await deriveSharedKey(myPrivateKeyJwk, recipientPublicKey);
+      const encryptedContent = await encryptMessage(sharedKey, g.msg.content || '');
       socket.emit('sendMessage', {
         receiverId: targetId,
-        content: encryptedContent
+        content: encryptedContent,
+        attachmentIds: uploadedIds
       });
     } catch (err) {
-      console.error(
-        'Erreur transfert de message (Grab & Send):',
-        err
-      );
+      await Promise.all(uploadedIds.map(id =>
+        api.delete(`/api/files/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => {})
+      ));
+      console.error('Erreur transfert de message (Grab & Send):', err);
+      window.alert(err.response?.data?.error || err.message || 'Impossible de transférer le message.');
     }
   };
 
   const forwardGrabbedMessageToGroup = async (g, targetId) => {
+    const uploadedIds = [];
     try {
       const response = await api.get(
         `/api/groups/${targetId}`,
@@ -697,13 +694,11 @@ export default function AppPage({
         if (!packageData?.encryptedKey || !sender?.publicKey) {
           throw new Error('Clé de chiffrement du groupe indisponible.');
         }
-
         const privateKey = await getStoredPrivateKeyJwk(user?.id);
         if (!privateKey) throw new Error('Clé privée locale introuvable.');
         const senderPublicKey = typeof sender.publicKey === 'string'
           ? JSON.parse(sender.publicKey)
           : sender.publicKey;
-
         groupKey = await decryptGroupKeyPackage(
           packageData.encryptedKey,
           privateKey,
@@ -713,13 +708,44 @@ export default function AppPage({
         await storeGroupKey(targetGroup._id, targetGroup.keyVersion, groupKey);
       }
 
-      const encryptedContent = await encryptMessage(groupKey, g.msg.content);
+      const attachments = Array.isArray(g.msg.attachments) ? g.msg.attachments : [];
+      if (attachments.length > 10) throw new Error('Ce message contient trop de fichiers pour être transféré.');
+      const batchId = crypto.randomUUID();
+
+      for (const rawAttachment of attachments) {
+        const fileId = (rawAttachment?._id || rawAttachment?.fileId || rawAttachment)?.toString();
+        if (!fileId) continue;
+        const downloaded = await downloadConversationFile(fileId, { userId: user?.id, token });
+        const file = new File([downloaded.blob], downloaded.name, {
+          type: downloaded.type,
+          lastModified: Date.now()
+        });
+        const newFileId = await uploadConversationFile({
+          file,
+          scope: 'group',
+          groupId: targetGroup._id,
+          groupKeyVersion: targetGroup.keyVersion || 1,
+          groupMembers: targetGroup.members,
+          userId: user?.id,
+          token,
+          batchId
+        });
+        uploadedIds.push(newFileId);
+      }
+
+      const encryptedContent = await encryptMessage(groupKey, g.msg.content || '');
       socket.emit('sendGroupMessage', {
         groupId: targetGroup._id,
         content: encryptedContent,
-        keyVersion: targetGroup.keyVersion || 1
+        keyVersion: targetGroup.keyVersion || 1,
+        attachmentIds: uploadedIds
       });
     } catch (err) {
+      await Promise.all(uploadedIds.map(id =>
+        api.delete(`/api/files/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => {})
+      ));
       console.error('Erreur transfert de message vers un groupe (Grab & Send):', err);
       window.alert(err.response?.data?.error || err.message || 'Impossible de transférer le message vers ce groupe.');
     }
