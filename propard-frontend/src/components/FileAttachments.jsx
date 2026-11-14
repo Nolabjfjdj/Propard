@@ -50,6 +50,45 @@ function AudioPlayer({ src }) {
 
   return (
     <div style={styles.audioPlayer}>
+      <style>{`
+        .propard-audio-progress {
+          appearance: none;
+          -webkit-appearance: none;
+          height: 5px;
+          border-radius: 999px;
+          background: #2583ed;
+          outline: none;
+        }
+        .propard-audio-progress::-webkit-slider-runnable-track {
+          height: 5px;
+          border-radius: 999px;
+          background: #2583ed;
+        }
+        .propard-audio-progress::-moz-range-track {
+          height: 5px;
+          border-radius: 999px;
+          background: #2583ed;
+        }
+        .propard-audio-progress::-webkit-slider-thumb {
+          appearance: none;
+          -webkit-appearance: none;
+          width: 12px;
+          height: 12px;
+          margin-top: -3.5px;
+          border: 2px solid #fff;
+          border-radius: 50%;
+          background: #2583ed;
+          box-shadow: 0 0 0 1px #2583ed;
+        }
+        .propard-audio-progress::-moz-range-thumb {
+          width: 9px;
+          height: 9px;
+          border: 2px solid #fff;
+          border-radius: 50%;
+          background: #2583ed;
+          box-shadow: 0 0 0 1px #2583ed;
+        }
+      `}</style>
       <audio
         ref={audioRef}
         src={src}
@@ -62,7 +101,16 @@ function AudioPlayer({ src }) {
         onEnded={() => setPlaying(false)}
       />
       <button type="button" style={styles.audioPlayButton} onClick={togglePlayback} aria-label={playing ? 'Mettre en pause' : 'Lire le fichier audio'}>
-        {playing ? 'Ⅱ' : '▶'}
+        {playing ? (
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" />
+            <rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path d="M7 4.8c0-.8.9-1.3 1.6-.9l11 6.9a1.4 1.4 0 0 1 0 2.4l-11 6.9c-.7.4-1.6-.1-1.6-.9V4.8Z" fill="currentColor" />
+          </svg>
+        )}
       </button>
       <div style={styles.audioTimeline}>
         <input
@@ -74,6 +122,7 @@ function AudioPlayer({ src }) {
           onChange={event => seek(event.target.value)}
           disabled={!duration}
           aria-label="Position dans le fichier audio"
+          className="propard-audio-progress"
           style={styles.audioProgress}
         />
         <div style={styles.audioTimes}>
@@ -451,6 +500,8 @@ const styles = {
     height: 5,
     margin: '7px 0',
     accentColor: '#2583ed',
+    background: '#2583ed',
+    borderRadius: 999,
     cursor: 'pointer'
   },
   audioTimes: {
