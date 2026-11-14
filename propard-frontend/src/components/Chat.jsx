@@ -1312,6 +1312,8 @@ export default function Chat({
                   ? msg.content
                   : '';
 
+              const isMediaOnly = Array.isArray(msg.attachments) && msg.attachments.length > 0 && !content;
+
               const showSeparator =
                 msg.createdAt &&
                 shouldShowDateSeparator(
@@ -1365,9 +1367,12 @@ export default function Chat({
                     <div
                       style={{
                         ...styles.bubble,
-                        background: isMe
-                          ? 'var(--accent)'
-                          : 'var(--bg-tertiary)',
+                        background: isMediaOnly
+                          ? 'transparent'
+                          : isMe
+                            ? 'var(--accent)'
+                            : 'var(--bg-tertiary)',
+                        padding: isMediaOnly ? 0 : '10px 14px',
                         opacity: isBeingGrabbed ? 0 : 1
                       }}
                       onContextMenu={e =>
@@ -1527,7 +1532,7 @@ export default function Chat({
                             <p
                               style={{
                                 ...styles.msgTime,
-                                color: isMe ? 'rgba(255,255,255,0.7)' : 'var(--text-secondary)'
+                                color: isMediaOnly ? 'var(--text-secondary)' : isMe ? 'rgba(255,255,255,0.7)' : 'var(--text-secondary)'
                               }}
                             >
                               {msg.createdAt
