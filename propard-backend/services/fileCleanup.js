@@ -1,4 +1,6 @@
 const FileAttachment = require('../models/FileAttachment');
+const Message = require('../models/Message');
+const GroupMessage = require('../models/GroupMessage');
 const { deleteStoredObject } = require('./filebase');
 
 async function cleanupFileObjects(file) {
@@ -13,17 +15,25 @@ async function cleanupFileObjects(file) {
     }
   }
 
-  await FileAttachment.updateOne(
-    { _id: file._id, status: 'deleted' },
-    { $set: { cleanupPending: pending } }
-  );
+  if (pending) {
+    await FileAttachment.updateOne(
+      { _id: file._id, status: 'deleted' },
+      { $set: { cleanupPending: true } }
+    );
+    return false;
+  }
 
-  return !pending;
+  await FileAttachment.deleteOne({
+    _id: file._id,
+    status: 'deleted'
+  });
+
+  return true;
 }
 
 async function deleteMessageAttachments(fileIds, senderId) {
   if (!Array.isArray(fileIds) || fileIds.length === 0 || !senderId) {
-    return { deleted: 0, cleanupPending: 0 };
+    return { deleted: 0, cleanupPending: 0, stillReferenced: 0 };
   }
 
   const uniqueIds = [...new Set(fileIds.map(id => id.toString()))];
@@ -35,8 +45,25 @@ async function deleteMessageAttachments(fileIds, senderId) {
 
   let cleanupPending = 0;
   let deleted = 0;
+  let stillReferenced = 0;
 
   for (const file of files) {
+    const [privateReference, groupReference] = await Promise.all([
+      Message.exists({
+        attachments: file._id,
+        deleted: { $ne: true }
+      }),
+      GroupMessage.exists({
+        attachments: file._id,
+        deleted: { $ne: true }
+      })
+    ]);
+
+    if (privateReference || groupReference) {
+      stillReferenced += 1;
+      continue;
+    }
+
     const marked = await FileAttachment.findOneAndUpdate(
       {
         _id: file._id,
@@ -55,13 +82,15 @@ async function deleteMessageAttachments(fileIds, senderId) {
 
     if (!marked) continue;
 
-    deleted += 1;
-    if (!(await cleanupFileObjects(marked))) cleanupPending += 1;
+    if (await cleanupFileObjects(marked)) {
+      deleted += 1;
+    } else {
+      cleanupPending += 1;
+    }
   }
 
-  return { deleted, cleanupPending };
+  return { deleted, cleanupPending, stillReferenced };
 }
-
 
 async function deleteFilesMatching(filter) {
   const files = await FileAttachment.find({
@@ -90,8 +119,11 @@ async function deleteFilesMatching(filter) {
 
     if (!marked) continue;
 
-    deleted += 1;
-    if (!(await cleanupFileObjects(marked))) cleanupPending += 1;
+    if (await cleanupFileObjects(marked)) {
+      deleted += 1;
+    } else {
+      cleanupPending += 1;
+    }
   }
 
   return { deleted, cleanupPending };
