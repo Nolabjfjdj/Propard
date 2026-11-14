@@ -227,6 +227,7 @@ app.use('/api/announcements',require('./routes/announcements'));
 app.use('/api',require('./routes/turn'));
 app.use('/api/reports',require('./routes/reports'));
 app.use('/api/groups',require('./routes/groups'));
+app.use('/api/files',require('./routes/files'));
 app.use('/api/push',require('./routes/push'));
 
 app.get('/health',(req,res)=>res.status(200).send('OK'));
