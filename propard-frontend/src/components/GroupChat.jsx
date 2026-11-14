@@ -2049,8 +2049,6 @@ export default function GroupChat({
         return;
       }
 
-      e.preventDefault();
-
       const now =
         Date.now();
 
