@@ -5,6 +5,7 @@ const groupMessageSchema = new mongoose.Schema({
   group:{type:mongoose.Schema.Types.ObjectId,ref:'Group',required:true,index:true},
   sender:{type:mongoose.Schema.Types.ObjectId,ref:'User',required:true},
   content:{type:String,required:true,maxlength:20000},
+  attachments:{type:[{type:mongoose.Schema.Types.ObjectId,ref:'FileAttachment'}],default:[],validate:v=>Array.isArray(v)&&v.length<=10},
   encrypted:{type:Boolean,default:true},
   keyVersion:{type:Number,min:1,default:null},
   edited:{type:Boolean,default:false},
