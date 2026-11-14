@@ -2526,6 +2526,8 @@ export default function GroupChat({
                     ? message.content
                     : '';
 
+                const isMediaOnly = Array.isArray(message.attachments) && message.attachments.length > 0 && !content;
+
                 const showSeparator =
                   message.createdAt &&
                   shouldShowDateSeparator(
@@ -2606,10 +2608,12 @@ export default function GroupChat({
                       <div
                         style={{
                           ...styles.bubble,
-                          background:
-                            isMe
+                          background: isMediaOnly
+                            ? 'transparent'
+                            : isMe
                               ? 'var(--accent)'
                               : 'var(--bg-tertiary)',
+                          padding: isMediaOnly ? 0 : '10px 14px',
                           opacity:
                             isBeingGrabbed
                               ? 0
@@ -2796,7 +2800,7 @@ export default function GroupChat({
                           <p
                             style={{
                               ...styles.msgTime,
-                              color: isMe ? 'rgba(255,255,255,0.7)' : 'var(--text-secondary)'
+                              color: isMediaOnly ? 'var(--text-secondary)' : isMe ? 'rgba(255,255,255,0.7)' : 'var(--text-secondary)'
                             }}
                           >
                             {message.createdAt
