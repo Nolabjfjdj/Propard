@@ -9,6 +9,7 @@ const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { MAX_AVATAR_LENGTH, MAX_GROUP_NAME_LENGTH, isEncryptedMessagePayload } = require('../utils/inputValidation');
 const { parseMessagePagination } = require('../utils/messagePagination');
+const { deleteMessageAttachments } = require('../services/fileCleanup');
 
 router.use(authMiddleware);
 
@@ -1011,6 +1012,8 @@ router.delete(
       // le contenu chiffré du message. On le conserve donc en base
       // et on utilise `deleted` comme marqueur de suppression logique.
       await message.save();
+
+      await deleteMessageAttachments(message.attachments || [], req.user.id);
 
       emitGroupEvent(
         req,
