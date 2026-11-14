@@ -12,7 +12,7 @@ import GroupProfile from './GroupProfile';
 import MessageReactions from './MessageReactions';
 import FileAttachments from './FileAttachments';
 import FileUploadButton from './FileUploadButton';
-import { uploadConversationFile } from '../utils/fileUpload';
+import { uploadConversationFile, downloadConversationMedia } from '../utils/fileUpload';
 import GroupVoiceCall from './GroupVoiceCall';
 
 import {
@@ -1500,6 +1500,16 @@ export default function GroupChat({
       }
     };
 
+  const downloadGroupMessageMedia = async message => {
+    setContextMenu(null);
+
+    try {
+      await downloadConversationMedia(message.attachments, { userId: myId, token });
+    } catch (err) {
+      setLoadError(err.message || 'Impossible de télécharger les médias.');
+    }
+  };
+
   const copyMessage = async message => {
     if (
       !message ||
@@ -2868,6 +2878,16 @@ export default function GroupChat({
           >
             Copier
           </button>
+
+          {Array.isArray(contextMenu.message.attachments) && contextMenu.message.attachments.length > 0 && (
+            <button
+              type="button"
+              style={styles.contextItem}
+              onClick={() => downloadGroupMessageMedia(contextMenu.message)}
+            >
+              Télécharger
+            </button>
+          )}
 
           {isOwnGroupMessage(
             contextMenu.message
