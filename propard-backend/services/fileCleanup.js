@@ -1,6 +1,26 @@
 const FileAttachment = require('../models/FileAttachment');
 const { deleteStoredObject } = require('./filebase');
 
+async function cleanupFileObjects(file) {
+  let pending = false;
+
+  for (const chunk of file.chunks || []) {
+    try {
+      await deleteStoredObject(chunk.objectKey, chunk.storageId);
+    } catch (error) {
+      pending = true;
+      console.error('File object cleanup error:', error);
+    }
+  }
+
+  await FileAttachment.updateOne(
+    { _id: file._id, status: 'deleted' },
+    { $set: { cleanupPending: pending } }
+  );
+
+  return !pending;
+}
+
 async function deleteMessageAttachments(fileIds, senderId) {
   if (!Array.isArray(fileIds) || fileIds.length === 0 || !senderId) {
     return { deleted: 0, cleanupPending: 0 };
@@ -14,6 +34,7 @@ async function deleteMessageAttachments(fileIds, senderId) {
   });
 
   let cleanupPending = 0;
+  let deleted = 0;
 
   for (const file of files) {
     const marked = await FileAttachment.findOneAndUpdate(
@@ -34,29 +55,48 @@ async function deleteMessageAttachments(fileIds, senderId) {
 
     if (!marked) continue;
 
-    let pending = false;
+    deleted += 1;
+    if (!(await cleanupFileObjects(marked))) cleanupPending += 1;
+  }
 
-    for (const chunk of marked.chunks) {
-      try {
-        await deleteStoredObject(chunk.objectKey, chunk.storageId);
-      } catch (error) {
-        pending = true;
-        console.error('Message attachment cleanup error:', error);
-      }
-    }
+  return { deleted, cleanupPending };
+}
 
+async function retryPendingFileCleanup(limit = 100) {
+  const expiredUploads = await FileAttachment.find({
+    status: 'uploading',
+    uploadExpiresAt: { $lte: new Date() }
+  }).limit(limit);
+
+  for (const file of expiredUploads) {
     await FileAttachment.updateOne(
-      { _id: marked._id, status: 'deleted' },
-      { $set: { cleanupPending: pending } }
+      { _id: file._id, status: 'uploading' },
+      {
+        $set: {
+          status: 'deleted',
+          deletedAt: new Date(),
+          cleanupPending: true
+        }
+      }
     );
+  }
 
-    if (pending) cleanupPending += 1;
+  const pendingFiles = await FileAttachment.find({
+    status: 'deleted',
+    cleanupPending: true
+  }).limit(limit);
+
+  for (const file of pendingFiles) {
+    await cleanupFileObjects(file);
   }
 
   return {
-    deleted: files.length,
-    cleanupPending
+    expiredUploads: expiredUploads.length,
+    retried: pendingFiles.length
   };
 }
 
-module.exports = { deleteMessageAttachments };
+module.exports = {
+  deleteMessageAttachments,
+  retryPendingFileCleanup
+};
