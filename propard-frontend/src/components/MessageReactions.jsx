@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import EmojiPicker from 'emoji-picker-react';
 
 export default function MessageReactions({ reactions = [], userId, onReact, showPicker = false }) {
   const [emoji, setEmoji] = useState('');
@@ -46,54 +47,67 @@ export default function MessageReactions({ reactions = [], userId, onReact, show
         );
       })}
       {showPicker && (
-        <form
-          onSubmit={event => {
-            event.preventDefault();
-            react(emoji);
-          }}
+        <div
           style={{
             display: 'flex',
-            alignItems: 'center',
-            gap: 6,
+            flexDirection: 'column',
+            alignItems: 'stretch',
+            gap: 9,
+            width: 'min(100%, 350px)',
             marginTop: 5,
-            padding: 7,
+            padding: 9,
             border: '1px solid var(--border)',
-            borderRadius: 10,
+            borderRadius: 12,
             background: 'var(--bg-secondary)'
           }}
         >
-          <input
-            type="text"
-            value={emoji}
-            onChange={event => setEmoji(event.target.value)}
-            placeholder="Choisir un emoji..."
-            aria-label="Emoji à envoyer"
-            maxLength={32}
-            style={{
-              width: 150,
-              minWidth: 0,
-              border: '1px solid var(--border)',
-              borderRadius: 7,
-              padding: '7px 9px',
-              color: 'var(--text-primary)',
-              background: 'var(--bg-primary)'
-            }}
+          <EmojiPicker
+            onEmojiClick={emojiObject => setEmoji(emojiObject.emoji)}
+            autoFocusSearch
+            searchPlaceholder="Rechercher un emoji..."
+            width="100%"
+            height={320}
+            lazyLoadEmojis={false}
+            skinTonesDisabled
+            previewConfig={{ showPreview: false }}
           />
+          {emoji && (
+            <div
+              aria-live="polite"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                minHeight: 38,
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: 24
+              }}
+            >
+              <span>{emoji}</span>
+              <span style={{ fontSize: 12 }}>Emoji sélectionné</span>
+            </div>
+          )}
           <button
-            type="submit"
+            type="button"
             disabled={!emoji.trim()}
+            onClick={() => react(emoji)}
             style={{
               border: 0,
-              borderRadius: 7,
-              padding: '7px 10px',
-              background: 'var(--accent)',
+              borderRadius: 8,
+              padding: '9px 12px',
+              background: emoji.trim() ? 'var(--accent)' : 'var(--border)',
               color: '#fff',
-              cursor: 'pointer'
+              cursor: emoji.trim() ? 'pointer' : 'not-allowed',
+              opacity: emoji.trim() ? 1 : 0.6
             }}
           >
             Réagir
           </button>
-        </form>
+        </div>
       )}
     </div>
   );
