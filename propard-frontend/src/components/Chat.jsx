@@ -28,6 +28,7 @@ export default function Chat({
   const [input, setInput] = useState('');
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const pendingAttachmentIdsRef = useRef([]);
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState('');
   const [contextMenu, setContextMenu] = useState(null);
@@ -395,6 +396,10 @@ export default function Chat({
         return;
       }
 
+      if (senderId === myId && Array.isArray(msg.attachments) && msg.attachments.length) {
+        pendingAttachmentIdsRef.current = [];
+      }
+
       let decryptedMessage = msg.encrypted === false
         ? { ...msg, decryptionError: false }
         : {
@@ -540,6 +545,19 @@ export default function Chat({
       handleEdited
     );
 
+    const handleMessageError = data => {
+      setLoadError(data?.message || 'Impossible d’envoyer le message.');
+      const pendingIds = pendingAttachmentIdsRef.current;
+      pendingAttachmentIdsRef.current = [];
+      Promise.all(pendingIds.map(id =>
+        api.delete(`/api/files/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => {})
+      ));
+    };
+
+    socket.on('messageError', handleMessageError);
+
     return () => {
       socket.off(
         'newMessage',
@@ -565,6 +583,8 @@ export default function Chat({
         'messageEdited',
         handleEdited
       );
+
+      socket.off('messageError', handleMessageError);
     };
   }, [
     friend._id,
@@ -690,6 +710,7 @@ export default function Chat({
 
       const encryptedContent = await encryptMessage(sharedKey, input.trim());
 
+      pendingAttachmentIdsRef.current = uploadedIds;
       socket.emit('sendMessage', {
         receiverId: friend._id,
         content: encryptedContent,
@@ -698,6 +719,11 @@ export default function Chat({
 
       setInput('');
     } catch (error) {
+      await Promise.all(uploadedIds.map(id =>
+        api.delete(`/api/files/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => {})
+      ));
       console.error('Erreur envoi fichiers:', error);
       setLoadError(error.response?.data?.error || error.message || 'Impossible d’envoyer les fichiers.');
     } finally {
@@ -1632,7 +1658,7 @@ export default function Chat({
         <button
           onClick={sendMessage}
           style={styles.btn}
-          disabled={uploadingFiles}
+          disabled={!input.trim() || uploadingFiles}
         >
           ➤
         </button>
