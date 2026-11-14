@@ -53,9 +53,36 @@ function getMemberPublicKey(member) {
   );
 }
 
+function getFileMimeType(type, name) {
+  if (typeof type === 'string' && /^(image|video)\//i.test(type)) {
+    return type.toLowerCase();
+  }
+
+  const extension = String(name || '').split('.').pop()?.toLowerCase();
+  const mimeTypes = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    jpe: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    avif: 'image/avif',
+    bmp: 'image/bmp',
+    svg: 'image/svg+xml',
+    mp4: 'video/mp4',
+    m4v: 'video/mp4',
+    webm: 'video/webm',
+    mov: 'video/quicktime',
+    ogv: 'video/ogg'
+  };
+
+  return mimeTypes[extension] || type || 'application/octet-stream';
+}
+
 function getFileCategory(file) {
-  if (file.type?.startsWith('image/')) return 'image';
-  if (file.type?.startsWith('video/')) return 'video';
+  const mimeType = getFileMimeType(file.type, file.name);
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/')) return 'video';
   return 'document';
 }
 
@@ -156,7 +183,7 @@ export async function uploadConversationFile({
 
   const encryptedMetadata = await encryptFileMetadata(fileKey, {
     name: file.name,
-    type: file.type || 'application/octet-stream',
+    type: getFileMimeType(file.type, file.name),
     size: file.size,
     lastModified: file.lastModified
   });
@@ -284,7 +311,7 @@ export async function downloadConversationMedia(fileIds, { userId, token }) {
   const mediaIds = [];
 
   for (const rawId of fileIds) {
-    const fileId = rawId?.toString();
+    const fileId = (rawId?._id || rawId?.fileId || rawId)?.toString();
     if (!fileId) continue;
 
     const info = await getConversationFileInfo(fileId, { token });
@@ -397,8 +424,9 @@ export async function downloadConversationFile(fileId, { userId, token }) {
 
   await Promise.all([worker(), worker()]);
 
+  const resolvedType = getFileMimeType(metadata.type, metadata.name);
   const blob = new Blob(plaintextChunks, {
-    type: metadata.type || 'application/octet-stream'
+    type: resolvedType
   });
 
   if (blob.size !== metadata.size) {
@@ -408,6 +436,6 @@ export async function downloadConversationFile(fileId, { userId, token }) {
   return {
     blob,
     name: metadata.name,
-    type: metadata.type
+    type: resolvedType
   };
 }
