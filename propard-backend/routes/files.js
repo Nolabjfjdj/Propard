@@ -148,12 +148,15 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
       chunkSize,
       chunkCount,
       encryptedMetadata,
-      keyPackages
+      keyPackages,
+      batchId
     } = req.body || {};
 
     if (
       !['private', 'group'].includes(scope) ||
       !['image', 'video', 'document'].includes(category) ||
+      typeof batchId !== 'string' ||
+      !/^[a-f0-9-]{36}$/i.test(batchId) ||
       !Number.isSafeInteger(originalSize) ||
       originalSize < 1 ||
       originalSize > MAX_FILE_SIZE ||
@@ -177,6 +180,21 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
 
     if (originalSize > categoryLimit) {
       return res.status(413).json({ error: 'Ce fichier dépasse la limite autorisée pour son type.' });
+    }
+
+    const batchFiles = await FileAttachment.find({
+      sender: req.user.id,
+      batchId,
+      status: { $in: ['uploading', 'ready'] }
+    }).select('originalSize');
+
+    const batchSize = batchFiles.reduce((total, item) => total + item.originalSize, 0);
+
+    if (
+      batchFiles.length >= 10 ||
+      batchSize + originalSize > 2 * 1024 * 1024 * 1024
+    ) {
+      return res.status(413).json({ error: 'La sélection dépasse la limite de 10 fichiers ou 2 Go.' });
     }
 
     let expectedUserIds;
@@ -270,6 +288,7 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
       group: group?._id || null,
       groupKeyVersion: scope === 'group' ? currentKeyVersion : null,
       storageId,
+      batchId,
       encryptedMetadata,
       cryptoVersion: 1,
       originalSize,
