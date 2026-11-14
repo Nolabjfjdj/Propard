@@ -1990,7 +1990,7 @@ router.post('/:groupId/messages/:messageId/reactions', createRateLimiter({
       void sendPushNotification(messageSenderId, {
         title: 'Nouvelle réaction dans un groupe',
         body: `${actorName} a réagi ${emoji} à ton message`,
-        url: '/',
+        url: `/group/${groupId.toString()}`,
         tag: `group-message-reaction-${messageId}`,
         data: { type: 'group-message-reaction', messageId: messageId.toString(), groupId: groupId.toString() }
       }).catch(error => console.error('Group message reaction notification error:', error));
