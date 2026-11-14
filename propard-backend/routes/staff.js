@@ -14,6 +14,7 @@ const authMiddleware = require('../middleware/auth');
 const { ROLE_LEVELS, roleLevel, requireStaffRole, canManageRole } = require('../middleware/staffRoles');
 const { effectiveStaffRole } = require('../utils/staffAllowlist');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { deleteFilesForUser, deleteFilesForGroup } = require('../services/fileCleanup');
 
 const router = express.Router();
 
@@ -710,6 +711,8 @@ router.delete('/users/:userId/purge', requireStaffRole('admin'), async (req, res
     }
     const ownedGroups = await Group.find({ owner: userId }).select('_id').lean();
     const groupIds = ownedGroups.map(group => group._id);
+    await deleteFilesForUser(userId);
+    await Promise.all(groupIds.map(groupId => deleteFilesForGroup(groupId)));
     const [privateMessages, sentGroupMessages] = await Promise.all([
       Message.find({ $or: [{ sender: userId }, { receiver: userId }] }).select('_id').lean(),
       GroupMessage.find({ sender: userId }).select('_id').lean()
