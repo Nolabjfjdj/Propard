@@ -62,6 +62,61 @@ async function deleteMessageAttachments(fileIds, senderId) {
   return { deleted, cleanupPending };
 }
 
+
+async function deleteFilesMatching(filter) {
+  const files = await FileAttachment.find({
+    ...filter,
+    status: { $in: ['uploading', 'ready', 'failed'] }
+  });
+
+  let deleted = 0;
+  let cleanupPending = 0;
+
+  for (const file of files) {
+    const marked = await FileAttachment.findOneAndUpdate(
+      {
+        _id: file._id,
+        status: { $in: ['uploading', 'ready', 'failed'] }
+      },
+      {
+        $set: {
+          status: 'deleted',
+          deletedAt: new Date(),
+          cleanupPending: true
+        }
+      },
+      { new: true }
+    );
+
+    if (!marked) continue;
+
+    deleted += 1;
+    if (!(await cleanupFileObjects(marked))) cleanupPending += 1;
+  }
+
+  return { deleted, cleanupPending };
+}
+
+async function deleteFilesForUser(userId) {
+  if (!userId) return { deleted: 0, cleanupPending: 0 };
+
+  return deleteFilesMatching({
+    $or: [
+      { sender: userId },
+      { scope: 'private', recipient: userId }
+    ]
+  });
+}
+
+async function deleteFilesForGroup(groupId) {
+  if (!groupId) return { deleted: 0, cleanupPending: 0 };
+
+  return deleteFilesMatching({
+    scope: 'group',
+    group: groupId
+  });
+}
+
 async function retryPendingFileCleanup(limit = 100) {
   const orphanedReadyFiles = await FileAttachment.find({
     status: 'ready',
@@ -118,5 +173,7 @@ async function retryPendingFileCleanup(limit = 100) {
 
 module.exports = {
   deleteMessageAttachments,
+  deleteFilesForUser,
+  deleteFilesForGroup,
   retryPendingFileCleanup
 };
