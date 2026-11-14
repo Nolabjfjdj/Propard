@@ -1,70 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   downloadConversationFile,
-  getConversationFileCategory
+  getConversationFileInfo
 } from '../utils/fileUpload';
+
+const MAX_INLINE_VIDEO_SIZE = 100 * 1024 * 1024;
 
 export default function FileAttachments({ attachments, token, userId }) {
   const [files, setFiles] = useState({});
-  const [error, setError] = useState('');
   const objectUrlsRef = useRef([]);
 
-  useEffect(() => {
-    let cancelled = false;
-    objectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
-    objectUrlsRef.current = [];
-    setFiles({});
-    setError('');
-
-    if (!Array.isArray(attachments) || attachments.length === 0) {
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const prepare = async () => {
-      await Promise.all(attachments.map(async rawId => {
-        const fileId = rawId?.toString();
-        if (!fileId) return;
-
-        try {
-          const category = await getConversationFileCategory(fileId, { token });
-          if (cancelled) return;
-
-          setFiles(previous => ({
-            ...previous,
-            [fileId]: { category, loading: false, url: null }
-          }));
-
-          if (category === 'image') {
-            await loadPreview(fileId, category, cancelled);
-          }
-        } catch (err) {
-          if (!cancelled) {
-            setFiles(previous => ({
-              ...previous,
-              [fileId]: {
-                category: 'document',
-                loading: false,
-                url: null,
-                error: err.response?.data?.error || 'Aperçu indisponible.'
-              }
-            }));
-          }
-        }
-      }));
-    };
-
-    prepare();
-
-    return () => {
-      cancelled = true;
-      objectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
-      objectUrlsRef.current = [];
-    };
-  }, [attachments, token, userId]);
-
-  const loadPreview = async (fileId, category, cancelled = false) => {
+  const loadPreview = useCallback(async (fileId, category, cancelled = false) => {
     setFiles(previous => ({
       ...previous,
       [fileId]: { ...previous[fileId], category, loading: true, error: '' }
@@ -110,7 +56,66 @@ export default function FileAttachments({ attachments, token, userId }) {
         }));
       }
     }
-  };
+  }, [userId, token]);
+
+  useEffect(() => {
+    let cancelled = false;
+    objectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    objectUrlsRef.current = [];
+    setFiles({});
+
+    if (!Array.isArray(attachments) || attachments.length === 0) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const prepare = async () => {
+      await Promise.all(attachments.map(async rawId => {
+        const fileId = rawId?.toString();
+        if (!fileId) return;
+
+        try {
+          const info = await getConversationFileInfo(fileId, { token });
+          if (cancelled) return;
+
+          setFiles(previous => ({
+            ...previous,
+            [fileId]: {
+              category: info.category,
+              size: info.size,
+              loading: false,
+              url: null
+            }
+          }));
+
+          if (info.category === 'image') {
+            await loadPreview(fileId, 'image', cancelled);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            setFiles(previous => ({
+              ...previous,
+              [fileId]: {
+                category: 'document',
+                loading: false,
+                url: null,
+                error: err.response?.data?.error || 'Aperçu indisponible.'
+              }
+            }));
+          }
+        }
+      }));
+    };
+
+    prepare();
+
+    return () => {
+      cancelled = true;
+      objectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      objectUrlsRef.current = [];
+    };
+  }, [attachments, token, loadPreview]);
 
   const download = async fileId => {
     setFiles(previous => ({
@@ -157,6 +162,7 @@ export default function FileAttachments({ attachments, token, userId }) {
         const file = files[fileId] || {};
         const isImage = file.category === 'image';
         const isVideo = file.category === 'video';
+        const videoTooLarge = isVideo && file.size > MAX_INLINE_VIDEO_SIZE;
 
         return (
           <div key={fileId} style={styles.item}>
@@ -182,10 +188,13 @@ export default function FileAttachments({ attachments, token, userId }) {
                 <span style={styles.label}>
                   {isImage ? 'Image jointe' : isVideo ? 'Vidéo jointe' : 'Fichier joint'}
                 </span>
-                {isImage && file.loading ? (
-                  <span style={styles.status}>Chargement de l’image...</span>
+                {file.loading ? (
+                  <span style={styles.status}>Chargement...</span>
                 ) : null}
-                {isVideo && !file.url && !file.loading ? (
+                {isImage && !file.loading ? (
+                  <span style={styles.status}>Préparation de l’aperçu</span>
+                ) : null}
+                {isVideo && !file.url && !file.loading && !videoTooLarge ? (
                   <button
                     type="button"
                     style={styles.button}
@@ -194,27 +203,17 @@ export default function FileAttachments({ attachments, token, userId }) {
                     Lire
                   </button>
                 ) : null}
-                {file.loading ? <span style={styles.status}>Chargement...</span> : null}
-                {!isImage && !isVideo ? (
-                  <button
-                    type="button"
-                    style={styles.button}
-                    onClick={() => download(fileId)}
-                    disabled={Boolean(file.downloading)}
-                  >
-                    {file.downloading ? 'Téléchargement...' : 'Télécharger'}
-                  </button>
+                {videoTooLarge ? (
+                  <span style={styles.status}>Vidéo trop volumineuse pour la lecture intégrée</span>
                 ) : null}
-                {(isImage || isVideo) && !file.url ? (
-                  <button
-                    type="button"
-                    style={styles.button}
-                    onClick={() => download(fileId)}
-                    disabled={Boolean(file.downloading)}
-                  >
-                    {file.downloading ? 'Téléchargement...' : 'Télécharger'}
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  style={styles.button}
+                  onClick={() => download(fileId)}
+                  disabled={Boolean(file.downloading)}
+                >
+                  {file.downloading ? 'Téléchargement...' : 'Télécharger'}
+                </button>
               </div>
             )}
 
@@ -264,7 +263,8 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
-    minWidth: 0
+    minWidth: 0,
+    flexWrap: 'wrap'
   },
   icon: {
     flexShrink: 0
