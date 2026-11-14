@@ -1013,9 +1013,9 @@ router.post('/messages/:messageId/reactions', createRateLimiter({
       void sendPushNotification(senderId, {
         title: 'Nouvelle réaction',
         body: `${actorName} a réagi ${emoji} à ton message`,
-        url: '/',
+        url: `/chat/${userId}`,
         tag: `message-reaction-${messageId}`,
-        data: { type: 'message-reaction', messageId, conversationId: otherId }
+        data: { type: 'message-reaction', messageId, senderId: userId, conversationId: otherId }
       }).catch(error => console.error('Message reaction notification error:', error));
     }
     const io = req.app.get('io');
