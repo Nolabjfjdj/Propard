@@ -594,7 +594,7 @@ router.post('/uploads/:fileId/finalize', signedUrlRateLimit, async (req, res) =>
       $filter: {
         input: { $ifNull: ['$fileUploadEvents', []] },
         as: 'event',
-        cond: { $gt: ['$event.completedAt', windowStart] }
+        cond: { $gt: ['$$event.completedAt', windowStart] }
       }
     };
 
@@ -615,7 +615,7 @@ router.post('/uploads/:fileId/finalize', signedUrlRateLimit, async (req, res) =>
                           $map: {
                             input: recentEvents,
                             as: 'event',
-                            in: '$event.size'
+                            in: '$$event.size'
                           }
                         }
                       },
