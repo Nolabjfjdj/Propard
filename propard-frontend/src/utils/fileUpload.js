@@ -68,7 +68,6 @@ function getFileMimeType(type, name) {
     webp: 'image/webp',
     avif: 'image/avif',
     bmp: 'image/bmp',
-    svg: 'image/svg+xml',
     mp4: 'video/mp4',
     m4v: 'video/mp4',
     webm: 'video/webm',
@@ -81,7 +80,7 @@ function getFileMimeType(type, name) {
 
 function getFileCategory(file) {
   const mimeType = getFileMimeType(file.type, file.name);
-  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('image/') && mimeType !== 'image/svg+xml' && !/\.svg$/i.test(String(file.name || ''))) return 'image';
   if (mimeType.startsWith('video/')) return 'video';
   return 'document';
 }
