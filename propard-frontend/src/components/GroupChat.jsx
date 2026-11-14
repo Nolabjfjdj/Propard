@@ -3200,7 +3200,7 @@ export default function GroupChat({
             style={
               styles.input
             }
-            disabled={!key || uploadingFiles}
+            disabled={!key || uploadingFiles || awaitingAttachmentAck}
           />
 
         </div>
@@ -3213,7 +3213,8 @@ export default function GroupChat({
           disabled={
             !key ||
             !input.trim() ||
-            uploadingFiles
+            uploadingFiles ||
+            awaitingAttachmentAck
           }
         >
           ➤
