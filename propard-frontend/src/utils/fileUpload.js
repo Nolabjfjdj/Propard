@@ -54,7 +54,7 @@ function getMemberPublicKey(member) {
 }
 
 function getFileMimeType(type, name) {
-  if (typeof type === 'string' && /^(image|video)\\//i.test(type)) {
+  if (typeof type === 'string' && /^(image|video|audio)\\//i.test(type)) {
     return type.toLowerCase();
   }
 
@@ -72,7 +72,16 @@ function getFileMimeType(type, name) {
     m4v: 'video/mp4',
     webm: 'video/webm',
     mov: 'video/quicktime',
-    ogv: 'video/ogg'
+    ogv: 'video/ogg',
+    mp3: 'audio/mpeg',
+    wav: 'audio/wav',
+    ogg: 'audio/ogg',
+    oga: 'audio/ogg',
+    m4a: 'audio/mp4',
+    aac: 'audio/aac',
+    flac: 'audio/flac',
+    opus: 'audio/opus',
+    weba: 'audio/webm'
   };
 
   return mimeTypes[extension] || type || 'application/octet-stream';
@@ -82,6 +91,7 @@ function getFileCategory(file) {
   const mimeType = getFileMimeType(file.type, file.name);
   if (mimeType.startsWith('image/') && mimeType !== 'image/svg+xml' && !/\\.svg$/i.test(String(file.name || ''))) return 'image';
   if (mimeType.startsWith('video/')) return 'video';
+  if (mimeType.startsWith('audio/')) return 'audio';
   return 'document';
 }
 
@@ -293,7 +303,7 @@ export async function getConversationFileInfo(fileId, { token, userId }) {
   const size = manifest?.originalSize;
 
   if (
-    !['image', 'video', 'document'].includes(category) ||
+    !['image', 'video', 'audio', 'document'].includes(category) ||
     !Number.isSafeInteger(size) ||
     size < 1
   ) {
