@@ -648,7 +648,7 @@ router.post('/uploads/:fileId/finalize', signedUrlRateLimit, async (req, res) =>
     } catch (quotaError) {
       await FileAttachment.updateOne(
         { _id: updated._id, status: 'ready' },
-        { $set: { status: 'failed', cleanupPending: true } }
+        { $set: { status: 'deleted', deletedAt: new Date(), cleanupPending: true } }
       );
       throw quotaError;
     }
@@ -656,7 +656,7 @@ router.post('/uploads/:fileId/finalize', signedUrlRateLimit, async (req, res) =>
     if (quotaReservation.modifiedCount !== 1) {
       await FileAttachment.updateOne(
         { _id: updated._id, status: 'ready' },
-        { $set: { status: 'failed', cleanupPending: true } }
+        { $set: { status: 'deleted', deletedAt: new Date(), cleanupPending: true } }
       );
       return res.status(429).json({
         error: 'Limite atteinte : 10 fichiers ou 2 Go maximum sur une période glissante de 5 minutes.',
