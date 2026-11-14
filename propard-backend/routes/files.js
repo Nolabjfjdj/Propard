@@ -496,6 +496,47 @@ router.post('/uploads/:fileId/finalize', signedUrlRateLimit, async (req, res) =>
   }
 });
 
+
+router.get('/:fileId/chunks/:index/url', signedUrlRateLimit, async (req, res) => {
+  try {
+    const { fileId, index } = req.params;
+
+    if (!mongoose.isValidObjectId(fileId) || !/^\\d{1,3}$/.test(index)) {
+      return res.status(400).json({ error: 'Identifiant de fichier ou index invalide.' });
+    }
+
+    const file = await FileAttachment.findOne({
+      _id: fileId,
+      status: 'ready'
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: 'Fichier introuvable.' });
+    }
+
+    const keyPackage = await getAuthorizedFile(file, req.user.id);
+    if (!keyPackage) {
+      return res.status(403).json({ error: 'Tu n’es pas autorisé à accéder à ce fichier.' });
+    }
+
+    const chunk = file.chunks.find(item => item.index === Number(index));
+    if (!chunk) {
+      return res.status(404).json({ error: 'Morceau de fichier introuvable.' });
+    }
+
+    const downloadUrl = await createPresignedDownloadUrl(
+      chunk.objectKey,
+      300,
+      chunk.storageId
+    );
+
+    res.json({ downloadUrl, expiresIn: 300 });
+  } catch (error) {
+    console.error('File chunk download URL error:', error);
+    res.status(500).json({ error: 'Impossible de préparer le téléchargement du morceau.' });
+  }
+});
+
 router.get('/:fileId', signedUrlRateLimit, async (req, res) => {
   try {
     const { fileId } = req.params;
@@ -519,23 +560,15 @@ router.get('/:fileId', signedUrlRateLimit, async (req, res) => {
       return res.status(403).json({ error: 'Tu n’es pas autorisé à accéder à ce fichier.' });
     }
 
-    const chunks = [...file.chunks].sort((a, b) => a.index - b.index);
-    const signedChunks = [];
-
-    for (const chunk of chunks) {
-      signedChunks.push({
+    const chunks = [...file.chunks]
+      .sort((a, b) => a.index - b.index)
+      .map(chunk => ({
         index: chunk.index,
         storageId: chunk.storageId,
         encryptedSize: chunk.encryptedSize,
         iv: chunk.iv,
-        sha256: chunk.sha256,
-        downloadUrl: await createPresignedDownloadUrl(
-          chunk.objectKey,
-          300,
-          chunk.storageId
-        )
-      });
-    }
+        sha256: chunk.sha256
+      }));
 
     res.json({
       fileId: file._id.toString(),
@@ -549,7 +582,7 @@ router.get('/:fileId', signedUrlRateLimit, async (req, res) => {
         keyVersion: keyPackage.keyVersion
       },
       senderId: file.sender.toString(),
-      chunks: signedChunks
+      chunks
     });
   } catch (error) {
     console.error('File download manifest error:', error);
