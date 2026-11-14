@@ -547,6 +547,13 @@ io.on('connection',async socket=>{
         encrypted:true
       });
 
+      if(attachmentIds.length){
+        await FileAttachment.updateMany(
+          {_id:{$in:attachmentIds},sender:socket.userId,status:'ready'},
+          {$set:{attachedAt:new Date()}}
+        );
+      }
+
       const sender=await User
         .findById(socket.userId)
         .select('username ipAlias');
@@ -690,6 +697,13 @@ io.on('connection',async socket=>{
         encrypted:true,
         keyVersion:currentKeyVersion
       });
+
+      if(attachmentIds.length){
+        await FileAttachment.updateMany(
+          {_id:{$in:attachmentIds},sender:socket.userId,status:'ready'},
+          {$set:{attachedAt:new Date()}}
+        );
+      }
 
       group.lastMessageAt=message.createdAt;
       await group.save();
