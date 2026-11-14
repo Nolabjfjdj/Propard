@@ -7,6 +7,8 @@ const userSchema = new mongoose.Schema({
   avatar:{type:String,default:null},
   password:{type:String,required:true,select:false},
   sessionVersion:{type:Number,default:0},
+  largeFileUploadStreak:{type:Number,default:0,min:0,max:3},
+  largeFileUploadBlockedUntil:{type:Date,default:null},
   revokedSessions:{type:[{jti:{type:String,required:true},expiresAt:{type:Date,required:true}}],default:[],select:false},
   staffRole:{type:String,enum:['user','support','junior_moderator','moderator','senior_moderator','admin','owner'],default:'user',index:true},
   staffRoleUpdatedAt:{type:Date,default:null},
