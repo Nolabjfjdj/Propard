@@ -5,6 +5,7 @@ const router = express.Router();
 
 const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { isEncryptedMessagePayload } = require('../utils/inputValidation');
 const User = require('../models/User');
 const Group = require('../models/Group');
 const FileAttachment = require('../models/FileAttachment');
@@ -69,6 +70,7 @@ function validKeyPackages(packages, expectedUserIds, keyVersion) {
       typeof item.userId !== 'string' ||
       !mongoose.isValidObjectId(item.userId) ||
       typeof item.encryptedKey !== 'string' ||
+      !isEncryptedMessagePayload(item.encryptedKey) ||
       item.encryptedKey.length < 1 ||
       item.encryptedKey.length > 10000 ||
       item.keyVersion !== keyVersion
@@ -166,6 +168,7 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
       chunkCount < 1 ||
       chunkCount > MAX_CHUNKS ||
       typeof encryptedMetadata !== 'string' ||
+      !isEncryptedMessagePayload(encryptedMetadata) ||
       encryptedMetadata.length < 1 ||
       encryptedMetadata.length > 20000
     ) {
@@ -191,7 +194,21 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
     const batchSize = batchFiles.reduce((total, item) => total + item.originalSize, 0);
     const senderAccount = await User.findById(req.user.id).select('publicKey');
 
-    if (!senderAccount?.publicKey || typeof senderAccount.publicKey !== 'string' || senderAccount.publicKey.length > 2000) {
+    let senderPublicKey;
+    try {
+      senderPublicKey = JSON.parse(senderAccount?.publicKey || 'null');
+    } catch {
+      senderPublicKey = null;
+    }
+
+    if (
+      !senderPublicKey ||
+      senderPublicKey.kty !== 'EC' ||
+      senderPublicKey.crv !== 'P-256' ||
+      typeof senderPublicKey.x !== 'string' ||
+      typeof senderPublicKey.y !== 'string' ||
+      senderAccount.publicKey.length > 2000
+    ) {
       return res.status(400).json({ error: 'Clé publique E2EE de l’émetteur indisponible.' });
     }
 
@@ -293,7 +310,7 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
       group: group?._id || null,
       groupKeyVersion: scope === 'group' ? currentKeyVersion : null,
       storageId,
-      senderPublicKey: senderAccount.publicKey,
+      senderPublicKey: JSON.stringify(senderPublicKey),
       batchId,
       encryptedMetadata,
       cryptoVersion: 1,
