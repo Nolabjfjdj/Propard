@@ -24,6 +24,9 @@ const DOCUMENT_MAX_SIZE = 250 * 1024 * 1024;
 const MAX_FILE_SIZE = VIDEO_MAX_SIZE;
 const MAX_CHUNKS = 640;
 const MAX_KEY_PACKAGES = 50;
+const LARGE_FILE_THRESHOLD = 200 * 1024 * 1024;
+const MAX_CONSECUTIVE_LARGE_FILES = 3;
+const LARGE_FILE_COOLDOWN_MS = 30 * 60 * 1000;
 
 router.use(authMiddleware);
 
@@ -340,6 +343,93 @@ router.post('/uploads', uploadRateLimit, async (req, res) => {
 
     if (!validKeyPackages(keyPackages, expectedUserIds, currentKeyVersion)) {
       return res.status(400).json({ error: 'Paquets de clés E2EE invalides ou incomplets.' });
+    }
+
+    const uploadNow = new Date();
+
+    if (originalSize >= LARGE_FILE_THRESHOLD) {
+      const cooldownUntil = new Date(uploadNow.getTime() + LARGE_FILE_COOLDOWN_MS);
+      const uploadAccount = await User.findOneAndUpdate(
+        {
+          _id: req.user.id,
+          $or: [
+            { largeFileUploadBlockedUntil: null },
+            { largeFileUploadBlockedUntil: { $exists: false } },
+            { largeFileUploadBlockedUntil: { $lte: uploadNow } }
+          ]
+        },
+        [
+          {
+            $set: {
+              largeFileUploadStreak: {
+                $add: [
+                  {
+                    $cond: [
+                      {
+                        $lte: [
+                          { $ifNull: ['$largeFileUploadBlockedUntil', uploadNow] },
+                          uploadNow
+                        ]
+                      },
+                      0,
+                      { $ifNull: ['$largeFileUploadStreak', 0] }
+                    ]
+                  },
+                  1
+                ]
+              }
+            }
+          },
+          {
+            $set: {
+              largeFileUploadBlockedUntil: {
+                $cond: [
+                  { $gte: ['$largeFileUploadStreak', MAX_CONSECUTIVE_LARGE_FILES] },
+                  cooldownUntil,
+                  null
+                ]
+              }
+            }
+          }
+        ],
+        { new: true }
+      ).select('largeFileUploadStreak largeFileUploadBlockedUntil');
+
+      if (!uploadAccount) {
+        const currentAccount = await User.findById(req.user.id)
+          .select('largeFileUploadBlockedUntil');
+
+        if (!currentAccount) {
+          return res.status(404).json({ error: 'Compte introuvable.' });
+        }
+
+        const blockedUntil = currentAccount.largeFileUploadBlockedUntil;
+        if (blockedUntil && blockedUntil > uploadNow) {
+          const retryAfterSeconds = Math.max(
+            1,
+            Math.ceil((blockedUntil.getTime() - uploadNow.getTime()) / 1000)
+          );
+
+          return res.status(429).json({
+            error: 'Tu as envoyé 3 fichiers volumineux à la suite. Réessaie dans 30 minutes.',
+            retryAfterSeconds
+          });
+        }
+
+        return res.status(409).json({ error: 'Impossible de vérifier la limite des fichiers volumineux. Réessaie.' });
+      }
+    } else {
+      await User.updateOne(
+        {
+          _id: req.user.id,
+          $or: [
+            { largeFileUploadBlockedUntil: null },
+            { largeFileUploadBlockedUntil: { $exists: false } },
+            { largeFileUploadBlockedUntil: { $lte: uploadNow } }
+          ]
+        },
+        { $set: { largeFileUploadStreak: 0, largeFileUploadBlockedUntil: null } }
+      );
     }
 
     const storageId = selectFilebaseStorageId();
