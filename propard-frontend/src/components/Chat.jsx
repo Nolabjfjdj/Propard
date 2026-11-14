@@ -685,6 +685,7 @@ export default function Chat({
     setUploadProgress(0);
 
     const uploadedIds = [];
+    const batchId = crypto.randomUUID();
     let completedBytes = 0;
 
     try {
@@ -696,6 +697,7 @@ export default function Chat({
           recipientPublicKey: friendPublicKey,
           userId,
           token,
+          batchId,
           onProgress: progress => {
             setUploadProgress(Math.min(
               99,
