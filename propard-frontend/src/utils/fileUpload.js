@@ -183,63 +183,68 @@ export async function uploadConversationFile({
   const fileId = created.data?.fileId;
   if (!fileId) throw new Error('Le serveur n’a pas créé la session d’envoi.');
 
-  await storeFileKeyLocally(fileId, fileKey);
+  try {
+    await storeFileKeyLocally(fileId, fileKey);
 
-  let nextIndex = 0;
-  let completedBytes = 0;
-  const worker = async () => {
-    while (true) {
-      const index = nextIndex;
-      nextIndex += 1;
-      if (index >= chunkCount) return;
+    let nextIndex = 0;
+    let completedBytes = 0;
+    const worker = async () => {
+      while (true) {
+        const index = nextIndex;
+        nextIndex += 1;
+        if (index >= chunkCount) return;
 
-      const start = index * FILE_CHUNK_SIZE;
-      const end = Math.min(file.size, start + FILE_CHUNK_SIZE);
-      const encrypted = await encryptFileChunk(
-        fileKey,
-        fileId,
-        index,
-        file.slice(start, end)
-      );
+        const start = index * FILE_CHUNK_SIZE;
+        const end = Math.min(file.size, start + FILE_CHUNK_SIZE);
+        const encrypted = await encryptFileChunk(
+          fileKey,
+          fileId,
+          index,
+          file.slice(start, end)
+        );
 
-      const signed = await api.post(
-        `/api/files/uploads/${fileId}/chunks/${index}/url`,
-        {
-          iv: encrypted.iv,
-          sha256: encrypted.sha256,
-          encryptedSize: encrypted.encryptedSize
-        },
-        authConfig(token)
-      );
+        const signed = await api.post(
+          `/api/files/uploads/${fileId}/chunks/${index}/url`,
+          {
+            iv: encrypted.iv,
+            sha256: encrypted.sha256,
+            encryptedSize: encrypted.encryptedSize
+          },
+          authConfig(token)
+        );
 
-      const response = await fetch(signed.data.uploadUrl, {
-        method: 'PUT',
-        headers: signed.data.headers,
-        body: encrypted.data
-      });
+        const response = await fetch(signed.data.uploadUrl, {
+          method: 'PUT',
+          headers: signed.data.headers,
+          body: encrypted.data
+        });
 
-      if (!response.ok) {
-        throw new Error(`Échec du transfert du morceau ${index + 1}.`);
+        if (!response.ok) {
+          throw new Error(`Échec du transfert du morceau ${index + 1}.`);
+        }
+
+        completedBytes += end - start;
+        onProgress?.(Math.min(99, Math.round(completedBytes / file.size * 100)));
       }
+    };
 
-      completedBytes += end - start;
-      onProgress?.(Math.min(99, Math.round(completedBytes / file.size * 100)));
-    }
-  };
+    await Promise.all([
+      worker(),
+      worker()
+    ]);
 
-  await Promise.all([
-    worker(),
-    worker()
-  ]);
+    await api.post(
+      `/api/files/uploads/${fileId}/finalize`,
+      {},
+      authConfig(token)
+    );
 
-  await api.post(
-    `/api/files/uploads/${fileId}/finalize`,
-    {},
-    authConfig(token)
-  );
-
-  onProgress?.(100);
-  return fileId;
+    onProgress?.(100);
+    return fileId;
+  } catch (error) {
+    await api.delete(`/api/files/${fileId}`, authConfig(token)).catch(() => {});
+    throw error;
+  }
 }
 
 export async function downloadConversationFile(fileId, { userId, token }) {
