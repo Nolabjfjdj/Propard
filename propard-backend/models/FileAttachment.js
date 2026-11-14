@@ -3,6 +3,7 @@ const { registerModel } = require('../db/shards');
 
 const chunkSchema = new mongoose.Schema({
   index: { type: Number, required: true, min: 0 },
+  storageId: { type: Number, required: true, min: 1, max: 100, default: 1 },
   objectKey: { type: String, required: true, maxlength: 1024 },
   encryptedSize: { type: Number, required: true, min: 17 },
   iv: { type: String, required: true, match: /^[A-Za-z0-9+/]{16}$/ },
@@ -83,14 +84,21 @@ fileAttachmentSchema.pre('validate', function validateFileConversation(next) {
   }
 
   const indexes = new Set();
-  const objectKeys = new Set();
+  const storedObjects = new Set();
 
   for (const chunk of this.chunks) {
-    if (chunk.index >= this.chunkCount || indexes.has(chunk.index) || objectKeys.has(chunk.objectKey)) {
+    const storedObject = `${chunk.storageId}:${chunk.objectKey}`;
+
+    if (
+      chunk.index >= this.chunkCount ||
+      indexes.has(chunk.index) ||
+      storedObjects.has(storedObject)
+    ) {
       return next(new Error('Morceau de fichier dupliqué.'));
     }
+
     indexes.add(chunk.index);
-    objectKeys.add(chunk.objectKey);
+    storedObjects.add(storedObject);
   }
 
   if (this.status === 'ready' && this.chunks.length !== this.chunkCount) {
