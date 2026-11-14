@@ -1854,6 +1854,7 @@ export default function GroupChat({
 
     let completedBytes = 0;
     const uploadedIds = [];
+    const batchId = crypto.randomUUID();
 
     try {
 
@@ -1866,6 +1867,7 @@ export default function GroupChat({
           groupMembers: group.members,
           userId: myId,
           token,
+          batchId,
           onProgress: progress => {
             setUploadProgress(Math.min(
               99,
