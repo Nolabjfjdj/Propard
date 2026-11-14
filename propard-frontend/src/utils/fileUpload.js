@@ -276,6 +276,42 @@ export async function getConversationFileInfo(fileId, { token }) {
   return { category, size };
 }
 
+export async function downloadConversationMedia(fileIds, { userId, token }) {
+  if (!Array.isArray(fileIds) || !userId || !token) {
+    throw new Error('Paramètres de téléchargement invalides.');
+  }
+
+  const mediaIds = [];
+
+  for (const rawId of fileIds) {
+    const fileId = rawId?.toString();
+    if (!fileId) continue;
+
+    const info = await getConversationFileInfo(fileId, { token });
+    if (info.category === 'image' || info.category === 'video') {
+      mediaIds.push(fileId);
+    }
+  }
+
+  if (mediaIds.length === 0) {
+    throw new Error('Aucune image ou vidéo à télécharger dans ce message.');
+  }
+
+  for (const fileId of mediaIds) {
+    const result = await downloadConversationFile(fileId, { userId, token });
+    const url = URL.createObjectURL(result.blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = result.name || 'fichier';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  return mediaIds.length;
+}
+
 export async function downloadConversationFile(fileId, { userId, token }) {
   if (!fileId || !userId || !token) {
     throw new Error('Paramètres de téléchargement invalides.');
