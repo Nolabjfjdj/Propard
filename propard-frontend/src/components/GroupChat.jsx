@@ -10,6 +10,9 @@ import socket from '../socket';
 
 import GroupProfile from './GroupProfile';
 import MessageReactions from './MessageReactions';
+import FileAttachments from './FileAttachments';
+import FileUploadButton from './FileUploadButton';
+import { uploadConversationFile } from '../utils/fileUpload';
 import GroupVoiceCall from './GroupVoiceCall';
 
 import {
@@ -58,6 +61,9 @@ export default function GroupChat({
 
   const [input, setInput] =
     useState('');
+
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
 
   const [key, setKey] =
@@ -1807,6 +1813,71 @@ export default function GroupChat({
       }
     };
 
+
+  const handleFilesSelected = async files => {
+    if (!key || !myId || !group?._id) {
+      setLoadError('Chiffrement indisponible pour ce groupe.');
+      return;
+    }
+
+    const totalSize = files.reduce((total, file) => total + file.size, 0);
+    const maxBatchSize = 2 * 1024 * 1024 * 1024;
+
+    if (files.length > 10 || totalSize > maxBatchSize) {
+      setLoadError('La sélection est limitée à 10 fichiers et 2 Go au total.');
+      return;
+    }
+
+    setUploadingFiles(true);
+    setUploadProgress(0);
+
+    let completedBytes = 0;
+
+    try {
+      const uploadedIds = [];
+
+      for (const file of files) {
+        const fileId = await uploadConversationFile({
+          file,
+          scope: 'group',
+          groupId: group._id,
+          groupKeyVersion: group.keyVersion || 1,
+          groupMembers: group.members,
+          userId: myId,
+          token,
+          onProgress: progress => {
+            setUploadProgress(Math.min(
+              99,
+              Math.round((completedBytes + file.size * progress / 100) / totalSize * 100)
+            ));
+          }
+        });
+
+        uploadedIds.push(fileId);
+        completedBytes += file.size;
+      }
+
+      const encryptedContent = await encryptMessage(key, input.trim());
+
+      socket.emit('sendGroupMessage', {
+        groupId: group._id,
+        content: encryptedContent,
+        keyVersion: group.keyVersion || 1,
+        attachmentIds: uploadedIds
+      });
+
+      setInput('');
+      setMentionQuery(null);
+      setMentionStart(-1);
+    } catch (error) {
+      console.error('Erreur envoi fichiers de groupe:', error);
+      setLoadError(error.response?.data?.error || error.message || 'Impossible d’envoyer les fichiers.');
+    } finally {
+      setUploadingFiles(false);
+      setUploadProgress(0);
+    }
+  };
+
   /*
    * Format des dates.
    */
@@ -2638,14 +2709,21 @@ export default function GroupChat({
                             </div>
                           </div>
                         ) : (
-                          <p
-                            style={{
-                              ...styles.text,
-                              color: isMe ? '#fff' : 'var(--text-primary)'
-                            }}
-                          >
-                            {content}
-                          </p>
+                          {content && (
+                            <p
+                              style={{
+                                ...styles.text,
+                                color: isMe ? '#fff' : 'var(--text-primary)'
+                              }}
+                            >
+                              {content}
+                            </p>
+                          )}
+                          <FileAttachments
+                            attachments={message.attachments}
+                            token={token}
+                            userId={myId}
+                          />
                         )}
 
                         <div
@@ -2890,6 +2968,12 @@ export default function GroupChat({
           styles.inputBar
         }
       >
+        <FileUploadButton
+          onFilesSelected={handleFilesSelected}
+          disabled={!key}
+          uploading={uploadingFiles}
+          progress={uploadProgress}
+        />
 
         <div
           style={
@@ -3054,7 +3138,7 @@ export default function GroupChat({
             style={
               styles.input
             }
-            disabled={!key}
+            disabled={!key || uploadingFiles}
           />
 
         </div>
@@ -3066,7 +3150,8 @@ export default function GroupChat({
           }
           disabled={
             !key ||
-            !input.trim()
+            !input.trim() && uploadingFiles ||
+            uploadingFiles
           }
         >
           ➤
