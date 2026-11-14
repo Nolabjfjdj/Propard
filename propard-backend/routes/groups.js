@@ -1005,15 +1005,15 @@ router.delete(
        * de conserver la cohÃ©rence des
        * historiques / signalements.
        */
-      message.deleted =
-        true;
+      const attachmentIds = message.attachments || [];
+      message.deleted = true;
+      message.attachments = [];
 
-      // Le champ `content` est required dans le schéma et contient
-      // le contenu chiffré du message. On le conserve donc en base
-      // et on utilise `deleted` comme marqueur de suppression logique.
+      // Le contenu chiffré reste conservé pour préserver l'historique,
+      // mais les pièces jointes ne doivent plus compter comme références actives.
       await message.save();
 
-      await deleteMessageAttachments(message.attachments || [], req.user.id);
+      await deleteMessageAttachments(attachmentIds, req.user.id);
 
       emitGroupEvent(
         req,
