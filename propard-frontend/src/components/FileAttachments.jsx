@@ -100,6 +100,8 @@ export default function FileAttachments({ attachments, token, userId }) {
 
           if (info.category === 'image') {
             await loadPreview(fileId, 'image', cancelled);
+          } else if (info.category === 'video' && info.size <= MAX_INLINE_VIDEO_SIZE) {
+            await loadPreview(fileId, 'video', cancelled);
           }
         } catch (err) {
           if (!cancelled) {
@@ -201,8 +203,10 @@ export default function FileAttachments({ attachments, token, userId }) {
               <video
                 src={file.url}
                 controls
+                autoPlay
+                muted
                 playsInline
-                preload="metadata"
+                preload="auto"
                 style={styles.video}
               />
             ) : null}
@@ -244,7 +248,6 @@ export default function FileAttachments({ attachments, token, userId }) {
 
             {(isImage || isVideo) && file.url ? (
               <div style={styles.mediaActions}>
-                <span style={styles.label}>{file.name || (isImage ? 'Image' : 'Vidéo')}</span>
                 <button
                   type="button"
                   style={styles.button}
@@ -277,10 +280,10 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: 7,
-    padding: 8,
-    borderRadius: 10,
-    background: 'var(--bg-tertiary)',
-    border: '1px solid var(--border)',
+    padding: 0,
+    borderRadius: 0,
+    background: 'transparent',
+    border: 'none',
     minWidth: 0,
     maxWidth: '100%'
   },
