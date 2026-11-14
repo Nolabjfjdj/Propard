@@ -71,6 +71,13 @@ const connectedUsers=new Map();
 const activeConversations=new Map();
 const socketRateLimiter=createSocketRateLimiter();
 
+const fileCleanupInterval=setInterval(()=>{
+  retryPendingFileCleanup().catch(error=>{
+    console.error('File cleanup worker error:',error);
+  });
+},15*60*1000);
+fileCleanupInterval.unref?.();
+
 const socketRateLimitCleanup=setInterval(()=>{
   socketRateLimiter.cleanup();
 },60000);
@@ -238,6 +245,7 @@ const Group=require('./models/Group');
 const GroupMessage=require('./models/GroupMessage');
 const FileAttachment=require('./models/FileAttachment');
 const {sendPushNotification}=require('./services/push');
+const {retryPendingFileCleanup}=require('./services/fileCleanup');
 
 async function areFriends(userId,friendId){
   const user=await User.findById(userId).select('friends');
