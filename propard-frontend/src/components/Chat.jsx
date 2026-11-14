@@ -1676,7 +1676,7 @@ export default function Chat({
         />
         <input
           value={input}
-          disabled={uploadingFiles}
+          disabled={uploadingFiles || awaitingAttachmentAck}
           onChange={e =>
             setInput(e.target.value)
           }
@@ -1693,7 +1693,7 @@ export default function Chat({
         <button
           onClick={sendMessage}
           style={styles.btn}
-          disabled={!input.trim() || uploadingFiles}
+          disabled={!input.trim() || uploadingFiles || awaitingAttachmentAck}
         >
           ➤
         </button>
