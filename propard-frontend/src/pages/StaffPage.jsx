@@ -800,7 +800,7 @@ export default function StaffPage() {
                     Réponse visible par le demandeur
                     <textarea
                       style={{ ...inputStyle, minHeight: 85, resize: 'vertical' }}
-                      value={helpReplyDrafts[item._id] ?? item.staffReply ?? ''}
+                      value={helpReplyDrafts[item._id] ?? ''}
                       onChange={event => setHelpReplyDrafts(previous => ({ ...previous, [item._id]: event.target.value }))}
                       maxLength={1500}
                       placeholder="Écris une réponse claire, sans demander le mot de passe."
