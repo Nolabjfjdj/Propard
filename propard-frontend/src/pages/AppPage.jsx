@@ -1792,6 +1792,9 @@ const styles = {
     padding: 'max(16px, env(safe-area-inset-top)) 16px 16px',
     gap: '12px',
     overflowY: 'auto',
+    touchAction: 'pan-y',
+    WebkitOverflowScrolling: 'touch',
+    overscrollBehaviorY: 'contain',
     background: 'var(--bg-secondary)',
     borderRight: '1px solid var(--border)',
     transition: 'transform 0.25s ease'
