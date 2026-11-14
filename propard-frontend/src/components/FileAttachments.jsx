@@ -205,7 +205,7 @@ export default function FileAttachments({ attachments, token, userId }) {
                     {file.downloading ? 'Téléchargement...' : 'Télécharger'}
                   </button>
                 ) : null}
-                {(isImage || isVideo) && file.url ? null : (
+                {(isImage || isVideo) && !file.url ? (
                   <button
                     type="button"
                     style={styles.button}
@@ -214,7 +214,7 @@ export default function FileAttachments({ attachments, token, userId }) {
                   >
                     {file.downloading ? 'Téléchargement...' : 'Télécharger'}
                   </button>
-                )}
+                ) : null}
               </div>
             )}
 
