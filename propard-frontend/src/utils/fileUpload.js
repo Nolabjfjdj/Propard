@@ -265,17 +265,7 @@ export async function downloadConversationFile(fileId, { userId, token }) {
     throw new Error('Clé privée E2EE locale introuvable.');
   }
 
-  let senderPublicKey;
-
-  if (manifest.senderId.toString() === userId.toString()) {
-    senderPublicKey = publicKeyFromPrivateJwk(privateKeyJwk);
-  } else {
-    const senderResponse = await api.get(
-      `/api/auth/user/${manifest.senderId}`,
-      authConfig(token)
-    );
-    senderPublicKey = parsePublicKey(senderResponse.data?.publicKey);
-  }
+  const senderPublicKey = parsePublicKey(manifest.senderPublicKey);
 
   const fileKey = await unwrapFileKeyForUser(
     manifest.keyPackage?.encryptedKey,
