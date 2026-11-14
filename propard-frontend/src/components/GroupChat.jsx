@@ -64,6 +64,7 @@ export default function GroupChat({
 
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const pendingAttachmentIdsRef = useRef([]);
 
 
   const [key, setKey] =
@@ -768,6 +769,11 @@ export default function GroupChat({
           return;
         }
 
+        const senderId = (message.sender?._id || message.sender)?.toString();
+        if (senderId === myId && Array.isArray(message.attachments) && message.attachments.length) {
+          pendingAttachmentIdsRef.current = [];
+        }
+
         let decryptedMessage = message.encrypted === false
           ? { ...message, decryptionError: false }
           : {
@@ -924,6 +930,19 @@ export default function GroupChat({
       handleGroupMessageEdited
     );
 
+    const handleGroupMessageError = data => {
+      setLoadError(data?.message || 'Impossible d’envoyer le message de groupe.');
+      const pendingIds = pendingAttachmentIdsRef.current;
+      pendingAttachmentIdsRef.current = [];
+      Promise.all(pendingIds.map(id =>
+        api.delete(`/api/files/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => {})
+      ));
+    };
+
+    socket.on('groupMessageError', handleGroupMessageError);
+
     return () => {
       socket.off(
         'newGroupMessage',
@@ -959,6 +978,8 @@ export default function GroupChat({
         'groupMessageEdited',
         handleGroupMessageEdited
       );
+
+      socket.off('groupMessageError', handleGroupMessageError);
     };
   }, [
     initialGroup?._id,
@@ -1832,9 +1853,9 @@ export default function GroupChat({
     setUploadProgress(0);
 
     let completedBytes = 0;
+    const uploadedIds = [];
 
     try {
-      const uploadedIds = [];
 
       for (const file of files) {
         const fileId = await uploadConversationFile({
@@ -1859,6 +1880,7 @@ export default function GroupChat({
 
       const encryptedContent = await encryptMessage(key, input.trim());
 
+      pendingAttachmentIdsRef.current = uploadedIds;
       socket.emit('sendGroupMessage', {
         groupId: group._id,
         content: encryptedContent,
@@ -1870,6 +1892,11 @@ export default function GroupChat({
       setMentionQuery(null);
       setMentionStart(-1);
     } catch (error) {
+      await Promise.all(uploadedIds.map(id =>
+        api.delete(`/api/files/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => {})
+      ));
       console.error('Erreur envoi fichiers de groupe:', error);
       setLoadError(error.response?.data?.error || error.message || 'Impossible d’envoyer les fichiers.');
     } finally {
