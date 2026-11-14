@@ -128,9 +128,21 @@ async function getAuthorizedFile(file, userId) {
     const group = await Group.findOne({
       _id: file.group,
       'members.userId': userId
-    }).select('members keyVersion');
+    }).select('members');
 
     if (!group) return null;
+
+    const membership = group.members.find(
+      member => member.userId.toString() === currentUserId
+    );
+
+    if (
+      !membership ||
+      !membership.joinedAt ||
+      new Date(membership.joinedAt) > new Date(file.createdAt)
+    ) {
+      return null;
+    }
 
     return file.keyPackages.find(item => item.userId.toString() === currentUserId) || null;
   }
