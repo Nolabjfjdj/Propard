@@ -170,6 +170,7 @@ export async function uploadConversationFile({
     chunkCount,
     encryptedMetadata,
     keyPackages,
+    senderPublicKey: JSON.stringify(ownPublicKey),
     batchId,
     ...(scope === 'private' ? { recipientId: recipientId.toString() } : {
       groupId: groupId.toString(),
