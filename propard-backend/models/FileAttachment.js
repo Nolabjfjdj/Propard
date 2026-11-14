@@ -36,7 +36,7 @@ const fileAttachmentSchema = new mongoose.Schema({
   groupKeyVersion: { type: Number, default: null, min: 1 },
   storageId: { type: Number, required: true, min: 1, max: 100, default: 1 },
   senderPublicKey: { type: String, required: true, maxlength: 2000 },
-  batchId: { type: String, required: true, minlength: 36, maxlength: 36, match: /^[a-f0-9-]{36}$/i, index: true },
+  batchId: { type: String, required: true, minlength: 36, maxlength: 36, match: /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i, index: true },
   encryptedMetadata: { type: String, required: true, maxlength: 20000 },
   cryptoVersion: { type: Number, enum: [1], default: 1, required: true },
   originalSize: { type: Number, required: true, min: 1 },
