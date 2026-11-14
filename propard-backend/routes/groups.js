@@ -9,7 +9,7 @@ const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { MAX_AVATAR_LENGTH, MAX_GROUP_NAME_LENGTH, isEncryptedMessagePayload } = require('../utils/inputValidation');
 const { parseMessagePagination } = require('../utils/messagePagination');
-const { deleteMessageAttachments } = require('../services/fileCleanup');
+const { deleteMessageAttachments, deleteFilesForGroup } = require('../services/fileCleanup');
 
 router.use(authMiddleware);
 
@@ -1650,6 +1650,8 @@ router.delete(
             'Seul le propriÃ©taire peut supprimer le groupe.'
         });
       }
+
+      await deleteFilesForGroup(group._id);
 
       await GroupMessage.deleteMany({
         group:
