@@ -44,6 +44,8 @@ export default function GroupChat({
   const [messages, setMessages] =
     useState([]);
 
+  const reactionNotificationAudioRef = useRef(null);
+
   const [loading, setLoading] =
     useState(true);
 
@@ -70,6 +72,17 @@ export default function GroupChat({
 
   const [key, setKey] =
     useState(null);
+
+  useEffect(() => {
+    const audio = new Audio('/notification.wav');
+    audio.preload = 'auto';
+    reactionNotificationAudioRef.current = audio;
+    return () => {
+      audio.pause();
+      audio.currentTime = 0;
+      reactionNotificationAudioRef.current = null;
+    };
+  }, []);
 
   const [showProfile, setShowProfile] =
     useState(false);
@@ -904,6 +917,32 @@ export default function GroupChat({
         !Array.isArray(data.reactions)
       ) return;
 
+      const targetMessage = messages.find(message =>
+        message._id?.toString() === data.messageId.toString()
+      );
+      const messageSenderId = (
+        targetMessage?.sender?._id || targetMessage?.sender
+      )?.toString();
+      const previousReactions = new Set(
+        (targetMessage?.reactions || []).map(reaction =>
+          `${reaction.userId?.toString() || ''}:${reaction.emoji}`
+        )
+      );
+      const hasIncomingReaction = data.reactions.some(reaction =>
+        reaction.userId?.toString() !== myId &&
+        !previousReactions.has(`${reaction.userId?.toString() || ''}:${reaction.emoji}`)
+      );
+
+      if (messageSenderId === myId && hasIncomingReaction) {
+        const audio = reactionNotificationAudioRef.current;
+        if (audio) {
+          audio.currentTime = 0;
+          audio.play().catch(error => {
+            console.warn('Lecture du son de notification impossible:', error);
+          });
+        }
+      }
+
       setMessages(prev => prev.map(message =>
         message._id?.toString() === data.messageId.toString()
           ? { ...message, reactions: data.reactions }
@@ -981,6 +1020,7 @@ export default function GroupChat({
   }, [
     initialGroup?._id,
     key,
+    messages,
     myId,
     token
   ]);
