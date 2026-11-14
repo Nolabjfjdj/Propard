@@ -63,6 +63,7 @@ export default function GroupChat({
     useState('');
 
   const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [awaitingAttachmentAck, setAwaitingAttachmentAck] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const pendingAttachmentIdsRef = useRef([]);
 
@@ -772,6 +773,7 @@ export default function GroupChat({
         const senderId = (message.sender?._id || message.sender)?.toString();
         if (senderId === myId && Array.isArray(message.attachments) && message.attachments.length) {
           pendingAttachmentIdsRef.current = [];
+          setAwaitingAttachmentAck(false);
         }
 
         let decryptedMessage = message.encrypted === false
@@ -928,6 +930,7 @@ export default function GroupChat({
       setLoadError(data?.message || 'Impossible d’envoyer le message de groupe.');
       const pendingIds = pendingAttachmentIdsRef.current;
       pendingAttachmentIdsRef.current = [];
+      setAwaitingAttachmentAck(false);
       Promise.all(pendingIds.map(id =>
         api.delete(`/api/files/${id}`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -1887,6 +1890,7 @@ export default function GroupChat({
       const encryptedContent = await encryptMessage(key, input.trim());
 
       pendingAttachmentIdsRef.current = uploadedIds;
+      setAwaitingAttachmentAck(true);
       socket.emit('sendGroupMessage', {
         groupId: group._id,
         content: encryptedContent,
@@ -3028,7 +3032,7 @@ export default function GroupChat({
       >
         <FileUploadButton
           onFilesSelected={handleFilesSelected}
-          disabled={!key}
+          disabled={!key || awaitingAttachmentAck}
           uploading={uploadingFiles}
           progress={uploadProgress}
         />
