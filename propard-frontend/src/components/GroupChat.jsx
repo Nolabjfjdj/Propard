@@ -2749,11 +2749,13 @@ export default function GroupChat({
                                 {content}
                               </p>
                             )}
-                            <FileAttachments
-                              attachments={message.attachments}
-                              token={token}
-                              userId={myId}
-                            />
+                            {!message.deleted && (
+                              <FileAttachments
+                                attachments={message.attachments}
+                                token={token}
+                                userId={myId}
+                              />
+                            )}
                           </>
                         )}
 
