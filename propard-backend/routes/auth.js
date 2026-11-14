@@ -1081,9 +1081,6 @@ router.delete('/delete', authMiddleware, accountDeletionLimiter, async (req, res
     const ownedGroupIds =
       ownedGroups.map(group => group._id);
 
-    await deleteFilesForUser(userId);
-    await Promise.all(ownedGroupIds.map(groupId => deleteFilesForGroup(groupId)));
-
     await Message.deleteMany({
       $or: [
         { sender: userId },
@@ -1108,6 +1105,9 @@ router.delete('/delete', authMiddleware, accountDeletionLimiter, async (req, res
         }
       });
     }
+
+    await deleteFilesForUser(userId);
+    await Promise.all(ownedGroupIds.map(groupId => deleteFilesForGroup(groupId)));
 
     await Group.updateMany(
       {
