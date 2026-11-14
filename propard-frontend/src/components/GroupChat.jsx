@@ -2709,21 +2709,23 @@ export default function GroupChat({
                             </div>
                           </div>
                         ) : (
-                          {content && (
-                            <p
-                              style={{
-                                ...styles.text,
-                                color: isMe ? '#fff' : 'var(--text-primary)'
-                              }}
-                            >
-                              {content}
-                            </p>
-                          )}
-                          <FileAttachments
-                            attachments={message.attachments}
-                            token={token}
-                            userId={myId}
-                          />
+                          <>
+                            {content && (
+                              <p
+                                style={{
+                                  ...styles.text,
+                                  color: isMe ? '#fff' : 'var(--text-primary)'
+                                }}
+                              >
+                                {content}
+                              </p>
+                            )}
+                            <FileAttachments
+                              attachments={message.attachments}
+                              token={token}
+                              userId={myId}
+                            />
+                          </>
                         )}
 
                         <div
@@ -3150,7 +3152,7 @@ export default function GroupChat({
           }
           disabled={
             !key ||
-            !input.trim() && uploadingFiles ||
+            !input.trim() ||
             uploadingFiles
           }
         >
