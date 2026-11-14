@@ -21,8 +21,8 @@ export default function FileAttachments({ attachments, token, userId }) {
       const expectedType = category === 'image' ? 'image/' : 'video/';
       const filename = String(result.name || '').toLowerCase();
       const extensionMatches = category === 'image'
-        ? /\\.(jpg|jpeg|jpe|png|gif|webp|avif|bmp|svg)$/.test(filename)
-        : /\\.(mp4|m4v|webm|mov|ogv)$/.test(filename);
+        ? /\.(jpg|jpeg|jpe|png|gif|webp|avif|bmp|svg)$/.test(filename)
+        : /\.(mp4|m4v|webm|mov|ogv)$/.test(filename);
 
       if (!result.type?.startsWith(expectedType) && !extensionMatches) {
         throw new Error('Le type réel du fichier ne correspond pas à son aperçu.');
