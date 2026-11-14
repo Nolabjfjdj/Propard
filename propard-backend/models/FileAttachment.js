@@ -67,7 +67,8 @@ const fileAttachmentSchema = new mongoose.Schema({
   },
   createdAt: { type: Date, default: Date.now, immutable: true },
   completedAt: { type: Date, default: null },
-  deletedAt: { type: Date, default: null }
+  deletedAt: { type: Date, default: null },
+  cleanupPending: { type: Boolean, default: false, index: true }
 });
 
 fileAttachmentSchema.pre('validate', function validateFileConversation(next) {
