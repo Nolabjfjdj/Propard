@@ -5,7 +5,7 @@ import VoiceCall from './VoiceCall';
 import MessageReactions from './MessageReactions';
 import FileAttachments from './FileAttachments';
 import FileUploadButton from './FileUploadButton';
-import { uploadConversationFile } from '../utils/fileUpload';
+import { uploadConversationFile, downloadConversationMedia } from '../utils/fileUpload';
 import {
   deriveSharedKey,
   encryptMessage,
@@ -731,6 +731,16 @@ export default function Chat({
     } finally {
       setUploadingFiles(false);
       setUploadProgress(0);
+    }
+  };
+
+  const downloadMessageMedia = async msg => {
+    setContextMenu(null);
+
+    try {
+      await downloadConversationMedia(msg.attachments, { userId: myId, token });
+    } catch (err) {
+      setLoadError(err.message || 'Impossible de télécharger les médias.');
     }
   };
 
@@ -1592,6 +1602,15 @@ export default function Chat({
             >
               Copier
             </button>
+
+            {Array.isArray(contextMenu.msg.attachments) && contextMenu.msg.attachments.length > 0 && (
+              <button
+                style={styles.contextItem}
+                onClick={() => downloadMessageMedia(contextMenu.msg)}
+              >
+                Télécharger
+              </button>
+            )}
 
             {isMe ? (
               <>
