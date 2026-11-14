@@ -196,7 +196,7 @@ export default function StaffPage() {
     } finally {
       if (!notify) setHelpRequestsLoading(false);
     }
-  }, [request, staffRole]);
+  }, [request, staffRole, systemNotificationsEnabled]);
 
   const saveStaffEventPreferences = async nextPreferences => {
     setStaffEventPreferences(nextPreferences);
@@ -291,7 +291,7 @@ export default function StaffPage() {
     } finally {
       if (!notify) setStaffNotificationsLoading(false);
     }
-  }, [request, staffRole]);
+  }, [request, staffRole, systemNotificationsEnabled]);
 
   const updateHelpRequestStatus = async (requestId, status) => {
     setError('');
