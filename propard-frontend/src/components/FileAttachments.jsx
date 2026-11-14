@@ -88,7 +88,7 @@ export default function FileAttachments({ attachments, token, userId }) {
         if (!fileId) return;
 
         try {
-          const info = await getConversationFileInfo(fileId, { token });
+          const info = await getConversationFileInfo(fileId, { token, userId });
           if (generation !== previewGenerationRef.current) return;
 
           setFiles(previous => ({
@@ -96,6 +96,7 @@ export default function FileAttachments({ attachments, token, userId }) {
             [fileId]: {
               category: info.category,
               size: info.size,
+              name: info.name,
               loading: false,
               url: null
             }
@@ -212,7 +213,7 @@ export default function FileAttachments({ attachments, token, userId }) {
               />
             ) : null}
 
-            {(!isImage || !file.url) && (!isVideo || !file.url) && (
+            <div style={styles.fileRow}>\n              <span style={styles.label}>{file.name || 'Nom du fichier indisponible'}</span>\n            </div>\n\n            {(!isImage || !file.url) && (!isVideo || !file.url) && (
               <div style={styles.fileRow}>
                 <span style={styles.icon}>{isImage ? '🖼️' : isVideo ? '🎬' : '📎'}</span>
                 <span style={styles.label}>
