@@ -14,6 +14,7 @@ const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { MAX_AVATAR_LENGTH } = require('../utils/inputValidation');
 const { effectiveStaffRole } = require('../utils/staffAllowlist');
+const { deleteFilesForUser, deleteFilesForGroup } = require('../services/fileCleanup');
 
 const accountHelpLimiter = createRateLimiter({
   windowMs: 30 * 60 * 1000,
@@ -1072,6 +1073,17 @@ router.delete('/delete', authMiddleware, accountDeletionLimiter, async (req, res
       disconnectUserSockets(userId);
     }
 
+    const ownedGroups =
+      await Group.find({
+        owner: userId
+      }).select('_id');
+
+    const ownedGroupIds =
+      ownedGroups.map(group => group._id);
+
+    await deleteFilesForUser(userId);
+    await Promise.all(ownedGroupIds.map(groupId => deleteFilesForGroup(groupId)));
+
     await Message.deleteMany({
       $or: [
         { sender: userId },
@@ -1082,14 +1094,6 @@ router.delete('/delete', authMiddleware, accountDeletionLimiter, async (req, res
     await GroupMessage.deleteMany({
       sender: userId
     });
-
-    const ownedGroups =
-      await Group.find({
-        owner: userId
-      }).select('_id');
-
-    const ownedGroupIds =
-      ownedGroups.map(group => group._id);
 
     if (ownedGroupIds.length > 0) {
       await GroupMessage.deleteMany({
