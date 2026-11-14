@@ -187,7 +187,7 @@ export async function uploadConversationFile({
   if (!fileId) throw new Error('Le serveur n’a pas créé la session d’envoi.');
 
   try {
-    await storeFileKeyLocally(fileId, fileKey);
+    await storeFileKeyLocally(fileId, fileKey).catch(() => {});
 
     let nextIndex = 0;
     let completedBytes = 0;
@@ -268,7 +268,13 @@ export async function downloadConversationFile(fileId, { userId, token }) {
 
   const senderPublicKey = parsePublicKey(manifest.senderPublicKey);
 
-  let fileKey = await getStoredFileKey(fileId);
+  let fileKey = null;
+
+  try {
+    fileKey = await getStoredFileKey(fileId);
+  } catch {
+    fileKey = null;
+  }
 
   if (!fileKey) {
     fileKey = await unwrapFileKeyForUser(
@@ -276,7 +282,7 @@ export async function downloadConversationFile(fileId, { userId, token }) {
       privateKeyJwk,
       senderPublicKey
     );
-    await storeFileKeyLocally(fileId, fileKey);
+    await storeFileKeyLocally(fileId, fileKey).catch(() => {});
   }
 
   const metadata = await decryptFileMetadata(
