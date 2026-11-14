@@ -632,7 +632,8 @@ router.delete('/:fileId', signedUrlRateLimit, async (req, res) => {
       {
         $set: {
           status: 'deleted',
-          deletedAt: new Date()
+          deletedAt: new Date(),
+          cleanupPending: true
         }
       },
       { new: true }
@@ -652,6 +653,11 @@ router.delete('/:fileId', signedUrlRateLimit, async (req, res) => {
         console.error('File object cleanup error:', error);
       }
     }
+
+    await FileAttachment.updateOne(
+      { _id: file._id, status: 'deleted' },
+      { $set: { cleanupPending } }
+    );
 
     res.json({
       deleted: true,
