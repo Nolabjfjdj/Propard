@@ -6,6 +6,11 @@ import {
 
 const MAX_INLINE_VIDEO_SIZE = 100 * 1024 * 1024;
 
+function getAttachmentId(value) {
+  const id = value?._id || value?.fileId || value?.id || value;
+  return typeof id === 'string' ? id : id?.toString?.() || '';
+}
+
 export default function FileAttachments({ attachments, token, userId }) {
   const [files, setFiles] = useState({});
   const objectUrlsRef = useRef([]);
@@ -76,7 +81,7 @@ export default function FileAttachments({ attachments, token, userId }) {
 
     const prepare = async () => {
       await Promise.all(attachments.map(async rawId => {
-        const fileId = rawId?.toString();
+        const fileId = getAttachmentId(rawId);
         if (!fileId) return;
 
         try {
@@ -172,7 +177,23 @@ export default function FileAttachments({ attachments, token, userId }) {
           <div key={fileId} style={styles.item}>
             {isImage && file.url ? (
               <a href={file.url} target="_blank" rel="noopener noreferrer" style={styles.previewLink}>
-                <img src={file.url} alt={file.name || 'Image jointe'} style={styles.image} />
+                <img
+                  src={file.url}
+                  alt={file.name || 'Image jointe'}
+                  style={styles.image}
+                  onLoad={() => setFiles(previous => ({
+                    ...previous,
+                    [fileId]: { ...previous[fileId], imageLoaded: true }
+                  }))}
+                  onError={() => setFiles(previous => ({
+                    ...previous,
+                    [fileId]: {
+                      ...previous[fileId],
+                      imageLoaded: false,
+                      error: 'Impossible d’afficher cette image dans le navigateur.'
+                    }
+                  }))}
+                />
               </a>
             ) : null}
 
@@ -286,10 +307,15 @@ const styles = {
   },
   previewLink: {
     display: 'block',
-    maxWidth: '100%'
+    width: 'fit-content',
+    maxWidth: '100%',
+    textDecoration: 'none',
+    lineHeight: 0
   },
   image: {
     display: 'block',
+    width: 'auto',
+    height: 'auto',
     maxWidth: '100%',
     maxHeight: 320,
     objectFit: 'contain',
