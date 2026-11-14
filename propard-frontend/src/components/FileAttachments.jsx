@@ -14,8 +14,10 @@ function getAttachmentId(value) {
 export default function FileAttachments({ attachments, token, userId }) {
   const [files, setFiles] = useState({});
   const objectUrlsRef = useRef([]);
+  const previewGenerationRef = useRef(0);
 
-  const loadPreview = useCallback(async (fileId, category, isCancelled = () => false) => {
+  const loadPreview = useCallback(async (fileId, category, generation = previewGenerationRef.current) => {
+    const isCancelled = () => generation !== previewGenerationRef.current;
     setFiles(previous => ({
       ...previous,
       [fileId]: { ...previous[fileId], category, loading: true, error: '' }
@@ -69,14 +71,14 @@ export default function FileAttachments({ attachments, token, userId }) {
   }, [userId, token]);
 
   useEffect(() => {
-    let cancelled = false;
+    const generation = ++previewGenerationRef.current;
     objectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
     objectUrlsRef.current = [];
     setFiles({});
 
     if (!Array.isArray(attachments) || attachments.length === 0) {
       return () => {
-        cancelled = true;
+        if (previewGenerationRef.current === generation) previewGenerationRef.current += 1;
       };
     }
 
@@ -87,7 +89,7 @@ export default function FileAttachments({ attachments, token, userId }) {
 
         try {
           const info = await getConversationFileInfo(fileId, { token });
-          if (cancelled) return;
+          if (generation !== previewGenerationRef.current) return;
 
           setFiles(previous => ({
             ...previous,
@@ -100,10 +102,10 @@ export default function FileAttachments({ attachments, token, userId }) {
           }));
 
           if ((info.category === 'image' || info.category === 'video') && info.size <= MAX_AUTO_PREVIEW) {
-            await loadPreview(fileId, info.category, () => cancelled);
+            await loadPreview(fileId, info.category, generation);
           }
         } catch (err) {
-          if (!cancelled) {
+          if (generation === previewGenerationRef.current) {
             setFiles(previous => ({
               ...previous,
               [fileId]: {
@@ -121,7 +123,7 @@ export default function FileAttachments({ attachments, token, userId }) {
     prepare();
 
     return () => {
-      cancelled = true;
+      if (previewGenerationRef.current === generation) previewGenerationRef.current += 1;
       objectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
       objectUrlsRef.current = [];
     };
