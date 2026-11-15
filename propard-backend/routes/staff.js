@@ -16,6 +16,7 @@ const authMiddleware = require('../middleware/auth');
 const { ROLE_LEVELS, roleLevel, requireStaffRole, canManageRole } = require('../middleware/staffRoles');
 const { effectiveStaffRole } = require('../utils/staffAllowlist');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { getClientIp } = require('../utils/clientIp');
 const { deleteFilesForUser, deleteFilesForGroup } = require('../services/fileCleanup');
 
 const router = express.Router();
@@ -23,14 +24,14 @@ const router = express.Router();
 const actionLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 300,
-  keyFn: req => req.user && req.user.id ? req.user.id : req.ip || 'unknown',
+  keyFn: req => req.user && req.user.id ? req.user.id : getClientIp(req) || 'unknown',
   message: 'Trop d’actions en peu de temps. Réessaie plus tard.'
 });
 
 const resetCompleteLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  keyFn: req => req.ip || 'unknown',
+  keyFn: req => getClientIp(req) || 'unknown',
   message: 'Trop de tentatives de récupération. Réessaie plus tard.'
 });
 
@@ -52,7 +53,7 @@ function requireSoleOwner(req, res, next) {
 const announcementLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 5,
-  keyFn: req => `${req.user?.id || 'unknown'}:${req.ip || 'unknown'}`,
+  keyFn: req => `${req.user?.id || 'unknown'}:${getClientIp(req) || 'unknown'}`,
   message: 'Trop de tentatives de publication. Réessaie plus tard.',
 });
 
@@ -84,7 +85,7 @@ async function audit(req, action, options = {}) {
     targetUsername: targetUser?.username || options.targetUsername || options.details?.username || null,
     targetReport: options.targetReport || null,
     details: options.details || null,
-    ip: typeof req.ip === 'string' ? req.ip.slice(0, 128) : null,
+    ip: typeof getClientIp(req) === 'string' ? getClientIp(req).slice(0, 128) : null,
     userAgent: typeof req.get('user-agent') === 'string' ? req.get('user-agent').slice(0, 512) : null
   });
 }
