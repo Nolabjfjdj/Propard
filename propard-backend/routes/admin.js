@@ -8,6 +8,7 @@ const StaffAuditLog = require('../models/StaffAuditLog');
 const authMiddleware = require('../middleware/auth');
 const { roleLevel } = require('../middleware/staffRoles');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { getClientIp } = require('../utils/clientIp');
 
 function requireSoleOwner(req, res, next) {
   if (req.user?.staffRole !== 'owner') {
@@ -30,7 +31,7 @@ async function auditAdminAction(req, action, targetUser = null, details = null) 
     action,
     targetUser,
     details,
-    ip: typeof req.ip === 'string' ? req.ip.slice(0, 128) : null,
+    ip: typeof getClientIp(req) === 'string' ? getClientIp(req).slice(0, 128) : null,
     userAgent: typeof req.get('user-agent') === 'string' ? req.get('user-agent').slice(0, 512) : null
   });
 }
@@ -38,7 +39,7 @@ async function auditAdminAction(req, action, targetUser = null, details = null) 
 const adminSensitiveLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 5,
-  keyFn: req => req.ip || 'unknown',
+  keyFn: req => getClientIp(req) || 'unknown',
   message: 'Trop de tentatives, réessaie plus tard.',
   captcha: true,
   resetOnCaptcha: true
