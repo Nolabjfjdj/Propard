@@ -27,7 +27,29 @@ const getOrigins = () => (process.env.FRONTEND_ORIGINS || process.env.FRONTEND_O
   .split(',')
   .map(value => value.trim())
   .filter(Boolean);
-const getRpId = () => process.env.WEBAUTHN_RP_ID || new URL(getOrigins()[0]).hostname;
+const getRequestContext = req => {
+  const requestOrigin = typeof req.headers.origin === 'string' ? req.headers.origin : '';
+  let parsed;
+  try {
+    parsed = new URL(requestOrigin);
+  } catch {
+    throw new Error('Origine WebAuthn invalide.');
+  }
+  const origin = parsed.origin;
+  const allowed = getOrigins().some(value => {
+    try {
+      return new URL(value).origin === origin;
+    } catch {
+      return false;
+    }
+  });
+  if (!allowed || (parsed.protocol !== 'https:' && parsed.hostname !== 'localhost')) {
+    throw new Error('Origine WebAuthn non autorisée.');
+  }
+  return { origin, rpId: parsed.hostname };
+};
+const getLegacyRpId = () => process.env.WEBAUTHN_RP_ID || null;
+const getCredentialRpId = item => item.rpId || getLegacyRpId();
 const toBase64Url = value => Buffer.from(value).toString('base64url');
 const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const hashRecoveryCode = value => crypto.createHmac('sha256', process.env.JWT_SECRET).update(value).digest('hex');
@@ -89,15 +111,16 @@ router.post('/register/options', auth, registrationLimiter, async (req, res) => 
     if (!await bcrypt.compare(password, user.password || DUMMY_PASSWORD_HASH)) {
       return res.status(401).json({ error: 'Mot de passe incorrect.' });
     }
+    const { origin, rpId } = getRequestContext(req);
     const { generateRegistrationOptions } = await getWebAuthn();
     const options = await generateRegistrationOptions({
       rpName: 'Propard',
-      rpID: getRpId(),
+      rpID: rpId,
       userID: new Uint8Array(Buffer.from(user._id.toString())),
       userName: user.username,
       userDisplayName: user.displayName || user.username,
       attestationType: 'none',
-      excludeCredentials: (user.passkeys || []).map(item => ({
+      excludeCredentials: (user.passkeys || []).filter(item => getCredentialRpId(item) === rpId).map(item => ({
         id: item.credentialId,
         transports: item.transports
       })),
@@ -109,6 +132,8 @@ router.post('/register/options', auth, registrationLimiter, async (req, res) => 
     });
     user.passkeyRegistrationChallenge = options.challenge;
     user.passkeyRegistrationChallengeExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    user.passkeyRegistrationRpId = rpId;
+    user.passkeyRegistrationOrigin = origin;
     await user.save();
     return res.json({ options });
   } catch (error) {
@@ -121,21 +146,29 @@ router.post('/register/verify', auth, registrationLimiter, async (req, res) => {
   try {
     const response = req.body?.response;
     const name = typeof req.body?.name === 'string' ? req.body.name.trim().slice(0, 40) : '';
-    const pendingUser = await User.findById(req.user.id).select('+passkeyRegistrationChallenge +passkeyRegistrationChallengeExpiresAt');
+    const pendingUser = await User.findById(req.user.id).select('+passkeyRegistrationChallenge +passkeyRegistrationChallengeExpiresAt +passkeyRegistrationRpId +passkeyRegistrationOrigin');
     const challenge = pendingUser?.passkeyRegistrationChallenge;
-    if (!pendingUser || !challenge || !pendingUser.passkeyRegistrationChallengeExpiresAt || pendingUser.passkeyRegistrationChallengeExpiresAt <= new Date()) {
+    const requestContext = getRequestContext(req);
+    if (!pendingUser || !challenge || !pendingUser.passkeyRegistrationChallengeExpiresAt || pendingUser.passkeyRegistrationChallengeExpiresAt <= new Date() || !pendingUser.passkeyRegistrationRpId || !pendingUser.passkeyRegistrationOrigin) {
       return res.status(400).json({ error: 'La demande a expiré. Recommence la création de la clé.' });
+    }
+    if (pendingUser.passkeyRegistrationRpId !== requestContext.rpId || pendingUser.passkeyRegistrationOrigin !== requestContext.origin) {
+      return res.status(400).json({ error: 'La création de cette clé doit être terminée sur le même domaine.' });
     }
     const user = await User.findOneAndUpdate(
       {
         _id: pendingUser._id,
         passkeyRegistrationChallenge: challenge,
-        passkeyRegistrationChallengeExpiresAt: { $gt: new Date() }
+        passkeyRegistrationChallengeExpiresAt: { $gt: new Date() },
+        passkeyRegistrationRpId: requestContext.rpId,
+        passkeyRegistrationOrigin: requestContext.origin
       },
       {
         $set: {
           passkeyRegistrationChallenge: null,
-          passkeyRegistrationChallengeExpiresAt: null
+          passkeyRegistrationChallengeExpiresAt: null,
+          passkeyRegistrationRpId: null,
+          passkeyRegistrationOrigin: null
         }
       },
       { new: true },
@@ -146,8 +179,8 @@ router.post('/register/verify', auth, registrationLimiter, async (req, res) => {
     const verification = await verifyRegistrationResponse({
       response,
       expectedChallenge: challenge,
-      expectedOrigin: getOrigins(),
-      expectedRPID: getRpId(),
+      expectedOrigin: requestContext.origin,
+      expectedRPID: requestContext.rpId,
       requireUserVerification: true
     });
     if (!verification.verified || !verification.registrationInfo) {
@@ -160,6 +193,7 @@ router.post('/register/verify', auth, registrationLimiter, async (req, res) => {
     }
     user.passkeys.push({
       credentialId: credential.id,
+      rpId: requestContext.rpId,
       publicKey: toBase64Url(credential.publicKey),
       counter: credential.counter,
       transports: credential.transports || response.response?.transports || [],
@@ -260,10 +294,11 @@ router.post('/login/options', loginLimiter, async (req, res) => {
     if (!user || !matches || !user.passkeys?.length || user.bannedAt) {
       return res.status(401).json({ error: 'Pseudo ou mot de passe incorrect.' });
     }
+    const { origin, rpId } = getRequestContext(req);
     const { generateAuthenticationOptions } = await getWebAuthn();
     const options = await generateAuthenticationOptions({
-      rpID: getRpId(),
-      allowCredentials: user.passkeys.map(item => ({
+      rpID: rpId,
+      allowCredentials: user.passkeys.filter(item => getCredentialRpId(item) === rpId).map(item => ({
         id: item.credentialId,
         transports: item.transports
       })),
@@ -272,6 +307,8 @@ router.post('/login/options', loginLimiter, async (req, res) => {
     });
     user.passkeyLoginChallenge = options.challenge;
     user.passkeyLoginChallengeExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    user.passkeyLoginRpId = rpId;
+    user.passkeyLoginOrigin = origin;
     await user.save();
     return res.json({ options });
   } catch (error) {
@@ -289,36 +326,44 @@ router.post('/login/verify', loginLimiter, async (req, res) => {
         { username: { $regex: new RegExp('^' + escapeRegExp(username) + '$', 'i') } },
         { realUsername: { $regex: new RegExp('^' + escapeRegExp(username) + '$', 'i') } }
       ]
-    }).select('+passkeyLoginChallenge +passkeyLoginChallengeExpiresAt');
+    }).select('+passkeyLoginChallenge +passkeyLoginChallengeExpiresAt +passkeyLoginRpId +passkeyLoginOrigin');
     const challenge = user?.passkeyLoginChallenge;
-    if (!user || !challenge || !user.passkeyLoginChallengeExpiresAt || user.passkeyLoginChallengeExpiresAt <= new Date() || user.bannedAt) {
+    const requestContext = getRequestContext(req);
+    if (!user || !challenge || !user.passkeyLoginChallengeExpiresAt || user.passkeyLoginChallengeExpiresAt <= new Date() || user.bannedAt || !user.passkeyLoginRpId || !user.passkeyLoginOrigin) {
       return res.status(401).json({ error: 'Vérification expirée. Recommence la connexion.' });
     }
     const claimedUser = await User.findOneAndUpdate(
       {
         _id: user._id,
         passkeyLoginChallenge: challenge,
-        passkeyLoginChallengeExpiresAt: { $gt: new Date() }
+        passkeyLoginChallengeExpiresAt: { $gt: new Date() },
+        passkeyLoginRpId: requestContext.rpId,
+        passkeyLoginOrigin: requestContext.origin
       },
       {
         $set: {
           passkeyLoginChallenge: null,
-          passkeyLoginChallengeExpiresAt: null
+          passkeyLoginChallengeExpiresAt: null,
+          passkeyLoginRpId: null,
+          passkeyLoginOrigin: null
         }
       },
       { new: true },
       '+passkeys'
     );
     if (!claimedUser) return res.status(401).json({ error: 'Cette vérification a déjà été utilisée. Recommence la connexion.' });
+    if (user.passkeyLoginRpId !== requestContext.rpId || user.passkeyLoginOrigin !== requestContext.origin) {
+      return res.status(401).json({ error: 'La connexion doit être terminée sur le même domaine.' });
+    }
     const credentialId = response?.id;
-    const stored = claimedUser.passkeys.find(item => item.credentialId === credentialId);
+    const stored = claimedUser.passkeys.find(item => item.credentialId === credentialId && getCredentialRpId(item) === requestContext.rpId);
     if (!stored) return res.status(401).json({ error: 'Clé d’accès inconnue.' });
     const { verifyAuthenticationResponse } = await getWebAuthn();
     const verification = await verifyAuthenticationResponse({
       response,
       expectedChallenge: challenge,
-      expectedOrigin: getOrigins(),
-      expectedRPID: getRpId(),
+      expectedOrigin: requestContext.origin,
+      expectedRPID: requestContext.rpId,
       credential: {
         id: stored.credentialId,
         publicKey: new Uint8Array(Buffer.from(stored.publicKey, 'base64url')),
