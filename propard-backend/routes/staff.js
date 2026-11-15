@@ -13,7 +13,7 @@ const Group = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
 const authMiddleware = require('../middleware/auth');
 const { ROLE_LEVELS, roleLevel, requireStaffRole, canManageRole } = require('../middleware/staffRoles');
-const { effectiveStaffRole, isSoleOwner } = require('../utils/staffAllowlist');
+const { effectiveStaffRole } = require('../utils/staffAllowlist');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { deleteFilesForUser, deleteFilesForGroup } = require('../services/fileCleanup');
 
@@ -42,7 +42,7 @@ function checkAnnouncementKey(providedKey) {
 }
 
 function requireSoleOwner(req, res, next) {
-  if (req.user?.staffRole !== 'owner' || !isSoleOwner(req.user?.id)) {
+  if (req.user?.staffRole !== 'owner') {
     return res.status(403).json({ error: 'Seul le propriétaire unique peut gérer les annonces globales.' });
   }
   return next();
@@ -540,7 +540,7 @@ router.patch('/account-help/settings', requireStaffRole('support'), async (req, 
 router.get('/me', requireStaffRole('support'), (req, res) => {
   return res.json({
     staffRole: req.user.staffRole,
-    canPublishAnnouncements: req.user.staffRole === 'owner' && isSoleOwner(req.user.id),
+    canPublishAnnouncements: req.user.staffRole === 'owner',
     permissions: Object.keys(ROLE_LEVELS).filter(role => roleLevel(role) <= roleLevel(req.user.staffRole))
   });
 });
