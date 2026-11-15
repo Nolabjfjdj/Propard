@@ -15,6 +15,7 @@ import CopyrightPage from './pages/CopyrightPage';
 import GlobalAnnouncement from './components/GlobalAnnouncement';
 import OfflineGame from './components/OfflineGame';
 import SettingsPage from './pages/SettingsPage';
+import PropardAIPage from './pages/PropardAIPage';
 import api from './utils/api';
 
 async function checkPropardServer() {
@@ -221,6 +222,14 @@ export default function App() {
     }
 
     return <AuthPage mode="register" />;
+  }
+
+  if (path === '/ai') {
+    if (!user) {
+      window.history.replaceState({}, '', '/login');
+      return null;
+    }
+    return <PropardAIPage />;
   }
 
   if (path === '/settings') {
