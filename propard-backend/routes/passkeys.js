@@ -9,17 +9,15 @@ const { createRateLimiter } = require('../middleware/rateLimit');
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10);
 const registrationLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 12,
   keyFn: req => `passkey-register:${req.user.id}`,
-  message: 'Trop de tentatives de création de clé. Réessaie plus tard.',
-  captcha: true
+  message: 'Trop de tentatives de création de clé. Réessaie plus tard.'
 });
 const loginLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 8,
+  max: 30,
   keyFn: req => `passkey-login:${req.ip || 'unknown'}`,
-  message: 'Trop de tentatives de connexion. Réessaie plus tard.',
-  captcha: true
+  message: 'Trop de tentatives de connexion. Réessaie plus tard.'
 });
 
 const getWebAuthn = async () => import('@simplewebauthn/server');
