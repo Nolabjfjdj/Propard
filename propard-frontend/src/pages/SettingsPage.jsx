@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
-import { getStoredPrivateKeyJwkForRecovery, publicKeyFromPrivateJwk, validatePrivateKeyMatchesPublicKey, encryptPrivateKeyBackup } from '../utils/crypto';
+import { findStoredPrivateKeyForRecovery, publicKeyFromPrivateJwk, encryptPrivateKeyBackup } from '../utils/crypto';
 
 export default function SettingsPage() {
   const { token, user } = useAuth();
@@ -160,8 +160,6 @@ export default function SettingsPage() {
       const userId = user?.id || user?._id;
       if (!userId) throw new Error('Impossible d’identifier le compte connecté.');
 
-      const privateKeyJwk = await getStoredPrivateKeyJwkForRecovery(userId);
-      const publicKeyJwk = publicKeyFromPrivateJwk(privateKeyJwk);
       let serverPublicKey = user?.publicKey || null;
 
       if (typeof serverPublicKey === 'string') {
@@ -172,10 +170,12 @@ export default function SettingsPage() {
         }
       }
 
-      if (serverPublicKey) {
-        await validatePrivateKeyMatchesPublicKey(privateKeyJwk, serverPublicKey);
+      if (!serverPublicKey) {
+        throw new Error('La clé publique E2EE du compte est absente. Impossible d’identifier la bonne clé privée sans risque.');
       }
 
+      const privateKeyJwk = await findStoredPrivateKeyForRecovery(serverPublicKey);
+      const publicKeyJwk = publicKeyFromPrivateJwk(privateKeyJwk);
       const backup = await encryptPrivateKeyBackup(privateKeyJwk, password);
       await api.post('/api/auth/keybackup', {
         backup,
@@ -239,7 +239,7 @@ export default function SettingsPage() {
         {section === 'e2ee' && (
           <div style={styles.card}>
             <strong>Récupérer ma clé E2EE</strong>
-            <p style={styles.description}>Cette opération cherche la clé privée déjà présente sur cet appareil, la vérifie puis recrée une sauvegarde chiffrée avec ton mot de passe. Elle ne génère aucune nouvelle identité et ne remplace jamais une sauvegarde serveur existante.</p>
+            <p style={styles.description}>Cette opération examine les entrées IndexedDB et localStorage du site, cherche une clé privée correspondant exactement à la clé publique du compte, puis recrée une sauvegarde chiffrée. Elle ne génère aucune nouvelle identité et ne modifie aucune donnée locale pendant le diagnostic.</p>
             {error && <p role="alert" style={styles.error}>{error}</p>}
             {notice && <p role="status" style={styles.success}>{notice}</p>}
             <button type="button" style={styles.primary} onClick={recoverE2EEBackup} disabled={loading}>
