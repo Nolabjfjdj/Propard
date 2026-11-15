@@ -36,7 +36,7 @@ const serializeConversation = conversation => ({
 
 router.get('/status', (req, res) => {
   const config = getGroqConfiguration();
-  res.json({ available: config.configured, model: config.model });
+  res.json({ available: config.configured, model: config.model, keyCount: config.keyCount });
 });
 
 router.get('/conversations', async (req, res) => {
