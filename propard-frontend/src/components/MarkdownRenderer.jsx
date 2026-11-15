@@ -12,7 +12,16 @@ function renderInline(text, prefix = 'i') {
   return String(text).split(pattern).map((part, index) => {
     const key = prefix + '-' + index;
     if (!part) return null;
-    if (/^https?:\/\//i.test(part)) {\n      let url = part;\n      let trailing = '';\n      while (/[.,!?;:)]$/.test(url)) { trailing = url.slice(-1) + trailing; url = url.slice(0, -1); }\n      return <React.Fragment key={key}><SafeLink href={url}>{url}</SafeLink>{trailing}</React.Fragment>;\n    }\n    const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (/^https?:\/\//i.test(part)) {
+      let url = part;
+      let trailing = '';
+      while (/[.,!?;:)]$/.test(url)) {
+        trailing = url.slice(-1) + trailing;
+        url = url.slice(0, -1);
+      }
+      return <React.Fragment key={key}><SafeLink href={url}>{url}</SafeLink>{trailing}</React.Fragment>;
+    }
+    const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     if (link) {
       const href = safeHref(link[2]);
       return href ? <SafeLink key={key} href={href}>{renderInline(link[1], key)}</SafeLink> : <span key={key}>{link[1]}</span>;
