@@ -223,12 +223,7 @@ export default function Chat({
 
       if (friendKeyLoading) return;
 
-      if (!friendPublicKey) {
-        if (!keyError) {
-          setKeyError('La clé publique de cet ami est indisponible.');
-        }
-        return;
-      }
+      if (!friendPublicKey) return;
 
       if (!userId) {
         setKeyError('Impossible d’identifier votre compte pour déverrouiller le chiffrement.');
