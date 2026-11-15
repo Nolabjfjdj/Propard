@@ -36,7 +36,7 @@ export default function PropardAIEntry() {
         onClick={event => { if (suppressClick.current) { event.preventDefault(); suppressClick.current = false; } }}
         style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 11px', borderRadius: 9, background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)', textDecoration: 'none', fontSize: 13, fontWeight: 650 }}
       >
-        <span style={{ width: 26, height: 26, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'var(--accent-glow)', border: '1px solid var(--accent)', color: 'var(--accent)', fontWeight: 800 }}>P</span>
+        <img src="/propard.png" alt="" style={{ width: 26, height: 26, objectFit: 'contain', borderRadius: 7 }} />
         Propard AI
       </a>
       {menu && <>
