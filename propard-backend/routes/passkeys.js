@@ -67,7 +67,7 @@ const publicUser = user => ({
 
 router.get('/', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id), '+passkeys +passkeyRecoveryCodes');
+    const user = await User.findById(req.user.id).select('+passkeys +passkeyRecoveryCodes');
     if (!user) return res.status(404).json({ error: 'Compte introuvable.' });
     return res.json({
       passkeys: (user.passkeys || []).map(safeCredential),
@@ -137,8 +137,9 @@ router.post('/register/verify', auth, registrationLimiter, async (req, res) => {
           passkeyRegistrationChallengeExpiresAt: null
         }
       },
-      { new: true }
-    ).select('+passkeys +passkeyRecoveryCodes');
+      { new: true },
+      '+passkeys +passkeyRecoveryCodes'
+    );
     if (!user) return res.status(400).json({ error: 'Cette demande a déjà été utilisée. Recommence la création de la clé.' });
     const { verifyRegistrationResponse } = await getWebAuthn();
     const verification = await verifyRegistrationResponse({
@@ -188,7 +189,7 @@ router.patch('/:credentialId', auth, async (req, res) => {
   try {
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
     if (!name || name.length > 40) return res.status(400).json({ error: 'Nom invalide (1 à 40 caractères).' });
-    const user = await User.findById(req.user.id), '+passkeys');
+    const user = await User.findById(req.user.id).select('+passkeys');
     const item = user?.passkeys?.find(entry => entry.credentialId === req.params.credentialId);
     if (!item) return res.status(404).json({ error: 'Clé d’accès introuvable.' });
     item.name = name;
@@ -304,8 +305,9 @@ router.post('/login/verify', loginLimiter, async (req, res) => {
           passkeyLoginChallengeExpiresAt: null
         }
       },
-      { new: true }
-    ).select('+passkeys');
+      { new: true },
+      '+passkeys'
+    );
     if (!claimedUser) return res.status(401).json({ error: 'Cette vérification a déjà été utilisée. Recommence la connexion.' });
     const credentialId = response?.id;
     const stored = claimedUser.passkeys.find(item => item.credentialId === credentialId);
@@ -362,8 +364,9 @@ router.post('/login/recovery', loginLimiter, async (req, res) => {
           passkeyRecoveryCodes: hashed
         }
       },
-      { new: true }
-    ), '+passkeyRecoveryCodes');
+      { new: true },
+      '+passkeyRecoveryCodes'
+    );
     if (!claimedUser) return res.status(401).json({ error: 'Code de récupération invalide ou déjà utilisé.' });
     return res.json({
       token: issueToken(claimedUser),
