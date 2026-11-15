@@ -12,6 +12,7 @@ import GroupProfile from './GroupProfile';
 import MessageReactions from './MessageReactions';
 import FileAttachments from './FileAttachments';
 import FileUploadButton from './FileUploadButton';
+import EmojiPicker from './EmojiPicker';
 import { uploadConversationFile, downloadConversationMedia } from '../utils/fileUpload';
 import GroupVoiceCall from './GroupVoiceCall';
 
@@ -3243,6 +3244,7 @@ export default function GroupChat({
 
         </div>
 
+        <EmojiPicker onSelect={emoji => setInput(value => value + emoji)} />
         <button
           onClick={sendMessage}
           style={
