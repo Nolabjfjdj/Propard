@@ -22,6 +22,33 @@ const titleFromMessage = value => {
   return normalized.length > 48 ? `${normalized.slice(0, 45)}...` : normalized;
 };
 
+const logGroqRequestDiagnostics = ({ label, messages, tools = [], temperature, max_completion_tokens }) => {
+  const roleCharacters = {};
+  let totalMessageCharacters = 0;
+  for (const message of messages || []) {
+    const size = typeof message.content === 'string' ? message.content.length : JSON.stringify(message.content || '').length;
+    const role = message.role || 'unknown';
+    roleCharacters[role] = (roleCharacters[role] || 0) + size;
+    totalMessageCharacters += size;
+  }
+  const toolNames = (tools || []).map(tool => tool.function?.name || 'unknown');
+  const serializedToolsCharacters = JSON.stringify(tools || []).length;
+  const requestCharacters = JSON.stringify({ messages, tools, temperature, max_completion_tokens }).length;
+  console.info('Propard AI Groq request diagnostics:', {
+    label,
+    messageCount: messages?.length || 0,
+    roleCharacters,
+    totalMessageCharacters,
+    toolCount: toolNames.length,
+    toolNames,
+    serializedToolsCharacters,
+    requestCharacters,
+    estimatedTokensFromCharacters: Math.ceil(requestCharacters / 4),
+    temperature,
+    maxCompletionTokens: max_completion_tokens
+  });
+};
+
 const buildRecentHistory = (messages, maxMessages = 4, maxCharacters = 3000) => {
   const selected = [];
   let remaining = maxCharacters;
@@ -473,6 +500,13 @@ UTILISATION DES OUTILS ET CONFIDENTIALITÉ
 
     let completion;
     for (let round = 0; round < 3; round++) {
+      logGroqRequestDiagnostics({
+        label: `main_round_${round + 1}`,
+        messages: requestMessages,
+        tools: selectedTools,
+        temperature: 0.6,
+        max_completion_tokens: 1000
+      });
       completion = await createGroqCompletion({
         messages: requestMessages,
         tools: selectedTools,
@@ -523,12 +557,20 @@ UTILISATION DES OUTILS ET CONFIDENTIALITÉ
 
     let answer = completion?.choices?.[0]?.message?.content || '';
     if (completion?.choices?.[0]?.finish_reason === 'length' && answer.trim()) {
-      const continuation = await createGroqCompletion({
-        messages: [
+      const continuationMessages = [
+
           ...requestMessages,
           { role: 'assistant', content: answer },
           { role: 'user', content: 'Ta réponse a été interrompue par la limite de génération. Continue exactement à partir du dernier caractère, sans répéter ce qui précède, puis termine toutes tes phrases et tous tes tableaux.' }
-        ],
+      ];
+      logGroqRequestDiagnostics({
+        label: 'continuation',
+        messages: continuationMessages,
+        temperature: 0.4,
+        max_completion_tokens: 1600
+      });
+      const continuation = await createGroqCompletion({
+        messages: continuationMessages,
         temperature: 0.4,
         max_completion_tokens: 1600
       });
