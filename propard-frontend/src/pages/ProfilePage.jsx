@@ -22,6 +22,7 @@ export default function ProfilePage({
 
   const [isEditing, setIsEditing] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState('');
+  const [editUsername, setEditUsername] = useState('');
   const [editAvatarPreview, setEditAvatarPreview] = useState(null);
   const [editAvatarData, setEditAvatarData] = useState(undefined);
   const [saveError, setSaveError] = useState('');
@@ -206,6 +207,7 @@ export default function ProfilePage({
     setEditDisplayName(
       profile.displayName || ''
     );
+    setEditUsername(profile.username || '');
 
     setEditAvatarPreview(
       profile.avatar || null
@@ -333,7 +335,8 @@ export default function ProfilePage({
 
     try {
       const body = {
-        displayName: editDisplayName
+        displayName: editDisplayName,
+        username: editUsername
       };
 
       if (editAvatarData !== undefined) {
@@ -358,10 +361,9 @@ export default function ProfilePage({
       }));
 
       updateUser({
-        displayName:
-          res.data.user.displayName,
-        avatar:
-          res.data.user.avatar
+        username: res.data.user.username,
+        displayName: res.data.user.displayName,
+        avatar: res.data.user.avatar
       });
 
       setIsEditing(false);
@@ -734,7 +736,23 @@ export default function ProfilePage({
         </div>
 
         {isEditing ? (
-          <input
+          <>
+            <div style={{ width: '100%' }}>
+              <label style={{ ...styles.infoText, display: 'block', padding: '0 0 6px', textAlign: 'left' }}>Nom d’utilisateur (@)</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '18px' }}>@</span>
+                <input
+                  style={styles.editNameInput}
+                  value={editUsername}
+                  maxLength={16}
+                  autoComplete="off"
+                  placeholder="nouveau_pseudo"
+                  onChange={e => setEditUsername(e.target.value.replace(/^@+/, ''))}
+                />
+              </div>
+              <p style={{ ...styles.infoText, padding: '6px 0 0', fontSize: '11px' }}>Tu peux le modifier autant de fois que tu le souhaites. Tes anciens @ restent réservés et conservés dans la base de données.</p>
+            </div>
+            <input
             style={styles.editNameInput}
             value={editDisplayName}
             maxLength={32}
@@ -745,6 +763,7 @@ export default function ProfilePage({
               )
             }
           />
+          </>
         ) : (
           <>
             <p style={styles.displayName}>
