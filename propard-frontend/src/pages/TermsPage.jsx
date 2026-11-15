@@ -5,7 +5,7 @@ export default function TermsPage() {
         <a href="/help" style={styles.back}>← Retour</a>
 
         <h1 style={styles.title}>Conditions Générales d'Utilisation</h1>
-        <p style={styles.date}>En vigueur depuis le 16 octobre 2026</p>
+        <p style={styles.date}>En vigueur depuis le 15 novembre 2026</p>
 
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>1. Présentation du service</h2>
@@ -199,6 +199,33 @@ export default function TermsPage() {
         </div>
 
 
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>Fichiers joints et stockage</h2>
+          <p style={styles.text}>
+            Propard permet l'envoi de fichiers dans les conversations privées et les groupes,
+            sous réserve des limites techniques affichées par le service. Les fichiers sont
+            chiffrés côté client par morceaux avant leur transfert. Le nom, le type et certaines
+            métadonnées du fichier sont également chiffrés côté client. Les clés de fichier
+            sont distribuées aux destinataires autorisés sous forme de paquets chiffrés.
+          </p>
+          <p style={styles.text}>
+            Le serveur conserve des informations techniques nécessaires au transfert, au
+            contrôle d'accès, à la vérification d'intégrité et à la suppression des fichiers.
+            Les objets chiffrés sont stockés auprès de Filebase. Le chiffrement côté client
+            ne dispense pas les utilisateurs de respecter les présentes CGU et la loi.
+          </p>
+          <p style={styles.text}>
+            Pour prévenir les abus, Propard applique notamment une limite de 10 fichiers et
+            2 Go sur une période glissante de 5 minutes pour les fichiers finalisés, ainsi
+            qu'une limitation spécifique des envois volumineux. Ces limites peuvent évoluer
+            pour des raisons de sécurité et de capacité.
+          </p>
+          <p style={styles.text}>
+            L'utilisateur doit disposer des droits nécessaires sur les fichiers transmis.
+            Il est interdit d'envoyer des fichiers malveillants, illicites, portant atteinte
+            aux droits de tiers ou destinés à contourner les protections du service.
+          </p>
+        </div>
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>7. Appels audio et vidéo</h2>
 
