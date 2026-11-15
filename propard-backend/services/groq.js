@@ -70,7 +70,11 @@ async function createGroqCompletion({
           messages,
           temperature,
           max_completion_tokens,
-          ...(Array.isArray(tools) && tools.length ? { tools, tool_choice: tool_choice || 'auto' } : {})
+          ...(Array.isArray(tools) && tools.length ? {
+            tools,
+            tool_choice: tool_choice || 'auto',
+            parallel_tool_calls: false
+          } : {})
         }),
         signal: AbortSignal.timeout(45000)
       });
