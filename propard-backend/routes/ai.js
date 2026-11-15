@@ -171,10 +171,10 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
           parameters: {
             type: 'object',
             properties: {
-              friendId: { type: 'string' },
+              recipient: { type: 'string', description: 'Pseudo ou nom d’affichage exact de l’ami' },
               content: { type: 'string' }
             },
-            required: ['friendId', 'content'],
+            required: ['recipient', 'content'],
             additionalProperties: false
           }
         }
@@ -230,7 +230,9 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
     const selectedTools = tools.filter(tool => {
       const name = tool.function.name;
       if (name === 'get_my_profile') return wantsProfile;
-      if (name === 'list_my_friends' || name === 'prepare_private_message' || name === 'request_last_private_message') return wantsFriends;
+      if (name === 'list_my_friends') return /liste|qui sont|quels sont|mes amis|amis disponibles/.test(intent) && !/envoyer|envoie|message privé|message prive/.test(intent);
+      if (name === 'prepare_private_message') return /envoyer|envoie|message privé|message prive|écris à|ecris a|écrire à|ecrire a/.test(intent);
+      if (name === 'request_last_private_message') return wantsFriends && /dernier message|lire|lis|montre/.test(intent);
       if (name === 'list_my_groups' || name === 'prepare_group_message' || name === 'request_last_group_message') return wantsGroups;
       return false;
     });
@@ -281,16 +283,19 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
       }
 
       if (name === 'prepare_private_message') {
-        if (!mongoose.isValidObjectId(args.friendId) || typeof args.content !== 'string' || !args.content.trim() || args.content.length > 6000) {
+        if (typeof args.recipient !== 'string' || !args.recipient.trim() || args.recipient.trim().length > 64 || typeof args.content !== 'string' || !args.content.trim() || args.content.length > 6000) {
           return { error: 'Destinataire ou contenu invalide.' };
         }
-        const [friendship, recipient] = await Promise.all([
-          User.findById(req.user.id).select('friends'),
-          User.findById(args.friendId).select('username displayName')
-        ]);
-        const isFriend = friendship?.friends?.some(friend => friend.userId?.toString() === args.friendId);
-        if (!isFriend || !recipient || args.friendId === req.user.id.toString()) {
-          return { error: 'Cet utilisateur n’est pas un ami accessible.' };
+        const account = await User.findById(req.user.id).select('friends');
+        const friendIds = (account?.friends || []).map(friend => friend.userId).filter(Boolean);
+        if (!friendIds.length) return { error: 'Aucun ami accessible dans votre liste.' };
+        const friends = await User.find({ _id: { $in: friendIds } }).select('_id username displayName');
+        const requestedName = args.recipient.trim().toLocaleLowerCase('fr');
+        const usernameMatch = friends.find(friend => friend.username?.toLocaleLowerCase('fr') === requestedName);
+        const displayNameMatches = friends.filter(friend => friend.displayName?.trim().toLocaleLowerCase('fr') === requestedName);
+        const recipient = usernameMatch || (displayNameMatches.length === 1 ? displayNameMatches[0] : null);
+        if (!recipient) {
+          return { error: displayNameMatches.length > 1 ? 'Plusieurs amis portent ce nom d’affichage. Précise leur pseudo exact.' : 'Aucun ami correspondant à ce pseudo ou nom d’affichage exact n’a été trouvé.' };
         }
         pendingAction = {
           type: 'private_message',
@@ -448,7 +453,7 @@ UTILISATION DES OUTILS ET CONFIDENTIALITÉ
 - Tu peux consulter le profil non sensible, les amis et les groupes de l’utilisateur avec les outils disponibles.
 - Tu peux préparer des brouillons privés ou de groupe, mais ne les envoie jamais. Une confirmation explicite dans l’interface est obligatoire.
 - Le contenu des messages E2EE est déchiffré uniquement sur l’appareil. Il ne doit jamais être transmis à Groq, résumé par toi ou ajouté à l’historique IA.
-- Ne demande ni mot de passe, ni clé privée, ni clé API, ni code de récupération.` : `Tu es Propard AI, l’assistant intégré à Propard. Réponds en français, clairement et honnêtement. N’invente aucune donnée ni fonctionnalité. Pour les questions techniques, distingue ce qui est vérifié de ce qui est supposé. Pour les demandes d’envoi, prépare uniquement un brouillon et attends la confirmation explicite dans l’interface. Ne prétends jamais avoir envoyé un message. Les messages E2EE sont déchiffrés uniquement sur l’appareil : ne demande jamais leur texte déchiffré et ne le transmets jamais à Groq. Ne demande jamais de mot de passe, clé privée, clé API ou code de récupération.` 
+- Ne demande ni mot de passe, ni clé privée, ni clé API, ni code de récupération.` : `Tu es Propard AI, l’assistant intégré à Propard. Réponds en français, clairement et honnêtement. N’invente aucune donnée ni fonctionnalité. Pour les questions techniques, distingue ce qui est vérifié de ce qui est supposé. Pour les demandes d’envoi, prépare uniquement un brouillon et attends la confirmation explicite dans l’interface. Ne prétends jamais avoir envoyé un message. Quand l’utilisateur demande d’envoyer un message privé, appelle directement prepare_private_message en utilisant le pseudo ou nom d’affichage qu’il a donné. Cet outil retrouve le destinataire dans sa liste d’amis et prépare le brouillon. Ne demande jamais un friendId à l’utilisateur. Les messages E2EE sont déchiffrés uniquement sur l’appareil : ne demande jamais leur texte déchiffré et ne le transmets jamais à Groq. Ne demande jamais de mot de passe, clé privée, clé API ou code de récupération.` 
       },
       ...history
     ];
@@ -482,7 +487,7 @@ UTILISATION DES OUTILS ET CONFIDENTIALITÉ
             get_my_profile: [],
             list_my_friends: [],
             list_my_groups: [],
-            prepare_private_message: ['friendId', 'content'],
+            prepare_private_message: ['recipient', 'content'],
             prepare_group_message: ['groupId', 'content'],
             request_last_private_message: ['friendId'],
             request_last_group_message: ['groupId']
