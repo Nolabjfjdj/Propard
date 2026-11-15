@@ -964,10 +964,23 @@ router.patch('/users/:userId/role', requireStaffRole('admin'), async (req, res) 
     }
 
     const previousRole = target.staffRole || 'user';
-    target.staffRole = staffRole;
-    target.staffRoleUpdatedAt = new Date();
-    target.staffRoleUpdatedBy = new mongoose.Types.ObjectId(req.user.id);
-    await target.save();
+    const roleUpdatedAt = new Date();
+    const roleUpdatedBy = new mongoose.Types.ObjectId(req.user.id);
+    const updatedTarget = await User.findByIdAndUpdate(
+      target._id,
+      {
+        $set: {
+          staffRole,
+          staffRoleUpdatedAt: roleUpdatedAt,
+          staffRoleUpdatedBy: roleUpdatedBy
+        }
+      },
+      { new: true, runValidators: true }
+    ).select('_id username staffRole');
+
+    if (!updatedTarget) {
+      return res.status(404).json({ error: 'Compte introuvable.' });
+    }
 
     await audit(req, 'staff.role.updated', {
       targetUser: target._id,
@@ -1067,10 +1080,23 @@ router.post('/audit/:logId/undo', requireStaffRole('owner'), async (req, res) =>
       if ((target.staffRole || 'user') !== details.staffRole) {
         return res.status(409).json({ error: 'Le rôle a changé depuis cette action. Annulation refusée pour éviter d’écraser une modification plus récente.' });
       }
-      target.staffRole = details.previousRole;
-      target.staffRoleUpdatedAt = new Date();
-      target.staffRoleUpdatedBy = new mongoose.Types.ObjectId(req.user.id);
-      await target.save();
+      const roleUpdatedAt = new Date();
+      const roleUpdatedBy = new mongoose.Types.ObjectId(req.user.id);
+      const restoredTarget = await User.findOneAndUpdate(
+        { _id: target._id, staffRole: details.staffRole },
+        {
+          $set: {
+            staffRole: details.previousRole,
+            staffRoleUpdatedAt: roleUpdatedAt,
+            staffRoleUpdatedBy: roleUpdatedBy
+          }
+        },
+        { new: true, runValidators: true }
+      ).select('_id');
+
+      if (!restoredTarget) {
+        return res.status(409).json({ error: 'Le rôle a changé pendant l’annulation. Aucune modification effectuée.' });
+      }
       undoDescription = { type: 'role_restore', targetUserId: target._id.toString(), restoredRole: details.previousRole };
     } else if (original.action === 'report.status.updated' && original.targetReport &&
       ['new', 'processed', 'rejected'].includes(details.previousStatus) &&
