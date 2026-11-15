@@ -5,6 +5,7 @@ import VoiceCall from './VoiceCall';
 import MessageReactions from './MessageReactions';
 import FileAttachments from './FileAttachments';
 import FileUploadButton from './FileUploadButton';
+import EmojiPicker from './EmojiPicker';
 import { uploadConversationFile, downloadConversationMedia } from '../utils/fileUpload';
 import {
   deriveSharedKey,
@@ -1761,6 +1762,7 @@ export default function Chat({
           style={styles.input}
         />
 
+        <EmojiPicker onSelect={emoji => setInput(value => value + emoji)} />
         <button
           onClick={sendMessage}
           style={styles.btn}
