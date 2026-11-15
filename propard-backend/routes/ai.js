@@ -22,6 +22,31 @@ const titleFromMessage = value => {
   return normalized.length > 48 ? `${normalized.slice(0, 45)}...` : normalized;
 };
 
+const buildRecentHistory = (messages, maxMessages = 8, maxCharacters = 10000) => {
+  const selected = [];
+  let remaining = maxCharacters;
+
+  for (const message of [...(messages || [])].reverse()) {
+    if (selected.length >= maxMessages || remaining <= 0) break;
+    if (!['user', 'assistant'].includes(message.role) || typeof message.content !== 'string') continue;
+
+    const content = message.content.trim();
+    if (!content) continue;
+
+    const keptContent = content.length > remaining
+      ? content.slice(-remaining)
+      : content;
+
+    selected.push({
+      role: message.role,
+      content: keptContent
+    });
+    remaining -= keptContent.length;
+  }
+
+  return selected.reverse();
+};
+
 const serializeConversation = conversation => ({
   id: conversation._id.toString(),
   title: conversation.title,
@@ -110,10 +135,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
       return res.status(503).json({ error: 'Propard AI n’est pas configuré. Les clés Groq sont absentes du serveur.' });
     }
 
-    const history = (conversation.messages || []).slice(-20).map(message => ({
-      role: message.role,
-      content: message.content
-    }));
+    const history = buildRecentHistory(conversation.messages);
     history.push({ role: 'user', content });
 
     const tools = [
@@ -222,7 +244,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         if (!account) return { error: 'Compte introuvable.' };
         const ids = (account.friends || []).map(friend => friend.userId).filter(Boolean);
         const friends = ids.length
-          ? await User.find({ _id: { $in: ids } }).select('username displayName avatar')
+          ? await User.find({ _id: { $in: ids.slice(0, 25) } }).select('username displayName avatar')
           : [];
         return friends.map(friend => ({
           id: friend._id.toString(),
@@ -236,7 +258,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         const groups = await Group.find({ 'members.userId': req.user.id })
           .select('_id name owner createdAt')
           .sort({ updatedAt: -1 })
-          .limit(30)
+          .limit(15)
           .lean();
         return groups.map(group => ({
           id: group._id.toString(),
