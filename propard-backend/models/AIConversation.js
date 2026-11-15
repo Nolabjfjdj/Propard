@@ -10,7 +10,7 @@ const messageSchema = new mongoose.Schema({
 
 const conversationSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  title: { type: String, default: 'Nouvelle conversation', trim: true, maxlength: 80 },
+  title: { type: String, default: 'Nouvelle conversation', trim: true, maxlength: 512 },
   messages: { type: [messageSchema], default: [] },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now, index: true }
@@ -20,6 +20,8 @@ conversationSchema.index({ userId: 1, updatedAt: -1 });
 
 conversationSchema.post('init', function () {
   let needsEncryption = false;
+  if (!isEncrypted(this.title)) needsEncryption = true;
+  else this.title = decryptText(this.title);
   for (const message of this.messages || []) {
     if (!isEncrypted(message.content)) needsEncryption = true;
     else message.content = decryptText(message.content);
@@ -33,12 +35,14 @@ conversationSchema.post('init', function () {
 });
 
 conversationSchema.pre('save', function () {
+  if (!isEncrypted(this.title)) this.title = encryptText(this.title);
   for (const message of this.messages || []) {
     if (!isEncrypted(message.content)) message.content = encryptText(message.content);
   }
 });
 
 conversationSchema.post('save', function () {
+  if (isEncrypted(this.title)) this.title = decryptText(this.title);
   for (const message of this.messages || []) {
     if (isEncrypted(message.content)) message.content = decryptText(message.content);
   }
