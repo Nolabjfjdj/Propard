@@ -489,9 +489,12 @@ router.get('/messages/:friendId', createRateLimiter({
       deleted: { $ne: true }
     };
 
-    if (req.query.sentByMe === 'true') {
+    if (req.query.direction === 'sent') {
       filter.sender = req.user.id;
       filter.receiver = friendId;
+    } else if (req.query.direction === 'received') {
+      filter.sender = friendId;
+      filter.receiver = req.user.id;
     }
 
     if (pagination.before) {
