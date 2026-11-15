@@ -103,7 +103,10 @@ async function decryptStoredPrivateKey(db, value) {
     return value || null;
   }
 
-  const key = await getLocalStorageEncryptionKey(db);
+  const key = await readLocalStorageEncryptionKey(db);
+  if (!key) {
+    throw new Error('La clé locale de chiffrement est absente. Aucune nouvelle clé n’a été créée.');
+  }
   const plaintext = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: new Uint8Array(value.iv) },
     key,
@@ -235,6 +238,44 @@ export async function getStoredPrivateKeyJwk(userId) {
     // Compatibilité temporaire avec les anciennes clés déjà présentes.
   }
   return parsed;
+}
+
+export async function getStoredPrivateKeyJwkForRecovery(userId) {
+  if (!userId) throw new Error('Compte invalide');
+
+  let db;
+  try {
+    db = await openPrivateKeyDb();
+    const storedValue = await new Promise((resolve, reject) => {
+      const transaction = db.transaction(PRIVATE_KEY_STORE, 'readonly');
+      const request = transaction.objectStore(PRIVATE_KEY_STORE).get(String(userId));
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+
+    if (storedValue) {
+      const privateKeyJwk = await decryptStoredPrivateKey(db, storedValue);
+      await validatePrivateKeyJwk(privateKeyJwk);
+      return privateKeyJwk;
+    }
+  } finally {
+    if (db) db.close();
+  }
+
+  const raw = localStorage.getItem(privKeyStorageKey(userId));
+  if (!raw) {
+    throw new Error('Aucune clé privée locale exploitable n’a été trouvée sur cet appareil.');
+  }
+
+  let privateKeyJwk;
+  try {
+    privateKeyJwk = JSON.parse(raw);
+  } catch {
+    throw new Error('L’ancienne clé locale est illisible.');
+  }
+
+  await validatePrivateKeyJwk(privateKeyJwk);
+  return privateKeyJwk;
 }
 
 export async function hasStoredPrivateKey(userId) {
