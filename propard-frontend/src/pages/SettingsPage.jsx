@@ -35,6 +35,10 @@ export default function SettingsPage() {
   }, [section]);
 
   const goBack = () => {
+    if (section === 'e2ee') {
+      setSection('security');
+      return;
+    }
     if (section === 'a2f') {
       setSection('security');
       return;
