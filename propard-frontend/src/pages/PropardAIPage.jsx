@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useAuth } from '../context/AuthContext';
 
 const auth = token => ({ headers: { Authorization: `Bearer ${token}` } });
@@ -210,7 +211,7 @@ export default function PropardAIPage() {
               <div style={{ color: 'var(--text-secondary)', fontSize: 15 }}>Comment puis-je t’aider aujourd’hui ?</div>
               <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 10 }}>Tes conversations sont privées et enregistrées sur ton compte.</div>
             </div>}
-            {messages.map((message, index) => <div key={`${message.createdAt || index}-${index}`} style={{ ...styles.bubble, ...(message.role === 'user' ? styles.userBubble : styles.assistantBubble) }}>{message.content}</div>)}
+            {messages.map((message, index) => <div key={`${message.createdAt || index}-${index}`} style={{ ...styles.bubble, ...(message.role === 'user' ? styles.userBubble : styles.assistantBubble) }}>{message.role === 'assistant' ? <MarkdownRenderer content={message.content} /> : message.content}</div>)}
             {sending && <div style={{ ...styles.bubble, ...styles.assistantBubble, color: 'var(--text-muted)' }}>Propard AI réfléchit…</div>}
             <div ref={endRef} />
           </div>
