@@ -6,6 +6,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { getClientIp } = require('../utils/clientIp');
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10);
 const registrationLimiter = createRateLimiter({
@@ -17,7 +18,7 @@ const registrationLimiter = createRateLimiter({
 const loginLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 30,
-  keyFn: req => `passkey-login:${req.ip || 'unknown'}`,
+  keyFn: req => `passkey-login:${getClientIp(req) || 'unknown'}`,
   message: 'Trop de tentatives de connexion. Réessaie plus tard.'
 });
 
