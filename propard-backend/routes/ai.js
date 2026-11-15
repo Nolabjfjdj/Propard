@@ -438,7 +438,12 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
       status: error.status || null,
       groqType: error.groqType || null,
       groqCode: error.groqCode || null,
-      groqParam: error.groqParam || null
+      groqParam: error.groqParam || null,
+      groqMessage: error.groqMessage || null,
+      groqLimitTokens: error.groqLimitTokens || null,
+      groqRemainingTokens: error.groqRemainingTokens || null,
+      groqResetTokens: error.groqResetTokens || null,
+      groqRetryAfter: error.groqRetryAfter || null
     });
     res.status(status).json({
       error: status === 413
