@@ -223,6 +223,18 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
       }
     ];
 
+    const intent = content.toLowerCase();
+    const wantsProfile = /profil|mon compte|mon pseudo|mon avatar|mon rôle|mon role|staff/.test(intent);
+    const wantsFriends = /ami|amis|envoyer|envoie|message privé|message prive|conversation privée|conversation prive|dernier message privé|dernier message prive/.test(intent);
+    const wantsGroups = /groupe|groupes|salon|message de groupe|message dans le groupe|dernier message du groupe/.test(intent);
+    const selectedTools = tools.filter(tool => {
+      const name = tool.function.name;
+      if (name === 'get_my_profile') return wantsProfile;
+      if (name === 'list_my_friends' || name === 'prepare_private_message' || name === 'request_last_private_message') return wantsFriends;
+      if (name === 'list_my_groups' || name === 'prepare_group_message' || name === 'request_last_group_message') return wantsGroups;
+      return false;
+    });
+
     let pendingAction = null;
     let pendingRead = null;
 
@@ -335,10 +347,12 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
       return { error: 'Outil inconnu.' };
     };
 
+    const includePolicy = /\b(cgu|conditions générales|conditions generales|politique de confidentialité|politique de confidentialite|pdc|rgpd|données personnelles|donnees personnelles|vie privée|vie privee|confidentialité|confidentialite|conservation|suppression des données|suppression des donnees|adresse ip|cookies|prestataire|transfert hors)\b/i.test(content);
+
     const requestMessages = [
       {
         role: 'system',
-        content: `Tu es Propard AI, l’assistant intégré à Propard. Réponds en français, clairement, naturellement et honnêtement.
+        content: includePolicy ? `Tu es Propard AI, l’assistant intégré à Propard. Réponds en français, clairement, naturellement et honnêtement.
 
 RÈGLES GÉNÉRALES
 - Ne fabrique jamais de fonctionnalité, de donnée, de règle, de date, de prestataire ou de garantie.
@@ -434,19 +448,19 @@ UTILISATION DES OUTILS ET CONFIDENTIALITÉ
 - Tu peux consulter le profil non sensible, les amis et les groupes de l’utilisateur avec les outils disponibles.
 - Tu peux préparer des brouillons privés ou de groupe, mais ne les envoie jamais. Une confirmation explicite dans l’interface est obligatoire.
 - Le contenu des messages E2EE est déchiffré uniquement sur l’appareil. Il ne doit jamais être transmis à Groq, résumé par toi ou ajouté à l’historique IA.
-- Ne demande ni mot de passe, ni clé privée, ni clé API, ni code de récupération.` 
+- Ne demande ni mot de passe, ni clé privée, ni clé API, ni code de récupération.` : `Tu es Propard AI, l’assistant intégré à Propard. Réponds en français, clairement et honnêtement. N’invente aucune donnée ni fonctionnalité. Pour les questions techniques, distingue ce qui est vérifié de ce qui est supposé. Pour les demandes d’envoi, prépare uniquement un brouillon et attends la confirmation explicite dans l’interface. Ne prétends jamais avoir envoyé un message. Les messages E2EE sont déchiffrés uniquement sur l’appareil : ne demande jamais leur texte déchiffré et ne le transmets jamais à Groq. Ne demande jamais de mot de passe, clé privée, clé API ou code de récupération.` 
       },
       ...history
     ];
 
     let completion;
-    for (let round = 0; round < 4; round++) {
+    for (let round = 0; round < 2; round++) {
       completion = await createGroqCompletion({
         messages: requestMessages,
-        tools,
+        tools: selectedTools,
         tool_choice: 'auto',
         temperature: 0.6,
-        max_completion_tokens: 2400
+        max_completion_tokens: 1000
       });
 
       const assistantMessage = completion.choices?.[0]?.message;
