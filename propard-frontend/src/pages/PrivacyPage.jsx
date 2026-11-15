@@ -623,7 +623,7 @@ export default function PrivacyPage() {
               liées à la sécurité et à la défense des droits de Propard.
             </li>
             <li>
-              <strong>Conversations Propard AI :</strong> elles sont conservées dans la base de données jusqu'à leur suppression par l'utilisateur ou leur suppression dans le cadre d'un traitement applicable au compte. Le code conserve au maximum les 80 derniers messages par conversation et ne définit pas de durée automatique d'expiration pour ces conversations.
+              <strong>Conversations Propard AI :</strong> elles sont conservées dans la base de données jusqu'à leur suppression par l'utilisateur. Le code actuel ne définit pas de durée automatique d'expiration pour ces conversations. Le code conserve au maximum les 80 derniers messages par conversation et ne définit pas de durée automatique d'expiration pour ces conversations.
             </li>
             <li>
               <strong>Données techniques et de sécurité :</strong> pendant la
