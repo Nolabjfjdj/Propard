@@ -11,8 +11,32 @@ export default function AdminPage() {
   const captchaContainerRef = useRef(null);
   const captchaWidgetRef = useRef(null);
   const [loading, setLoading] = useState(false);
+  const [accessLoading, setAccessLoading] = useState(true);
+  const [hasAccess, setHasAccess] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    const token = localStorage.getItem('propard_token');
+    if (!token) {
+      setAccessLoading(false);
+      return;
+    }
+    api.get('/api/admin/access', {
+      headers: { Authorization: 'Bearer ' + token },
+      validateStatus: () => true
+    }).then(response => {
+      if (active) setHasAccess(response.status === 200 && response.data?.owner === true);
+    }).catch(() => {
+      if (active) setHasAccess(false);
+    }).finally(() => {
+      if (active) setAccessLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!captchaRequired) return;
@@ -100,6 +124,22 @@ export default function AdminPage() {
       setLoading(false);
     }
   };
+
+  if (accessLoading) {
+    return <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: 'var(--text-primary)' }}>Vérification des accès…</main>;
+  }
+
+  if (!hasAccess) {
+    return (
+      <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, color: 'var(--text-primary)', background: 'var(--bg-primary)' }}>
+        <section style={{ maxWidth: 460, padding: 24, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--bg-secondary)' }}>
+          <h1>Accès refusé</h1>
+          <p>Ce panneau est réservé au propriétaire unique de Propard.</p>
+          <a href="/" style={{ color: 'var(--text-secondary)' }}>← Retour</a>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main style={{ minHeight: '100vh', padding: 24, background: 'var(--bg-primary)', color: 'var(--text-primary)', boxSizing: 'border-box' }}>
