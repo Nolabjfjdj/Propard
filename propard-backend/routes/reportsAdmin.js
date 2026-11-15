@@ -7,6 +7,7 @@ const StaffAuditLog = require('../models/StaffAuditLog');
 const authMiddleware = require('../middleware/auth');
 const { requireStaffRole } = require('../middleware/staffRoles');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { getClientIp } = require('../utils/clientIp');
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ const router = express.Router();
 const reportsAdminLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 30,
-  keyFn: req => req.ip || 'unknown',
+  keyFn: req => getClientIp(req) || 'unknown',
   message: 'Trop de tentatives, réessaie plus tard.',
   captcha: true,
   resetOnCaptcha: true
@@ -118,7 +119,7 @@ router.post(
         actor: req.user.id,
         action: 'report.bulk_review.accessed',
         details: { count: reports.length },
-        ip: typeof req.ip === 'string' ? req.ip.slice(0, 128) : null,
+        ip: typeof getClientIp(req) === 'string' ? getClientIp(req).slice(0, 128) : null,
         userAgent: typeof req.get('user-agent') === 'string' ? req.get('user-agent').slice(0, 512) : null
       });
 
@@ -213,7 +214,7 @@ router.post(
         action: 'report.status.changed',
         targetReport: report._id,
         details: { previousStatus, newStatus: status },
-        ip: typeof req.ip === 'string' ? req.ip.slice(0, 128) : null,
+        ip: typeof getClientIp(req) === 'string' ? getClientIp(req).slice(0, 128) : null,
         userAgent: typeof req.get('user-agent') === 'string' ? req.get('user-agent').slice(0, 512) : null
       });
 
@@ -282,7 +283,7 @@ router.post(
         action: 'report.deleted',
         targetReport: reportId,
         details: { deletedCount: result.deletedCount },
-        ip: typeof req.ip === 'string' ? req.ip.slice(0, 128) : null,
+        ip: typeof getClientIp(req) === 'string' ? getClientIp(req).slice(0, 128) : null,
         userAgent: typeof req.get('user-agent') === 'string' ? req.get('user-agent').slice(0, 512) : null
       });
 
