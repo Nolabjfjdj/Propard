@@ -171,8 +171,9 @@ router.post('/register/verify', auth, registrationLimiter, async (req, res) => {
           passkeyRegistrationOrigin: null
         }
       },
-      { new: true }
-    ).select('+passkeys +passkeyRecoveryCodes');
+      { new: true },
+      '+passkeys +passkeyRecoveryCodes'
+    );
     if (!user) return res.status(400).json({ error: 'Cette demande a déjà été utilisée. Recommence la création de la clé.' });
     const { verifyRegistrationResponse } = await getWebAuthn();
     const verification = await verifyRegistrationResponse({
