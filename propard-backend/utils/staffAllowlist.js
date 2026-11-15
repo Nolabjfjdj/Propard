@@ -56,4 +56,9 @@ function effectiveStaffRole(userId, dbRole) {
   return roleLevel(stored) <= roleLevel(allowed) ? stored : allowed;
 }
 
-module.exports = { effectiveStaffRole, maxAllowedRole };
+function isSoleOwner(userId) {
+  const owners = parseList(process.env.STAFF_OWNER_IDS);
+  return owners.size === 1 && owners.has(String(userId || '').toLowerCase());
+}
+
+module.exports = { effectiveStaffRole, maxAllowedRole, isSoleOwner };

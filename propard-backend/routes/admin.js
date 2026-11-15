@@ -4,46 +4,26 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
 const User = require('../models/User');
-const Announcement = require('../models/Announcement');
 const StaffAuditLog = require('../models/StaffAuditLog');
 const authMiddleware = require('../middleware/auth');
-const { requireStaffRole, roleLevel } = require('../middleware/staffRoles');
+const { roleLevel } = require('../middleware/staffRoles');
+const { isSoleOwner } = require('../utils/staffAllowlist');
 const { createRateLimiter } = require('../middleware/rateLimit');
 
-/*
- * Vérification des clés secrètes.
- *
- * Les clés restent exclusivement dans les variables d'environnement
- * du backend.
- */
-function checkKey(providedKey, environmentKey) {
-  if (
-    typeof providedKey !== 'string' ||
-    typeof environmentKey !== 'string' ||
-    !providedKey ||
-    !environmentKey
-  ) {
-    return false;
+function requireSoleOwner(req, res, next) {
+  if (!isSoleOwner(req.user?.id) || req.user?.staffRole !== 'owner') {
+    return res.status(403).json({ error: 'Accès réservé au propriétaire unique de Propard.' });
   }
+  return next();
+}
 
+function checkAdminKey(providedKey) {
+  const expectedKey = process.env.ADMIN_KEY;
+  if (typeof providedKey !== 'string' || typeof expectedKey !== 'string' || !providedKey || !expectedKey) return false;
   const provided = Buffer.from(providedKey);
-  const expected = Buffer.from(environmentKey);
-
-  if (provided.length !== expected.length) {
-    return false;
-  }
-
-  return crypto.timingSafeEqual(provided, expected);
+  const expected = Buffer.from(expectedKey);
+  return provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
 }
-
-/*
- * Évite qu'un username fourni par l'admin soit interprété
- * comme une expression régulière.
- */
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 
 async function auditAdminAction(req, action, targetUser = null, details = null) {
   await StaffAuditLog.create({
@@ -55,72 +35,45 @@ async function auditAdminAction(req, action, targetUser = null, details = null) 
     userAgent: typeof req.get('user-agent') === 'string' ? req.get('user-agent').slice(0, 512) : null
   });
 }
-// Ces routes ne sont protégées que par une clé secrète (pas de JWT), donc
-// un rate limit strict par IP est important pour rendre le brute-force de
-// la clé impraticable — même une clé "très longue et aléatoire" mérite
-// cette défense en profondeur.
+
 const adminSensitiveLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 5,
-  keyFn: (req) => req.ip,
+  keyFn: req => req.ip || 'unknown',
   message: 'Trop de tentatives, réessaie plus tard.',
   captcha: true,
   resetOnCaptcha: true
 });
 
+router.get('/access', authMiddleware, requireSoleOwner, (req, res) => {
+  return res.json({ success: true, owner: true });
+});
 
-/*
- * ============================================================
- * RÉINITIALISATION DE MOT DE PASSE
- * ============================================================
- */
+function escapeRegex(value) {
+  const special = new Set(['.', '*', '+', '?', '^', '$', '{', '}', '(', ')', '|', '[', ']', '\\']);
+  return Array.from(value, character => special.has(character) ? '\\' + character : character).join('');
+}
 
-router.post('/reset-password', authMiddleware, requireStaffRole('admin'), adminSensitiveLimiter, async (req, res) => {
+router.post('/reset-password', authMiddleware, requireSoleOwner, adminSensitiveLimiter, async (req, res) => {
   try {
-    const {
-      adminKey,
-      username,
-      newPassword,
-      acknowledgeE2eeKeyBackupLoss
-    } = req.body;
+    const { adminKey, username, newPassword, acknowledgeE2eeKeyBackupLoss } = req.body || {};
 
-    if (!checkKey(adminKey, process.env.ADMIN_KEY)) {
-      return res.status(403).json({
-        error: 'Accès refusé'
-      });
+    if (!checkAdminKey(adminKey)) {
+      return res.status(403).json({ error: 'Accès refusé' });
     }
 
-    if (!username || !newPassword) {
-      return res.status(400).json({
-        error: 'Username et nouveau mot de passe requis'
-      });
-    }
-
-    if (typeof username !== 'string' || typeof newPassword !== 'string') {
-      return res.status(400).json({
-        error: 'Données invalides'
-      });
+    if (typeof username !== 'string' || typeof newPassword !== 'string' || !username.trim() || !newPassword) {
+      return res.status(400).json({ error: 'Username et nouveau mot de passe requis' });
     }
 
     if (newPassword.length < 8 || newPassword.length > 128) {
-      return res.status(400).json({
-        error: 'Le mot de passe doit contenir entre 8 et 128 caractères'
-      });
+      return res.status(400).json({ error: 'Le mot de passe doit contenir entre 8 et 128 caractères' });
     }
 
-    const safeUsername = escapeRegex(username);
+    const safeUsername = escapeRegex(username.trim());
+    const user = await User.findOne({ username: { $regex: new RegExp('^' + safeUsername + '$', 'i') } });
 
-    const user = await User.findOne({
-      username: {
-        $regex: new RegExp(`^${safeUsername}$`, 'i')
-      }
-    });
-
-    if (!user) {
-      return res.status(404).json({
-        error: 'Utilisateur introuvable'
-      });
-    }
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
 
     if (roleLevel(req.user.staffRole) <= roleLevel(user.staffRole || 'user')) {
       return res.status(403).json({ error: 'Tu ne peux pas réinitialiser le compte d’un membre du personnel de niveau égal ou supérieur.' });
@@ -133,434 +86,23 @@ router.post('/reset-password', authMiddleware, requireStaffRole('admin'), adminS
       });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
     const e2eeBackupCleared = Boolean(user.e2eeKeyBackup);
-
-    user.password = hashedPassword;
+    user.password = await bcrypt.hash(newPassword, 10);
     if (e2eeBackupCleared) user.e2eeKeyBackup = null;
     user.sessionVersion = (user.sessionVersion || 0) + 1;
-
     await user.save();
 
     const disconnectUserSockets = req.app.get('disconnectUserSockets');
-    if (typeof disconnectUserSockets === 'function') {
-      disconnectUserSockets(user._id);
-    }
+    if (typeof disconnectUserSockets === 'function') disconnectUserSockets(user._id);
 
     await auditAdminAction(req, 'user.password_reset.admin_override', user._id, {
       method: 'legacy-admin-reset',
       e2eeBackupCleared
     });
 
-    res.json({
-      success: true,
-      message: `Mot de passe de ${user.username} réinitialisé`
-    });
-
-  } catch (err) {
-    console.error('reset-password error:', err);
-
-    res.status(500).json({
-      error: 'Erreur serveur'
-    });
-  }
-});
-
-
-/*
- * ============================================================
- * CRÉER UNE ANNONCE GLOBALE
- * ============================================================
- */
-
-router.post('/announcement/create', authMiddleware, requireStaffRole('admin'), adminSensitiveLimiter, async (req, res) => {
-  try {
-    const {
-      announcementKey,
-      title,
-      message
-    } = req.body;
-
-    if (
-      !checkKey(
-        announcementKey,
-        process.env.ADMIN_KEY_ANNOUNCEMENT
-      )
-    ) {
-      return res.status(403).json({
-        error: 'Clé annonce incorrecte'
-      });
-    }
-
-    if (
-      typeof title !== 'string' ||
-      typeof message !== 'string' ||
-      !title.trim() ||
-      !message.trim()
-    ) {
-      return res.status(400).json({
-        error: 'Titre et message requis'
-      });
-    }
-
-    if (title.trim().length > 150) {
-      return res.status(400).json({
-        error: 'Titre trop long'
-      });
-    }
-
-    if (message.trim().length > 5000) {
-      return res.status(400).json({
-        error: 'Message trop long'
-      });
-    }
-
-    /*
-     * Désactive toutes les anciennes annonces.
-     */
-    await Announcement.updateMany(
-      { active: true },
-      { $set: { active: false } }
-    );
-
-    /*
-     * Crée la nouvelle annonce.
-     */
-    const announcement = await Announcement.create({
-      title: title.trim(),
-      message: message.trim(),
-      active: true
-    });
-    await auditAdminAction(req, 'announcement.created', null, { announcementId: announcement._id.toString(), title: announcement.title });
-
-    /*
-     * Si des clients utilisent déjà Socket.IO pour autre chose,
-     * on diffuse également l'événement.
-     *
-     * Le frontend utilise aussi une vérification périodique,
-     * donc l'annonce fonctionne même si un client n'écoute pas
-     * cet événement.
-     */
-    const io = req.app.get('io');
-
-    if (io) {
-      io.emit('globalAnnouncement', {
-        _id: announcement._id.toString(),
-        title: announcement.title,
-        message: announcement.message,
-        createdAt: announcement.createdAt
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Annonce publiée',
-      announcement: {
-        _id: announcement._id,
-        title: announcement.title,
-        message: announcement.message,
-        createdAt: announcement.createdAt
-      }
-    });
-
-  } catch (err) {
-    console.error('announcement/create error:', err);
-
-    res.status(500).json({
-      error: 'Erreur serveur'
-    });
-  }
-});
-
-
-/*
- * ============================================================
- * RÉCUPÉRER L'ANNONCE ACTIVE
- * ============================================================
- *
- * Cette route est surtout destinée au panneau admin. Pas de clé secrète
- * requise (lecture seule, non sensible) donc pas de rate limit strict ici.
- */
-
-router.get('/announcement', async (req, res) => {
-  try {
-    const announcement = await Announcement.findOne({
-      active: true
-    }).sort({
-      createdAt: -1
-    });
-
-    if (!announcement) {
-      return res.json({
-        announcement: null
-      });
-    }
-
-    res.json({
-      announcement: {
-        _id: announcement._id,
-        title: announcement.title,
-        message: announcement.message,
-        createdAt: announcement.createdAt
-      }
-    });
-
-  } catch (err) {
-    console.error('announcement get error:', err);
-
-    res.status(500).json({
-      error: 'Erreur serveur'
-    });
-  }
-});
-
-
-/*
- * ============================================================
- * SUPPRIMER / DÉSACTIVER L'ANNONCE ACTIVE
- * ============================================================
- */
-
-router.post('/announcement/delete', authMiddleware, requireStaffRole('admin'), adminSensitiveLimiter, async (req, res) => {
-  try {
-    const {
-      announcementKey
-    } = req.body;
-
-    if (
-      !checkKey(
-        announcementKey,
-        process.env.ADMIN_KEY_ANNOUNCEMENT
-      )
-    ) {
-      return res.status(403).json({
-        error: 'Clé annonce incorrecte'
-      });
-    }
-
-    await Announcement.updateMany(
-      { active: true },
-      { $set: { active: false } }
-    );
-
-    const io = req.app.get('io');
-
-    if (io) {
-      io.emit('globalAnnouncementRemoved');
-    }
-
-    res.json({
-      success: true,
-      message: 'Annonce désactivée'
-    });
-
-  } catch (err) {
-    console.error('announcement/delete error:', err);
-
-    res.status(500).json({
-      error: 'Erreur serveur'
-    });
-  }
-});
-
-
-/*
- * ============================================================
- * BANNISSEMENTS
- * ============================================================
- */
-
-router.post('/bans/list', authMiddleware, requireStaffRole('admin'), adminSensitiveLimiter, async (req, res) => {
-  try {
-    const { banKey } = req.body;
-
-    if (!checkKey(banKey, process.env.ADMIN_KEY_BANS)) {
-      return res.status(403).json({ error: 'Clé des bannissements incorrecte' });
-    }
-
-    const users = await User.find({
-      bannedAt: { $ne: null }
-    })
-      .select('username displayName avatar ipAlias bannedAt banExpiresAt banReason createdAt')
-      .sort({ bannedAt: -1 })
-      .limit(200)
-      .lean();
-
-    return res.json({
-      success: true,
-      users
-    });
-  } catch (err) {
-    console.error('bans/list error:', err);
-    return res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-router.post('/bans/ban', authMiddleware, requireStaffRole('admin'), adminSensitiveLimiter, async (req, res) => {
-  try {
-    const { banKey, username, reason, duration, customDuration, customUnit } = req.body;
-
-    if (!checkKey(banKey, process.env.ADMIN_KEY_BANS)) {
-      return res.status(403).json({ error: 'Clé des bannissements incorrecte' });
-    }
-
-    if (typeof username !== 'string' || !username.trim()) {
-      return res.status(400).json({ error: 'Username requis' });
-    }
-
-    if (
-      reason !== undefined &&
-      (typeof reason !== 'string' || reason.trim().length > 500)
-    ) {
-      return res.status(400).json({ error: 'Motif invalide' });
-    }
-
-    const quickDurations = {
-      '1h': 60 * 60 * 1000,
-      '6h': 6 * 60 * 60 * 1000,
-      '12h': 12 * 60 * 60 * 1000,
-      '24h': 24 * 60 * 60 * 1000,
-      '3d': 3 * 24 * 60 * 60 * 1000,
-      '7d': 7 * 24 * 60 * 60 * 1000,
-      '30d': 30 * 24 * 60 * 60 * 1000,
-      'permanent': null
-    };
-
-    let durationMs = null;
-
-    if (duration === 'custom') {
-      const units = {
-        minutes: 60 * 1000,
-        hours: 60 * 60 * 1000,
-        days: 24 * 60 * 60 * 1000,
-        weeks: 7 * 24 * 60 * 60 * 1000,
-        months: 30 * 24 * 60 * 60 * 1000,
-        years: 365 * 24 * 60 * 60 * 1000
-      };
-
-      if (
-        !Number.isInteger(customDuration) ||
-        customDuration < 1 ||
-        customDuration > 36500 ||
-        !Object.prototype.hasOwnProperty.call(units, customUnit)
-      ) {
-        return res.status(400).json({ error: 'Durée personnalisée invalide' });
-      }
-
-      durationMs = customDuration * units[customUnit];
-    } else if (Object.prototype.hasOwnProperty.call(quickDurations, duration)) {
-      durationMs = quickDurations[duration];
-    } else {
-      return res.status(400).json({ error: 'Durée de bannissement invalide' });
-    }
-
-    const safeUsername = escapeRegex(username.trim());
-
-    const user = await User.findOne({
-      username: {
-        $regex: new RegExp(`^${safeUsername}$`, 'i')
-      }
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: 'Utilisateur introuvable' });
-    }
-
-    if (roleLevel(req.user.staffRole) <= roleLevel(user.staffRole || 'user')) {
-      return res.status(403).json({ error: 'Tu ne peux pas bannir un membre du personnel de niveau égal ou supérieur.' });
-    }
-
-    user.bannedAt = new Date();
-    user.banExpiresAt = durationMs === null
-      ? null
-      : new Date(Date.now() + durationMs);
-    user.banReason = reason?.trim() || null;
-    user.sessionVersion = (user.sessionVersion || 0) + 1;
-    user.isOnline = false;
-
-    await user.save();
-    await auditAdminAction(req, 'user.banned.admin_override', user._id, { duration, reason: reason?.trim() || null, banExpiresAt: user.banExpiresAt });
-
-    const io = req.app.get('io');
-
-    if (io) {
-      for (const socket of io.sockets.sockets.values()) {
-        if (socket.userId?.toString() === user._id.toString()) {
-          socket.emit('accountBanned', {
-            message: 'Ton compte a été banni de Propard.'
-          });
-          socket.disconnect(true);
-        }
-      }
-    }
-
-    return res.json({
-      success: true,
-      message: durationMs === null
-        ? `Utilisateur ${user.username} banni définitivement.`
-        : `Utilisateur ${user.username} banni jusqu'au ${user.banExpiresAt.toISOString()}.`,
-      user: {
-        _id: user._id,
-        username: user.username,
-        displayName: user.displayName,
-        avatar: user.avatar,
-        bannedAt: user.bannedAt,
-        banExpiresAt: user.banExpiresAt,
-        banReason: user.banReason
-      }
-    });
-  } catch (err) {
-    console.error('bans/ban error:', err);
-    return res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-router.post('/bans/unban', authMiddleware, requireStaffRole('admin'), adminSensitiveLimiter, async (req, res) => {
-  try {
-    const { banKey, username } = req.body;
-
-    if (!checkKey(banKey, process.env.ADMIN_KEY_BANS)) {
-      return res.status(403).json({ error: 'Clé des bannissements incorrecte' });
-    }
-
-    if (typeof username !== 'string' || !username.trim()) {
-      return res.status(400).json({ error: 'Username requis' });
-    }
-
-    const safeUsername = escapeRegex(username.trim());
-
-    const user = await User.findOne({
-      username: {
-        $regex: new RegExp(`^${safeUsername}$`, 'i')
-      }
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: 'Utilisateur introuvable' });
-    }
-
-    if (roleLevel(req.user.staffRole) <= roleLevel(user.staffRole || 'user')) {
-      return res.status(403).json({ error: 'Tu ne peux pas modifier la sanction d’un membre du personnel de niveau égal ou supérieur.' });
-    }
-
-    if (!user.bannedAt) {
-      return res.status(400).json({ error: 'Cet utilisateur n’est pas banni' });
-    }
-
-    user.bannedAt = null;
-    user.banExpiresAt = null;
-    user.banReason = null;
-    user.sessionVersion = (user.sessionVersion || 0) + 1;
-
-    await user.save();
-    await auditAdminAction(req, 'user.unbanned.admin_override', user._id);
-
-    return res.json({
-      success: true,
-      message: `Utilisateur ${user.username} débanni.`
-    });
-  } catch (err) {
-    console.error('bans/unban error:', err);
+    return res.json({ success: true, message: 'Mot de passe de ' + user.username + ' réinitialisé' });
+  } catch (error) {
+    console.error('reset-password error:', error);
     return res.status(500).json({ error: 'Erreur serveur' });
   }
 });
