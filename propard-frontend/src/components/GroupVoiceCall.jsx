@@ -1367,6 +1367,7 @@ export default function GroupVoiceCall({
                       </button>
                     </>
                   {videoCall && (
+                    <>
                     <button
                       style={{
                         ...styles.muteBtn,
@@ -1389,6 +1390,7 @@ export default function GroupVoiceCall({
                       aria-label="Retourner la caméra"
                       title="Retourner la caméra"
                     >🔄</button>
+                    </>
                   )}
                 </>
               )}
