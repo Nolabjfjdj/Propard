@@ -62,6 +62,8 @@ export default function GroupVoiceCall({
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(videoCall);
+  const [mirrorEnabled, setMirrorEnabled] = useState(true);
+  const [cameraFacingMode, setCameraFacingMode] = useState('user');
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenShareSettingsOpen, setScreenShareSettingsOpen] = useState(false);
   const [screenShareError, setScreenShareError] = useState('');
@@ -561,6 +563,44 @@ export default function GroupVoiceCall({
     });
 
     setCameraEnabled(nextEnabled);
+  };
+
+  const toggleMirror = () => setMirrorEnabled(value => !value);
+
+  const switchCamera = async () => {
+    const currentStream = localStreamRef.current;
+    if (!currentStream || isScreenSharing) return;
+    const nextFacingMode = cameraFacingMode === 'user' ? 'environment' : 'user';
+    let replacementStream;
+    try {
+      replacementStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: nextFacingMode } }
+      });
+      const replacementTrack = replacementStream.getVideoTracks()[0];
+      if (!replacementTrack) throw new Error('Caméra indisponible');
+      const oldTrack = currentStream.getVideoTracks()[0];
+      for (const peer of peersRef.current.values()) {
+        const sender = peer.getSenders().find(item => item.track?.kind === 'video') ||
+          peer.getTransceivers().find(item => item.receiver?.track?.kind === 'video')?.sender;
+        if (sender) await sender.replaceTrack(replacementTrack);
+      }
+      const nextStream = new MediaStream([
+        ...currentStream.getAudioTracks(),
+        replacementTrack
+      ]);
+      localStreamRef.current = nextStream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = nextStream;
+        localVideoRef.current.play?.().catch(() => {});
+      }
+      oldTrack?.stop();
+      setCameraFacingMode(nextFacingMode);
+    } catch (err) {
+      replacementStream?.getTracks().forEach(track => track.stop());
+      console.error('Changement de caméra impossible:', err);
+      setError('Impossible de changer de caméra sur cet appareil.');
+    }
   };
 
   const setScreenAudioEnabled = enabled => {
@@ -1157,7 +1197,7 @@ export default function GroupVoiceCall({
                 autoPlay
                 muted
                 playsInline
-                style={styles.videoElement}
+                style={{ ...styles.videoElement, transform: mirrorEnabled ? 'scaleX(-1)' : 'none' }}
               />
               <span style={styles.videoLabel}>Vous</span>
             </div>
@@ -1165,17 +1205,27 @@ export default function GroupVoiceCall({
               const hasVideo = stream.getVideoTracks().some(track => track.readyState === 'live');
               if (!hasVideo) return null;
               return (
-                <button
+                <div
                   key={id}
-                  type="button"
                   onClick={() => setViewingStreamId(id)}
-                  style={{ ...styles.videoTile, border: '1px solid var(--border)', padding: 0, cursor: 'pointer', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '90px' }}
-                  aria-label={`Regarder le stream de ${getMemberName(id)}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Agrandir la caméra de ${getMemberName(id)}`}
+                  style={{ ...styles.videoTile, padding: 0, cursor: 'pointer', overflow: 'hidden' }}
                 >
-                  <span style={{ fontSize: '28px' }}>🖥️</span>
+                  <video
+                    autoPlay
+                    playsInline
+                    ref={element => {
+                      if (element && element.srcObject !== stream) {
+                        element.srcObject = stream;
+                        element.play?.().catch(() => {});
+                      }
+                    }}
+                    style={{ ...styles.videoElement, width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
                   <span style={styles.videoLabel}>{getMemberName(id)}</span>
-                  <span style={{ fontSize: '12px' }}>Regarder le stream</span>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -1327,6 +1377,18 @@ export default function GroupVoiceCall({
                     >
                       {cameraEnabled ? '📹' : '🚫'}
                     </button>
+                    <button
+                      style={{ ...styles.muteBtn, background: mirrorEnabled ? 'var(--accent-glow)' : 'var(--bg-hover)' }}
+                      onClick={toggleMirror}
+                      aria-label={mirrorEnabled ? 'Désactiver le mode miroir' : 'Activer le mode miroir'}
+                      title={mirrorEnabled ? 'Désactiver le mode miroir' : 'Activer le mode miroir'}
+                    >↔️</button>
+                    <button
+                      style={{ ...styles.muteBtn, background: 'var(--bg-hover)' }}
+                      onClick={() => void switchCamera()}
+                      aria-label="Retourner la caméra"
+                      title="Retourner la caméra"
+                    >🔄</button>
                   )}
                 </>
               )}
