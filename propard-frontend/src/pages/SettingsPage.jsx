@@ -1,7 +1,35 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { startRegistration } from '@simplewebauthn/browser';
+import api from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function SettingsPage() {
+  const { token } = useAuth();
   const [section, setSection] = useState('main');
+  const [passkeys, setPasskeys] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [recoveryCodes, setRecoveryCodes] = useState([]);
+
+  const headers = { Authorization: `Bearer ${token}` };
+
+  const loadPasskeys = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.get('/api/auth/passkeys', { headers });
+      setPasskeys(response.data.passkeys || []);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de charger les clés d’accès.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (section === 'a2f') loadPasskeys();
+  }, [section]);
 
   const goBack = () => {
     if (section === 'a2f') {
@@ -14,6 +42,73 @@ export default function SettingsPage() {
     }
     window.history.pushState({}, '', '/');
     window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
+  const addPasskey = async () => {
+    const password = window.prompt('Confirme ton mot de passe Propard pour créer une clé d’accès.');
+    if (!password) return;
+    const name = window.prompt('Donne un nom à cette clé (ex. iPhone, ordinateur).', 'Ma clé d’accès');
+    if (name === null) return;
+    setLoading(true);
+    setError('');
+    setNotice('');
+    try {
+      const optionsResponse = await api.post('/api/auth/passkeys/register/options', {
+        password,
+        name
+      }, { headers });
+      const credential = await startRegistration({
+        optionsJSON: optionsResponse.data.options
+      });
+      const result = await api.post('/api/auth/passkeys/register/verify', {
+        response: credential,
+        name
+      }, { headers });
+      setPasskeys(result.data.passkeys || []);
+      setRecoveryCodes(result.data.recoveryCodes || []);
+      setNotice('Ta clé d’accès est enregistrée.');
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'La création de la clé a échoué.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renamePasskey = async passkey => {
+    const name = window.prompt('Nouveau nom de cette clé :', passkey.name);
+    if (!name || !name.trim()) return;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await api.patch(`/api/auth/passkeys/${encodeURIComponent(passkey.id)}`, {
+        name: name.trim()
+      }, { headers });
+      setPasskeys(result.data.passkeys || []);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de renommer cette clé.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deletePasskey = async passkey => {
+    if (!window.confirm(`Supprimer la clé « ${passkey.name} » ?`)) return;
+    const password = window.prompt('Confirme ton mot de passe Propard pour supprimer cette clé.');
+    if (!password) return;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await api.delete(`/api/auth/passkeys/${encodeURIComponent(passkey.id)}`, {
+        headers,
+        data: { password }
+      });
+      setPasskeys(result.data.passkeys || []);
+      setNotice('La clé d’accès a été supprimée.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer cette clé.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const heading = section === 'main'
@@ -54,18 +149,51 @@ export default function SettingsPage() {
             <div style={styles.cardHeader}>
               <div>
                 <strong>Clé de sécurité</strong>
-                <p style={styles.description}>Créer et gérer les clés d'accès de ton compte Propard.</p>
+                <p style={styles.description}>Les clés d’accès utilisent WebAuthn et sont protégées par ton appareil, ta clé physique ou ton gestionnaire de mots de passe.</p>
               </div>
               <span style={styles.keyIcon}>⌑</span>
             </div>
-            <div style={styles.empty}>
-              <strong>Aucune clé enregistrée</strong>
-              <p>Tu pourras enregistrer une clé d'accès et retrouver ici toutes les clés associées à ton compte.</p>
-            </div>
-            <button type="button" style={styles.primary} disabled>
-              Nouveau
+
+            {error && <p role="alert" style={styles.error}>{error}</p>}
+            {notice && <p role="status" style={styles.success}>{notice}</p>}
+
+            {loading && <p style={styles.description}>Chargement…</p>}
+
+            {!loading && passkeys.length === 0 && (
+              <div style={styles.empty}>
+                <strong>Aucune clé enregistrée</strong>
+                <p>Ajoute une clé d’accès pour demander une vérification supplémentaire à chaque connexion par mot de passe.</p>
+              </div>
+            )}
+
+            {passkeys.map(passkey => (
+              <div key={passkey.id} style={styles.passkey}>
+                <div style={styles.passkeyInfo}>
+                  <strong>{passkey.name}</strong>
+                  <small>Ajoutée le {new Date(passkey.createdAt).toLocaleDateString('fr-FR')}</small>
+                  <small>{passkey.deviceType === 'multiDevice' ? 'Synchronisable' : passkey.deviceType === 'singleDevice' ? 'Liée à un appareil' : 'Type d’appareil inconnu'}</small>
+                </div>
+                <div style={styles.actions}>
+                  <button type="button" style={styles.secondary} onClick={() => renamePasskey(passkey)} disabled={loading}>Renommer</button>
+                  <button type="button" style={styles.danger} onClick={() => deletePasskey(passkey)} disabled={loading}>Supprimer</button>
+                </div>
+              </div>
+            ))}
+
+            <button type="button" style={styles.primary} onClick={addPasskey} disabled={loading}>
+              {loading ? 'Patiente…' : 'Nouveau'}
             </button>
-            <p style={styles.notice}>L'enregistrement sécurisé des clés sera activé dans la prochaine étape.</p>
+
+            {recoveryCodes.length > 0 && (
+              <div style={styles.recovery}>
+                <strong>Codes de récupération</strong>
+                <p>Conserve ces codes dans un endroit sûr. Chaque code ne peut être utilisé qu’une seule fois. Ils ne seront plus affichés après avoir quitté cette page.</p>
+                <pre style={styles.codes}>{recoveryCodes.join('\n')}</pre>
+                <button type="button" style={styles.secondary} onClick={() => navigator.clipboard?.writeText(recoveryCodes.join('\n'))}>Copier les codes</button>
+              </div>
+            )}
+
+            <p style={styles.notice}>La clé privée reste sur ton appareil ou dans ton gestionnaire de clés. Propard ne stocke que les données publiques nécessaires à la vérification.</p>
           </div>
         )}
       </section>
@@ -171,23 +299,84 @@ const styles = {
     padding: '20px 12px',
     border: '1px dashed var(--border)',
     borderRadius: '10px',
-    textAlign: 'center'
+    textAlign: 'center',
+    color: 'var(--text-secondary)'
+  },
+  passkey: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+    marginTop: '14px',
+    padding: '14px',
+    border: '1px solid var(--border)',
+    borderRadius: '10px'
+  },
+  passkeyInfo: {
+    display: 'grid',
+    gap: '5px',
+    minWidth: 0
+  },
+  actions: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px'
   },
   primary: {
     width: '100%',
     border: 0,
     borderRadius: '9px',
     padding: '12px 16px',
+    marginTop: '16px',
     background: 'var(--accent)',
     color: '#fff',
     fontWeight: 700,
-    cursor: 'not-allowed',
-    opacity: 0.55
+    cursor: 'pointer'
+  },
+  secondary: {
+    border: '1px solid var(--border)',
+    borderRadius: '8px',
+    padding: '8px 11px',
+    background: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+    cursor: 'pointer'
+  },
+  danger: {
+    border: '1px solid var(--danger)',
+    borderRadius: '8px',
+    padding: '8px 11px',
+    background: 'transparent',
+    color: 'var(--danger)',
+    cursor: 'pointer'
+  },
+  recovery: {
+    marginTop: '18px',
+    padding: '14px',
+    border: '1px solid var(--border)',
+    borderRadius: '10px'
+  },
+  codes: {
+    whiteSpace: 'pre-wrap',
+    overflowWrap: 'anywhere',
+    padding: '12px',
+    borderRadius: '8px',
+    background: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+    fontSize: '13px'
+  },
+  error: {
+    color: 'var(--danger)',
+    fontSize: '13px'
+  },
+  success: {
+    color: 'var(--success)',
+    fontSize: '13px'
   },
   notice: {
-    margin: '10px 0 0',
+    margin: '12px 0 0',
     color: 'var(--text-muted)',
     fontSize: '12px',
-    textAlign: 'center'
+    lineHeight: 1.5
   }
 };
