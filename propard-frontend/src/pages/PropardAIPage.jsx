@@ -133,7 +133,7 @@ export default function PropardAIPage({ initialConversationId = null }) {
           if (!publicKey) throw new Error('Clé publique de cet ami indisponible.');
           const sharedKey = await deriveSharedKey(privateKey, publicKey);
           response = await api.get(
-            `/api/friends/messages/${encodeURIComponent(pendingRead.conversationId)}?limit=1`,
+            `/api/friends/messages/${encodeURIComponent(pendingRead.conversationId)}?limit=1&sentByMe=true`,
             auth(token)
           );
           const latest = Array.isArray(response.data) ? response.data[0] : null;
@@ -176,7 +176,11 @@ export default function PropardAIPage({ initialConversationId = null }) {
           }
         }
         if (plaintext === null) throw new Error('Impossible de déchiffrer ce message avec la clé locale.');
-        if (!cancelled) setLocalReadResult({ name: pendingRead.conversationName, content: plaintext });
+        if (!cancelled) setLocalReadResult({
+          name: pendingRead.conversationName,
+          label: pendingRead.type === 'private_message' ? 'Dernier message envoyé à' : 'Dernier message du groupe',
+          content: plaintext
+        });
       } catch (err) {
         if (!cancelled) setLocalReadResult({ name: pendingRead.conversationName, error: err.response?.data?.error || err.message || 'Lecture locale impossible.' });
       } finally {
@@ -488,7 +492,7 @@ export default function PropardAIPage({ initialConversationId = null }) {
             {actionNotice && <div style={{ ...styles.bubble, ...styles.assistantBubble, fontSize: 13 }}>{actionNotice}</div>}
             {readingLocal && <div style={{ ...styles.bubble, ...styles.assistantBubble, color: 'var(--text-muted)' }}>Déchiffrement du dernier message directement sur cet appareil…</div>}
             {localReadResult && <div style={{ ...styles.bubble, ...styles.assistantBubble, border: '1px solid var(--border)' }}>
-              <strong>Dernier message de {localReadResult.name}</strong>
+              <strong>{localReadResult.label} {localReadResult.name}</strong>
               {localReadResult.error ? <div style={{ color: 'var(--danger)', marginTop: 8 }}>{localReadResult.error}</div> : <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginTop: 8 }}>{localReadResult.content}</div>}
               <div style={styles.muted}>Déchiffré localement. Ce contenu n’a pas été envoyé à Groq ni enregistré dans l’historique IA.</div>
               <button type="button" onClick={() => setLocalReadResult(null)} style={{ ...styles.back, marginTop: 8, cursor: 'pointer', background: 'transparent' }}>Fermer</button>
