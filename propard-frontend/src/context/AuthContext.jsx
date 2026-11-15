@@ -218,12 +218,12 @@ const ensureEncryptionKeys = async (
      * une clé publique, on attend une connexion explicite pour restaurer la
      * clé privée depuis la sauvegarde.
      */
-    if (serverPub) {
+    if (serverPub && !password) {
       return;
     }
 
     /*
-     * Compte totalement nouveau : génération de la première paire.
+     * Compte totalement nouveau ou identité perdue : génération d'une paire.
      */
     const {
       publicKeyJwk,
