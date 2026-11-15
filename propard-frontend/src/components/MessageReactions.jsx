@@ -174,7 +174,12 @@ export default function MessageReactions({ reactions = [], userId, onReact, show
             display: 'flex',
             flexDirection: 'column',
             gap: 10,
-            width: 'min(100%, 340px)',
+            width: 'min(320px, calc(100vw - 24px))',
+            maxWidth: 'calc(100vw - 24px)',
+            minWidth: 0,
+            flex: '0 0 auto',
+            boxSizing: 'border-box',
+            alignSelf: 'flex-start',
             marginTop: 5,
             padding: 10,
             border: '1px solid var(--border)',
@@ -233,7 +238,7 @@ export default function MessageReactions({ reactions = [], userId, onReact, show
               display: 'grid',
               gridTemplateColumns: 'repeat(8, minmax(0, 1fr))',
               gap: 3,
-              maxHeight: 190,
+              maxHeight: 160,
               overflowY: 'auto',
               padding: 2
             }}
@@ -252,7 +257,7 @@ export default function MessageReactions({ reactions = [], userId, onReact, show
                   border: emoji === value ? '1px solid var(--accent)' : '1px solid transparent',
                   borderRadius: 8,
                   background: emoji === value ? 'color-mix(in srgb, var(--accent) 18%, transparent)' : 'transparent',
-                  fontSize: 23,
+                  fontSize: 21,
                   cursor: 'pointer'
                 }}
               >
