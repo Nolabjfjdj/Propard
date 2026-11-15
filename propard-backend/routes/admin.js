@@ -45,6 +45,10 @@ const adminSensitiveLimiter = createRateLimiter({
   resetOnCaptcha: true
 });
 
+router.get('/access', authMiddleware, requireSoleOwner, (req, res) => {
+  return res.json({ success: true, owner: true });
+});
+
 function escapeRegex(value) {
   const special = new Set(['.', '*', '+', '?', '^', '$', '{', '}', '(', ')', '|', '[', ']', '\\']);
   return Array.from(value, character => special.has(character) ? '\\' + character : character).join('');
