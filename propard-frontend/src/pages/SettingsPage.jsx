@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import { getStoredPrivateKeyJwkForRecovery, publicKeyFromPrivateJwk, validatePrivateKeyMatchesPublicKey, encryptPrivateKeyBackup } from '../utils/crypto';
 
 export default function SettingsPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [section, setSection] = useState('main');
   const [passkeys, setPasskeys] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -34,6 +35,10 @@ export default function SettingsPage() {
   }, [section]);
 
   const goBack = () => {
+    if (section === 'e2ee') {
+      setSection('security');
+      return;
+    }
     if (section === 'a2f') {
       setSection('security');
       return;
@@ -136,11 +141,63 @@ export default function SettingsPage() {
     }
   };
 
+
+  const recoverE2EEBackup = async () => {
+    const password = window.prompt('Saisis le mot de passe actuel du compte pour recréer la sauvegarde E2EE chiffrée.');
+    if (!password) return;
+
+    setLoading(true);
+    setError('');
+    setNotice('');
+
+    try {
+      const currentBackup = await api.get('/api/auth/keybackup', { headers });
+      if (currentBackup.data?.backup) {
+        setNotice('Une sauvegarde E2EE existe déjà. Aucune modification n’a été effectuée.');
+        return;
+      }
+
+      const userId = user?.id || user?._id;
+      if (!userId) throw new Error('Impossible d’identifier le compte connecté.');
+
+      const privateKeyJwk = await getStoredPrivateKeyJwkForRecovery(userId);
+      const publicKeyJwk = publicKeyFromPrivateJwk(privateKeyJwk);
+      let serverPublicKey = user?.publicKey || null;
+
+      if (typeof serverPublicKey === 'string') {
+        try {
+          serverPublicKey = JSON.parse(serverPublicKey);
+        } catch {
+          throw new Error('La clé publique du compte est illisible. Aucune modification effectuée.');
+        }
+      }
+
+      if (serverPublicKey) {
+        await validatePrivateKeyMatchesPublicKey(privateKeyJwk, serverPublicKey);
+      }
+
+      const backup = await encryptPrivateKeyBackup(privateKeyJwk, password);
+      await api.post('/api/auth/keybackup', {
+        backup,
+        password,
+        publicKey: JSON.stringify(publicKeyJwk)
+      }, { headers });
+
+      setNotice('Sauvegarde E2EE recréée avec succès. La clé privée n’a pas été envoyée en clair.');
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'La récupération E2EE a échoué.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const heading = section === 'main'
     ? 'Paramètres'
     : section === 'security'
       ? 'Sécurité'
-      : 'Authentification à deux facteurs';
+      : section === 'e2ee'
+        ? 'Récupération E2EE'
+        : 'Authentification à deux facteurs';
 
   return (
     <main style={styles.page}>
@@ -160,14 +217,36 @@ export default function SettingsPage() {
           </button>
         )}
         {section === 'security' && (
-          <button type="button" style={styles.row} onClick={() => setSection('a2f')}>
-            <span style={styles.icon}>⌑</span>
-            <span style={styles.rowContent}>
-              <strong>A2F</strong>
-              <small>Authentification à deux facteurs</small>
-            </span>
-            <span style={styles.arrow}>›</span>
-          </button>
+          <>
+            <button type="button" style={styles.row} onClick={() => setSection('a2f')}>
+              <span style={styles.icon}>⌑</span>
+              <span style={styles.rowContent}>
+                <strong>A2F</strong>
+                <small>Authentification à deux facteurs</small>
+              </span>
+              <span style={styles.arrow}>›</span>
+            </button>
+            <button type="button" style={{ ...styles.row, marginTop: '12px' }} onClick={() => setSection('e2ee')}>
+              <span style={styles.icon}>♧</span>
+              <span style={styles.rowContent}>
+                <strong>Récupération de la clé E2EE</strong>
+                <small>Restaurer la sauvegarde depuis la clé privée de cet appareil</small>
+              </span>
+              <span style={styles.arrow}>›</span>
+            </button>
+          </>
+        )}
+        {section === 'e2ee' && (
+          <div style={styles.card}>
+            <strong>Récupérer ma clé E2EE</strong>
+            <p style={styles.description}>Cette opération cherche la clé privée déjà présente sur cet appareil, la vérifie puis recrée une sauvegarde chiffrée avec ton mot de passe. Elle ne génère aucune nouvelle identité et ne remplace jamais une sauvegarde serveur existante.</p>
+            {error && <p role="alert" style={styles.error}>{error}</p>}
+            {notice && <p role="status" style={styles.success}>{notice}</p>}
+            <button type="button" style={styles.primary} onClick={recoverE2EEBackup} disabled={loading}>
+              {loading ? 'Vérification et récupération…' : 'Récupérer ma clé E2EE'}
+            </button>
+            <p style={styles.notice}>Ne ferme pas la page pendant l’opération. Si la clé locale ou sa clé de déchiffrement manque, Propard affichera un diagnostic sans effacer les données existantes.</p>
+          </div>
         )}
         {section === 'a2f' && (
           <div style={styles.card}>
