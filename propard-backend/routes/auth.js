@@ -389,7 +389,51 @@ router.post('/register', registerRateLimiter, async (req, res) => {
     const existing = await User.findOne({
       $or: [
         { username: { $regex: new RegExp(`^${usernamePattern}$`, 'i') } },
-        { realUsername: { $regex: new RegExp(`^${usernamePattern}$`, 'i') } }
+        { realUsername: { $regex: new RegExp(`^${usernamePattern}router.post('/register', registerRateLimiter, async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (typeof username !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Username et mot de passe requis' });
+    }
+
+    if (username.length < 3 || username.length > 16) {
+      return res.status(400).json({ error: 'Username entre 3 et 16 caractères' });
+    }
+
+    const lower = username.toLowerCase();
+    const usernamePattern = escapeRegExp(username);
+
+    if (
+      PSEUDOS_INTERDITS.includes(lower) ||
+      PSEUDOS_INTERDITS.some(w => lower.includes(w))
+    ) {
+      return res.status(400).json({ error: 'Ce username n\'est pas autorisé' });
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+      return res.status(400).json({
+        error: 'Username : lettres, chiffres, _ et - uniquement'
+      });
+    }
+
+    if (!/[a-zA-Z]/.test(username)) {
+      return res.status(400).json({
+        error: 'Username doit contenir au moins une lettre'
+      });
+    }
+
+    if (password.length < 8 || password.length > 128) {
+      return res.status(400).json({
+        error: 'Mot de passe entre 8 et 128 caractères'
+      });
+    }
+
+    const existing = await User.findOne({
+      $or: [
+        { username: { $regex: new RegExp(`^${usernamePattern}$`, 'i') } },
+, 'i') } },
+        { 'usernameHistory.normalized': lower }
       ]
     });
 
@@ -401,6 +445,7 @@ router.post('/register', registerRateLimiter, async (req, res) => {
 
     const user = new User({
       username,
+      usernameHistory: [{ username, normalized: lower, changedAt: new Date() }],
       password: await bcrypt.hash(password, 10),
       ipAlias: await generateUniqueIpAlias()
     });
@@ -609,7 +654,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 
 router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
   try {
-    const { displayName, avatar } = req.body;
+    const { displayName, avatar, username } = req.body;
 
     const user = await User.findById(req.user.id);
 
@@ -617,6 +662,158 @@ router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
       return res.status(404).json({
         error: 'Utilisateur introuvable'
       });
+    }
+
+    if (username !== undefined) {
+      if (typeof username !== 'string') {
+        return res.status(400).json({ error: 'Username invalide' });
+      }
+      const trimmedUsername = username.trim();
+      const normalizedUsername = trimmedUsername.toLowerCase();
+      if (trimmedUsername.length < 3 || trimmedUsername.length > 16 || !/^[a-zA-Z0-9_-]+$/.test(trimmedUsername) || !/[a-zA-Z]/.test(trimmedUsername)) {
+        return res.status(400).json({ error: 'Le @ doit contenir 3 à 16 caractères : lettres, chiffres, _ ou -, avec au moins une lettre.' });
+      }
+      if (PSEUDOS_INTERDITS.includes(normalizedUsername) || PSEUDOS_INTERDITS.some(word => normalizedUsername.includes(word))) {
+        return res.status(400).json({ error: 'Ce username n’est pas autorisé.' });
+      }
+      const usernamePattern = escapeRegExp(trimmedUsername);
+      const conflict = await User.findOne({
+        _id: { $ne: user._id },
+        $or: [
+          { username: { $regex: new RegExp('^' + usernamePattern + '
+      if (typeof displayName !== 'string') {
+        return res.status(400).json({
+          error: 'Nom d’affichage invalide'
+        });
+      }
+
+      const trimmed = displayName.trim();
+
+      if (trimmed.length > 32) {
+        return res.status(400).json({
+          error: 'Nom d’affichage trop long'
+        });
+      }
+
+      user.displayName = trimmed || null;
+    }
+
+    if (avatar !== undefined) {
+      if (avatar !== null && typeof avatar !== 'string') {
+        return res.status(400).json({
+          error: 'Avatar invalide'
+        });
+      }
+
+      if (
+        typeof avatar === 'string' &&
+        avatar.length > MAX_AVATAR_LENGTH
+      ) {
+        return res.status(400).json({
+          error: 'Avatar trop volumineux'
+        });
+      }
+
+      user.avatar = avatar || null;
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        username: user.username,
+        displayName: user.displayName,
+        avatar: user.avatar,
+        ipAlias: user.ipAlias,
+        publicKey: user.publicKey
+      }
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+, 'i') } },
+          { realUsername: { $regex: new RegExp('^' + usernamePattern + '
+      if (typeof displayName !== 'string') {
+        return res.status(400).json({
+          error: 'Nom d’affichage invalide'
+        });
+      }
+
+      const trimmed = displayName.trim();
+
+      if (trimmed.length > 32) {
+        return res.status(400).json({
+          error: 'Nom d’affichage trop long'
+        });
+      }
+
+      user.displayName = trimmed || null;
+    }
+
+    if (avatar !== undefined) {
+      if (avatar !== null && typeof avatar !== 'string') {
+        return res.status(400).json({
+          error: 'Avatar invalide'
+        });
+      }
+
+      if (
+        typeof avatar === 'string' &&
+        avatar.length > MAX_AVATAR_LENGTH
+      ) {
+        return res.status(400).json({
+          error: 'Avatar trop volumineux'
+        });
+      }
+
+      user.avatar = avatar || null;
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        username: user.username,
+        displayName: user.displayName,
+        avatar: user.avatar,
+        ipAlias: user.ipAlias,
+        publicKey: user.publicKey
+      }
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+, 'i') } },
+          { 'usernameHistory.normalized': normalizedUsername }
+        ]
+      }).select('_id');
+      if (conflict) {
+        return res.status(409).json({ error: 'Ce @ est déjà utilisé ou a déjà été utilisé par un autre compte.' });
+      }
+      const previousNormalized = String(user.username || '').toLowerCase();
+      if (previousNormalized !== normalizedUsername) {
+        const hasPrevious = (user.usernameHistory || []).some(entry => entry.normalized === previousNormalized);
+        if (!hasPrevious && user.username) {
+          user.usernameHistory.push({ username: user.username, normalized: previousNormalized, changedAt: new Date() });
+        }
+        user.usernameHistory.push({ username: trimmedUsername, normalized: normalizedUsername, changedAt: new Date() });
+      } else if (trimmedUsername !== user.username) {
+        const hasCurrent = (user.usernameHistory || []).some(entry => entry.normalized === normalizedUsername);
+        if (!hasCurrent) {
+          user.usernameHistory.push({ username: trimmedUsername, normalized: normalizedUsername, changedAt: new Date() });
+        }
+      }
+      user.username = trimmedUsername;
     }
 
     if (displayName !== undefined) {
@@ -670,6 +867,9 @@ router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
       }
     });
   } catch (e) {
+    if (e?.code === 11000) {
+      return res.status(409).json({ error: 'Ce @ est déjà réservé.' });
+    }
     console.error(e);
     res.status(500).json({ error: 'Erreur serveur' });
   }
