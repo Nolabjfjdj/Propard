@@ -5,7 +5,7 @@ export default function PrivacyPage() {
         <a href="/help" style={styles.back}>← Retour</a>
 
         <h1 style={styles.title}>Politique de Confidentialité</h1>
-        <p style={styles.date}>En vigueur depuis le 16 octobre 2026</p>
+        <p style={styles.date}>En vigueur depuis le 15 novembre 2026</p>
 
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>1. Responsable du traitement</h2>
@@ -131,6 +131,16 @@ export default function PrivacyPage() {
               et les informations techniques nécessaires à sa validation par Cloudflare
               Turnstile
             </li>
+            <li>
+              Les fichiers joints : taille d'origine, nombre de morceaux, identifiants
+              techniques de stockage, métadonnées chiffrées, empreintes d'intégrité,
+              vecteurs d'initialisation et paquets de clés chiffrés destinés aux
+              participants autorisés
+            </li>
+            <li>
+              Les jetons de notification natifs Apple Push Notification service (APNs)
+              lorsque les notifications iOS sont activées
+            </li>
           </ul>
 
           <p style={styles.text}>
@@ -139,13 +149,15 @@ export default function PrivacyPage() {
           </p>
 
           <p style={styles.text}>
-            Propard ne collecte ni ne stocke volontairement les adresses IP des
-            utilisateurs dans la base de données des comptes à des fins
-            d'identification des utilisateurs. Le fonctionnement de
-            l'infrastructure d'hébergement peut toutefois entraîner la création
-            de journaux techniques par les prestataires d'infrastructure,
-            indépendamment des données enregistrées par Propard dans sa propre
-            base de données.
+            Propard n'enregistre pas volontairement les adresses IP dans la base de
+            données des comptes pour identifier les utilisateurs. Toutefois, le serveur
+            accède à l'adresse IP fournie par la couche réseau (req.ip) pour certaines
+            limitations de requêtes et peut la transmettre à Cloudflare lors de la
+            validation Turnstile. Cette adresse peut être influencée par la configuration
+            des proxys et ne permet pas à Propard d'affirmer qu'il s'agit toujours de
+            l'adresse IP directe de l'utilisateur. Les prestataires d'hébergement et de
+            sécurité peuvent également générer leurs propres journaux techniques selon
+            leurs politiques de conservation.
           </p>
         </div>
 
@@ -476,6 +488,15 @@ export default function PrivacyPage() {
               <strong>Cloudflare</strong> pour la vérification anti-robot via Turnstile
               lorsque cette vérification est déclenchée.
             </li>
+            <li>
+              <strong>Filebase</strong> pour le stockage des objets correspondant aux
+              morceaux de fichiers chiffrés ;
+            </li>
+            <li>
+              <strong>Apple</strong> pour l'acheminement des notifications natives iOS
+              via Apple Push Notification service (APNs) ;
+            </li>
+
           </ul>
 
           <p style={styles.text}>
@@ -513,6 +534,23 @@ export default function PrivacyPage() {
             européen, Propard applique ou exige l'application du mécanisme de
             transfert prévu par le RGPD lorsqu'il est applicable, notamment une
             décision d'adéquation ou des garanties appropriées.
+          </p>
+        </div>
+
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>Transferts et stockage des fichiers</h2>
+          <p style={styles.text}>
+            Render indique héberger et exploiter ses services aux États-Unis. Filebase
+            utilise un point d'accès S3 mondial et ne propose pas de région de bucket
+            sélectionnable dans l'intégration utilisée par Propard. La localisation
+            physique précise des objets ne peut donc pas être déterminée à partir du code
+            de Propard. Les prestataires peuvent traiter des données dans plusieurs pays,
+            selon leurs infrastructures et leurs propres engagements contractuels.
+          </p>
+          <p style={styles.text}>
+            Les transferts de données hors de l'Espace économique européen doivent être
+            encadrés par un mécanisme conforme au RGPD lorsqu'il est requis. Les garanties
+            effectivement applicables dépendent des contrats et paramètres des prestataires.
           </p>
         </div>
 
