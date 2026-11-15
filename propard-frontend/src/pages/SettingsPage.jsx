@@ -11,6 +11,7 @@ export default function SettingsPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [recoveryCodes, setRecoveryCodes] = useState([]);
+  const [recoveryCodesAvailable, setRecoveryCodesAvailable] = useState(false);
 
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -20,6 +21,7 @@ export default function SettingsPage() {
     try {
       const response = await api.get('/api/auth/passkeys', { headers });
       setPasskeys(response.data.passkeys || []);
+      setRecoveryCodesAvailable(response.data.recoveryCodesAvailable === true);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de charger les clés d’accès.');
     } finally {
@@ -66,6 +68,7 @@ export default function SettingsPage() {
       }, { headers });
       setPasskeys(result.data.passkeys || []);
       setRecoveryCodes(result.data.recoveryCodes || []);
+      setRecoveryCodesAvailable((result.data.recoveryCodes || []).length > 0 || recoveryCodesAvailable);
       setNotice('Ta clé d’accès est enregistrée.');
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'La création de la clé a échoué.');
@@ -103,9 +106,28 @@ export default function SettingsPage() {
         data: { password }
       });
       setPasskeys(result.data.passkeys || []);
+      if ((result.data.passkeys || []).length === 0) setRecoveryCodesAvailable(false);
       setNotice('La clé d’accès a été supprimée.');
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de supprimer cette clé.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const regenerateRecoveryCodes = async () => {
+    const password = window.prompt('Confirme ton mot de passe pour remplacer tes codes de récupération.');
+    if (!password) return;
+    setLoading(true);
+    setError('');
+    setNotice('');
+    try {
+      const result = await api.post('/api/auth/passkeys/recovery/regenerate', { password }, { headers });
+      setRecoveryCodes(result.data.recoveryCodes || []);
+      setRecoveryCodesAvailable(true);
+      setNotice('Tes anciens codes ne fonctionnent plus. Conserve les nouveaux codes en lieu sûr.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de régénérer les codes.');
     } finally {
       setLoading(false);
     }
@@ -183,6 +205,12 @@ export default function SettingsPage() {
             <button type="button" style={styles.primary} onClick={addPasskey} disabled={loading}>
               {loading ? 'Patiente…' : 'Nouveau'}
             </button>
+
+            {recoveryCodesAvailable && recoveryCodes.length === 0 && (
+              <button type="button" style={styles.secondary} onClick={regenerateRecoveryCodes} disabled={loading}>
+                Régénérer les codes de récupération
+              </button>
+            )}
 
             {recoveryCodes.length > 0 && (
               <div style={styles.recovery}>
