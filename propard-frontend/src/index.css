@@ -39,7 +39,7 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: var(--font-body); background: var(--bg-primary); color: var(--text-primary); transition: background 0.3s ease, color 0.3s ease; min-height: 100vh; }
-button { cursor: pointer; border: none; font-family: var(--font-body); }
+button { cursor: pointer; border: none; font-family: var(--font-body); height: max-content; min-height: 36px; line-height: 1.2; }
 input,
 textarea,
 select {
