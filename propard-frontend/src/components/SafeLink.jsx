@@ -14,7 +14,7 @@ const TRUSTED_DOMAINS = [
 ];
 
 export function isTrustedDomain(hostname) {
-  const host = hostname.toLowerCase().replace(/^www\\./, '');
+  const host = hostname.toLowerCase().replace(/^www\./, '');
   return TRUSTED_DOMAINS.some(domain => host === domain || host.endsWith('.' + domain));
 }
 
