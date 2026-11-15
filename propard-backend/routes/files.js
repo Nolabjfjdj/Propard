@@ -459,8 +459,7 @@ router.post(
         if (
           chunk.iv !== iv ||
           chunk.sha256 !== sha256 ||
-          chunk.encryptedSize !== encryptedSize ||
-          chunk.storageId !== file.storageId
+          chunk.encryptedSize !== encryptedSize
         ) {
           return res.status(409).json({ error: 'Ce morceau a déjà été préparé avec d’autres données.' });
         }
@@ -468,7 +467,7 @@ router.post(
         const objectKey = `uploads/${file._id.toString()}/${chunkIndex}-${randomBytes(16).toString('hex')}.bin`;
         const chunkData = {
           index: chunkIndex,
-          storageId: file.storageId,
+          storageId: chunkIndex === 0 ? file.storageId : selectFilebaseStorageId(),
           objectKey,
           encryptedSize,
           iv,
@@ -510,7 +509,7 @@ router.post(
       const uploadUrl = await createPresignedUploadUrl(
         chunk.objectKey,
         300,
-        file.storageId
+        chunk.storageId
       );
 
       res.json({
@@ -558,7 +557,12 @@ router.post('/uploads/:fileId/finalize', signedUrlRateLimit, async (req, res) =>
     for (let index = 0; index < chunks.length; index += 1) {
       const chunk = chunks[index];
 
-      if (chunk.index !== index || chunk.storageId !== file.storageId) {
+      if (
+        chunk.index !== index ||
+        !Number.isSafeInteger(chunk.storageId) ||
+        chunk.storageId < 1 ||
+        chunk.storageId > 100
+      ) {
         return res.status(409).json({ error: 'Manifeste du fichier incomplet ou invalide.' });
       }
 
