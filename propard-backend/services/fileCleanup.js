@@ -31,6 +31,21 @@ async function cleanupFileObjects(file) {
   return true;
 }
 
+async function hasFileReferences(fileId) {
+  const [privateReferences, groupReferences] = await Promise.all([
+    Message.countDocuments({
+      attachments: fileId,
+      deleted: { $ne: true }
+    }),
+    GroupMessage.countDocuments({
+      attachments: fileId,
+      deleted: { $ne: true }
+    })
+  ]);
+
+  return privateReferences > 0 || groupReferences > 0;
+}
+
 async function deleteMessageAttachments(fileIds, senderId) {
   if (!Array.isArray(fileIds) || fileIds.length === 0 || !senderId) {
     return { deleted: 0, cleanupPending: 0, stillReferenced: 0 };
@@ -48,18 +63,7 @@ async function deleteMessageAttachments(fileIds, senderId) {
   let stillReferenced = 0;
 
   for (const file of files) {
-    const [privateReference, groupReference] = await Promise.all([
-      Message.exists({
-        attachments: file._id,
-        deleted: { $ne: true }
-      }),
-      GroupMessage.exists({
-        attachments: file._id,
-        deleted: { $ne: true }
-      })
-    ]);
-
-    if (privateReference || groupReference) {
+    if (await hasFileReferences(file._id)) {
       stillReferenced += 1;
       continue;
     }
@@ -150,10 +154,14 @@ async function deleteFilesForGroup(groupId) {
 }
 
 async function retryPendingFileCleanup(limit = 100) {
+  const now = new Date();
+  const staleAttachmentDate = new Date(now.getTime() - 60 * 60 * 1000);
+  const retryCheckDate = new Date(now.getTime() - 15 * 60 * 1000);
+
   const orphanedReadyFiles = await FileAttachment.find({
     status: 'ready',
     attachedAt: null,
-    createdAt: { $lte: new Date(Date.now() - 60 * 60 * 1000) }
+    createdAt: { $lte: staleAttachmentDate }
   }).limit(limit);
 
   for (const file of orphanedReadyFiles) {
@@ -162,16 +170,55 @@ async function retryPendingFileCleanup(limit = 100) {
       {
         $set: {
           status: 'deleted',
-          deletedAt: new Date(),
+          deletedAt: now,
           cleanupPending: true
         }
       }
     );
   }
 
+  const detachedReadyFiles = await FileAttachment.find({
+    status: 'ready',
+    attachedAt: { $lte: staleAttachmentDate },
+    $or: [
+      { cleanupCheckedAt: null },
+      { cleanupCheckedAt: { $lte: retryCheckDate } }
+    ]
+  }).limit(limit);
+
+  let detachedDeleted = 0;
+  let detachedStillReferenced = 0;
+
+  for (const file of detachedReadyFiles) {
+    if (await hasFileReferences(file._id)) {
+      await FileAttachment.updateOne(
+        { _id: file._id, status: 'ready' },
+        { $set: { cleanupCheckedAt: now } }
+      );
+      detachedStillReferenced += 1;
+      continue;
+    }
+
+    const marked = await FileAttachment.findOneAndUpdate(
+      { _id: file._id, status: 'ready' },
+      {
+        $set: {
+          status: 'deleted',
+          deletedAt: now,
+          cleanupPending: true
+        }
+      },
+      { new: true }
+    );
+
+    if (marked && await cleanupFileObjects(marked)) {
+      detachedDeleted += 1;
+    }
+  }
+
   const expiredUploads = await FileAttachment.find({
     status: 'uploading',
-    uploadExpiresAt: { $lte: new Date() }
+    uploadExpiresAt: { $lte: now }
   }).limit(limit);
 
   for (const file of expiredUploads) {
@@ -180,7 +227,7 @@ async function retryPendingFileCleanup(limit = 100) {
       {
         $set: {
           status: 'deleted',
-          deletedAt: new Date(),
+          deletedAt: now,
           cleanupPending: true
         }
       }
@@ -198,6 +245,9 @@ async function retryPendingFileCleanup(limit = 100) {
 
   return {
     orphanedReadyFiles: orphanedReadyFiles.length,
+    detachedReadyFiles: detachedReadyFiles.length,
+    detachedDeleted,
+    detachedStillReferenced,
     expiredUploads: expiredUploads.length,
     retried: pendingFiles.length
   };
