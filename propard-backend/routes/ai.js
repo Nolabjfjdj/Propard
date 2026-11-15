@@ -199,11 +199,14 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         type: 'function',
         function: {
           name: 'request_last_private_message',
-          description: 'Demander au navigateur de déchiffrer localement le dernier message privé envoyé par l’utilisateur à un ami.',
+          description: 'Demander au navigateur de déchiffrer localement le dernier message privé reçu d’un ami ou envoyé par l’utilisateur à cet ami.',
           parameters: {
             type: 'object',
-            properties: { recipient: { type: 'string', description: 'Pseudo ou nom d’affichage exact de l’ami' } },
-            required: ['recipient'],
+            properties: {
+              recipient: { type: 'string', description: 'Pseudo ou nom d’affichage exact de l’ami' },
+              direction: { type: 'string', enum: ['received', 'sent'], description: 'received si l’utilisateur demande le dernier message de cet ami ; sent s’il demande le dernier message qu’il lui a envoyé' }
+            },
+            required: ['recipient', 'direction'],
             additionalProperties: false
           }
         }
@@ -232,7 +235,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
       if (name === 'get_my_profile') return wantsProfile;
       if (name === 'list_my_friends') return /liste|qui sont|quels sont|mes amis|amis disponibles/.test(intent) && !/envoyer|envoie|message privé|message prive/.test(intent);
       if (name === 'prepare_private_message') return /envoyer|envoie|message privé|message prive|écris à|ecris a|écrire à|ecrire a/.test(intent);
-      if (name === 'request_last_private_message') return wantsFriends && /dernier message|lire|lis|montre/.test(intent);
+      if (name === 'request_last_private_message') return wantsFriends && /dernier message|lire|lis|montre|qu.?est.ce.*dit|répondu|repondu|écrit|ecrit/.test(intent);
       if (name === 'list_my_groups' || name === 'prepare_group_message' || name === 'request_last_group_message') return wantsGroups;
       return false;
     });
@@ -322,8 +325,8 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
       }
 
       if (name === 'request_last_private_message') {
-        if (typeof args.recipient !== 'string' || !args.recipient.trim() || args.recipient.trim().length > 64) {
-          return { error: 'Destinataire invalide.' };
+        if (typeof args.recipient !== 'string' || !args.recipient.trim() || args.recipient.trim().length > 64 || !['received', 'sent'].includes(args.direction)) {
+          return { error: 'Destinataire ou sens de lecture invalide.' };
         }
         const account = await User.findById(req.user.id).select('friends');
         const friendIds = (account?.friends || []).map(item => item.userId).filter(Boolean);
@@ -339,9 +342,10 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         pendingRead = {
           type: 'private_message',
           conversationId: friend._id.toString(),
-          conversationName: friend.displayName || friend.username
+          conversationName: friend.displayName || friend.username,
+          direction: args.direction
         };
-        return { requested: true, note: 'Le navigateur va récupérer uniquement le dernier message envoyé par l’utilisateur à cet ami, puis le déchiffrer localement. Ne demande pas son contenu à Groq.' };
+        return { requested: true, direction: args.direction, note: 'Le navigateur va récupérer uniquement le dernier message correspondant au sens demandé, puis le déchiffrer localement. Ne demande pas son contenu à Groq.' };
       }
 
       if (name === 'request_last_group_message') {
@@ -458,9 +462,11 @@ CONDITIONS GÉNÉRALES D’UTILISATION
 
 UTILISATION DES OUTILS ET CONFIDENTIALITÉ
 - Tu peux consulter le profil non sensible, les amis et les groupes de l’utilisateur avec les outils disponibles.
-- Tu peux préparer des brouillons privés ou de groupe, mais ne les envoie jamais. Une confirmation explicite dans l’interface est obligatoire.
+- Tu peux préparer des brouillons privés ou de groupe, mais ne les envoie jamais sans confirmation explicite dans l’interface.
+- Pour une demande de lecture, demande au navigateur le dernier message voulu et laisse-le le déchiffrer localement. « Le dernier message de [ami] » signifie reçu ; « le dernier message que j’ai envoyé à [ami] » signifie envoyé par l’utilisateur.
+- Comprends le langage naturel, l’argot, les fautes et les demandes contenant plusieurs actions. Appelle tous les outils nécessaires pour traiter chaque action.
 - Le contenu des messages E2EE est déchiffré uniquement sur l’appareil. Il ne doit jamais être transmis à Groq, résumé par toi ou ajouté à l’historique IA.
-- Ne demande ni mot de passe, ni clé privée, ni clé API, ni code de récupération.` : `Tu es Propard AI, l’assistant intégré à Propard. Réponds en français, clairement et honnêtement. N’invente aucune donnée ni fonctionnalité. Pour les questions techniques, distingue ce qui est vérifié de ce qui est supposé. Pour les demandes d’envoi, prépare uniquement un brouillon et attends la confirmation explicite dans l’interface. Ne prétends jamais avoir envoyé un message. Quand l’utilisateur demande d’envoyer un message privé, appelle directement prepare_private_message en utilisant le pseudo ou nom d’affichage qu’il a donné. Cet outil retrouve le destinataire dans sa liste d’amis et prépare le brouillon. Ne demande jamais un friendId à l’utilisateur. Quand l’utilisateur demande le dernier message qu’il a envoyé à un ami, appelle request_last_private_message avec le pseudo ou nom d’affichage de cet ami, sans demander d’identifiant. Les messages E2EE sont déchiffrés uniquement sur l’appareil : ne demande jamais leur texte déchiffré et ne le transmets jamais à Groq. Ne demande jamais de mot de passe, clé privée, clé API ou code de récupération.` 
+- Ne demande ni mot de passe, ni clé privée, ni clé API, ni code de récupération.` : `Tu es Propard AI, l’assistant intégré à Propard. Réponds en français, clairement et honnêtement. N’invente aucune donnée ni fonctionnalité. Pour les questions techniques, distingue ce qui est vérifié de ce qui est supposé. Comprends les demandes formulées naturellement, même avec des salutations, de l’argot, des fautes ou plusieurs actions dans un même message. Traite chaque action demandée séparément et appelle tous les outils nécessaires dans la même réponse, sans ignorer une demande parce qu’une autre est présente. Pour une demande d’envoi, appelle prepare_private_message avec le pseudo ou nom d’affichage et le texte exact demandé ; le navigateur affichera ensuite une confirmation obligatoire et tu ne dois jamais prétendre que le message est déjà envoyé. Ne demande jamais un friendId. Pour « le dernier message de Yoyo », utilise request_last_private_message avec direction='received'. Pour « le dernier message que j’ai envoyé à Yoyo », utilise direction='sent'. Si l’utilisateur demande de lire et d’envoyer dans le même message, déclenche les deux outils. Ne demande pas le contenu déchiffré à l’utilisateur. Les messages E2EE sont déchiffrés uniquement sur l’appareil : ne demande jamais leur texte déchiffré et ne le transmets jamais à Groq. Ne demande jamais de mot de passe, clé privée, clé API ou code de récupération.` 
       },
       ...history
     ];
@@ -496,7 +502,7 @@ UTILISATION DES OUTILS ET CONFIDENTIALITÉ
             list_my_groups: [],
             prepare_private_message: ['recipient', 'content'],
             prepare_group_message: ['groupId', 'content'],
-            request_last_private_message: ['recipient'],
+            request_last_private_message: ['recipient', 'direction'],
             request_last_group_message: ['groupId']
           }[toolName];
           if (!args || typeof args !== 'object' || Array.isArray(args) || !allowedKeys || Object.keys(args).some(key => !allowedKeys.includes(key)) || allowedKeys.some(key => !Object.prototype.hasOwnProperty.call(args, key))) {
