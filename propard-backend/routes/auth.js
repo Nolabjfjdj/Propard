@@ -929,7 +929,11 @@ router.get('/keybackup', authMiddleware, keyBackupReadLimiter, async (req, res) 
 
 router.post('/keybackup', authMiddleware, keyBackupLimiter, async (req, res) => {
   try {
-    const { backup, publicKey } = req.body;
+    const { backup, publicKey, password } = req.body;
+
+    if (typeof password !== 'string' || !password || password.length > 128) {
+      return res.status(400).json({ error: 'Mot de passe requis pour protéger la sauvegarde E2EE.' });
+    }
 
     if (!backup || typeof backup !== 'object') {
       return res.status(400).json({
@@ -1007,12 +1011,16 @@ router.post('/keybackup', authMiddleware, keyBackupLimiter, async (req, res) => 
       });
     }
 
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.id).select('+password');
 
     if (!user) {
       return res.status(404).json({
         error: 'Compte introuvable'
       });
+    }
+
+    if (!(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ error: 'Mot de passe incorrect. La sauvegarde E2EE n’a pas été modifiée.' });
     }
 
     user.e2eeKeyBackup = {
