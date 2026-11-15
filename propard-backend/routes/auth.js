@@ -928,7 +928,7 @@ router.get('/keybackup', authMiddleware, keyBackupReadLimiter, async (req, res) 
 
 router.post('/keybackup', authMiddleware, keyBackupLimiter, async (req, res) => {
   try {
-    const { backup } = req.body;
+    const { backup, publicKey } = req.body;
 
     if (!backup || typeof backup !== 'object') {
       return res.status(400).json({
@@ -970,6 +970,42 @@ router.post('/keybackup', authMiddleware, keyBackupLimiter, async (req, res) => 
       });
     }
 
+    let sanitizedPublicKey = null;
+
+    if (publicKey !== undefined) {
+      if (typeof publicKey !== 'string' || publicKey.length > 2000) {
+        return res.status(400).json({ error: 'Clé publique invalide' });
+      }
+
+      let parsedPublicKey;
+
+      try {
+        parsedPublicKey = JSON.parse(publicKey);
+      } catch {
+        return res.status(400).json({ error: 'Clé publique mal formée' });
+      }
+
+      if (
+        !parsedPublicKey ||
+        parsedPublicKey.kty !== 'EC' ||
+        parsedPublicKey.crv !== 'P-256' ||
+        !isP256Coordinate(parsedPublicKey.x) ||
+        !isP256Coordinate(parsedPublicKey.y) ||
+        Object.prototype.hasOwnProperty.call(parsedPublicKey, 'd')
+      ) {
+        return res.status(400).json({ error: 'Clé publique invalide' });
+      }
+
+      sanitizedPublicKey = JSON.stringify({
+        kty: 'EC',
+        crv: 'P-256',
+        x: parsedPublicKey.x,
+        y: parsedPublicKey.y,
+        ext: true,
+        key_ops: []
+      });
+    }
+
     const user = await User.findById(req.user.id);
 
     if (!user) {
@@ -988,6 +1024,10 @@ router.post('/keybackup', authMiddleware, keyBackupLimiter, async (req, res) => 
       ciphertext: backup.ciphertext,
       updatedAt: new Date()
     };
+
+    if (sanitizedPublicKey) {
+      user.publicKey = sanitizedPublicKey;
+    }
 
     await user.save();
 
