@@ -53,8 +53,6 @@ const announcementLimiter = createRateLimiter({
   max: 5,
   keyFn: req => `${req.user?.id || 'unknown'}:${req.ip || 'unknown'}`,
   message: 'Trop de tentatives de publication. Réessaie plus tard.',
-  captcha: true,
-  resetOnCaptcha: true
 });
 
 function hashToken(token) {
