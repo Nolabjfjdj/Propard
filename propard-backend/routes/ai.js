@@ -206,7 +206,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
       });
 
       const assistantMessage = completion.choices?.[0]?.message;
-      const toolCalls = assistantMessage?.tool_calls || [];
+      const toolCalls = (assistantMessage?.tool_calls || []).slice(0, 5);
       if (!toolCalls.length) break;
 
       requestMessages.push({
