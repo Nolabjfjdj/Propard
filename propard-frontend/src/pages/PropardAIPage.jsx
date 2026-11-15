@@ -283,15 +283,13 @@ export default function PropardAIPage({ initialConversationId = null }) {
   const waitForSocket = async () => {
     if (socket.connected) return;
     socket.auth = { token };
-    socket.connect();
     await new Promise((resolve, reject) => {
       const timeout = window.setTimeout(() => {
         cleanup();
         reject(new Error('Connexion sécurisée au serveur indisponible.'));
       }, 10000);
       const onConnect = () => { cleanup(); resolve(); };
-      const onError = () => { cleanup(); reject(new Error('Impossible de connecter la messagerie.'));
-      };
+      const onError = () => { cleanup(); reject(new Error('Impossible de connecter la messagerie.')); };
       const cleanup = () => {
         window.clearTimeout(timeout);
         socket.off('connect', onConnect);
@@ -299,6 +297,7 @@ export default function PropardAIPage({ initialConversationId = null }) {
       };
       socket.on('connect', onConnect);
       socket.on('connect_error', onError);
+      socket.connect();
     });
   };
 
