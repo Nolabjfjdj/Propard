@@ -7,12 +7,13 @@ const User = require('../models/User');
 const Report = require('../models/Report');
 const StaffAuditLog = require('../models/StaffAuditLog');
 const SupportRequest = require('../models/SupportRequest');
+const Announcement = require('../models/Announcement');
 const Message = require('../models/Message');
 const Group = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
 const authMiddleware = require('../middleware/auth');
 const { ROLE_LEVELS, roleLevel, requireStaffRole, canManageRole } = require('../middleware/staffRoles');
-const { effectiveStaffRole } = require('../utils/staffAllowlist');
+const { effectiveStaffRole, isSoleOwner } = require('../utils/staffAllowlist');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { deleteFilesForUser, deleteFilesForGroup } = require('../services/fileCleanup');
 
@@ -30,6 +31,30 @@ const resetCompleteLimiter = createRateLimiter({
   max: 10,
   keyFn: req => req.ip || 'unknown',
   message: 'Trop de tentatives de récupération. Réessaie plus tard.'
+});
+
+function checkAnnouncementKey(providedKey) {
+  const expectedKey = process.env.ADMIN_KEY_ANNOUNCEMENT;
+  if (typeof providedKey !== 'string' || typeof expectedKey !== 'string' || !providedKey || !expectedKey) return false;
+  const provided = Buffer.from(providedKey);
+  const expected = Buffer.from(expectedKey);
+  return provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
+}
+
+function requireSoleOwner(req, res, next) {
+  if (req.user?.staffRole !== 'owner' || !isSoleOwner(req.user?.id)) {
+    return res.status(403).json({ error: 'Seul le propriétaire unique peut gérer les annonces globales.' });
+  }
+  return next();
+}
+
+const announcementLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  keyFn: req => `${req.user?.id || 'unknown'}:${req.ip || 'unknown'}`,
+  message: 'Trop de tentatives de publication. Réessaie plus tard.',
+  captcha: true,
+  resetOnCaptcha: true
 });
 
 function hashToken(token) {
@@ -139,6 +164,65 @@ router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) =
 
 router.use(authMiddleware);
 router.use(actionLimiter);
+
+router.post('/announcements/create', requireStaffRole('owner'), requireSoleOwner, announcementLimiter, async (req, res) => {
+  try {
+    const { announcementKey, title, message } = req.body || {};
+    if (!checkAnnouncementKey(announcementKey)) return res.status(403).json({ error: 'Clé annonce incorrecte.' });
+    if (typeof title !== 'string' || typeof message !== 'string' || !title.trim() || !message.trim()) {
+      return res.status(400).json({ error: 'Titre et message requis.' });
+    }
+    if (title.trim().length > 150 || message.trim().length > 5000) {
+      return res.status(400).json({ error: 'Titre ou message trop long.' });
+    }
+
+    await Announcement.updateMany({ active: true }, { $set: { active: false } });
+    const announcement = await Announcement.create({ title: title.trim(), message: message.trim(), active: true });
+    await audit(req, 'announcement.created', {
+      details: { announcementId: announcement._id.toString(), title: announcement.title }
+    });
+
+    const io = req.app.get('io');
+    if (io) io.emit('globalAnnouncement', {
+      _id: announcement._id.toString(),
+      title: announcement.title,
+      message: announcement.message,
+      createdAt: announcement.createdAt
+    });
+
+    return res.json({
+      success: true,
+      message: 'Annonce publiée.',
+      announcement: {
+        _id: announcement._id,
+        title: announcement.title,
+        message: announcement.message,
+        createdAt: announcement.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Staff announcement creation failed:', error);
+    return res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
+
+router.post('/announcements/delete', requireStaffRole('owner'), requireSoleOwner, announcementLimiter, async (req, res) => {
+  try {
+    const { announcementKey } = req.body || {};
+    if (!checkAnnouncementKey(announcementKey)) return res.status(403).json({ error: 'Clé annonce incorrecte.' });
+
+    const result = await Announcement.updateMany({ active: true }, { $set: { active: false } });
+    await audit(req, 'announcement.deactivated', {
+      details: { deactivatedCount: result.modifiedCount || 0 }
+    });
+    const io = req.app.get('io');
+    if (io) io.emit('globalAnnouncementRemoved');
+    return res.json({ success: true, message: 'Annonce désactivée.' });
+  } catch (error) {
+    console.error('Staff announcement deactivation failed:', error);
+    return res.status(500).json({ error: 'Erreur serveur.' });
+  }
+});
 
 router.get('/notifications/preferences', requireStaffRole('support'), async (req, res) => {
   try {
@@ -458,6 +542,7 @@ router.patch('/account-help/settings', requireStaffRole('support'), async (req, 
 router.get('/me', requireStaffRole('support'), (req, res) => {
   return res.json({
     staffRole: req.user.staffRole,
+    canPublishAnnouncements: req.user.staffRole === 'owner' && isSoleOwner(req.user.id),
     permissions: Object.keys(ROLE_LEVELS).filter(role => roleLevel(role) <= roleLevel(req.user.staffRole))
   });
 });
