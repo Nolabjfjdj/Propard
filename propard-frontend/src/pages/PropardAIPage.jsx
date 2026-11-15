@@ -2,6 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useAuth } from '../context/AuthContext';
+import socket from '../socket';
+import {
+  deriveSharedKey,
+  encryptMessage,
+  decryptMessage,
+  getStoredPrivateKeyJwk
+} from '../utils/crypto';
+import {
+  decryptGroupKeyPackage,
+  getStoredGroupKey,
+  storeGroupKey
+} from '../utils/groupCrypto';
 
 const auth = token => ({ headers: { Authorization: `Bearer ${token}` } });
 
@@ -14,7 +26,7 @@ const updateConversationUrl = id => {
 };
 
 export default function PropardAIPage({ initialConversationId = null }) {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId] = useState(initialConversationId);
   const [messages, setMessages] = useState([]);
@@ -25,6 +37,12 @@ export default function PropardAIPage({ initialConversationId = null }) {
   const [available, setAvailable] = useState(null);
   const [keyCount, setKeyCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionNotice, setActionNotice] = useState('');
+  const [pendingRead, setPendingRead] = useState(null);
+  const [localReadResult, setLocalReadResult] = useState(null);
+  const [readingLocal, setReadingLocal] = useState(false);
   const endRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -81,6 +99,96 @@ export default function PropardAIPage({ initialConversationId = null }) {
     });
     return () => { mounted = false; };
   }, [token, initialConversationId]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    socket.auth = { token };
+    if (!socket.connected) socket.connect();
+    return () => {
+      socket.disconnect();
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (!pendingRead || !token || !user) return;
+    let cancelled = false;
+    const readLatestMessageLocally = async () => {
+      setReadingLocal(true);
+      setLocalReadResult(null);
+      try {
+        const userId = (user.id || user._id)?.toString();
+        if (!userId) throw new Error('Compte utilisateur introuvable.');
+        const privateKey = await getStoredPrivateKeyJwk(userId);
+        if (!privateKey) throw new Error('Clé privée E2EE locale introuvable.');
+
+        let response;
+        let plaintext = null;
+        if (pendingRead.type === 'private_message') {
+          const profileResponse = await api.get(
+            `/api/auth/user/${encodeURIComponent(pendingRead.conversationId)}`,
+            auth(token)
+          );
+          const publicKeyValue = profileResponse.data?.publicKey;
+          const publicKey = typeof publicKeyValue === 'string' ? JSON.parse(publicKeyValue) : publicKeyValue;
+          if (!publicKey) throw new Error('Clé publique de cet ami indisponible.');
+          const sharedKey = await deriveSharedKey(privateKey, publicKey);
+          response = await api.get(
+            `/api/friends/messages/${encodeURIComponent(pendingRead.conversationId)}?limit=1`,
+            auth(token)
+          );
+          const latest = Array.isArray(response.data) ? response.data[0] : null;
+          if (!latest) throw new Error('Aucun message dans cette conversation.');
+          if (latest.encrypted === false) plaintext = latest.content || '';
+          else plaintext = await decryptMessage(sharedKey, latest.content);
+        } else if (pendingRead.type === 'group_message') {
+          const groupResponse = await api.get(
+            `/api/groups/${encodeURIComponent(pendingRead.conversationId)}`,
+            auth(token)
+          );
+          const group = groupResponse.data;
+          const currentVersion = group.keyVersion || 1;
+          let groupKey = await getStoredGroupKey(group._id, currentVersion);
+          if (!groupKey) {
+            const keyPackage = group.keyPackage;
+            if (!keyPackage?.encryptedKey || !keyPackage?.senderId) {
+              throw new Error('Clé du groupe introuvable sur cet appareil.');
+            }
+            const senderId = keyPackage.senderId.toString();
+            const senderPublicKeyValue = keyPackage.senderPublicKey || group.members?.find(member => member._id?.toString() === senderId)?.publicKey;
+            const senderPublicKey = typeof senderPublicKeyValue === 'string' ? JSON.parse(senderPublicKeyValue) : senderPublicKeyValue;
+            if (!senderPublicKey) throw new Error('Clé publique du distributeur indisponible.');
+            groupKey = await decryptGroupKeyPackage(keyPackage.encryptedKey, privateKey, senderPublicKey);
+            if (!groupKey) throw new Error('Impossible de déchiffrer la clé du groupe.');
+            await storeGroupKey(group._id, currentVersion, groupKey);
+          }
+          response = await api.get(
+            `/api/groups/${encodeURIComponent(group._id)}/messages?limit=1`,
+            auth(token)
+          );
+          const latest = Array.isArray(response.data) ? response.data[0] : null;
+          if (!latest) throw new Error('Aucun message dans ce groupe.');
+          if (latest.encrypted === false) plaintext = latest.content || '';
+          else {
+            const messageVersion = latest.keyVersion || currentVersion;
+            const messageKey = messageVersion === currentVersion ? groupKey : await getStoredGroupKey(group._id, messageVersion);
+            if (!messageKey) throw new Error('Ancienne clé de groupe absente sur cet appareil.');
+            plaintext = await decryptMessage(messageKey, latest.content);
+          }
+        }
+        if (plaintext === null) throw new Error('Impossible de déchiffrer ce message avec la clé locale.');
+        if (!cancelled) setLocalReadResult({ name: pendingRead.conversationName, content: plaintext });
+      } catch (err) {
+        if (!cancelled) setLocalReadResult({ name: pendingRead.conversationName, error: err.response?.data?.error || err.message || 'Lecture locale impossible.' });
+      } finally {
+        if (!cancelled) {
+          setReadingLocal(false);
+          setPendingRead(null);
+        }
+      }
+    };
+    readLatestMessageLocally();
+    return () => { cancelled = true; };
+  }, [pendingRead, token, user]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -157,6 +265,10 @@ export default function PropardAIPage({ initialConversationId = null }) {
         response.data.userMessage,
         response.data.assistantMessage
       ]);
+      setPendingAction(response.data.pendingAction || null);
+      setPendingRead(response.data.pendingRead || null);
+      setLocalReadResult(null);
+      setActionNotice('');
       await loadConversations();
     } catch (err) {
       setMessages(current => current.slice(0, -1));
@@ -165,6 +277,110 @@ export default function PropardAIPage({ initialConversationId = null }) {
     } finally {
       setSending(false);
       inputRef.current?.focus();
+    }
+  };
+
+  const waitForSocket = async () => {
+    if (socket.connected) return;
+    socket.auth = { token };
+    socket.connect();
+    await new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        cleanup();
+        reject(new Error('Connexion sécurisée au serveur indisponible.'));
+      }, 10000);
+      const onConnect = () => { cleanup(); resolve(); };
+      const onError = () => { cleanup(); reject(new Error('Impossible de connecter la messagerie.'));
+      };
+      const cleanup = () => {
+        window.clearTimeout(timeout);
+        socket.off('connect', onConnect);
+        socket.off('connect_error', onError);
+      };
+      socket.on('connect', onConnect);
+      socket.on('connect_error', onError);
+    });
+  };
+
+  const emitMessageWithConfirmation = async (eventName, successEvent, errorEvent, payload) => {
+    await waitForSocket();
+    await new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        cleanup();
+        reject(new Error('Aucune confirmation du serveur après l’envoi.'));
+      }, 15000);
+      const onSuccess = () => { cleanup(); resolve(); };
+      const onError = data => { cleanup(); reject(new Error(data?.message || 'Envoi refusé par le serveur.')); };
+      const cleanup = () => {
+        window.clearTimeout(timeout);
+        socket.off(successEvent, onSuccess);
+        socket.off(errorEvent, onError);
+      };
+      socket.once(successEvent, onSuccess);
+      socket.once(errorEvent, onError);
+      socket.emit(eventName, payload);
+    });
+  };
+
+  const confirmPendingAction = async () => {
+    if (!pendingAction || actionLoading) return;
+    setActionLoading(true);
+    setActionNotice('');
+    try {
+      const userId = (user?.id || user?._id)?.toString();
+      if (!userId) throw new Error('Compte utilisateur introuvable.');
+      const privateKey = await getStoredPrivateKeyJwk(userId);
+      if (!privateKey) throw new Error('Clé privée E2EE locale introuvable.');
+
+      if (pendingAction.type === 'private_message') {
+        const profile = await api.get(
+          `/api/auth/user/${encodeURIComponent(pendingAction.recipientId)}`,
+          auth(token)
+        );
+        const publicKeyValue = profile.data?.publicKey;
+        const publicKey = typeof publicKeyValue === 'string' ? JSON.parse(publicKeyValue) : publicKeyValue;
+        if (!publicKey) throw new Error('Clé publique du destinataire indisponible.');
+        const sharedKey = await deriveSharedKey(privateKey, publicKey);
+        const encryptedContent = await encryptMessage(sharedKey, pendingAction.content);
+        await emitMessageWithConfirmation('sendMessage', 'messageSent', 'messageError', {
+          receiverId: pendingAction.recipientId,
+          content: encryptedContent
+        });
+      } else if (pendingAction.type === 'group_message') {
+        const groupResponse = await api.get(
+          `/api/groups/${encodeURIComponent(pendingAction.groupId)}`,
+          auth(token)
+        );
+        const group = groupResponse.data;
+        const keyVersion = group.keyVersion || 1;
+        let groupKey = await getStoredGroupKey(group._id, keyVersion);
+        if (!groupKey) {
+          const keyPackage = group.keyPackage;
+          if (!keyPackage?.encryptedKey || !keyPackage?.senderId) throw new Error('Clé du groupe introuvable sur cet appareil.');
+          const senderId = keyPackage.senderId.toString();
+          const senderPublicKeyValue = keyPackage.senderPublicKey || group.members?.find(member => member._id?.toString() === senderId)?.publicKey;
+          const senderPublicKey = typeof senderPublicKeyValue === 'string' ? JSON.parse(senderPublicKeyValue) : senderPublicKeyValue;
+          if (!senderPublicKey) throw new Error('Clé publique du distributeur indisponible.');
+          groupKey = await decryptGroupKeyPackage(keyPackage.encryptedKey, privateKey, senderPublicKey);
+          if (!groupKey) throw new Error('Impossible de déchiffrer la clé du groupe.');
+          await storeGroupKey(group._id, keyVersion, groupKey);
+        }
+        const encryptedContent = await encryptMessage(groupKey, pendingAction.content);
+        await emitMessageWithConfirmation('sendGroupMessage', 'groupMessageSent', 'groupMessageError', {
+          groupId: group._id,
+          content: encryptedContent,
+          keyVersion
+        });
+      } else {
+        throw new Error('Action inconnue.');
+      }
+
+      setPendingAction(null);
+      setActionNotice('Message envoyé.');
+    } catch (err) {
+      setActionNotice(err.response?.data?.error || err.message || 'Impossible d’envoyer le message.');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -261,6 +477,23 @@ export default function PropardAIPage({ initialConversationId = null }) {
               <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 10 }}>Tes conversations sont privées et enregistrées sur ton compte.</div>
             </div>}
             {messages.map((message, index) => <div key={`${message.createdAt || index}-${index}`} style={{ ...styles.bubble, ...(message.role === 'user' ? styles.userBubble : styles.assistantBubble) }}>{message.role === 'assistant' ? <MarkdownRenderer content={message.content} /> : message.content}</div>)}
+            {pendingAction && <div style={{ ...styles.bubble, ...styles.assistantBubble, border: '1px solid var(--accent)' }}>
+              <strong>Confirmer l’envoi</strong>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 6 }}>Destinataire : {pendingAction.type === 'private_message' ? pendingAction.recipientName : pendingAction.groupName}</div>
+              <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginTop: 10 }}>{pendingAction.content}</div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+                <button type="button" disabled={actionLoading} onClick={confirmPendingAction} style={styles.send}>{actionLoading ? 'Envoi…' : 'Confirmer et envoyer'}</button>
+                <button type="button" disabled={actionLoading} onClick={() => { setPendingAction(null); setActionNotice('Envoi annulé.'); }} style={{ ...styles.back, cursor: 'pointer', background: 'transparent' }}>Annuler</button>
+              </div>
+            </div>}
+            {actionNotice && <div style={{ ...styles.bubble, ...styles.assistantBubble, fontSize: 13 }}>{actionNotice}</div>}
+            {readingLocal && <div style={{ ...styles.bubble, ...styles.assistantBubble, color: 'var(--text-muted)' }}>Déchiffrement du dernier message directement sur cet appareil…</div>}
+            {localReadResult && <div style={{ ...styles.bubble, ...styles.assistantBubble, border: '1px solid var(--border)' }}>
+              <strong>Dernier message de {localReadResult.name}</strong>
+              {localReadResult.error ? <div style={{ color: 'var(--danger)', marginTop: 8 }}>{localReadResult.error}</div> : <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginTop: 8 }}>{localReadResult.content}</div>}
+              <div style={styles.muted}>Déchiffré localement. Ce contenu n’a pas été envoyé à Groq ni enregistré dans l’historique IA.</div>
+              <button type="button" onClick={() => setLocalReadResult(null)} style={{ ...styles.back, marginTop: 8, cursor: 'pointer', background: 'transparent' }}>Fermer</button>
+            </div>}
             {sending && <div style={{ ...styles.bubble, ...styles.assistantBubble, color: 'var(--text-muted)' }}>Propard AI réfléchit…</div>}
             <div ref={endRef} />
           </div>
