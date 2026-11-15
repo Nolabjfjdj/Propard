@@ -93,7 +93,6 @@ router.get('/status', (req, res) => {
 
 router.get('/conversations', async (req, res) => {
   try {
-    await AIConversation.migrateUserConversations(req.user.id);
     const conversations = await AIConversation.find({ userId: req.user.id })
       .select('_id title createdAt updatedAt')
       .sort({ updatedAt: -1 })
