@@ -469,7 +469,7 @@ export default function PropardAIPage({ initialConversationId = null }) {
         <header style={styles.top}>
           <button onClick={() => setSidebarOpen(true)} style={{ ...styles.back, display: window.innerWidth < 700 ? 'block' : 'none', background: 'transparent', cursor: 'pointer' }}>☰</button>
           <strong>Propard AI</strong>
-          <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: 12 }}>{available === false ? 'IA indisponible' : available ? `${keyCount} clé${keyCount > 1 ? 's' : ''} Groq` : 'Assistant'}</span>
+          <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: 12 }}>{available === false ? 'IA indisponible' : 'Assistant'}</span>
         </header>
         <section style={styles.feed}>
           <div style={styles.content}>
