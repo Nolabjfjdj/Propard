@@ -12,6 +12,7 @@ const Group = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
 const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { getClientIp } = require('../utils/clientIp');
 const { MAX_AVATAR_LENGTH } = require('../utils/inputValidation');
 const { effectiveStaffRole } = require('../utils/staffAllowlist');
 const { deleteFilesForUser, deleteFilesForGroup } = require('../services/fileCleanup');
@@ -19,14 +20,14 @@ const { deleteFilesForUser, deleteFilesForGroup } = require('../services/fileCle
 const accountHelpLimiter = createRateLimiter({
   windowMs: 30 * 60 * 1000,
   max: 4,
-  keyFn: req => `account-help:${req.ip || 'unknown'}`,
+  keyFn: req => `account-help:${getClientIp(req) || 'unknown'}`,
   message: 'Trop de demandes envoyées. Réessaie plus tard.'
 });
 
 const accountHelpStatusLimiter = createRateLimiter({
   windowMs: 30 * 60 * 1000,
   max: 20,
-  keyFn: req => `account-help-status:${req.ip || 'unknown'}`,
+  keyFn: req => `account-help-status:${getClientIp(req) || 'unknown'}`,
   message: 'Trop de consultations. Réessaie plus tard.'
 });
 
@@ -177,7 +178,7 @@ const escapeRegExp = value =>
 const loginRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  keyFn: (req) => `login:${req.ip || 'unknown'}`,
+  keyFn: (req) => `login:${getClientIp(req) || 'unknown'}`,
   message: 'Trop de tentatives de connexion, réessaie dans quelques minutes.',
   captcha: true
 });
@@ -185,7 +186,7 @@ const loginRateLimiter = createRateLimiter({
 const registerRateLimiter = createRateLimiter({
   windowMs: 60 * 60 * 1000,
   max: 8,
-  keyFn: (req) => req.ip,
+  keyFn: (req) => getClientIp(req),
   message: 'Trop de comptes créés depuis cette adresse, réessaie plus tard.',
   captcha: true
 });
