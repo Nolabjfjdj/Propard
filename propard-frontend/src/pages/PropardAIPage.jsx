@@ -133,7 +133,7 @@ export default function PropardAIPage({ initialConversationId = null }) {
           if (!publicKey) throw new Error('Clé publique de cet ami indisponible.');
           const sharedKey = await deriveSharedKey(privateKey, publicKey);
           response = await api.get(
-            `/api/friends/messages/${encodeURIComponent(pendingRead.conversationId)}?limit=1&sentByMe=true`,
+            `/api/friends/messages/${encodeURIComponent(pendingRead.conversationId)}?limit=1&direction=${pendingRead.direction === 'sent' ? 'sent' : 'received'}`,
             auth(token)
           );
           const latest = Array.isArray(response.data) ? response.data[0] : null;
@@ -178,7 +178,7 @@ export default function PropardAIPage({ initialConversationId = null }) {
         if (plaintext === null) throw new Error('Impossible de déchiffrer ce message avec la clé locale.');
         if (!cancelled) setLocalReadResult({
           name: pendingRead.conversationName,
-          label: pendingRead.type === 'private_message' ? 'Dernier message envoyé à' : 'Dernier message du groupe',
+          label: pendingRead.type === 'private_message' ? (pendingRead.direction === 'sent' ? 'Dernier message envoyé à' : 'Dernier message reçu de') : 'Dernier message du groupe',
           content: plaintext
         });
       } catch (err) {
