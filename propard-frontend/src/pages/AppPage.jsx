@@ -10,6 +10,7 @@ import GroupManager from '../components/GroupManager';
 import Chat from '../components/Chat';
 import AddFriend from '../components/AddFriend';
 import VoiceCall from '../components/VoiceCall';
+import GroupVoiceCall from '../components/GroupVoiceCall';
 import OfflineGame from '../components/OfflineGame';
 import ProfilePage from './ProfilePage';
 import {
@@ -68,6 +69,7 @@ export default function AppPage({
   const [friendNotFound, setFriendNotFound] = useState(false);
 
   const [incomingCall, setIncomingCall] = useState(null);
+  const [incomingGroupCall, setIncomingGroupCall] = useState(null);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
@@ -206,47 +208,83 @@ export default function AppPage({
   }, [initialGroupId, token]);
 
   useEffect(() => {
-    socket.on(
-      'incomingCall',
-      async ({ callerId, offer, videoCall = false }) => {
-        try {
-          const res = await api.get(
-            `/api/auth/user/${callerId}`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`
-              }
-            }
-          );
-
-          setIncomingCall({
-            friend: {
-              ...res.data,
-              _id: callerId
-            },
-            offer,
-            videoCall
-          });
-        } catch (err) {
-          console.error(err);
-        }
-      }
-    );
+    let pendingRequested = false;
 
     const requestPendingCalls = () => {
-      if (socket.connected) {
+      if (!pendingRequested && socket.connected) {
+        pendingRequested = true;
         socket.emit('requestPendingCalls');
       }
     };
 
-    socket.on('connect', requestPendingCalls);
+    const handleIncomingCall = async ({ callerId, offer, videoCall = false }) => {
+      try {
+        const res = await api.get(
+          `/api/auth/user/${callerId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+
+        setIncomingCall({
+          friend: {
+            ...res.data,
+            _id: callerId
+          },
+          offer,
+          videoCall
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    const handleGroupCallInvite = async payload => {
+      if (!payload?.groupId || !payload?.callId || payload.callerId?.toString() === user?.id?.toString()) {
+        return;
+      }
+
+      try {
+        const res = await api.get(
+          `/api/groups/${payload.groupId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+
+        setIncomingGroupCall({
+          group: res.data,
+          callId: payload.callId,
+          callerId: payload.callerId?.toString(),
+          videoCall: Boolean(payload.videoCall)
+        });
+      } catch (err) {
+        console.error('Impossible de récupérer le groupe de l’appel entrant:', err);
+      }
+    };
+
+    const handleReconnect = () => {
+      pendingRequested = false;
+    };
+
+    socket.on('incomingCall', handleIncomingCall);
+    socket.on('groupCallInvite', handleGroupCallInvite);
+    socket.on('authenticated', requestPendingCalls);
+    socket.on('connect', handleReconnect);
+
     requestPendingCalls();
 
     return () => {
-      socket.off('incomingCall');
-      socket.off('connect', requestPendingCalls);
+      socket.off('incomingCall', handleIncomingCall);
+      socket.off('groupCallInvite', handleGroupCallInvite);
+      socket.off('authenticated', requestPendingCalls);
+      socket.off('connect', handleReconnect);
     };
-  }, [token]);
+  }, [token, user?.id]);
 
   const handleSelectFriend = friend => {
     setSelectedFriend(friend);
@@ -1542,6 +1580,18 @@ export default function AppPage({
             incomingCall.offer
           }
           videoCall={incomingCall.videoCall}
+        />
+      )}
+
+      {incomingGroupCall && (
+        <GroupVoiceCall
+          group={incomingGroupCall.group}
+          userId={user?.id}
+          token={token}
+          incomingCall
+          callId={incomingGroupCall.callId}
+          videoCall={incomingGroupCall.videoCall}
+          onClose={() => setIncomingGroupCall(null)}
         />
       )}
 
