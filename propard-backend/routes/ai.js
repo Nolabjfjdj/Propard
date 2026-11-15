@@ -97,8 +97,7 @@ router.get('/conversations', async (req, res) => {
     const conversations = await AIConversation.find({ userId: req.user.id })
       .select('_id title createdAt updatedAt')
       .sort({ updatedAt: -1 })
-      .limit(50)
-      .lean();
+      .limit(50);
     res.json(conversations.map(item => ({
       id: item._id.toString(),
       title: item.title,
@@ -651,12 +650,14 @@ router.patch('/conversations/:id', async (req, res) => {
     }
     const title = typeof req.body?.title === 'string' ? req.body.title.trim().slice(0, 80) : '';
     if (!title) return res.status(400).json({ error: 'Le titre est obligatoire.' });
-    const conversation = await AIConversation.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user.id },
-      { $set: { title, updatedAt: new Date() } },
-      { new: true }
-    );
+    const conversation = await AIConversation.findOne({
+      _id: req.params.id,
+      userId: req.user.id
+    });
     if (!conversation) return res.status(404).json({ error: 'Conversation introuvable.' });
+    conversation.title = title;
+    conversation.updatedAt = new Date();
+    await conversation.save();
     res.json({ id: conversation._id.toString(), title: conversation.title });
   } catch (error) {
     console.error('Propard AI conversation rename failed:', error.message);
