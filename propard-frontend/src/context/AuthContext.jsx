@@ -55,6 +55,7 @@ const uploadKeyBackup = async (
     '/api/auth/keybackup',
     {
       backup,
+      password,
       ...(publicKeyJwk ? { publicKey: JSON.stringify(publicKeyJwk) } : {}),
       ...(captchaToken ? { captchaToken } : {})
     },
