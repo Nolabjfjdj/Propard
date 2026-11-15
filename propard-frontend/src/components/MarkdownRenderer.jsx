@@ -38,11 +38,11 @@ const languageKeywords = {
 };
 
 function highlightCode(code, language = '') {
-  const lang = language.toLowerCase().replace(/^\\./, '');
+  const lang = language.toLowerCase().replace(/^\./, '');
   const aliases = { js: 'javascript', mjs: 'javascript', cjs: 'javascript', ts: 'typescript', py: 'python', sh: 'bash', shell: 'bash', yml: 'yaml', html: 'html', xml: 'html', css: 'css', jsx: 'jsx', tsx: 'tsx' };
   const normalized = aliases[lang] || lang;
-  const keywords = new Set((languageKeywords[normalized] || languageKeywords.javascript).split(/\\s+/));
-  const pattern = /(\\/\\*[\\s\\S]*?\\*\\/|\\/\\/[^\\n]*|#[^\\n]*|"(?:\\\\.|[^"\\\\])*"|'(?:\\\\.|[^'\\\\])*'|\\x60(?:\\\\.|[^\\x60\\\\])*\\x60|\\b\\d+(?:\\.\\d+)?\\b|\\b[A-Za-z_$][\\w$]*\\b|=>|===?|!==?|<=?|>=?|\\+\\+|--|&&|\\|\\||[{}()[\\].,;:+*/%=!<>?-])/g;
+  const keywords = new Set((languageKeywords[normalized] || languageKeywords.javascript).split(/\s+/));
+  const pattern = /(\/\*[\s\S]*?\*\/|\/\/[^\n]*|#[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b\d+(?:\.\d+)?\b|\b[A-Za-z_$][\w$]*\b|=>|===?|!==?|<=?|>=?|\+\+|--|&&|\|\||[{}()[\].,;:+*/%=!<>?-])/g;
   const parts = [];
   let last = 0;
   let match;
@@ -50,13 +50,13 @@ function highlightCode(code, language = '') {
     if (match.index > last) parts.push(code.slice(last, match.index));
     const token = match[0];
     let type = 'punctuation';
-    if (/^(\\/\\*|\\/\\/|#)/.test(token)) type = 'comment';
-    else if (/^["'\\x60]/.test(token)) type = 'string';
-    else if (/^\\d/.test(token)) type = 'number';
+    if (/^(\/\*|\/\/|#)/.test(token)) type = 'comment';
+    else if (/^["']/.test(token)) type = 'string';
+    else if (/^\d/.test(token)) type = 'number';
     else if (keywords.has(token)) type = 'keyword';
-    else if (/^[A-Za-z_$][\\w$]*$/.test(token)) {
+    else if (/^[A-Za-z_$][\w$]*$/.test(token)) {
       const rest = code.slice(pattern.lastIndex);
-      type = /^\\s*\\(/.test(rest) ? 'function' : 'variable';
+      type = /^\s*\(/.test(rest) ? 'function' : 'variable';
     }
     parts.push(<span className={'propard-token-' + type} key={match.index}>{token}</span>);
     last = pattern.lastIndex;
