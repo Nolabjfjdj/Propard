@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import socket from '../socket';
 import FriendList from '../components/FriendList';
+import PropardAIEntry from '../components/PropardAIEntry';
 import GroupChat from '../components/GroupChat';
 import GroupManager from '../components/GroupManager';
 import Chat from '../components/Chat';
@@ -1237,6 +1238,8 @@ export default function AppPage({
         >
           + Ajouter un ami
         </button>
+
+        <PropardAIEntry />
 
         <FriendList
           token={token}
