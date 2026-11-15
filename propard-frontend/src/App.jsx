@@ -224,12 +224,14 @@ export default function App() {
     return <AuthPage mode="register" />;
   }
 
-  if (path === '/ai') {
+  const aiRoute = /^\/ai(?:\/([^/]+))?\/?$/.exec(path);
+
+  if (aiRoute) {
     if (!user) {
       window.history.replaceState({}, '', '/login');
       return null;
     }
-    return <PropardAIPage />;
+    return <PropardAIPage initialConversationId={aiRoute[1] || null} />;
   }
 
   if (path === '/settings') {
