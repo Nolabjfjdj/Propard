@@ -8,15 +8,15 @@ export default function PropardAIEntry() {
 
   if (hidden) return null;
 
-  const openMenu = (x, y) => {
-    suppressClick.current = true;
+  const openMenu = (x, y, suppress = false) => {
+    suppressClick.current = suppress;
     setMenu({ x: Math.max(8, Math.min(x, window.innerWidth - 150)), y: Math.max(8, Math.min(y, window.innerHeight - 70)) });
   };
 
   const startPress = event => {
     const touch = event.touches?.[0];
     if (!touch) return;
-    timer.current = window.setTimeout(() => openMenu(touch.clientX, touch.clientY), 650);
+    timer.current = window.setTimeout(() => openMenu(touch.clientX, touch.clientY, true), 650);
   };
 
   const cancelPress = () => {
@@ -29,7 +29,7 @@ export default function PropardAIEntry() {
       <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '2px 4px' }}>IA</div>
       <a
         href="/ai"
-        onContextMenu={event => { event.preventDefault(); openMenu(event.clientX, event.clientY); }}
+        onContextMenu={event => { event.preventDefault(); openMenu(event.clientX, event.clientY, false); }}
         onTouchStart={startPress}
         onTouchEnd={cancelPress}
         onTouchMove={cancelPress}
