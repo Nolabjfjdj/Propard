@@ -461,6 +461,13 @@ router.post('/login', loginRateLimiter, async (req, res) => {
       });
     }
 
+    if (user.passkeys?.length) {
+      return res.status(200).json({
+        passkeyRequired: true,
+        message: 'Confirme la connexion avec une clé d’accès.'
+      });
+    }
+
     if (user.bannedAt && user.banExpiresAt && user.banExpiresAt <= new Date()) {
       user.bannedAt = null;
       user.banExpiresAt = null;
