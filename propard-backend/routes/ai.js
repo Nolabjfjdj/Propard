@@ -454,7 +454,7 @@ UTILISATION DES OUTILS ET CONFIDENTIALITÉ
     ];
 
     let completion;
-    for (let round = 0; round < 2; round++) {
+    for (let round = 0; round < 3; round++) {
       completion = await createGroqCompletion({
         messages: requestMessages,
         tools: selectedTools,
