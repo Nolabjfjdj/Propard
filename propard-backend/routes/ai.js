@@ -22,7 +22,7 @@ const titleFromMessage = value => {
   return normalized.length > 48 ? `${normalized.slice(0, 45)}...` : normalized;
 };
 
-const buildRecentHistory = (messages, maxMessages = 8, maxCharacters = 10000) => {
+const buildRecentHistory = (messages, maxMessages = 4, maxCharacters = 3000) => {
   const selected = [];
   let remaining = maxCharacters;
 
@@ -143,7 +143,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         type: 'function',
         function: {
           name: 'get_my_profile',
-          description: 'Consulter les informations non sensibles du profil Propard de l’utilisateur connecté.',
+          description: 'Consulter le profil non sensible de l’utilisateur connecté.',
           parameters: { type: 'object', properties: {}, additionalProperties: false }
         }
       },
@@ -151,7 +151,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         type: 'function',
         function: {
           name: 'list_my_friends',
-          description: 'Lister les amis Propard de l’utilisateur connecté avec leurs identifiants.',
+          description: 'Lister les amis de l’utilisateur avec leurs identifiants.',
           parameters: { type: 'object', properties: {}, additionalProperties: false }
         }
       },
@@ -159,7 +159,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         type: 'function',
         function: {
           name: 'list_my_groups',
-          description: 'Lister les groupes Propard dont l’utilisateur connecté est membre.',
+          description: 'Lister les groupes de l’utilisateur.',
           parameters: { type: 'object', properties: {}, additionalProperties: false }
         }
       },
@@ -167,7 +167,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         type: 'function',
         function: {
           name: 'prepare_private_message',
-          description: 'Préparer un brouillon de message privé. Ne jamais envoyer le message. Le destinataire doit être un ami présent dans la liste des amis.',
+          description: 'Préparer un brouillon privé pour un ami. Ne jamais envoyer.',
           parameters: {
             type: 'object',
             properties: {
@@ -183,7 +183,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         type: 'function',
         function: {
           name: 'prepare_group_message',
-          description: 'Préparer un brouillon de message dans un groupe dont l’utilisateur est membre. Ne jamais envoyer le message.',
+          description: 'Préparer un brouillon dans un groupe. Ne jamais envoyer.',
           parameters: {
             type: 'object',
             properties: {
@@ -199,7 +199,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         type: 'function',
         function: {
           name: 'request_last_private_message',
-          description: 'Demander au navigateur de récupérer et déchiffrer localement le dernier message privé d’un ami. Le serveur et Groq ne doivent jamais recevoir le texte déchiffré.',
+          description: 'Demander au navigateur de déchiffrer localement le dernier message privé.',
           parameters: {
             type: 'object',
             properties: { friendId: { type: 'string' } },
@@ -212,7 +212,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         type: 'function',
         function: {
           name: 'request_last_group_message',
-          description: 'Demander au navigateur de récupérer et déchiffrer localement le dernier message d’un groupe. Le serveur et Groq ne doivent jamais recevoir le texte déchiffré.',
+          description: 'Demander au navigateur de déchiffrer localement le dernier message du groupe.',
           parameters: {
             type: 'object',
             properties: { groupId: { type: 'string' } },
@@ -244,7 +244,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         if (!account) return { error: 'Compte introuvable.' };
         const ids = (account.friends || []).map(friend => friend.userId).filter(Boolean);
         const friends = ids.length
-          ? await User.find({ _id: { $in: ids.slice(0, 25) } }).select('username displayName avatar')
+          ? await User.find({ _id: { $in: ids.slice(0, 10) } }).select('username displayName avatar')
           : [];
         return friends.map(friend => ({
           id: friend._id.toString(),
@@ -258,7 +258,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         const groups = await Group.find({ 'members.userId': req.user.id })
           .select('_id name owner createdAt')
           .sort({ updatedAt: -1 })
-          .limit(15)
+          .limit(8)
           .lean();
         return groups.map(group => ({
           id: group._id.toString(),
@@ -338,7 +338,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
     const requestMessages = [
       {
         role: 'system',
-        content: 'Tu es Propard AI, l’assistant intégré à Propard. Réponds en français par défaut, clairement et honnêtement. Tu peux consulter le profil non sensible, les amis et les groupes de l’utilisateur connecté. Tu peux préparer un brouillon de message privé ou de groupe, mais tu ne peux jamais l’envoyer toi-même : l’utilisateur doit obligatoirement confirmer dans l’interface. Tu peux demander au navigateur de lire le dernier message privé ou de groupe, mais le contenu est déchiffré uniquement sur l’appareil et ne doit jamais être demandé, reconstitué, résumé ou transmis à Groq. Tu ne peux lire aucune clé, aucun mot de passe ni aucune donnée d’autres utilisateurs. Ne prétends jamais qu’un message a été envoyé avant confirmation. Ne demande jamais de mot de passe, de clé privée, de clé API ou de code de récupération.'
+        content: 'Tu es Propard AI. Réponds en français, clairement et honnêtement. Tu peux consulter le profil non sensible, les amis et les groupes de l’utilisateur. Tu peux préparer des brouillons privés ou de groupe, jamais les envoyer : une confirmation explicite dans l’interface est obligatoire. Le contenu des messages E2EE est déchiffré uniquement sur l’appareil et ne doit jamais être transmis à Groq, résumé par toi ou ajouté à l’historique. Ne demande ni mot de passe, ni clé privée, ni clé API, ni code de récupération.'
       },
       ...history
     ];
@@ -350,7 +350,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         tools,
         tool_choice: 'auto',
         temperature: 0.6,
-        max_completion_tokens: 1400
+        max_completion_tokens: 700
       });
 
       const assistantMessage = completion.choices?.[0]?.message;
@@ -426,11 +426,13 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
   } catch (error) {
     const status = error.code === 'GROQ_NOT_CONFIGURED'
       ? 503
-      : error.status === 429
-        ? 429
-        : error.status >= 500
-          ? 503
-          : 500;
+      : error.status === 413
+        ? 413
+        : error.status === 429
+          ? 429
+          : error.status >= 500
+            ? 503
+            : 500;
     console.error('Propard AI message failed:', {
       code: error.code || 'UNKNOWN',
       status: error.status || null,
@@ -439,11 +441,13 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
       groqParam: error.groqParam || null
     });
     res.status(status).json({
-      error: status === 429
-        ? 'Limite Groq temporairement atteinte. Réessaie dans un instant.'
-        : status === 503
-          ? 'Le service IA est temporairement indisponible. Réessaie plus tard.'
-          : 'Impossible de générer une réponse.'
+      error: status === 413
+        ? 'La demande dépasse la limite de tokens autorisée par Groq. L’historique a été réduit ; essaie dans une nouvelle conversation ou avec un message plus court.'
+        : status === 429
+          ? 'Limite Groq temporairement atteinte. Réessaie dans un instant.'
+          : status === 503
+            ? 'Le service IA est temporairement indisponible. Réessaie plus tard.'
+            : 'Impossible de générer une réponse.'
     });
   }
 });
