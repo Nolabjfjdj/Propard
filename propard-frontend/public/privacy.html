@@ -180,15 +180,16 @@ try {
           </p>
 
           <p class="legal-text">
-            Propard n'enregistre pas volontairement les adresses IP dans la base de
-            données des comptes pour identifier les utilisateurs. Toutefois, le serveur
-            accède à l'adresse IP fournie par la couche réseau (req.ip) pour certaines
-            limitations de requêtes et peut la transmettre à Cloudflare lors de la
-            validation Turnstile. Cette adresse peut être influencée par la configuration
-            des proxys et ne permet pas à Propard d'affirmer qu'il s'agit toujours de
-            l'adresse IP directe de l'utilisateur. Les prestataires d'hébergement et de
-            sécurité peuvent également générer leurs propres journaux techniques selon
-            leurs politiques de conservation.
+            Propard n'utilise pas l'adresse IP comme identifiant du compte et ne l'enregistre
+            pas dans le document du compte utilisateur. Pour les requêtes passant par
+            l'infrastructure Cloudflare de Render, le serveur récupère l'adresse du
+            visiteur depuis l'en-tête CF-Connecting-IP ajouté par Cloudflare. Cette
+            adresse est utilisée pour les limitations de requêtes et peut être transmise
+            à Cloudflare lors de la validation Turnstile. Elle peut également être
+            enregistrée dans les journaux d'audit associés aux actions du personnel,
+            afin de sécuriser le service et d'analyser les accès anormaux. Les
+            prestataires d'hébergement et de sécurité peuvent aussi générer leurs
+            propres journaux techniques selon leurs politiques de conservation.
           </p>
         </div>
 
