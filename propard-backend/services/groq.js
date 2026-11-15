@@ -100,6 +100,11 @@ async function createGroqCompletion({
         ? String(payload.error.code).slice(0, 80)
         : null;
       error.groqParam = typeof payload.error?.param === 'string' ? payload.error.param.slice(0, 80) : null;
+      error.groqMessage = typeof payload.error?.message === 'string' ? payload.error.message.slice(0, 300) : null;
+      error.groqLimitTokens = response.headers.get('x-ratelimit-limit-tokens');
+      error.groqRemainingTokens = response.headers.get('x-ratelimit-remaining-tokens');
+      error.groqResetTokens = response.headers.get('x-ratelimit-reset-tokens');
+      error.groqRetryAfter = response.headers.get('retry-after');
       lastError = error;
 
       if (!retryable) throw error;
