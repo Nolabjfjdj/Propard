@@ -93,6 +93,7 @@ router.get('/status', (req, res) => {
 
 router.get('/conversations', async (req, res) => {
   try {
+    await AIConversation.migrateUserConversations(req.user.id);
     const conversations = await AIConversation.find({ userId: req.user.id })
       .select('_id title createdAt updatedAt')
       .sort({ updatedAt: -1 })
@@ -134,6 +135,7 @@ router.get('/conversations/:id', async (req, res) => {
       userId: req.user.id
     });
     if (!conversation) return res.status(404).json({ error: 'Conversation introuvable.' });
+    if (conversation._aiMessagesNeedEncryption) await conversation.save();
     res.json(serializeConversation(conversation));
   } catch (error) {
     console.error('Propard AI conversation read failed:', error.message);
