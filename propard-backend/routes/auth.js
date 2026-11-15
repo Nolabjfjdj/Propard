@@ -448,7 +448,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
         { username: { $regex: new RegExp(`^${usernamePattern}$`, 'i') } },
         { realUsername: { $regex: new RegExp(`^${usernamePattern}$`, 'i') } }
       ]
-    }).select('+password');
+    }).select('+password +passkeys');
 
     const passwordMatches = await bcrypt.compare(
       password,
