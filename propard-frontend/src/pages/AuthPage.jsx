@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { startAuthentication } from '@simplewebauthn/browser';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -10,6 +11,8 @@ export default function AuthPage({ mode }) {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
   const [error, setError] = useState('');
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [captchaRequired, setCaptchaRequired] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
@@ -147,12 +150,34 @@ export default function AuthPage({ mode }) {
         ...(authCaptchaToken ? { captchaToken: authCaptchaToken } : {})
       });
 
-      await login(
-        res.data.user,
-        res.data.token,
-        password,
-        e2eeCaptchaToken
-      );
+      if (mode === 'login' && res.data?.passkeyRequired) {
+        const optionsResponse = await api.post('/api/auth/passkeys/login/options', {
+          username,
+          password,
+          ...(authCaptchaToken ? { captchaToken: authCaptchaToken } : {})
+        });
+        const assertion = await startAuthentication({
+          optionsJSON: optionsResponse.data.options
+        });
+        const verification = await api.post('/api/auth/passkeys/login/verify', {
+          username,
+          response: assertion,
+          ...(authCaptchaToken ? { captchaToken: authCaptchaToken } : {})
+        });
+        await login(
+          verification.data.user,
+          verification.data.token,
+          password,
+          e2eeCaptchaToken
+        );
+      } else {
+        await login(
+          res.data.user,
+          res.data.token,
+          password,
+          e2eeCaptchaToken
+        );
+      }
 
       // Mémorise que ce navigateur a déjà utilisé Propard.
       // Cela permet de savoir quelle page afficher après une déconnexion.
@@ -174,7 +199,44 @@ export default function AuthPage({ mode }) {
           window.turnstile.reset(captchaWidgetRef.current);
         }
       }
-      setError(err.response?.data?.error || 'Erreur serveur');
+      if (mode === 'login' && err.name !== 'AxiosError' && err.name !== 'Error') {
+        setRecoveryMode(true);
+      }
+      if (mode === 'login' && (err.name === 'NotAllowedError' || err.name === 'InvalidStateError' || err.name === 'SecurityError' || err.name === 'UnknownError')) {
+        setRecoveryMode(true);
+        setError('La clé d’accès n’a pas pu être utilisée. Tu peux essayer un code de récupération.');
+      } else {
+        setError(err.response?.data?.error || err.message || 'Erreur serveur');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRecoveryLogin = async () => {
+    if (!username || !password || !recoveryCode.trim()) {
+      setError('Entre ton pseudo, ton mot de passe et un code de récupération.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.post('/api/auth/passkeys/login/recovery', {
+        username,
+        password,
+        code: recoveryCode.trim(),
+        ...(captchaToken ? { captchaToken } : {})
+      });
+      await login(
+        response.data.user,
+        response.data.token,
+        password,
+        captchaPurpose === 'e2ee' ? captchaToken : ''
+      );
+      localStorage.setItem('propard_has_logged_in', 'true');
+      window.location.href = '/';
+    } catch (err) {
+      setError(err.response?.data?.error || 'Code de récupération invalide.');
     } finally {
       setLoading(false);
     }
@@ -323,6 +385,21 @@ export default function AuthPage({ mode }) {
             >
               {error}
             </p>
+          )}
+
+          {mode === 'login' && recoveryMode && (
+            <div style={{ display: 'grid', gap: 8 }}>
+              <input
+                style={styles.input}
+                value={recoveryCode}
+                onChange={event => setRecoveryCode(event.target.value)}
+                placeholder="Code de récupération"
+                autoComplete="one-time-code"
+              />
+              <button type="button" style={styles.btn} onClick={handleRecoveryLogin} disabled={loading}>
+                Utiliser le code de récupération
+              </button>
+            </div>
           )}
 
           <button
