@@ -233,10 +233,19 @@ export default function AppPage({
       }
     );
 
-    socket.emit('requestPendingCalls');
+    const requestPendingCalls = () => {
+      if (socket.connected) {
+        socket.emit('requestPendingCalls');
+      }
+    };
 
-    return () =>
+    socket.on('connect', requestPendingCalls);
+    requestPendingCalls();
+
+    return () => {
       socket.off('incomingCall');
+      socket.off('connect', requestPendingCalls);
+    };
   }, [token]);
 
   const handleSelectFriend = friend => {
