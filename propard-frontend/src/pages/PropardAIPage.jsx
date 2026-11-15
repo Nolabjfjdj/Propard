@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import VoiceMode from '../components/VoiceMode';
 import { useAuth } from '../context/AuthContext';
 import socket from '../socket';
 import {
@@ -242,9 +243,9 @@ export default function PropardAIPage({ initialConversationId = null }) {
     }
   };
 
-  const sendMessage = async event => {
+  const sendMessage = async (event, voiceContent = null) => {
     event?.preventDefault();
-    const content = draft.trim();
+    const content = typeof voiceContent === 'string' ? voiceContent.trim() : draft.trim();
     if (!content || sending) return;
     setError('');
     setSending(true);
@@ -274,10 +275,12 @@ export default function PropardAIPage({ initialConversationId = null }) {
       setLocalReadResult(null);
       setActionNotice('');
       await loadConversations();
+      return response.data.assistantMessage?.content || '';
     } catch (err) {
       setMessages(current => current.slice(0, -1));
       setDraft(content);
       setError(err.response?.data?.error || 'Une erreur est survenue pendant la génération.');
+      return null;
     } finally {
       setSending(false);
       inputRef.current?.focus();
@@ -470,6 +473,7 @@ export default function PropardAIPage({ initialConversationId = null }) {
           <button onClick={() => setSidebarOpen(true)} style={{ ...styles.back, display: window.innerWidth < 700 ? 'block' : 'none', background: 'transparent', cursor: 'pointer' }}>☰</button>
           <strong>Propard AI</strong>
           <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: 12 }}>{available === false ? 'IA indisponible' : 'Assistant'}</span>
+          <VoiceMode onSend={content => sendMessage(null, content)} sending={sending} />
         </header>
         <section style={styles.feed}>
           <div style={styles.content}>
