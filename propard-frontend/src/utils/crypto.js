@@ -240,42 +240,133 @@ export async function getStoredPrivateKeyJwk(userId) {
   return parsed;
 }
 
-export async function getStoredPrivateKeyJwkForRecovery(userId) {
-  if (!userId) throw new Error('Compte invalide');
+export async function findStoredPrivateKeyForRecovery(expectedPublicKeyJwk) {
+  if (!expectedPublicKeyJwk) {
+    throw new Error('La clé publique du compte est indisponible. Aucune donnée locale n’a été modifiée.');
+  }
+
+  await importPublicKey(expectedPublicKeyJwk);
 
   let db;
+  let encryptedEntries = 0;
+  let undecryptableEntries = 0;
+  let invalidEntries = 0;
+  let aesKeyMissing = false;
+
+  const matchesAccount = async candidate => {
+    try {
+      await validatePrivateKeyMatchesPublicKey(candidate, expectedPublicKeyJwk);
+      return candidate;
+    } catch {
+      invalidEntries += 1;
+      return null;
+    }
+  };
+
   try {
     db = await openPrivateKeyDb();
-    const storedValue = await new Promise((resolve, reject) => {
+    const records = await new Promise((resolve, reject) => {
       const transaction = db.transaction(PRIVATE_KEY_STORE, 'readonly');
-      const request = transaction.objectStore(PRIVATE_KEY_STORE).get(String(userId));
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
+      const store = transaction.objectStore(PRIVATE_KEY_STORE);
+      const keysRequest = store.getAllKeys();
+      const valuesRequest = store.getAll();
+      let keys;
+      let values;
+      let keysReady = false;
+      let valuesReady = false;
+      const finish = () => {
+        if (keysReady && valuesReady) resolve({ keys, values });
+      };
+      keysRequest.onsuccess = () => {
+        keys = keysRequest.result || [];
+        keysReady = true;
+        finish();
+      };
+      valuesRequest.onsuccess = () => {
+        values = valuesRequest.result || [];
+        valuesReady = true;
+        finish();
+      };
+      keysRequest.onerror = () => reject(keysRequest.error);
+      valuesRequest.onerror = () => reject(valuesRequest.error);
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error || new Error('Lecture du stockage local interrompue'));
     });
 
-    if (storedValue) {
-      const privateKeyJwk = await decryptStoredPrivateKey(db, storedValue);
-      await validatePrivateKeyJwk(privateKeyJwk);
-      return privateKeyJwk;
+    const encryptionKey = await readLocalStorageEncryptionKey(db);
+
+    for (let index = 0; index < records.values.length; index += 1) {
+      const value = records.values[index];
+      let candidate = null;
+
+      if (value?.version === 2 && Array.isArray(value.iv) && Array.isArray(value.ciphertext)) {
+        encryptedEntries += 1;
+        if (!encryptionKey) {
+          aesKeyMissing = true;
+          continue;
+        }
+
+        try {
+          const plaintext = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: new Uint8Array(value.iv) },
+            encryptionKey,
+            new Uint8Array(value.ciphertext)
+          );
+          candidate = JSON.parse(new TextDecoder().decode(plaintext));
+        } catch {
+          undecryptableEntries += 1;
+          continue;
+        }
+      } else {
+        candidate = value;
+      }
+
+      if (candidate?.kty === 'EC' && candidate?.crv === CURVE && candidate?.d) {
+        const match = await matchesAccount(candidate);
+        if (match) return match;
+      }
+    }
+  } catch (error) {
+    if (!db) {
+      console.warn('Lecture IndexedDB impossible pendant le diagnostic E2EE:', error);
     }
   } finally {
     if (db) db.close();
   }
 
-  const raw = localStorage.getItem(privKeyStorageKey(userId));
-  if (!raw) {
-    throw new Error('Aucune clé privée locale exploitable n’a été trouvée sur cet appareil.');
+  if (typeof localStorage !== 'undefined') {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith('propard_privkey_')) continue;
+
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+
+      try {
+        const candidate = JSON.parse(raw);
+        if (candidate?.kty === 'EC' && candidate?.crv === CURVE && candidate?.d) {
+          const match = await matchesAccount(candidate);
+          if (match) return match;
+        }
+      } catch {
+        invalidEntries += 1;
+      }
+    }
   }
 
-  let privateKeyJwk;
-  try {
-    privateKeyJwk = JSON.parse(raw);
-  } catch {
-    throw new Error('L’ancienne clé locale est illisible.');
+  if (encryptedEntries > 0 && aesKeyMissing) {
+    throw new Error(`Diagnostic E2EE : ${encryptedEntries} entrée(s) chiffrée(s) trouvée(s) dans IndexedDB, mais la clé AES locale est absente. Les données n’ont pas été modifiées.`);
   }
 
-  await validatePrivateKeyJwk(privateKeyJwk);
-  return privateKeyJwk;
+  if (undecryptableEntries > 0) {
+    throw new Error(`Diagnostic E2EE : ${encryptedEntries} entrée(s) chiffrée(s) trouvée(s), dont ${undecryptableEntries} impossible(s) à déchiffrer. Aucune clé correspondant au compte n’a été récupérée. Les données n’ont pas été modifiées.`);
+  }
+
+  if (invalidEntries > 0) {
+    throw new Error(`Diagnostic E2EE : ${invalidEntries} entrée(s) locale(s) examinée(s), mais aucune clé privée ne correspond à la clé publique de ce compte. Les données n’ont pas été modifiées.`);
+  }
+
+  throw new Error('Diagnostic E2EE : aucune clé privée candidate trouvée dans les entrées IndexedDB ou localStorage de ce site. Les données n’ont pas été modifiées.');
 }
 
 export async function hasStoredPrivateKey(userId) {
