@@ -138,6 +138,9 @@ export default function PrivacyPage() {
               participants autorisés
             </li>
             <li>
+              Les conversations Propard AI : titres, messages saisis, réponses générées et dates associées, ainsi que les informations de profil, d'amis ou de groupes utilisées pour répondre aux demandes lorsque les outils correspondants sont sollicités
+            </li>
+            <li>
               Les jetons de notification natifs Apple Push Notification service (APNs)
               lorsque les notifications iOS sont activées
             </li>
@@ -494,6 +497,10 @@ export default function PrivacyPage() {
               morceaux de fichiers chiffrés ;
             </li>
             <li>
+              <strong>Groq</strong> pour le traitement des demandes adressées à Propard AI
+              et la génération des réponses ;
+            </li>
+            <li>
               <strong>Apple</strong> pour l'acheminement des notifications natives iOS
               via Apple Push Notification service (APNs) ;
             </li>
@@ -614,6 +621,9 @@ export default function PrivacyPage() {
               ne sont plus nécessaires aux finalités pour lesquelles ils ont été
               conservés, sous réserve des obligations légales ou des nécessités
               liées à la sécurité et à la défense des droits de Propard.
+            </li>
+            <li>
+              <strong>Conversations Propard AI :</strong> elles sont conservées dans la base de données jusqu'à leur suppression par l'utilisateur ou leur suppression dans le cadre d'un traitement applicable au compte. Le code conserve au maximum les 80 derniers messages par conversation et ne définit pas de durée automatique d'expiration pour ces conversations.
             </li>
             <li>
               <strong>Données techniques et de sécurité :</strong> pendant la
@@ -860,6 +870,76 @@ export default function PrivacyPage() {
           </p>
         </div>
 
+
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>16. Propard AI et traitement par Groq</h2>
+
+          <p style={styles.text}>
+            Propard AI est une fonctionnalité facultative utilisée à l'initiative
+            de l'utilisateur. Lorsque vous lui adressez une demande, le texte de
+            cette demande ainsi qu'un extrait de l'historique récent de la
+            conversation avec Propard AI sont transmis au service d'inférence de
+            Groq afin de générer une réponse. Le code limite cet historique à
+            quatre messages précédents et à 3 000 caractères au total ; le message
+            courant peut contenir jusqu'à 6 000 caractères.
+          </p>
+
+          <p style={styles.text}>
+            Selon la demande et les outils déclenchés, Propard AI peut également
+            accéder à certaines informations du compte connecté : pseudo, nom
+            d'affichage, avatar, rôle sur la plateforme et date de création du
+            compte ; informations limitées sur les amis (jusqu'à dix entrées) ;
+            ou informations sur les groupes auxquels l'utilisateur appartient
+            (jusqu'à huit entrées). Les informations nécessaires à la réponse
+            peuvent être transmises à Groq avec la demande. Propard AI ne reçoit
+            pas un accès général à tous les comptes ni à toutes les conversations.
+          </p>
+
+          <p style={styles.text}>
+            Pour lire le dernier message privé ou de groupe à la demande de
+            l'utilisateur, le navigateur récupère le message chiffré puis le
+            déchiffre localement avec les clés présentes sur l'appareil. Le texte
+            déchiffré est affiché dans l'interface Propard AI, mais ce mécanisme
+            ne le transmet pas à Groq et ne l'ajoute pas à l'historique enregistré
+            de la conversation IA.
+          </p>
+
+          <p style={styles.text}>
+            Les conversations Propard AI (titre, messages saisis, réponses et
+            dates associées) sont enregistrées dans la base de données de Propard.
+            Le code conserve au maximum les 80 derniers messages d'une conversation.
+            Aucune durée automatique d'expiration propre à ces conversations
+            n'est actuellement définie dans le code. L'utilisateur peut supprimer
+            individuellement une conversation depuis l'interface Propard AI.
+          </p>
+
+          <p style={styles.text}>
+            Groq est un prestataire distinct qui traite les demandes et les
+            informations contextuelles nécessaires pour fournir l'inférence.
+            Selon sa documentation publique consultée le 15 novembre 2026,
+            Groq indique ne pas conserver par défaut les entrées et sorties des
+            requêtes d'inférence, mais pouvoir enregistrer temporairement des
+            données de requête en cas de problème de fiabilité ou de suspicion
+            d'abus, pour une durée pouvant aller jusqu'à 30 jours, sauf obligation
+            légale de conservation plus longue. Les métadonnées d'utilisation
+            peuvent être conservées séparément. La région exacte de traitement
+            applicable à chaque requête et les paramètres contractuels du compte
+            API de Propard ne sont pas déterminés par le code de Propard.
+            Consultez la
+            <a href="https://console.groq.com/docs/your-data" style={styles.link}> documentation de Groq sur les données</a>
+            et ses
+            <a href="https://console.groq.com/docs/legal" style={styles.link}> politiques juridiques</a>.
+          </p>
+
+          <p style={styles.text}>
+            Les demandes adressées à Propard AI sont utilisées pour fournir la
+            fonctionnalité sollicitée et assurer la sécurité du service. Ne
+            transmettez pas à l'assistant de mots de passe, de clés privées,
+            de codes de récupération ou d'autres secrets. Les réponses générées
+            peuvent être inexactes et doivent être vérifiées.
+          </p>
+        </div>
+
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>Demandes d'assistance et récupération de compte</h2>
 
@@ -879,7 +959,7 @@ export default function PrivacyPage() {
         </div>
 
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>16. Contact</h2>
+          <h2 style={styles.sectionTitle}>17. Contact</h2>
 
           <p style={styles.text}>
             Pour toute question concernant cette politique, le traitement de vos
