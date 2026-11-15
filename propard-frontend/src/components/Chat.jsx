@@ -36,6 +36,8 @@ export default function Chat({
   const [contextMenu, setContextMenu] = useState(null);
   const [inCall, setInCall] = useState(null);
   const [friendPublicKey, setFriendPublicKey] = useState(null);
+  const [friendKeyLoading, setFriendKeyLoading] = useState(true);
+  const [keyError, setKeyError] = useState(null);
   const [sharedKey, setSharedKey] = useState(null);
 
   useEffect(() => {
@@ -150,6 +152,10 @@ export default function Chat({
     let cancelled = false;
 
     const loadFriendKey = async () => {
+      setFriendKeyLoading(true);
+      setFriendPublicKey(null);
+      setKeyError(null);
+
       try {
         let publicKey = friend.publicKey;
 
@@ -168,18 +174,23 @@ export default function Chat({
 
         if (cancelled) return;
 
-        if (publicKey) {
-          try {
-            setFriendPublicKey(
-              typeof publicKey === 'string'
-                ? JSON.parse(publicKey)
-                : publicKey
-            );
-          } catch {
-            setFriendPublicKey(null);
+        if (!publicKey) {
+          setKeyError('La clé publique de cet ami est indisponible. Réessaie plus tard ou contacte le support.');
+          return;
+        }
+
+        try {
+          const parsedKey = typeof publicKey === 'string'
+            ? JSON.parse(publicKey)
+            : publicKey;
+
+          if (!parsedKey || parsedKey.kty !== 'EC' || parsedKey.crv !== 'P-256') {
+            throw new Error('Format de clé publique invalide.');
           }
-        } else {
-          setFriendPublicKey(null);
+
+          setFriendPublicKey(parsedKey);
+        } catch {
+          setKeyError('La clé publique de cet ami est invalide. Contacte le support Propard.');
         }
       } catch (err) {
         console.error(
@@ -188,7 +199,11 @@ export default function Chat({
         );
 
         if (!cancelled) {
-          setFriendPublicKey(null);
+          setKeyError('Impossible de récupérer la clé publique de cet ami. Vérifie ta connexion puis réessaie.');
+        }
+      } finally {
+        if (!cancelled) {
+          setFriendKeyLoading(false);
         }
       }
     };
@@ -206,18 +221,28 @@ export default function Chat({
     const createSharedKey = async () => {
       setSharedKey(null);
 
-      if (!friendPublicKey || !userId) {
+      if (friendKeyLoading) return;
+
+      if (!friendPublicKey) {
+        if (!keyError) {
+          setKeyError('La clé publique de cet ami est indisponible.');
+        }
         return;
       }
+
+      if (!userId) {
+        setKeyError('Impossible d’identifier votre compte pour déverrouiller le chiffrement.');
+        return;
+      }
+
+      setKeyError(null);
 
       try {
         const privateKeyJwk =
           await getStoredPrivateKeyJwk(userId);
 
         if (!privateKeyJwk) {
-          throw new Error(
-            'Aucune clé privée locale trouvée.'
-          );
+          throw new Error('Aucune clé privée locale trouvée.');
         }
 
         const key = await deriveSharedKey(
@@ -236,6 +261,11 @@ export default function Chat({
 
         if (!cancelled) {
           setSharedKey(null);
+          setKeyError(
+            err.message === 'Aucune clé privée locale trouvée.'
+              ? 'Votre clé privée de chiffrement est introuvable sur cet appareil. Ne réinstalle pas Propard et ne réinitialise pas tes données : contacte le support pour vérifier la sauvegarde E2EE.'
+              : 'Impossible de déverrouiller le chiffrement de cette conversation. Contacte le support Propard.'
+          );
         }
       }
     };
@@ -245,7 +275,7 @@ export default function Chat({
     return () => {
       cancelled = true;
     };
-  }, [friendPublicKey, userId]);
+  }, [friendPublicKey, friendKeyLoading, userId]);
 
   const decryptMessages = async (rawMessages, key) => {
     return Promise.all(
@@ -289,7 +319,15 @@ export default function Chat({
     let cancelled = false;
 
     const fetchMessages = async () => {
-      if (!sharedKey) return;
+      if (!sharedKey) {
+        if (!friendKeyLoading) {
+          setLoading(false);
+          setLoadError(
+            keyError || 'Impossible de préparer le chiffrement de cette conversation.'
+          );
+        }
+        return;
+      }
 
       setLoading(true);
       setLoadError(null);
@@ -348,7 +386,7 @@ export default function Chat({
     return () => {
       cancelled = true;
     };
-  }, [friend._id, token, sharedKey]);
+  }, [friend._id, token, sharedKey, friendKeyLoading, keyError]);
 
   useEffect(() => {
     const conversationId = friend?._id?.toString();
