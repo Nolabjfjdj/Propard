@@ -95,7 +95,10 @@ export default function SettingsPage() {
   };
 
   const deletePasskey = async passkey => {
-    if (!window.confirm(`Supprimer la clé « ${passkey.name} » ?`)) return;
+    const confirmation = passkeys.length === 1
+      ? `Supprimer « ${passkey.name} » désactivera l’authentification par clé d’accès sur ce compte. Continuer ?`
+      : `Supprimer la clé « ${passkey.name} » ?`;
+    if (!window.confirm(confirmation)) return;
     const password = window.prompt('Confirme ton mot de passe Propard pour supprimer cette clé.');
     if (!password) return;
     setLoading(true);
