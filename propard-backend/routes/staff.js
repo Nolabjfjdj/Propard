@@ -8,6 +8,7 @@ const Report = require('../models/Report');
 const StaffAuditLog = require('../models/StaffAuditLog');
 const SupportRequest = require('../models/SupportRequest');
 const Announcement = require('../models/Announcement');
+const { signAnnouncement } = require('../utils/announcementSignature');
 const Message = require('../models/Message');
 const Group = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
@@ -175,7 +176,9 @@ router.post('/announcements/create', requireStaffRole('owner'), requireSoleOwner
     }
 
     await Announcement.updateMany({ active: true }, { $set: { active: false } });
-    const announcement = await Announcement.create({ title: title.trim(), message: message.trim(), active: true });
+    const announcement = new Announcement({ title: title.trim(), message: message.trim(), active: true });
+    announcement.signature = signAnnouncement(announcement);
+    await announcement.save();
     await audit(req, 'announcement.created', {
       details: { announcementId: announcement._id.toString(), title: announcement.title }
     });
