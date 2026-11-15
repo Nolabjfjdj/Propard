@@ -175,6 +175,7 @@ export default function SettingsPage() {
       const backup = await encryptPrivateKeyBackup(privateKeyJwk, password);
       await api.post('/api/auth/keybackup', {
         backup,
+        password,
         publicKey: JSON.stringify(publicKeyJwk)
       }, { headers });
 
