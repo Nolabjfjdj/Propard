@@ -1,4 +1,5 @@
 import React from 'react';
+import SafeLink from './SafeLink';
 
 const safeHref = value => {
   const href = value.trim();
@@ -14,7 +15,7 @@ function renderInline(text, prefix = 'i') {
     const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     if (link) {
       const href = safeHref(link[2]);
-      return href ? <a key={key} href={href} target="_blank" rel="noopener noreferrer">{renderInline(link[1], key)}</a> : <span key={key}>{link[1]}</span>;
+      return href ? <SafeLink key={key} href={href}>{renderInline(link[1], key)}</SafeLink> : <span key={key}>{link[1]}</span>;
     }
     if (part.startsWith('**') && part.endsWith('**')) return <strong key={key}>{renderInline(part.slice(2, -2), key)}</strong>;
     if (part.startsWith('__') && part.endsWith('__')) return <strong key={key}>{renderInline(part.slice(2, -2), key)}</strong>;
