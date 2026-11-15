@@ -79,10 +79,22 @@ function isSeparator(line) {
 
 export default function MarkdownRenderer({ content = '' }) {
   const [copiedBlock, setCopiedBlock] = React.useState(null);
+  const copyResetTimer = React.useRef(null);
+  React.useEffect(() => () => {
+    if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+  }, []);
+  const markCopied = blockIndex => {
+    setCopiedBlock(blockIndex);
+    if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+    copyResetTimer.current = setTimeout(() => {
+      setCopiedBlock(null);
+      copyResetTimer.current = null;
+    }, 5000);
+  };
   const copyCode = async (code, blockIndex) => {
     try {
       await navigator.clipboard.writeText(code);
-      setCopiedBlock(blockIndex);
+      markCopied(blockIndex);
     } catch {
       const textarea = document.createElement('textarea');
       textarea.value = code;
@@ -92,7 +104,7 @@ export default function MarkdownRenderer({ content = '' }) {
       textarea.select();
       const copied = document.execCommand('copy');
       textarea.remove();
-      if (copied) setCopiedBlock(blockIndex);
+      if (copied) markCopied(blockIndex);
     }
   };
   const lines = String(content).replace(/\r\n?/g, '\n').split('\n');
