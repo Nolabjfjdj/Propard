@@ -1046,7 +1046,7 @@ export default function Chat({
     y,
     isTouch = false
   ) => {
-    const menuWidth = Math.min(344, window.innerWidth - 16);
+    const menuWidth = Math.min(160, window.innerWidth - 16);
     const menuHeight = Math.min(430, window.innerHeight - 16);
     const margin = 8;
 
