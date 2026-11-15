@@ -411,7 +411,10 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
           : 500;
     console.error('Propard AI message failed:', {
       code: error.code || 'UNKNOWN',
-      status: error.status || null
+      status: error.status || null,
+      groqType: error.groqType || null,
+      groqCode: error.groqCode || null,
+      groqParam: error.groqParam || null
     });
     res.status(status).json({
       error: status === 429
