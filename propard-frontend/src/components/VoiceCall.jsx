@@ -2079,6 +2079,7 @@ export default function VoiceCall({
                       </button>
                     </>
                   {videoCall && (
+                    <>
                     <button
                       style={{
                         ...styles.muteBtn,
@@ -2103,6 +2104,7 @@ export default function VoiceCall({
                       aria-label="Retourner la caméra"
                       title="Retourner la caméra"
                     >🔄</button>
+                    </>
                   )}
                 </>
               )}
