@@ -3,6 +3,7 @@ const { registerModel } = require('../db/shards');
 
 const userSchema = new mongoose.Schema({
   username:{type:String,required:true,unique:true,trim:true,minlength:3,maxlength:32},
+  usernameHistory:{type:[{username:{type:String,required:true},normalized:{type:String,required:true},changedAt:{type:Date,default:Date.now}}],default:[]},
   displayName:{type:String,default:null,trim:true,maxlength:32},
   avatar:{type:String,default:null},
   password:{type:String,required:true,select:false},
@@ -35,5 +36,7 @@ const userSchema = new mongoose.Schema({
   acceptedAnnouncements:[{announcementId:{type:mongoose.Schema.Types.ObjectId,ref:'Announcement'},acceptedAt:{type:Date,default:Date.now}}],
   createdAt:{type:Date,default:Date.now}
 });
+
+userSchema.index({ 'usernameHistory.normalized': 1 }, { unique: true, sparse: true });
 
 module.exports = registerModel('User', userSchema);
