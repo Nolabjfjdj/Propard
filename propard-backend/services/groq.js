@@ -95,6 +95,11 @@ async function createGroqCompletion({
       );
       error.status = status;
       error.code = 'GROQ_API_ERROR';
+      error.groqType = typeof payload.error?.type === 'string' ? payload.error.type.slice(0, 80) : null;
+      error.groqCode = typeof payload.error?.code === 'string' || typeof payload.error?.code === 'number'
+        ? String(payload.error.code).slice(0, 80)
+        : null;
+      error.groqParam = typeof payload.error?.param === 'string' ? payload.error.param.slice(0, 80) : null;
       lastError = error;
 
       if (!retryable) throw error;
