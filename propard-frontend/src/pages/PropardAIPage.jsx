@@ -34,19 +34,15 @@ export default function PropardAIPage({ initialConversationId = null }) {
     return response.data || [];
   }, [token]);
 
-  const openConversation = useCallback(async id => {
+  const openConversation = useCallback(id => {
     setError('');
-    setActiveId(id);
-    updateConversationUrl(id);
     setSidebarOpen(false);
-    try {
-      const response = await api.get(`/api/ai/conversations/${id}`, auth(token));
-      setMessages(response.data.messages || []);
-    } catch (err) {
-      setMessages([]);
-      setError(err.response?.data?.error || 'Impossible de charger cette conversation.');
-    }
-  }, [token]);
+    if (id === activeId) return;
+    setActiveId(id);
+    setMessages([]);
+    setLoading(true);
+    updateConversationUrl(id);
+  }, [activeId]);
 
   useEffect(() => {
     let mounted = true;
