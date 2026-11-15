@@ -88,6 +88,11 @@ function Panel({ title, children }) {
 
 export default function StaffPage() {
   const [staffRole, setStaffRole] = useState('');
+  const [canPublishAnnouncements, setCanPublishAnnouncements] = useState(false);
+  const [announcementKey, setAnnouncementKey] = useState('');
+  const [announcementTitle, setAnnouncementTitle] = useState('');
+  const [announcementMessage, setAnnouncementMessage] = useState('');
+  const [announcementLoading, setAnnouncementLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -396,14 +401,59 @@ export default function StaffPage() {
     try {
       const response = await request('get', '/api/staff/me');
       setStaffRole(response.data.staffRole || '');
+      setCanPublishAnnouncements(response.data.canPublishAnnouncements === true);
       setError('');
     } catch (err) {
       setStaffRole('');
+      setCanPublishAnnouncements(false);
       setError(err.response?.data?.error || err.message || 'Impossible de charger le rôle.');
     } finally {
       setLoading(false);
     }
   }, [request]);
+
+  const publishGlobalAnnouncement = async () => {
+    if (!announcementKey || !announcementTitle.trim() || !announcementMessage.trim()) {
+      setError('Renseigne la clé secrète, le titre et le message.');
+      return;
+    }
+    setAnnouncementLoading(true);
+    setError('');
+    setNotice('');
+    try {
+      const response = await request('post', '/api/staff/announcements/create', {
+        announcementKey,
+        title: announcementTitle.trim(),
+        message: announcementMessage.trim()
+      });
+      setNotice(response.data.message || 'Annonce publiée.');
+      setAnnouncementTitle('');
+      setAnnouncementMessage('');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de publier l’annonce.');
+    } finally {
+      setAnnouncementLoading(false);
+    }
+  };
+
+  const deactivateGlobalAnnouncement = async () => {
+    if (!announcementKey) {
+      setError('Entre la clé secrète des annonces.');
+      return;
+    }
+    if (!window.confirm('Désactiver l’annonce globale actuellement affichée ?')) return;
+    setAnnouncementLoading(true);
+    setError('');
+    setNotice('');
+    try {
+      const response = await request('post', '/api/staff/announcements/delete', { announcementKey });
+      setNotice(response.data.message || 'Annonce désactivée.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de désactiver l’annonce.');
+    } finally {
+      setAnnouncementLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadRole();
@@ -638,6 +688,33 @@ export default function StaffPage() {
 
       {error && <div role="alert" style={{ padding: 12, borderRadius: 8, background: '#5a2020' }}>{error}</div>}
       {notice && <div role="status" style={{ padding: 12, borderRadius: 8, background: 'var(--bg-tertiary)' }}>{notice}</div>}
+
+      {canPublishAnnouncements && (
+        <Panel title="Annonces globales">
+          <p>Seul le propriétaire unique peut publier ou désactiver une annonce. La clé secrète est obligatoire et vérifiée côté serveur.</p>
+          <Field label="Clé secrète des annonces" value={announcementKey} onChange={setAnnouncementKey} placeholder="Clé secrète" type="password" />
+          <Field label="Titre" value={announcementTitle} onChange={setAnnouncementTitle} placeholder="Titre de l’annonce" />
+          <label style={{ display: 'block', color: 'var(--text-primary)' }}>
+            Message
+            <textarea
+              style={{ ...inputStyle, minHeight: 150, resize: 'vertical' }}
+              value={announcementMessage}
+              onChange={event => setAnnouncementMessage(event.target.value)}
+              maxLength={5000}
+              placeholder="Contenu de l’annonce globale"
+            />
+          </label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <button type="button" style={buttonStyle} onClick={publishGlobalAnnouncement} disabled={announcementLoading}>
+              {announcementLoading ? 'Publication…' : 'Publier l’annonce'}
+            </button>
+            <button type="button" style={{ ...buttonStyle, background: '#a32626', borderColor: '#a32626' }} onClick={deactivateGlobalAnnouncement} disabled={announcementLoading}>
+              Désactiver l’annonce active
+            </button>
+          </div>
+        </Panel>
+      )}
+
 
       {staffRole && (
         <Panel title="Notifications du personnel">
