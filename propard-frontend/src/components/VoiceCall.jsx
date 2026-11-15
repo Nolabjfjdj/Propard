@@ -91,6 +91,8 @@ export default function VoiceCall({
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(videoCall);
+  const [mirrorEnabled, setMirrorEnabled] = useState(true);
+  const [cameraFacingMode, setCameraFacingMode] = useState('user');
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenShareSettingsOpen, setScreenShareSettingsOpen] = useState(false);
   const [screenShareError, setScreenShareError] = useState('');
@@ -1399,6 +1401,41 @@ export default function VoiceCall({
     setCameraEnabled(nextEnabled);
   };
 
+  const toggleMirror = () => setMirrorEnabled(value => !value);
+
+  const switchCamera = async () => {
+    const currentStream = localStreamRef.current;
+    if (!currentStream || isScreenSharing) return;
+    const nextFacingMode = cameraFacingMode === 'user' ? 'environment' : 'user';
+    let replacementStream;
+    try {
+      replacementStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: nextFacingMode } }
+      });
+      const replacementTrack = replacementStream.getVideoTracks()[0];
+      if (!replacementTrack) throw new Error('Caméra indisponible');
+      const oldTrack = currentStream.getVideoTracks()[0];
+      const sender = peerRef.current?.getSenders().find(item => item.track?.kind === 'video');
+      if (sender) await sender.replaceTrack(replacementTrack);
+      const nextStream = new MediaStream([
+        ...currentStream.getAudioTracks(),
+        replacementTrack
+      ]);
+      localStreamRef.current = nextStream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = nextStream;
+        localVideoRef.current.play?.().catch(() => {});
+      }
+      oldTrack?.stop();
+      setCameraFacingMode(nextFacingMode);
+    } catch (err) {
+      replacementStream?.getTracks().forEach(track => track.stop());
+      console.error('Changement de caméra impossible:', err);
+      setCallError('Impossible de changer de caméra sur cet appareil.');
+    }
+  };
+
   const setScreenAudioEnabled = enabled => {
     setScreenShareSettings(previous => ({ ...previous, audio: enabled }));
     const share = screenShareRef.current;
@@ -1915,19 +1952,26 @@ export default function VoiceCall({
             autoPlay
             muted
             playsInline
-            style={{ width: '100%', maxHeight: '110px', objectFit: 'contain', background: '#111', borderRadius: '8px' }}
+            style={{ width: '100%', maxHeight: '110px', objectFit: 'contain', background: '#111', borderRadius: '8px', transform: mirrorEnabled ? 'scaleX(-1)' : 'none' }}
             aria-label="Aperçu local"
           />
         )}
 
-        {remoteVideoAvailable && (status === 'connected' || status === 'calling') && !isWatchingRemoteStream && (
-          <button
-            type="button"
+        {remoteVideoAvailable && (status === 'connected' || status === 'calling') && (
+          <video
+            ref={element => {
+              remoteVideoRef.current = element;
+              if (element && remoteStreamRef.current && element.srcObject !== remoteStreamRef.current) {
+                element.srcObject = remoteStreamRef.current;
+                element.play?.().catch(() => {});
+              }
+            }}
+            autoPlay
+            playsInline
             onClick={() => setIsWatchingRemoteStream(true)}
-            style={{ width: '100%', padding: '12px', border: '1px solid var(--border)', borderRadius: '10px', background: 'var(--bg-hover)', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600 }}
-          >
-            🖥️ Regarder le partage d’écran / le stream
-          </button>
+            style={{ width: '100%', maxHeight: '220px', objectFit: 'contain', background: '#111', borderRadius: '8px', cursor: 'pointer' }}
+            aria-label="Flux vidéo distant"
+          />
         )}
 
         {isWatchingRemoteStream && remoteVideoAvailable && (
@@ -2047,6 +2091,18 @@ export default function VoiceCall({
                     >
                       {cameraEnabled ? '📹' : '🚫'}
                     </button>
+                    <button
+                      style={{ ...styles.muteBtn, background: mirrorEnabled ? 'var(--accent-glow)' : 'var(--bg-hover)' }}
+                      onClick={toggleMirror}
+                      aria-label={mirrorEnabled ? 'Désactiver le mode miroir' : 'Activer le mode miroir'}
+                      title={mirrorEnabled ? 'Désactiver le mode miroir' : 'Activer le mode miroir'}
+                    >↔️</button>
+                    <button
+                      style={{ ...styles.muteBtn, background: 'var(--bg-hover)' }}
+                      onClick={() => void switchCamera()}
+                      aria-label="Retourner la caméra"
+                      title="Retourner la caméra"
+                    >🔄</button>
                   )}
                 </>
               )}
