@@ -1309,7 +1309,7 @@ export default function GroupChat({
     (x, y) => ({
       x: Math.min(
         Math.max(8, x),
-        Math.max(8, window.innerWidth - 344)
+        Math.max(8, window.innerWidth - 160)
       ),
       y: Math.min(
         Math.max(8, y),
