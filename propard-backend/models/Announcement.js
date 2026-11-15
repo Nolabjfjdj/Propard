@@ -5,6 +5,7 @@ const announcementSchema = new mongoose.Schema({
   title:{type:String,required:true,trim:true,maxlength:150},
   message:{type:String,required:true,trim:true,maxlength:5000},
   active:{type:Boolean,default:true},
+  signature:{type:String,default:null,maxlength:64},
   createdAt:{type:Date,default:Date.now}
 });
 
