@@ -29,9 +29,9 @@ const getOrigins = () => (process.env.FRONTEND_ORIGINS || process.env.FRONTEND_O
 const getRpId = () => process.env.WEBAUTHN_RP_ID || new URL(getOrigins()[0]).hostname;
 const toBase64Url = value => Buffer.from(value).toString('base64url');
 const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const hashRecoveryCode = value => crypto.createHash('sha256').update(value).digest('hex');
+const hashRecoveryCode = value => crypto.createHmac('sha256', process.env.JWT_SECRET).update(value).digest('hex');
 const makeRecoveryCodes = () => Array.from({ length: 10 }, () => {
-  const value = crypto.randomBytes(6).toString('hex').toUpperCase();
+  const value = crypto.randomBytes(8).toString('hex').toUpperCase();
   return value.match(/.{1,4}/g).join('-');
 });
 const safeCredential = item => ({
@@ -332,18 +332,23 @@ router.post('/login/recovery', loginLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Code de récupération invalide.' });
     }
     const hashed = hashRecoveryCode(code);
-    const index = user.passkeyRecoveryCodes.findIndex(value => {
-      const a = Buffer.from(value, 'hex');
-      const b = Buffer.from(hashed, 'hex');
-      return a.length === b.length && crypto.timingSafeEqual(a, b);
-    });
-    if (index < 0) return res.status(401).json({ error: 'Code de récupération invalide.' });
-    user.passkeyRecoveryCodes.splice(index, 1);
-    await user.save();
+    const claimedUser = await User.findOneAndUpdate(
+      {
+        _id: user._id,
+        passkeyRecoveryCodes: hashed
+      },
+      {
+        $pull: {
+          passkeyRecoveryCodes: hashed
+        }
+      },
+      { new: true }
+    ).select('+passkeyRecoveryCodes');
+    if (!claimedUser) return res.status(401).json({ error: 'Code de récupération invalide ou déjà utilisé.' });
     return res.json({
-      token: issueToken(user),
-      user: publicUser(user),
-      remainingRecoveryCodes: user.passkeyRecoveryCodes.length
+      token: issueToken(claimedUser),
+      user: publicUser(claimedUser),
+      remainingRecoveryCodes: claimedUser.passkeyRecoveryCodes.length
     });
   } catch (error) {
     console.error('Passkey recovery failed:', error);
