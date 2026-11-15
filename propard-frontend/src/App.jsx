@@ -14,6 +14,7 @@ import TermsPage from './pages/TermsPage';
 import CopyrightPage from './pages/CopyrightPage';
 import GlobalAnnouncement from './components/GlobalAnnouncement';
 import OfflineGame from './components/OfflineGame';
+import SettingsPage from './pages/SettingsPage';
 import api from './utils/api';
 
 async function checkPropardServer() {
@@ -220,6 +221,15 @@ export default function App() {
     }
 
     return <AuthPage mode="register" />;
+  }
+
+  if (path === '/settings') {
+    if (!user) {
+      window.history.replaceState({}, '', '/login');
+      return null;
+    }
+
+    return <SettingsPage />;
   }
 
   if (path === '/help') {
