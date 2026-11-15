@@ -129,7 +129,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         type: 'function',
         function: {
           name: 'list_my_friends',
-          description: 'Lister les amis Propard de l’utilisateur connecté.',
+          description: 'Lister les amis Propard de l’utilisateur connecté avec leurs identifiants.',
           parameters: { type: 'object', properties: {}, additionalProperties: false }
         }
       },
@@ -140,10 +140,71 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
           description: 'Lister les groupes Propard dont l’utilisateur connecté est membre.',
           parameters: { type: 'object', properties: {}, additionalProperties: false }
         }
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'prepare_private_message',
+          description: 'Préparer un brouillon de message privé. Ne jamais envoyer le message. Le destinataire doit être un ami présent dans la liste des amis.',
+          parameters: {
+            type: 'object',
+            properties: {
+              friendId: { type: 'string' },
+              content: { type: 'string' }
+            },
+            required: ['friendId', 'content'],
+            additionalProperties: false
+          }
+        }
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'prepare_group_message',
+          description: 'Préparer un brouillon de message dans un groupe dont l’utilisateur est membre. Ne jamais envoyer le message.',
+          parameters: {
+            type: 'object',
+            properties: {
+              groupId: { type: 'string' },
+              content: { type: 'string' }
+            },
+            required: ['groupId', 'content'],
+            additionalProperties: false
+          }
+        }
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'request_last_private_message',
+          description: 'Demander au navigateur de récupérer et déchiffrer localement le dernier message privé d’un ami. Le serveur et Groq ne doivent jamais recevoir le texte déchiffré.',
+          parameters: {
+            type: 'object',
+            properties: { friendId: { type: 'string' } },
+            required: ['friendId'],
+            additionalProperties: false
+          }
+        }
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'request_last_group_message',
+          description: 'Demander au navigateur de récupérer et déchiffrer localement le dernier message d’un groupe. Le serveur et Groq ne doivent jamais recevoir le texte déchiffré.',
+          parameters: {
+            type: 'object',
+            properties: { groupId: { type: 'string' } },
+            required: ['groupId'],
+            additionalProperties: false
+          }
+        }
       }
     ];
 
-    const executeTool = async name => {
+    let pendingAction = null;
+    let pendingRead = null;
+
+    const executeTool = async (name, args = {}) => {
       if (name === 'get_my_profile') {
         const profile = await User.findById(req.user.id).select('username displayName avatar staffRole createdAt');
         if (!profile) return { error: 'Profil introuvable.' };
@@ -164,6 +225,7 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
           ? await User.find({ _id: { $in: ids } }).select('username displayName avatar')
           : [];
         return friends.map(friend => ({
+          id: friend._id.toString(),
           username: friend.username,
           displayName: friend.displayName || null,
           avatar: friend.avatar || null
@@ -184,13 +246,77 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         }));
       }
 
+      if (name === 'prepare_private_message') {
+        if (!mongoose.isValidObjectId(args.friendId) || typeof args.content !== 'string' || !args.content.trim() || args.content.length > 6000) {
+          return { error: 'Destinataire ou contenu invalide.' };
+        }
+        const [friendship, recipient] = await Promise.all([
+          User.findById(req.user.id).select('friends'),
+          User.findById(args.friendId).select('username displayName')
+        ]);
+        const isFriend = friendship?.friends?.some(friend => friend.userId?.toString() === args.friendId);
+        if (!isFriend || !recipient || args.friendId === req.user.id.toString()) {
+          return { error: 'Cet utilisateur n’est pas un ami accessible.' };
+        }
+        pendingAction = {
+          type: 'private_message',
+          recipientId: recipient._id.toString(),
+          recipientName: recipient.displayName || recipient.username,
+          content: args.content.trim()
+        };
+        return { prepared: true, recipient: pendingAction.recipientName, note: 'Brouillon préparé. Aucune action d’envoi effectuée.' };
+      }
+
+      if (name === 'prepare_group_message') {
+        if (!mongoose.isValidObjectId(args.groupId) || typeof args.content !== 'string' || !args.content.trim() || args.content.length > 6000) {
+          return { error: 'Groupe ou contenu invalide.' };
+        }
+        const group = await Group.findOne({ _id: args.groupId, 'members.userId': req.user.id }).select('_id name');
+        if (!group) return { error: 'Groupe introuvable ou accès refusé.' };
+        pendingAction = {
+          type: 'group_message',
+          groupId: group._id.toString(),
+          groupName: group.name,
+          content: args.content.trim()
+        };
+        return { prepared: true, group: group.name, note: 'Brouillon préparé. Aucune action d’envoi effectuée.' };
+      }
+
+      if (name === 'request_last_private_message') {
+        if (!mongoose.isValidObjectId(args.friendId)) return { error: 'Ami invalide.' };
+        const [account, friend] = await Promise.all([
+          User.findById(req.user.id).select('friends'),
+          User.findById(args.friendId).select('username displayName')
+        ]);
+        const isFriend = account?.friends?.some(item => item.userId?.toString() === args.friendId);
+        if (!isFriend || !friend) return { error: 'Cet utilisateur n’est pas un ami accessible.' };
+        pendingRead = {
+          type: 'private_message',
+          conversationId: friend._id.toString(),
+          conversationName: friend.displayName || friend.username
+        };
+        return { requested: true, note: 'Le navigateur va récupérer le message chiffré et le déchiffrer localement. Ne demande pas son contenu à Groq.' };
+      }
+
+      if (name === 'request_last_group_message') {
+        if (!mongoose.isValidObjectId(args.groupId)) return { error: 'Groupe invalide.' };
+        const group = await Group.findOne({ _id: args.groupId, 'members.userId': req.user.id }).select('_id name');
+        if (!group) return { error: 'Groupe introuvable ou accès refusé.' };
+        pendingRead = {
+          type: 'group_message',
+          conversationId: group._id.toString(),
+          conversationName: group.name
+        };
+        return { requested: true, note: 'Le navigateur va récupérer le message chiffré et le déchiffrer localement. Ne demande pas son contenu à Groq.' };
+      }
+
       return { error: 'Outil inconnu.' };
     };
 
     const requestMessages = [
       {
         role: 'system',
-        content: 'Tu es Propard AI, l’assistant intégré à Propard. Réponds en français par défaut, clairement et honnêtement. Tu peux aider sur les sujets généraux et utiliser uniquement les outils de consultation explicitement disponibles pour lire le profil non sensible, les amis et les groupes de l’utilisateur connecté. Les outils sont limités à son propre compte. Tu ne peux pas lire les messages privés, les conversations E2EE, les fichiers, les clés, les mots de passe ni les données d’autres utilisateurs. Tu ne peux modifier aucun paramètre ni effectuer d’action destructive. Ne prétends jamais avoir effectué une action qui n’a pas été exécutée. Ne demande jamais de mot de passe, de clé privée, de clé API ou de code de récupération.'
+        content: 'Tu es Propard AI, l’assistant intégré à Propard. Réponds en français par défaut, clairement et honnêtement. Tu peux consulter le profil non sensible, les amis et les groupes de l’utilisateur connecté. Tu peux préparer un brouillon de message privé ou de groupe, mais tu ne peux jamais l’envoyer toi-même : l’utilisateur doit obligatoirement confirmer dans l’interface. Tu peux demander au navigateur de lire le dernier message privé ou de groupe, mais le contenu est déchiffré uniquement sur l’appareil et ne doit jamais être demandé, reconstitué, résumé ou transmis à Groq. Tu ne peux lire aucune clé, aucun mot de passe ni aucune donnée d’autres utilisateurs. Ne prétends jamais qu’un message a été envoyé avant confirmation. Ne demande jamais de mot de passe, de clé privée, de clé API ou de code de récupération.'
       },
       ...history
     ];
@@ -220,10 +346,19 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
         let result;
         try {
           const args = JSON.parse(toolCall.function?.arguments || '{}');
-          if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).length) {
+          const allowedKeys = {
+            get_my_profile: [],
+            list_my_friends: [],
+            list_my_groups: [],
+            prepare_private_message: ['friendId', 'content'],
+            prepare_group_message: ['groupId', 'content'],
+            request_last_private_message: ['friendId'],
+            request_last_group_message: ['groupId']
+          }[toolName];
+          if (!args || typeof args !== 'object' || Array.isArray(args) || !allowedKeys || Object.keys(args).some(key => !allowedKeys.includes(key)) || allowedKeys.some(key => !Object.prototype.hasOwnProperty.call(args, key))) {
             result = { error: 'Arguments invalides.' };
           } else {
-            result = await executeTool(toolName);
+            result = await executeTool(toolName, args);
           }
         } catch {
           result = { error: 'Impossible d’exécuter cet outil.' };
@@ -258,6 +393,8 @@ router.post('/conversations/:id/messages', messageLimiter, async (req, res) => {
     res.json({
       userMessage: { role: 'user', content, createdAt: now },
       assistantMessage: { role: 'assistant', content: answer.trim(), createdAt: new Date() },
+      ...(pendingAction ? { pendingAction } : {}),
+      ...(pendingRead ? { pendingRead } : {}),
       conversation: {
         id: conversation._id.toString(),
         title: conversation.title,
