@@ -1,7 +1,7 @@
 import React from 'react';
 import SafeLink from './SafeLink';
 
-const URL_PATTERN = /https?:\\/\\/[^\\s<>{}]+/gi;
+const URL_PATTERN = /https?:\/\/[^\s<>{}]+/gi;
 
 export default function LinkText({ text = '' }) {
   const value = String(text);
