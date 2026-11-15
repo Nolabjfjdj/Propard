@@ -5,10 +5,18 @@ import { useAuth } from '../context/AuthContext';
 
 const auth = token => ({ headers: { Authorization: `Bearer ${token}` } });
 
-export default function PropardAIPage() {
+const updateConversationUrl = id => {
+  const nextPath = id ? `/ai/${encodeURIComponent(id)}` : '/ai';
+  if (window.location.pathname !== nextPath) {
+    window.history.pushState({}, '', nextPath);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }
+};
+
+export default function PropardAIPage({ initialConversationId = null }) {
   const { token } = useAuth();
   const [conversations, setConversations] = useState([]);
-  const [activeId, setActiveId] = useState(null);
+  const [activeId, setActiveId] = useState(initialConversationId);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(true);
@@ -29,31 +37,46 @@ export default function PropardAIPage() {
   const openConversation = useCallback(async id => {
     setError('');
     setActiveId(id);
+    updateConversationUrl(id);
     setSidebarOpen(false);
     try {
       const response = await api.get(`/api/ai/conversations/${id}`, auth(token));
       setMessages(response.data.messages || []);
     } catch (err) {
+      setMessages([]);
       setError(err.response?.data?.error || 'Impossible de charger cette conversation.');
     }
   }, [token]);
 
   useEffect(() => {
     let mounted = true;
+    setLoading(true);
+    setError('');
     Promise.all([
       api.get('/api/ai/status', auth(token)),
       api.get('/api/ai/conversations', auth(token))
-    ]).then(([status, list]) => {
+    ]).then(async ([status, list]) => {
       if (!mounted) return;
       setAvailable(status.data.available);
       setKeyCount(status.data.keyCount || 0);
       setConversations(list.data || []);
-      if (list.data?.length) {
-        const first = list.data[0];
-        setActiveId(first.id);
-        return api.get(`/api/ai/conversations/${first.id}`, auth(token)).then(result => {
-          if (mounted) setMessages(result.data.messages || []);
-        });
+      const conversationId = initialConversationId || list.data?.[0]?.id || null;
+      if (!conversationId) {
+        setActiveId(null);
+        setMessages([]);
+        updateConversationUrl(null);
+        return;
+      }
+      setActiveId(conversationId);
+      if (!initialConversationId) updateConversationUrl(conversationId);
+      try {
+        const result = await api.get(`/api/ai/conversations/${encodeURIComponent(conversationId)}`, auth(token));
+        if (mounted) setMessages(result.data.messages || []);
+      } catch (err) {
+        if (mounted) {
+          setMessages([]);
+          setError(err.response?.data?.error || 'Impossible de charger cette conversation.');
+        }
       }
     }).catch(err => {
       if (mounted) setError(err.response?.data?.error || 'Impossible de contacter Propard AI.');
@@ -61,7 +84,7 @@ export default function PropardAIPage() {
       if (mounted) setLoading(false);
     });
     return () => { mounted = false; };
-  }, [token]);
+  }, [token, initialConversationId]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -74,6 +97,7 @@ export default function PropardAIPage() {
       const conversation = response.data;
       setConversations(current => [conversation, ...current]);
       setActiveId(conversation.id);
+      updateConversationUrl(conversation.id);
       setMessages([]);
       setDraft('');
       setSidebarOpen(false);
@@ -96,6 +120,7 @@ export default function PropardAIPage() {
         const created = await api.post('/api/ai/conversations', {}, auth(token));
         conversationId = created.data.id;
         setActiveId(conversationId);
+        updateConversationUrl(conversationId);
         setConversations(current => [created.data, ...current]);
       }
       setMessages(current => [...current, { role: 'user', content }]);
@@ -141,6 +166,7 @@ export default function PropardAIPage() {
         if (remaining.length) await openConversation(remaining[0].id);
         else {
           setActiveId(null);
+          updateConversationUrl(null);
           setMessages([]);
         }
       }
