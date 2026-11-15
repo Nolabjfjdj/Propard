@@ -446,7 +446,7 @@ UTILISATION DES OUTILS ET CONFIDENTIALITÉ
         tools,
         tool_choice: 'auto',
         temperature: 0.6,
-        max_completion_tokens: 700
+        max_completion_tokens: 2400
       });
 
       const assistantMessage = completion.choices?.[0]?.message;
@@ -489,7 +489,22 @@ UTILISATION DES OUTILS ET CONFIDENTIALITÉ
       }
     }
 
-    const answer = completion?.choices?.[0]?.message?.content;
+    let answer = completion?.choices?.[0]?.message?.content || '';
+    if (completion?.choices?.[0]?.finish_reason === 'length' && answer.trim()) {
+      const continuation = await createGroqCompletion({
+        messages: [
+          ...requestMessages,
+          { role: 'assistant', content: answer },
+          { role: 'user', content: 'Ta réponse a été interrompue par la limite de génération. Continue exactement à partir du dernier caractère, sans répéter ce qui précède, puis termine toutes tes phrases et tous tes tableaux.' }
+        ],
+        temperature: 0.4,
+        max_completion_tokens: 1600
+      });
+      const continuationText = continuation.choices?.[0]?.message?.content;
+      if (typeof continuationText === 'string' && continuationText.trim()) {
+        answer = `${answer.trimEnd()}\n${continuationText.trimStart()}`;
+      }
+    }
     if (typeof answer !== 'string' || !answer.trim()) {
       return res.status(502).json({ error: 'Groq a renvoyé une réponse vide. Réessaie.' });
     }
