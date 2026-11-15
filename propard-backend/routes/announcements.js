@@ -3,6 +3,7 @@ const router = express.Router();
 
 const User = require('../models/User');
 const Announcement = require('../models/Announcement');
+const { verifyAnnouncement } = require('../utils/announcementSignature');
 const authMiddleware = require('../middleware/auth');
 const mongoose = require('mongoose');
 
@@ -15,11 +16,10 @@ const mongoose = require('mongoose');
 
 router.get('/active', authMiddleware, async (req, res) => {
   try {
-    const announcement = await Announcement.findOne({
-      active: true
-    }).sort({
-      createdAt: -1
-    });
+    const candidates = await Announcement.find({ active: true })
+      .sort({ createdAt: -1 })
+      .limit(5);
+    const announcement = candidates.find(verifyAnnouncement) || null;
 
     if (!announcement) {
       return res.json({
@@ -92,7 +92,7 @@ router.post('/:announcementId/accept', authMiddleware, async (req, res) => {
       active: true
     });
 
-    if (!announcement) {
+    if (!announcement || !verifyAnnouncement(announcement)) {
       return res.status(404).json({
         error: 'Annonce introuvable'
       });
