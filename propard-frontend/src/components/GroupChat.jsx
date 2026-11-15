@@ -13,6 +13,7 @@ import MessageReactions from './MessageReactions';
 import FileAttachments from './FileAttachments';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
+import LinkText from './LinkText';
 import { uploadConversationFile, downloadConversationMedia } from '../utils/fileUpload';
 import GroupVoiceCall from './GroupVoiceCall';
 
@@ -2762,7 +2763,7 @@ export default function GroupChat({
                                   color: isMe ? '#fff' : 'var(--text-primary)'
                                 }}
                               >
-                                {content}
+                                <LinkText text={content} />
                               </p>
                             )}
                             {!message.deleted && (
