@@ -284,10 +284,14 @@ function facade(name) {
         }
         return null;
       };
-      if (property === 'findOneAndUpdate') return async (filter, update, options) => {
+      if (property === 'findOneAndUpdate') return async (filter, update, options, select) => {
         for (const index of readyIndexes()) {
           const model = rawModel(index, name);
-          if (await model.exists(filter)) return model.findOneAndUpdate(filter, update, options).exec();
+          if (await model.exists(filter)) {
+            const query = model.findOneAndUpdate(filter, update, options);
+            if (select) query.select(select);
+            return query.exec();
+          }
         }
         return null;
       };
