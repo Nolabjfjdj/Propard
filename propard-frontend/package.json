@@ -17,7 +17,8 @@
     "socket.io-client": "^4.8.4",
     "@capacitor/push-notifications": "^8.1.2",
     "@capacitor/core": "^8.1.2",
-    "emoji-picker-react": "^4.12.2"
+    "emoji-picker-react": "^4.12.2",
+    "@simplewebauthn/browser": "^13.2.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
