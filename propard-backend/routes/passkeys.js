@@ -221,6 +221,26 @@ router.delete('/:credentialId', auth, async (req, res) => {
   }
 });
 
+router.post('/recovery/regenerate', auth, registrationLimiter, async (req, res) => {
+  try {
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!password || password.length > 128) return res.status(400).json({ error: 'Mot de passe requis.' });
+    const user = await User.findById(req.user.id).select('+password +passkeys +passkeyRecoveryCodes');
+    if (!user) return res.status(404).json({ error: 'Compte introuvable.' });
+    if (!user.passkeys?.length) return res.status(400).json({ error: 'Ajoute une clé d’accès avant de créer des codes.' });
+    if (!await bcrypt.compare(password, user.password || DUMMY_PASSWORD_HASH)) {
+      return res.status(401).json({ error: 'Mot de passe incorrect.' });
+    }
+    const recoveryCodes = makeRecoveryCodes();
+    user.passkeyRecoveryCodes = recoveryCodes.map(hashRecoveryCode);
+    await user.save();
+    return res.json({ success: true, recoveryCodes });
+  } catch (error) {
+    console.error('Passkey recovery code regeneration failed:', error);
+    return res.status(500).json({ error: 'Impossible de régénérer les codes de récupération.' });
+  }
+});
+
 router.post('/login/options', loginLimiter, async (req, res) => {
   try {
     const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
