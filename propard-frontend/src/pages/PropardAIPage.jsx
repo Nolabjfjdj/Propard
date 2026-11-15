@@ -14,6 +14,7 @@ export default function PropardAIPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [available, setAvailable] = useState(null);
+  const [keyCount, setKeyCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const endRef = useRef(null);
   const inputRef = useRef(null);
@@ -44,6 +45,7 @@ export default function PropardAIPage() {
     ]).then(([status, list]) => {
       if (!mounted) return;
       setAvailable(status.data.available);
+      setKeyCount(status.data.keyCount || 0);
       setConversations(list.data || []);
       if (list.data?.length) {
         const first = list.data[0];
@@ -198,7 +200,7 @@ export default function PropardAIPage() {
         <header style={styles.top}>
           <button onClick={() => setSidebarOpen(true)} style={{ ...styles.back, display: window.innerWidth < 700 ? 'block' : 'none', background: 'transparent', cursor: 'pointer' }}>☰</button>
           <strong>Propard AI</strong>
-          <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: 12 }}>{available === false ? 'IA indisponible' : 'Assistant'}</span>
+          <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: 12 }}>{available === false ? 'IA indisponible' : available ? `${keyCount} clé${keyCount > 1 ? 's' : ''} Groq` : 'Assistant'}</span>
         </header>
         <section style={styles.feed}>
           <div style={styles.content}>
