@@ -50,3 +50,49 @@ select {
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+
+html.propard-ai-page,
+body.propard-ai-page,
+body.propard-ai-page #root {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body.propard-ai-page {
+  position: fixed;
+  inset: 0;
+  touch-action: pan-y;
+}
+
+body.propard-ai-page #root {
+  position: relative;
+}
+
+.propard-ai-page textarea,
+.propard-ai-page input {
+  font-size: 16px !important;
+}
+
+.propard-ai-page * {
+  min-width: 0;
+}
+
+.propard-ai-page .propard-ai-markdown,
+.propard-ai-page .propard-ai-markdown p,
+.propard-ai-page .propard-ai-markdown li,
+.propard-ai-page .propard-ai-markdown h1,
+.propard-ai-page .propard-ai-markdown h2,
+.propard-ai-page .propard-ai-markdown h3 {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+@media (max-width: 699px) {
+  .propard-ai-page {
+    overscroll-behavior: none;
+  }
+}
