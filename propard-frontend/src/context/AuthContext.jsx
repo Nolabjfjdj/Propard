@@ -445,7 +445,10 @@ export function AuthProvider({ children }) {
         response => response,
 
         error => {
-          if (error.response?.status === 401) {
+          const requestUrl = error.config?.url || '';
+          const isPasskeyRequest = requestUrl.includes('/api/auth/passkeys');
+
+          if (error.response?.status === 401 && !isPasskeyRequest) {
             localStorage.removeItem(
               'propard_token'
             );
