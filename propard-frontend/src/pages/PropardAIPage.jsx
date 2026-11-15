@@ -102,13 +102,13 @@ export default function PropardAIPage() {
         auth(token)
       );
       setMessages(current => [
-        ...current.filter(message => !(message.role === 'user' && message.content === content && message.pending)),
+        ...current.slice(0, -1),
         response.data.userMessage,
         response.data.assistantMessage
       ]);
       await loadConversations();
     } catch (err) {
-      setMessages(current => current.filter(message => !(message.role === 'user' && message.content === content && message.pending)));
+      setMessages(current => current.slice(0, -1));
       setDraft(content);
       setError(err.response?.data?.error || 'Une erreur est survenue pendant la génération.');
     } finally {
