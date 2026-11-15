@@ -6,6 +6,7 @@ import MessageReactions from './MessageReactions';
 import FileAttachments from './FileAttachments';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
+import LinkText from './LinkText';
 import { uploadConversationFile, downloadConversationMedia } from '../utils/fileUpload';
 import {
   deriveSharedKey,
@@ -1575,7 +1576,7 @@ export default function Chat({
                                 color: isMe ? '#fff' : 'var(--text-primary)'
                               }}
                             >
-                              {content}
+                              <LinkText text={content} />
                             </p>
                           )}
                           <FileAttachments
