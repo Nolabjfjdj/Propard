@@ -68,7 +68,7 @@ const publicUser = user => ({
 
 router.get('/', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('+passkeys');
+    const user = await User.findById(req.user.id).select('+passkeys +passkeyRecoveryCodes');
     if (!user) return res.status(404).json({ error: 'Compte introuvable.' });
     return res.json({ passkeys: (user.passkeys || []).map(safeCredential), recoveryCodesAvailable: (user.passkeyRecoveryCodes || []).length > 0 });
   } catch (error) {
@@ -136,7 +136,7 @@ router.post('/register/verify', auth, registrationLimiter, async (req, res) => {
     }
     const info = verification.registrationInfo;
     const credential = info.credential;
-    const credentialId = credential.id || toBase64Url(credentialID);
+    const credentialId = credential.id;
     if ((user.passkeys || []).some(item => item.credentialId === credentialId)) {
       return res.status(409).json({ error: 'Cette clé est déjà associée au compte.' });
     }
