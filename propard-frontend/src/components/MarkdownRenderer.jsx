@@ -8,11 +8,11 @@ const safeHref = value => {
 
 function renderInline(text, prefix = 'i') {
   const tick = String.fromCharCode(96);
-  const pattern = new RegExp('(\\[[^\\]]+\\]\\([^)]+\\)|\\*\\*[^*]+\\*\\*|__[^_]+__|~~[^~]+~~|\\*[^*]+\\*|_[^_]+_|' + tick + '[^' + tick + ']+' + tick + ')', 'g');
+  const pattern = new RegExp('(https?:\\/\\/[^\\s<>{}]+|\\[[^\\]]+\\]\\([^)]+\\)|\\*\\*[^*]+\\*\\*|__[^_]+__|~~[^~]+~~|\\*[^*]+\\*|_[^_]+_|' + tick + '[^' + tick + ']+' + tick + ')', 'g');
   return String(text).split(pattern).map((part, index) => {
     const key = prefix + '-' + index;
     if (!part) return null;
-    const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (/^https?:\/\//i.test(part)) {\n      let url = part;\n      let trailing = '';\n      while (/[.,!?;:)]$/.test(url)) { trailing = url.slice(-1) + trailing; url = url.slice(0, -1); }\n      return <React.Fragment key={key}><SafeLink href={url}>{url}</SafeLink>{trailing}</React.Fragment>;\n    }\n    const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     if (link) {
       const href = safeHref(link[2]);
       return href ? <SafeLink key={key} href={href}>{renderInline(link[1], key)}</SafeLink> : <span key={key}>{link[1]}</span>;
