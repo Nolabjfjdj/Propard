@@ -846,6 +846,15 @@ export default function ProfilePage({
             >
               Modifier le profil
             </button>
+            <button
+              style={styles.secondaryBtn}
+              onClick={() => {
+                window.history.pushState({}, '', '/settings');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
+            >
+              Paramètres
+            </button>
           </div>
         ) : profile.isBlockedByMe ? (
           <div style={styles.actionsRow}>
