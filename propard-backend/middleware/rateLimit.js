@@ -1,3 +1,4 @@
+const { getClientIp } = require('../utils/clientIp');
 // Rate limiting générique en mémoire pour un processus Node.
 // Les compteurs ne sont pas partagés entre plusieurs instances du serveur.
 const buckets = new Map();
@@ -28,7 +29,7 @@ function createRateLimiter({ windowMs, max, keyFn, message, captcha = false, res
   const limiterId = nextLimiterId++;
 
   return async (req, res, next) => {
-    const rawKey = keyFn ? keyFn(req) : req.ip;
+    const rawKey = keyFn ? keyFn(req) : getClientIp(req);
     const key = `${limiterId}:${String(rawKey ?? 'unknown')}`;
     const now = Date.now();
 
@@ -53,7 +54,7 @@ function createRateLimiter({ windowMs, max, keyFn, message, captcha = false, res
     if (bucket.count > max) {
       if (captcha) {
         const captchaToken = req.body?.captchaToken || req.get('x-captcha-token');
-        if (await verifyTurnstile(captchaToken, req.ip)) {
+        if (await verifyTurnstile(captchaToken, getClientIp(req))) {
           if (resetOnCaptcha) {
             bucket.start = now;
             bucket.count = 0;
