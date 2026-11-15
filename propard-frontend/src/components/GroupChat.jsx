@@ -270,51 +270,9 @@ export default function GroupChat({
   ]);
 
   /*
-   * Appels de groupe entrants.
-   *
-   * L'invitation est uniquement acceptée pour un groupe
-   * que l'utilisateur est déjà en train de consulter.
+   * Les invitations de groupe sont gérées globalement dans AppPage,
+   * même lorsque l'utilisateur consulte une autre page.
    */
-  useEffect(() => {
-    const groupId = initialGroup?._id?.toString();
-    if (!groupId || !myId) {
-      return;
-    }
-
-    const handleGroupCallInvite = payload => {
-      if (
-        payload?.groupId?.toString() !== groupId ||
-        payload?.callerId?.toString() === myId ||
-        !payload?.callId
-      ) {
-        return;
-      }
-
-      setGroupCall({
-        incoming: true,
-        callId: payload.callId,
-          callerId: payload.callerId?.toString(),
-          video: Boolean(payload.videoCall)
-      });
-    };
-
-    socket.on(
-      'groupCallInvite',
-      handleGroupCallInvite
-    );
-
-    socket.emit('requestPendingCalls');
-
-    return () => {
-      socket.off(
-        'groupCallInvite',
-        handleGroupCallInvite
-      );
-    };
-  }, [
-    initialGroup?._id,
-    myId
-  ]);
 
   /*
    * Récupération des surnoms d'amis.
