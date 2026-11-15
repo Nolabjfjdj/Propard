@@ -37,7 +37,13 @@ const parsePublicKey = value => {
   }
 };
 
-const uploadKeyBackup = async (authToken, privateKeyJwk, password, captchaToken = '') => {
+const uploadKeyBackup = async (
+  authToken,
+  privateKeyJwk,
+  password,
+  captchaToken = '',
+  publicKeyJwk = null
+) => {
   if (!password) return false;
 
   const backup = await encryptPrivateKeyBackup(
@@ -47,7 +53,11 @@ const uploadKeyBackup = async (authToken, privateKeyJwk, password, captchaToken 
 
   await api.post(
     '/api/auth/keybackup',
-    { backup, ...(captchaToken ? { captchaToken } : {}) },
+    {
+      backup,
+      ...(publicKeyJwk ? { publicKey: JSON.stringify(publicKeyJwk) } : {}),
+      ...(captchaToken ? { captchaToken } : {})
+    },
     {
       headers: {
         Authorization: `Bearer ${authToken}`
@@ -188,12 +198,9 @@ const ensureEncryptionKeys = async (
         return;
       }
 
-      if (serverPub) {
-        console.warn(
-          '🔐 Aucune sauvegarde E2EE disponible. Aucune nouvelle clé n’a été générée.'
-        );
-        return;
-      }
+      console.warn(
+        '🔐 Aucune sauvegarde E2EE disponible. Une nouvelle identité sera créée pour ce compte.'
+      );
     }
 
     /*
@@ -223,26 +230,38 @@ const ensureEncryptionKeys = async (
       privateKeyJwk
     } = await generateKeyPair();
 
-    // Stocker la clé privée avant de publier sa clé publique :
-    // si le stockage local échoue, le serveur ne doit pas conserver une
-    // clé publique dont cet appareil n'a pas sauvegardé la clé privée.
-    await storePrivateKey(
-      userId,
-      privateKeyJwk
-    );
+    if (password) {
+      await uploadKeyBackup(
+        authToken,
+        privateKeyJwk,
+        password,
+        captchaToken,
+        publicKeyJwk
+      );
 
-    await api.patch(
-      '/api/auth/publickey',
-      {
-        publicKey: JSON.stringify(publicKeyJwk),
-        ...(captchaToken ? { captchaToken } : {})
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${authToken}`
+      await storePrivateKey(
+        userId,
+        privateKeyJwk
+      );
+    } else {
+      await storePrivateKey(
+        userId,
+        privateKeyJwk
+      );
+
+      await api.patch(
+        '/api/auth/publickey',
+        {
+          publicKey: JSON.stringify(publicKeyJwk),
+          ...(captchaToken ? { captchaToken } : {})
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`
+          }
         }
-      }
-    );
+      );
+    }
 
     console.log(
       '🔐 Clés E2EE générées avec succès'
