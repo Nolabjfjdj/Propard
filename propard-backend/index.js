@@ -252,6 +252,7 @@ app.set('connectedUsers',connectedUsers);
 app.set('emitToUser',emitToUser);
 
 app.use('/api/auth',require('./routes/auth'));
+app.use('/api/auth/passkeys',require('./routes/passkeys'));
 app.use('/api/friends',require('./routes/friends'));
 app.use('/api/admin',require('./routes/admin'));
 app.use('/api/staff',require('./routes/staff'));
