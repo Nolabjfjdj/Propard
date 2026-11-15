@@ -476,7 +476,8 @@ io.on('connection',async socket=>{
             callStartedAt: pendingPrivateCall.startedAt,
             iceCandidates: pendingPrivateCall.pendingIceCandidates || []
           },
-          callStartedAt: pendingPrivateCall.startedAt
+          callStartedAt: pendingPrivateCall.startedAt,
+          videoCall: Boolean(pendingPrivateCall.videoCall)
         }
       );
     }
@@ -490,7 +491,8 @@ io.on('connection',async socket=>{
           groupId: call.groupId,
           callId: call.callId,
           callStartedAt: call.startedAt,
-          callerId: call.callerId
+          callerId: call.callerId,
+          videoCall: Boolean(call.videoCall)
         }
       );
     }
