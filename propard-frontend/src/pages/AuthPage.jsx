@@ -12,6 +12,7 @@ export default function AuthPage({ mode }) {
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
   const [error, setError] = useState('');
   const [recoveryMode, setRecoveryMode] = useState(false);
+  const [passkeyLoginRequired, setPasskeyLoginRequired] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [captchaRequired, setCaptchaRequired] = useState(false);
@@ -151,6 +152,7 @@ export default function AuthPage({ mode }) {
       });
 
       if (mode === 'login' && res.data?.passkeyRequired) {
+        setPasskeyLoginRequired(true);
         const optionsResponse = await api.post('/api/auth/passkeys/login/options', {
           username,
           password,
@@ -199,12 +201,9 @@ export default function AuthPage({ mode }) {
           window.turnstile.reset(captchaWidgetRef.current);
         }
       }
-      if (mode === 'login' && err.name !== 'AxiosError' && err.name !== 'Error') {
+      if (mode === 'login' && passkeyLoginRequired) {
         setRecoveryMode(true);
-      }
-      if (mode === 'login' && (err.name === 'NotAllowedError' || err.name === 'InvalidStateError' || err.name === 'SecurityError' || err.name === 'UnknownError')) {
-        setRecoveryMode(true);
-        setError('La clé d’accès n’a pas pu être utilisée. Tu peux essayer un code de récupération.');
+        setError(err.response?.data?.error || 'La clé d’accès n’a pas pu être vérifiée. Tu peux utiliser un code de récupération.');
       } else {
         setError(err.response?.data?.error || err.message || 'Erreur serveur');
       }
