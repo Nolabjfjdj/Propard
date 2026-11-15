@@ -73,7 +73,8 @@ const ensureEncryptionKeys = async (
   authToken,
   password = null,
   serverPublicKey = null,
-  captchaToken = ''
+  captchaToken = '',
+  allowKeyRegeneration = false
 ) => {
   if (!userId || !authToken) return;
 
@@ -196,6 +197,14 @@ const ensureEncryptionKeys = async (
         }
 
         return;
+      }
+
+      if (serverPub && !allowKeyRegeneration) {
+        const error = new Error(
+          'Aucune sauvegarde de clé E2EE n’est disponible. Une nouvelle identité peut être créée, mais les anciens messages chiffrés avec la clé perdue ne seront pas récupérables sur cet appareil.'
+        );
+        error.code = 'E2EE_KEY_REGENERATION_CONFIRMATION_REQUIRED';
+        throw error;
       }
 
       console.warn(
@@ -498,6 +507,23 @@ export function AuthProvider({ children }) {
         captchaToken
       );
     } catch (err) {
+      if (
+        err.code === 'E2EE_KEY_REGENERATION_CONFIRMATION_REQUIRED' &&
+        window.confirm(
+          'Aucune sauvegarde de la clé E2EE de ce compte n’a été trouvée. Créer une nouvelle identité de chiffrement ? Les anciens messages chiffrés avec l’ancienne clé ne seront pas récupérables sur cet appareil. Les autres appareils qui possèdent encore l’ancienne clé ne pourront pas déchiffrer les nouveaux messages. Cette action remplacera la clé publique du compte.'
+        )
+      ) {
+        await ensureEncryptionKeys(
+          normalized.id,
+          userToken,
+          password,
+          normalized.publicKey,
+          captchaToken,
+          true
+        );
+        return;
+      }
+
       console.error('Erreur de restauration E2EE:', err);
 
       // Le compte est bien connecté. On remonte toutefois une erreur
