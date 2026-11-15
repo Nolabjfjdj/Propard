@@ -262,6 +262,7 @@ app.use('/api/reports',require('./routes/reports'));
 app.use('/api/groups',require('./routes/groups'));
 app.use('/api/files',require('./routes/files'));
 app.use('/api/push',require('./routes/push'));
+app.use('/api/ai',require('./routes/ai'));
 
 app.get('/health',(req,res)=>res.status(200).send('OK'));
 
