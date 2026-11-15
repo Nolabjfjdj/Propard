@@ -83,6 +83,30 @@ export default function PropardAIPage({ initialConversationId = null }) {
   }, [token, initialConversationId]);
 
   useEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    root.classList.add('propard-ai-page');
+    body.classList.add('propard-ai-page');
+    const viewport = window.visualViewport;
+    const updateHeight = () => {
+      const height = viewport?.height || window.innerHeight;
+      root.style.setProperty('--propard-ai-viewport-height', height + 'px');
+    };
+    updateHeight();
+    viewport?.addEventListener('resize', updateHeight);
+    viewport?.addEventListener('scroll', updateHeight);
+    window.addEventListener('resize', updateHeight);
+    return () => {
+      root.classList.remove('propard-ai-page');
+      body.classList.remove('propard-ai-page');
+      root.style.removeProperty('--propard-ai-viewport-height');
+      viewport?.removeEventListener('resize', updateHeight);
+      viewport?.removeEventListener('scroll', updateHeight);
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, []);
+
+  useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, sending]);
 
@@ -172,25 +196,25 @@ export default function PropardAIPage({ initialConversationId = null }) {
   };
 
   const styles = {
-    shell: { height: '100dvh', minHeight: '100vh', display: 'flex', background: 'var(--bg-primary)', color: 'var(--text-primary)', overflow: 'hidden' },
-    sidebar: { width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12, padding: 14, background: 'var(--bg-secondary)', borderRight: '1px solid var(--border)', overflowY: 'auto' },
+    shell: { position: 'fixed', inset: 0, width: '100vw', height: 'var(--propard-ai-viewport-height, 100dvh)', minHeight: 0, display: 'flex', background: 'var(--bg-primary)', color: 'var(--text-primary)', overflow: 'hidden', overscrollBehavior: 'none' },
+    sidebar: { width: 280, maxWidth: '85vw', minWidth: 0, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12, padding: 14, background: 'var(--bg-secondary)', borderRight: '1px solid var(--border)', overflowY: 'auto' },
     sideHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     brand: { fontSize: 17, fontWeight: 800, letterSpacing: '-.4px' },
     newButton: { width: '100%', padding: '11px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg-tertiary)', color: 'var(--text-primary)', textAlign: 'left', cursor: 'pointer', fontWeight: 650 },
     conversation: { display: 'flex', alignItems: 'center', gap: 5, padding: '9px 8px', borderRadius: 8, background: 'transparent', border: '1px solid transparent', color: 'var(--text-secondary)', cursor: 'pointer', textAlign: 'left', width: '100%' },
     activeConversation: { background: 'var(--bg-tertiary)', borderColor: 'var(--border)', color: 'var(--text-primary)' },
-    main: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' },
-    top: { minHeight: 58, padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--border)' },
+    main: { flex: 1, minWidth: 0, minHeight: 0, width: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+    top: { minHeight: 58, flexShrink: 0, padding: 'max(10px, env(safe-area-inset-top)) 18px 10px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--border)' },
     back: { color: 'var(--text-secondary)', textDecoration: 'none', fontSize: 13, border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px' },
-    feed: { flex: 1, overflowY: 'auto', padding: '28px 18px 18px' },
-    content: { width: '100%', maxWidth: 820, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 },
+    feed: { flex: 1, minHeight: 0, minWidth: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '28px 18px 18px' },
+    content: { width: '100%', maxWidth: 1100, minWidth: 0, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 },
     welcome: { textAlign: 'center', padding: '10vh 12px 20px' },
-    bubble: { maxWidth: '85%', padding: '13px 16px', borderRadius: 16, lineHeight: 1.6, fontSize: 14, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' },
-    userBubble: { alignSelf: 'flex-end', background: 'var(--accent)', color: '#fff', borderBottomRightRadius: 5 },
-    assistantBubble: { alignSelf: 'flex-start', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderBottomLeftRadius: 5 },
-    composerWrap: { padding: '12px 18px max(16px, env(safe-area-inset-bottom))', borderTop: '1px solid var(--border)' },
-    composer: { maxWidth: 820, margin: '0 auto', display: 'flex', gap: 9, alignItems: 'flex-end', padding: 9, background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 15 },
-    textarea: { flex: 1, minWidth: 0, resize: 'none', border: 0, outline: 0, background: 'transparent', color: 'var(--text-primary)', font: 'inherit', fontSize: 14, lineHeight: 1.5, padding: '7px 6px', maxHeight: 180 },
+    bubble: { maxWidth: '100%', minWidth: 0, padding: '13px 16px', borderRadius: 16, lineHeight: 1.6, fontSize: 14, whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'normal' },
+    userBubble: { alignSelf: 'flex-end', maxWidth: '85%', background: 'var(--accent)', color: '#fff', borderBottomRightRadius: 5 },
+    assistantBubble: { alignSelf: 'stretch', width: '100%', maxWidth: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderBottomLeftRadius: 5 },
+    composerWrap: { flexShrink: 0, width: '100%', padding: '12px max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left))', borderTop: '1px solid var(--border)', background: 'var(--bg-primary)' },
+    composer: { width: '100%', maxWidth: 1100, minWidth: 0, margin: '0 auto', display: 'flex', gap: 9, alignItems: 'flex-end', padding: 9, background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 15 },
+    textarea: { flex: 1, minWidth: 0, width: 0, resize: 'none', border: 0, outline: 0, background: 'transparent', color: 'var(--text-primary)', font: 'inherit', fontSize: 14, lineHeight: 1.5, padding: '7px 6px', maxHeight: 180 },
     send: { border: 0, borderRadius: 10, background: 'var(--accent)', color: '#fff', padding: '10px 14px', fontWeight: 700, cursor: 'pointer' },
     muted: { color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', marginTop: 8 },
     error: { color: 'var(--danger)', fontSize: 13, textAlign: 'center', padding: '8px 14px' }
