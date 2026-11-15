@@ -88,21 +88,24 @@ export default function PropardAIPage({ initialConversationId = null }) {
     root.classList.add('propard-ai-page');
     body.classList.add('propard-ai-page');
     const viewport = window.visualViewport;
-    const updateHeight = () => {
+    const updateViewport = () => {
       const height = viewport?.height || window.innerHeight;
+      const offsetTop = viewport?.offsetTop || 0;
       root.style.setProperty('--propard-ai-viewport-height', height + 'px');
+      root.style.setProperty('--propard-ai-viewport-offset-top', offsetTop + 'px');
     };
-    updateHeight();
-    viewport?.addEventListener('resize', updateHeight);
-    viewport?.addEventListener('scroll', updateHeight);
-    window.addEventListener('resize', updateHeight);
+    updateViewport();
+    viewport?.addEventListener('resize', updateViewport);
+    viewport?.addEventListener('scroll', updateViewport);
+    window.addEventListener('resize', updateViewport);
     return () => {
       root.classList.remove('propard-ai-page');
       body.classList.remove('propard-ai-page');
       root.style.removeProperty('--propard-ai-viewport-height');
-      viewport?.removeEventListener('resize', updateHeight);
-      viewport?.removeEventListener('scroll', updateHeight);
-      window.removeEventListener('resize', updateHeight);
+      root.style.removeProperty('--propard-ai-viewport-offset-top');
+      viewport?.removeEventListener('resize', updateViewport);
+      viewport?.removeEventListener('scroll', updateViewport);
+      window.removeEventListener('resize', updateViewport);
     };
   }, []);
 
@@ -196,7 +199,7 @@ export default function PropardAIPage({ initialConversationId = null }) {
   };
 
   const styles = {
-    shell: { position: 'fixed', inset: 0, width: '100vw', height: 'var(--propard-ai-viewport-height, 100dvh)', minHeight: 0, display: 'flex', background: 'var(--bg-primary)', color: 'var(--text-primary)', overflow: 'hidden', overscrollBehavior: 'none' },
+    shell: { position: 'fixed', top: 'var(--propard-ai-viewport-offset-top, 0px)', left: 0, right: 0, width: '100vw', height: 'var(--propard-ai-viewport-height, 100dvh)', minHeight: 0, display: 'flex', background: 'var(--bg-primary)', color: 'var(--text-primary)', overflow: 'hidden', overscrollBehavior: 'none' },
     sidebar: { width: 280, maxWidth: '85vw', minWidth: 0, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12, padding: 14, background: 'var(--bg-secondary)', borderRight: '1px solid var(--border)', overflowY: 'auto' },
     sideHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     brand: { fontSize: 17, fontWeight: 800, letterSpacing: '-.4px' },
