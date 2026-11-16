@@ -12,7 +12,6 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
   const baseTextRef = useRef('');
   const finalTextRef = useRef('');
   const cancelledRef = useRef(false);
-  const stoppingRef = useRef(false);
 
   useEffect(() => () => {
     cancelledRef.current = true;
@@ -30,7 +29,6 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
     baseTextRef.current = value || '';
     finalTextRef.current = '';
     cancelledRef.current = false;
-    stoppingRef.current = false;
 
     const recognition = new Recognition();
     recognition.lang = 'fr-FR';
@@ -81,7 +79,6 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
 
   const stop = () => {
     if (!recognitionRef.current) return;
-    stoppingRef.current = true;
     recognitionRef.current.stop();
   };
 
