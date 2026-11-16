@@ -10,7 +10,29 @@ const getKey = () => {
   return key;
 };
 
-const isEncrypted = value => typeof value === 'string' && value.startsWith(PREFIX);
+const decryptPayload = value => {
+  const parts = value.slice(PREFIX.length).split(':');
+  if (parts.length !== 3) throw new Error('Invalid encrypted Propard AI conversation value.');
+  const [ivHex, tagHex, encrypted] = parts;
+  if (!/^[a-f0-9]{24}$/i.test(ivHex) || !/^[a-f0-9]{32}$/i.test(tagHex) || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encrypted)) {
+    throw new Error('Invalid encrypted Propard AI conversation metadata.');
+  }
+  const iv = Buffer.from(ivHex, 'hex');
+  const tag = Buffer.from(tagHex, 'hex');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', getKey(), iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(Buffer.from(encrypted, 'base64')), decipher.final()]).toString('utf8');
+};
+
+const isEncrypted = value => {
+  if (typeof value !== 'string' || !value.startsWith(PREFIX)) return false;
+  try {
+    decryptPayload(value);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 const encryptText = value => {
   if (typeof value !== 'string' || isEncrypted(value)) return value;
@@ -21,16 +43,8 @@ const encryptText = value => {
 };
 
 const decryptText = value => {
-  if (typeof value !== 'string' || !isEncrypted(value)) return value;
-  const parts = value.slice(PREFIX.length).split(':');
-  if (parts.length !== 3) throw new Error('Invalid encrypted Propard AI conversation value.');
-  const [ivHex, tagHex, encrypted] = parts;
-  const iv = Buffer.from(ivHex, 'hex');
-  const tag = Buffer.from(tagHex, 'hex');
-  if (iv.length !== 12 || tag.length !== 16) throw new Error('Invalid encrypted Propard AI conversation metadata.');
-  const decipher = crypto.createDecipheriv('aes-256-gcm', getKey(), iv);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(Buffer.from(encrypted, 'base64')), decipher.final()]).toString('utf8');
+  if (typeof value !== 'string' || !value.startsWith(PREFIX)) return value;
+  return decryptPayload(value);
 };
 
 module.exports = { encryptText, decryptText, isEncrypted };
