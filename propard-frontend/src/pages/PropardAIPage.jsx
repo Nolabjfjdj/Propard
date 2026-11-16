@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import VoiceMode from '../components/VoiceMode';
+import VoiceDictationButton from '../components/VoiceDictationButton';
 import { useAuth } from '../context/AuthContext';
 import socket from '../socket';
 import {
@@ -510,6 +511,7 @@ export default function PropardAIPage({ initialConversationId = null }) {
         <div style={styles.composerWrap}>
           <form style={styles.composer} onSubmit={sendMessage}>
             <textarea ref={inputRef} value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(event); } }} placeholder="Écris un message à Propard AI…" rows={1} maxLength={6000} style={styles.textarea} />
+            <VoiceDictationButton value={draft} onChange={setDraft} disabled={sending} />
             <button type="submit" disabled={sending || !draft.trim()} style={{ ...styles.send, opacity: sending || !draft.trim() ? .5 : 1 }}>Envoyer</button>
           </form>
           <div style={styles.muted}>Propard AI peut faire des erreurs. Ne partage pas de secrets ni de clés privées.</div>
