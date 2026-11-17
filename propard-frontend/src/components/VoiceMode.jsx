@@ -148,13 +148,17 @@ export default function VoiceMode({ onSend, sending }) {
     recognition.onerror = event => {
       setListening(false);
       if (event.error !== 'aborted' && event.error !== 'no-speech') {
+        activeRef.current = false;
+        setActive(false);
         setStatus('Erreur du micro : ' + event.error);
       }
     };
     recognition.onend = () => {
       setListening(false);
-      if (modeRef.current === 'classic' && transcriptRef.current) {
-        sendRecognizedText(transcriptRef.current);
+      if (modeRef.current === 'classic') {
+        activeRef.current = false;
+        setActive(false);
+        if (transcriptRef.current) sendRecognizedText(transcriptRef.current);
       } else if (modeRef.current === 'direct' && activeRef.current && !processingRef.current) {
         restartRef.current = window.setTimeout(() => startRecognition(), 450);
       }
@@ -164,6 +168,8 @@ export default function VoiceMode({ onSend, sending }) {
       recognition.start();
       setStatus(modeRef.current === 'direct' ? 'Je t’écoute…' : 'Parle maintenant…');
     } catch {
+      activeRef.current = false;
+      setActive(false);
       setStatus('Impossible de démarrer le micro. Vérifie son autorisation.');
     }
   };
