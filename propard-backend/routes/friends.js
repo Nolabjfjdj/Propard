@@ -428,9 +428,7 @@ router.patch('/messages/read/:friendId', async (req, res) => {
     }
 
     const currentUser = await User.findById(req.user.id).select('readReceiptsEnabled');
-    if (currentUser?.readReceiptsEnabled === false) {
-      return res.json({ success: true, readReceiptsEnabled: false });
-    }
+    const sendReceipt = currentUser?.readReceiptsEnabled !== false;
 
     await Message.updateMany(
       {
@@ -439,13 +437,16 @@ router.patch('/messages/read/:friendId', async (req, res) => {
         read: false
       },
       {
-        read: true
+        $set: {
+          read: true,
+          readReceiptSent: sendReceipt
+        }
       }
     );
 
     res.json({
       success: true,
-      readReceiptsEnabled: true
+      readReceiptsEnabled: sendReceipt
     });
   } catch (e) {
     console.error(e);
@@ -547,6 +548,18 @@ router.get('/messages/:friendId', createRateLimiter({
         );
       }
     }
+
+    messages = messages.map(message => {
+      const item = message.toObject();
+      const senderId = item.sender?._id || item.sender;
+      if (
+        senderId?.toString() === req.user.id.toString() &&
+        item.readReceiptSent === false
+      ) {
+        item.read = false;
+      }
+      return item;
+    });
 
     res.json(messages);
   } catch (e) {
