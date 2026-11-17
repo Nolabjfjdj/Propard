@@ -3,6 +3,9 @@ import React from 'react';
 const voteEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣'];
 
 export default function PollMessage({ content, reactions = [], userId, onVote, disabled = false }) {
+  if (disabled || typeof content !== 'string') {
+    return <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Sondage chiffré impossible à déchiffrer sur cet appareil.</p>;
+  }
   let poll;
   try {
     poll = JSON.parse(content);
