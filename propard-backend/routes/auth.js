@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const SupportRequest = require('../models/SupportRequest');
-const { sendStaffHelpNotification } = require('../services/push');
+const { sendStaffHelpNotification, sendPushNotification } = require('../services/push');
 const Message = require('../models/Message');
 const Group = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
@@ -178,6 +178,7 @@ async function recordIssuedSession(userId, token, req, eventType = 'password_log
   const user = await User.findById(userId).select('+activeSessions +revokedSessions +securityEvents');
   if (!user) throw new Error('Utilisateur introuvable lors de la création de session.');
   const now = new Date();
+  const hadExistingSession = (user.activeSessions || []).some(session => session.expiresAt > now);
   user.activeSessions = (user.activeSessions || []).filter(session => session.expiresAt > now);
   user.revokedSessions = (user.revokedSessions || []).filter(session => session.expiresAt > now);
   user.activeSessions.push({
@@ -201,6 +202,15 @@ async function recordIssuedSession(userId, token, req, eventType = 'password_log
     userAgent: String(req.get('user-agent') || '').slice(0, 300) || null
   }].slice(-50);
   await user.save();
+  if (hadExistingSession && eventType !== 'registration') {
+    void sendPushNotification(userId, {
+      title: 'Alerte de sécurité Propard',
+      body: 'Une nouvelle connexion à ton compte a été détectée.',
+      url: '/settings',
+      tag: 'propard-security-login',
+      data: { type: 'security-login' }
+    }).catch(error => console.error('Security login alert failed:', error.message));
+  }
 }
 
 const escapeRegExp = value =>
