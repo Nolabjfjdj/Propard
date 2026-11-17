@@ -5,6 +5,7 @@ import VoiceCall from './VoiceCall';
 import MessageReactions from './MessageReactions';
 import FileAttachments from './FileAttachments';
 import ConversationGallery from './ConversationGallery';
+import ConversationSharedNote from './ConversationSharedNote';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
 import LinkText from './LinkText';
@@ -1337,6 +1338,7 @@ export default function Chat({
           }}
         >
           <ConversationGallery messages={messages} token={token} userId={userId} />
+          <ConversationSharedNote scope="private" conversationId={friend._id} userId={myId} token={token} encryptionKey={sharedKey} />
           <button
             type="button"
             onClick={reportConversation}
