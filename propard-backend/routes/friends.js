@@ -586,6 +586,7 @@ router.patch('/messages/:messageId/pin', createRateLimiter({
       return res.status(403).json({ error: 'Cette interaction n’est pas autorisée.' });
     }
 
+    message.pinned = pinned;
     message.pinnedAt = pinned ? new Date() : null;
     message.pinnedBy = pinned ? userId : null;
     await message.save();
