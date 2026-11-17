@@ -38,7 +38,6 @@ export default function GroupChat({
   group: initialGroup,
   token,
   userId,
-  onBack,
   onDeleted,
   onGrabStart,
   grabbedMessageId
@@ -142,9 +141,6 @@ export default function GroupChat({
 
   const bottomRef =
     useRef(null);
-
-  const lastMessageTime =
-    useRef(0);
 
   const longPressTimer =
     useRef(null);
