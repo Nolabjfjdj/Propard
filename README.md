@@ -164,6 +164,19 @@ La page des paramètres permet de consulter le navigateur et la date de connexio
 
 Une réinitialisation du mot de passe invalide les sessions existantes et vide la liste des appareils actifs.
 
+## Messages épinglés
+
+Les participants d'une conversation privée peuvent épingler ou désépingler un message. Les membres d'un groupe peuvent faire de même dans leur groupe. L'état d'épinglage et sa date sont des métadonnées séparées du contenu chiffré : le serveur ne déchiffre jamais les messages.
+
+Routes :
+
+```http
+PATCH /api/friends/messages/:messageId/pin
+PATCH /api/groups/:groupId/messages/:messageId/pin
+```
+
+Le corps de la requête contient `pinned: true` pour épingler ou `pinned: false` pour désépingler. Les mises à jour sont diffusées aux participants connectés.
+
 ## Messagerie privée
 
 Les conversations privées utilisent Socket.IO pour le temps réel.
