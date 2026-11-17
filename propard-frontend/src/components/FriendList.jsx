@@ -68,6 +68,20 @@ export default function FriendList({
     saveFolderData({ ...folderData, assignments });
   };
 
+  const deleteActiveFolder = () => {
+    if (!activeFolder || activeFolder === 'all') return;
+    if (!window.confirm('Supprimer le dossier « ' + activeFolder + ' » ? Les conversations seront replacées sans dossier.')) return;
+    const assignments = { ...folderData.assignments };
+    for (const key of Object.keys(assignments)) {
+      if (assignments[key] === activeFolder) delete assignments[key];
+    }
+    saveFolderData({
+      names: folderData.names.filter(name => name !== activeFolder),
+      assignments
+    });
+    setActiveFolder('all');
+  };
+
   const isInActiveFolder = key => activeFolder === 'all' || (folderData.assignments[key] || '') === activeFolder;
   const [captchaRequired, setCaptchaRequired] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
@@ -540,6 +554,9 @@ export default function FriendList({
           <option value="">Sans dossier</option>
           {folderData.names.map(name => <option key={name} value={name}>{name}</option>)}
         </select>
+        {activeFolder !== 'all' && activeFolder !== '' && (
+          <button type="button" onClick={deleteActiveFolder} style={{ ...styles.hideIpBtn, whiteSpace: 'nowrap', color: 'var(--danger)' }} title="Supprimer ce dossier">Supprimer</button>
+        )}
         <button type="button" onClick={createFolder} style={{ ...styles.hideIpBtn, whiteSpace: 'nowrap' }} title="Créer un dossier">+ Dossier</button>
       </div>
 
