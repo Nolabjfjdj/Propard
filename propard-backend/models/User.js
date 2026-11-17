@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema({
   largeFileUploadBlockedUntil:{type:Date,default:null},
   fileUploadEvents:{type:[{fileId:{type:mongoose.Schema.Types.ObjectId,required:true},size:{type:Number,required:true,min:1},completedAt:{type:Date,required:true}}],default:[],select:false},
   revokedSessions:{type:[{jti:{type:String,required:true},expiresAt:{type:Date,required:true}}],default:[],select:false},
+  activeSessions:{type:[{jti:{type:String,required:true},createdAt:{type:Date,default:Date.now},expiresAt:{type:Date,required:true},ip:{type:String,default:null,maxlength:64},userAgent:{type:String,default:null,maxlength:300}}],default:[],select:false},
   staffRole:{type:String,enum:['user','support','junior_moderator','moderator','senior_moderator','admin','owner'],default:'user',index:true},
   staffRoleUpdatedAt:{type:Date,default:null},
   staffRoleUpdatedBy:{type:mongoose.Schema.Types.ObjectId,ref:'User',default:null},
