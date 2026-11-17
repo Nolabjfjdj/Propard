@@ -5,6 +5,8 @@ Propard est une plateforme web française de communication développée avec Rea
 ## Fonctionnalités
 
 - Inscription et connexion avec JWT
+- Clés d’accès WebAuthn et codes de récupération
+- Consultation et révocation des sessions par appareil
 - Protection des mots de passe avec bcryptjs
 - Profils utilisateurs, avatars, surnoms et blocage
 - Système d'amis
@@ -144,6 +146,23 @@ Le middleware d'authentification se trouve dans :
 ```text
 propard-backend/middleware/auth.js
 ```
+
+## Sessions et appareils connectés
+
+Les sessions JWT sont identifiées par un identifiant unique. Le compte conserve au maximum 10 sessions actives et une liste limitée de sessions révoquées.
+
+Routes authentifiées :
+
+```http
+GET /api/auth/sessions
+DELETE /api/auth/sessions/:jti
+POST /api/auth/logout
+POST /api/auth/logout-all
+```
+
+La page des paramètres permet de consulter le navigateur et la date de connexion, de révoquer un appareil précis ou de déconnecter toutes les sessions. Les adresses IP ne sont pas enregistrées dans les entrées de session du compte.
+
+Une réinitialisation du mot de passe invalide les sessions existantes et vide la liste des appareils actifs.
 
 ## Messagerie privée
 
