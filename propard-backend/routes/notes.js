@@ -93,9 +93,10 @@ router.get('/group/:groupId', async (req, res) => {
     const group = await Group.findOne({ _id: req.params.groupId, 'members.userId': req.user.id }).select('_id');
     if (!group) return res.status(403).json({ error: 'Groupe inaccessible.' });
     const key = group._id.toString();
-    const note = await ConversationNote.findOne({ scope: 'group', conversationKey: key }).select('encryptedContent updatedAt updatedBy');
+    const note = await ConversationNote.findOne({ scope: 'group', conversationKey: key }).select('encryptedContent keyVersion updatedAt updatedBy');
     res.json(note ? {
       encryptedContent: note.encryptedContent,
+      keyVersion: note.keyVersion,
       updatedAt: note.updatedAt,
       updatedBy: note.updatedBy
     } : null);
@@ -111,14 +112,18 @@ router.put('/group/:groupId', saveLimiter, async (req, res) => {
     const group = await Group.findOne({ _id: req.params.groupId, 'members.userId': req.user.id }).select('_id members');
     if (!group) return res.status(403).json({ error: 'Groupe inaccessible.' });
     const encryptedContent = req.body?.encryptedContent;
+    const keyVersion = req.body?.keyVersion;
     if (!isEncryptedMessagePayload(encryptedContent) || encryptedContent.length > 20000) {
       return res.status(400).json({ error: 'Contenu chiffré invalide.' });
+    }
+    if (!Number.isSafeInteger(keyVersion) || keyVersion < 1 || keyVersion !== (group.keyVersion || 1)) {
+      return res.status(409).json({ error: 'La clé du groupe a changé. Recharge la conversation.' });
     }
     const key = group._id.toString();
     const now = new Date();
     const note = await ConversationNote.findOneAndUpdate(
       { scope: 'group', conversationKey: key },
-      { $set: { encryptedContent, updatedBy: req.user.id, updatedAt: now } },
+      { $set: { encryptedContent, keyVersion, updatedBy: req.user.id, updatedAt: now } },
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
     ).select('updatedAt updatedBy');
     emitNoteUpdate(req, 'group', key, note.updatedAt, note.updatedBy, group);
