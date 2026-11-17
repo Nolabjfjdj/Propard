@@ -30,6 +30,7 @@ Ma demande :
         kind: 'support',
         message: message.trim()
       });
+      setSent(true);
       window.location.href = `/support/${response.data.reference}#${response.data.accessToken}`;
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible d’envoyer la demande.');
