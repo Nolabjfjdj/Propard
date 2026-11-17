@@ -352,7 +352,7 @@ export default function SettingsPage() {
         {section === 'sessions' && (
           <div style={styles.card}>
             <strong>Sessions de ton compte</strong>
-            <p style={styles.description}>Les connexions récentes sont conservées avec leur navigateur et leur adresse IP. Tu peux révoquer chaque session séparément.</p>
+            <p style={styles.description}>Les connexions récentes sont conservées avec leur navigateur et leur date de connexion. Tu peux révoquer chaque session séparément.</p>
             {error && <p role="alert" style={styles.error}>{error}</p>}
             {notice && <p role="status" style={styles.success}>{notice}</p>}
             {loading && <p style={styles.description}>Chargement…</p>}
