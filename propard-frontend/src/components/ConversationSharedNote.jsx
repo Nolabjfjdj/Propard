@@ -71,7 +71,7 @@ export default function ConversationSharedNote({ scope, conversationId, userId, 
     };
     socket.on('conversationNoteUpdated', handleUpdate);
     return () => socket.off('conversationNoteUpdated', handleUpdate);
-  }, [open, scope, conversationKey, encryptionKey, token]);
+  }, [open, scope, conversationKey, encryptionKey, keyVersion, token]);
 
   const saveNote = async () => {
     if (!encryptionKey || !conversationId || saving) return;
