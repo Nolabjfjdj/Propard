@@ -90,6 +90,7 @@ router.post('/reset-password', authMiddleware, requireSoleOwner, adminSensitiveL
     user.password = await bcrypt.hash(newPassword, 10);
     if (e2eeBackupCleared) user.e2eeKeyBackup = null;
     user.sessionVersion = (user.sessionVersion || 0) + 1;
+    user.activeSessions = [];
     await user.save();
 
     const disconnectUserSockets = req.app.get('disconnectUserSockets');
