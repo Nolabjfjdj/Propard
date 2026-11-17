@@ -75,6 +75,27 @@ const issueToken = user => jwt.sign(
   process.env.JWT_SECRET,
   { algorithm: 'HS256', expiresIn: '7d' }
 );
+async function recordIssuedSession(userId, token, req) {
+  const decoded = jwt.decode(token);
+  if (!decoded?.jti || !decoded?.exp) return;
+  await User.updateOne(
+    { _id: userId },
+    {
+      $push: {
+        activeSessions: {
+          $each: [{
+            jti: decoded.jti,
+            createdAt: new Date(),
+            expiresAt: new Date(decoded.exp * 1000),
+            ip: String(req.ip || '').slice(0, 64) || null,
+            userAgent: String(req.get('user-agent') || '').slice(0, 300) || null
+          }],
+          $slice: -10
+        }
+      }
+    }
+  );
+}
 const publicUser = user => ({
   id: user._id,
   username: user.username,
@@ -376,7 +397,9 @@ router.post('/login/verify', loginLimiter, async (req, res) => {
     stored.counter = verification.authenticationInfo.newCounter;
     stored.lastUsedAt = new Date();
     await claimedUser.save();
-    return res.json({ token: issueToken(claimedUser), user: publicUser(claimedUser) });
+    const token = issueToken(claimedUser);
+    await recordIssuedSession(claimedUser._id, token, req);
+    return res.json({ token, user: publicUser(claimedUser) });
   } catch (error) {
     console.error('Passkey login verification failed:', error);
     return res.status(401).json({ error: 'La vérification de la clé d’accès a échoué.' });
@@ -414,8 +437,10 @@ router.post('/login/recovery', loginLimiter, async (req, res) => {
       '+passkeyRecoveryCodes'
     );
     if (!claimedUser) return res.status(401).json({ error: 'Code de récupération invalide ou déjà utilisé.' });
+    const token = issueToken(claimedUser);
+    await recordIssuedSession(claimedUser._id, token, req);
     return res.json({
-      token: issueToken(claimedUser),
+      token,
       user: publicUser(claimedUser),
       remainingRecoveryCodes: claimedUser.passkeyRecoveryCodes.length
     });
