@@ -21,6 +21,50 @@ export default function FriendList({
   const [requestUsers, setRequestUsers] = useState({});
   const [unread, setUnread] = useState({});
   const [groups, setGroups] = useState([]);
+  const [folderData, setFolderData] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('propard_conversation_folders_' + (userId || 'local')) || '{}');
+      return {
+        names: Array.isArray(saved.names) ? saved.names.filter(name => typeof name === 'string').slice(0, 30) : [],
+        assignments: saved.assignments && typeof saved.assignments === 'object' ? saved.assignments : {}
+      };
+    } catch {
+      return { names: [], assignments: {} };
+    }
+  });
+  const [activeFolder, setActiveFolder] = useState('all');
+
+  const saveFolderData = next => {
+    setFolderData(next);
+    try {
+      localStorage.setItem('propard_conversation_folders_' + (userId || 'local'), JSON.stringify(next));
+    } catch (error) {
+      console.warn('Impossible de sauvegarder les dossiers de conversations:', error);
+    }
+  };
+
+  const createFolder = () => {
+    const name = window.prompt('Nom du dossier (24 caractères maximum) :');
+    const cleanName = typeof name === 'string' ? name.trim().slice(0, 24) : '';
+    if (!cleanName) return;
+    const existing = folderData.names.find(item => item.toLowerCase() === cleanName.toLowerCase());
+    if (existing) {
+      setActiveFolder(existing);
+      return;
+    }
+    const next = { ...folderData, names: [...folderData.names, cleanName].slice(0, 30) };
+    saveFolderData(next);
+    setActiveFolder(cleanName);
+  };
+
+  const assignFolder = (key, folder) => {
+    const assignments = { ...folderData.assignments };
+    if (folder) assignments[key] = folder;
+    else delete assignments[key];
+    saveFolderData({ ...folderData, assignments });
+  };
+
+  const isInActiveFolder = key => activeFolder === 'all' || (folderData.assignments[key] || '') === activeFolder;
   const [captchaRequired, setCaptchaRequired] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
   const [requestActionError, setRequestActionError] = useState('');
@@ -481,6 +525,20 @@ export default function FriendList({
         </p>
       )}
 
+      <div style={{ display: 'flex', gap: 6, padding: '6px 4px', alignItems: 'center' }}>
+        <select
+          aria-label="Filtrer les conversations par dossier"
+          value={activeFolder}
+          onChange={event => setActiveFolder(event.target.value)}
+          style={{ flex: 1, minWidth: 0, padding: '7px 8px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: 12 }}
+        >
+          <option value="all">Toutes les conversations</option>
+          <option value="">Sans dossier</option>
+          {folderData.names.map(name => <option key={name} value={name}>{name}</option>)}
+        </select>
+        <button type="button" onClick={createFolder} style={{ ...styles.hideIpBtn, whiteSpace: 'nowrap' }} title="Créer un dossier">+ Dossier</button>
+      </div>
+
       <div style={styles.sectionHeader}>
         <p style={styles.sectionTitle}>
           Groupes — {groups.length}
@@ -501,7 +559,7 @@ export default function FriendList({
           Crée ton premier groupe !
         </p>
       ) : (
-        groups.map(group => {
+        groups.filter(group => isInActiveFolder('group:' + group?._id?.toString())).map(group => {
           const groupId = group?._id?.toString();
           const unreadCount = group?.unreadCount || 0;
 
@@ -555,6 +613,17 @@ export default function FriendList({
                 </p>
               </div>
 
+              <select
+                aria-label={'Dossier du groupe ' + (group?.name || '')}
+                value={folderData.assignments['group:' + groupId] || ''}
+                onClick={event => event.stopPropagation()}
+                onChange={event => assignFolder('group:' + groupId, event.target.value)}
+                style={styles.folderSelect}
+              >
+                <option value="">Sans dossier</option>
+                {folderData.names.map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
+
               {unreadCount > 0 && (
                 <div style={styles.badge}>
                   <span style={styles.badgeIcon}>
@@ -592,7 +661,7 @@ export default function FriendList({
       )}
 
       {friends
-        .filter(friend => friend.userId)
+        .filter(friend => friend.userId && isInActiveFolder('friend:' + friend.userId?._id?.toString()))
         .map(friend => {
           const friendUser = friend.userId;
           const friendId = friendUser?._id?.toString();
@@ -671,6 +740,17 @@ export default function FriendList({
                 </p>
               </div>
 
+              <select
+                aria-label={'Dossier de ' + (friend.nickname || friendUser?.username || 'cet ami')}
+                value={folderData.assignments['friend:' + friendId] || ''}
+                onClick={event => event.stopPropagation()}
+                onChange={event => assignFolder('friend:' + friendId, event.target.value)}
+                style={styles.folderSelect}
+              >
+                <option value="">Sans dossier</option>
+                {folderData.names.map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
+
               {isDropTarget ? (
                 <div style={styles.dropHint}>
                   📥
@@ -715,6 +795,18 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between'
+  },
+
+  folderSelect: {
+    maxWidth: 92,
+    minWidth: 0,
+    padding: '5px 4px',
+    border: '1px solid var(--border)',
+    borderRadius: 6,
+    background: 'var(--bg-tertiary)',
+    color: 'var(--text-secondary)',
+    fontSize: 10,
+    cursor: 'pointer'
   },
 
   sectionTitle: {
