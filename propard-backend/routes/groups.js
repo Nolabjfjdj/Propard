@@ -244,7 +244,11 @@ router.get(
               },
               deleted: {
                 $ne: true
-              }
+              },
+              $or: [
+                { expiresAt: null },
+                { expiresAt: { $gt: new Date() } }
+              ]
             };
 
             if (me?.lastReadAt) {
@@ -659,8 +663,11 @@ router.get(
       }
 
       const filter = {
-        group:
-          group._id
+        group: group._id,
+        $or: [
+          { expiresAt: null },
+          { expiresAt: { $gt: new Date() } }
+        ]
       };
 
       if (pagination.before) {
