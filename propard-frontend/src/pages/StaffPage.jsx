@@ -544,9 +544,7 @@ export default function StaffPage() {
       setLookupResult(null);
       setLookupUsername('');
       setTargetUserId('');
-      setResetUserId('');
       setRoleUserId('');
-      setResetToken('');
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de supprimer complètement ce compte.');
     }
@@ -569,7 +567,6 @@ export default function StaffPage() {
     try {
       const response = await request('get', `/api/staff/reports/${reportId}`);
       setSelectedReport(response.data.report);
-      setReportStatus(response.data.report.status || 'new');
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible d’ouvrir ce signalement.');
     }
