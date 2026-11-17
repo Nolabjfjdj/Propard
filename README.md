@@ -583,3 +583,8 @@ La rubrique Sécurité affiche les 50 derniers événements de création de comp
 ### Confirmations de lecture facultatives
 
 Chaque compte peut désactiver l’envoi des confirmations de lecture depuis les paramètres de sécurité. Quand l’option est désactivée, Propard ne met plus à jour l’état « lu » des messages privés ni la date de dernière lecture des groupes pour ce compte. Les confirmations reçues des autres utilisateurs restent visibles.
+
+
+### Notes partagées chiffrées
+
+Les conversations privées et les groupes disposent d'une note partagée modifiable depuis leur en-tête. Le navigateur chiffre le texte avec la clé E2EE de la conversation avant l'envoi ; le serveur ne stocke que le texte chiffré et les métadonnées de mise à jour. Les accès sont limités aux amis de la conversation privée ou aux membres du groupe. Pour les groupes, la note conserve sa version de clé et les membres qui possèdent encore l'ancienne clé peuvent la migrer vers la version actuelle lors de son ouverture.
