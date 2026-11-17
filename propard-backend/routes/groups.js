@@ -613,6 +613,33 @@ router.get(
    MESSAGES D'UN GROUPE
 ========================= */
 
+router.get('/:groupId/attachments', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.groupId)) {
+      return res.status(400).json({ error: 'Groupe invalide.' });
+    }
+    const group = await Group.findOne({
+      _id: req.params.groupId,
+      'members.userId': req.user.id
+    }).select('_id');
+    if (!group) return res.status(403).json({ error: 'Groupe inaccessible.' });
+    const messages = await GroupMessage.find({
+      group: group._id,
+      deleted: { $ne: true },
+      attachments: { $exists: true, $ne: [] },
+      $or: [
+        { expiresAt: null },
+        { expiresAt: { $gt: new Date() } }
+      ]
+    }).select('attachments');
+    const attachments = [...new Set(messages.flatMap(message => (message.attachments || []).map(id => id.toString())))];
+    res.json({ attachments });
+  } catch (error) {
+    console.error('Group conversation gallery failed:', error);
+    res.status(500).json({ error: 'Impossible de charger la galerie.' });
+  }
+});
+
 router.get(
   '/:groupId/messages',
   createRateLimiter({
