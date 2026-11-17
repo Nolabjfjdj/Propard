@@ -8,6 +8,7 @@ import ConversationGallery from './ConversationGallery';
 import ConversationSharedNote from './ConversationSharedNote';
 import E2EEVerification from './E2EEVerification';
 import PollMessage from './PollMessage';
+import PollComposer from './PollComposer';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
 import LinkText from './LinkText';
@@ -33,6 +34,7 @@ export default function Chat({
   const [loadError, setLoadError] = useState(null);
   const [input, setInput] = useState('');
   const [messageExpiry, setMessageExpiry] = useState(0);
+  const [pollOpen, setPollOpen] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [awaitingAttachmentAck, setAwaitingAttachmentAck] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -792,6 +794,25 @@ export default function Chat({
     }
   };
 
+
+  const createPoll = async (question, options) => {
+    if (!sharedKey || !friend?._id) {
+      setLoadError('Chiffrement indisponible pour créer ce sondage.');
+      return false;
+    }
+    const encryptedContent = await encryptMessage(sharedKey, JSON.stringify({
+      type: 'propard-poll',
+      question,
+      options
+    }));
+    socket.emit('sendMessage', {
+      receiverId: friend._id,
+      content: encryptedContent,
+      messageType: 'poll',
+      expiresIn: 0
+    });
+    return true;
+  };
 
   const handleFilesSelected = async files => {
     if (messageExpiry > 0) {
@@ -1848,6 +1869,7 @@ export default function Chat({
           style={styles.input}
         />
 
+        <button type="button" onClick={() => setPollOpen(true)} disabled={!sharedKey || uploadingFiles || awaitingAttachmentAck} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 9px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: 11 }}>Sondage</button>
         <EmojiPicker onSelect={emoji => setInput(value => value + emoji)} />
         <button
           onClick={sendMessage}
@@ -1857,6 +1879,8 @@ export default function Chat({
           ➤
         </button>
       </div>
+
+      {pollOpen && <PollComposer onClose={() => setPollOpen(false)} onCreate={createPoll} />}
 
       {reportTarget && (
         <div
