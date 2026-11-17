@@ -14,6 +14,7 @@ import FileAttachments from './FileAttachments';
 import ConversationGallery from './ConversationGallery';
 import ConversationSharedNote from './ConversationSharedNote';
 import E2EEVerification from './E2EEVerification';
+import PollMessage from './PollMessage';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
 import LinkText from './LinkText';
@@ -2812,7 +2813,15 @@ export default function GroupChat({
                           <>
                             {message.expiresAt && <p style={{ fontSize: '10px', color: isMe ? 'rgba(255,255,255,0.75)' : 'var(--text-secondary)', margin: '0 0 5px' }}>Message éphémère</p>}
                             {message.pinned && <p style={{ fontSize: '11px', color: isMe ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)', margin: '0 0 5px' }}>Épinglé</p>}
-                            {content && (
+                            {message.messageType === 'poll' ? (
+                              <PollMessage
+                                content={content}
+                                reactions={message.reactions}
+                                userId={myId}
+                                onVote={emoji => toggleGroupMessageReaction(message._id, emoji)}
+                                disabled={message.decryptionError}
+                              />
+                            ) : content && (
                               <p
                                 style={{
                                   ...styles.text,
