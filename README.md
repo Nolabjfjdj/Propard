@@ -408,6 +408,32 @@ METERED20_DOMAIN=
 METERED20_SECRET_KEY=
 ```
 
+### Stockages Filebase multiples
+
+Le backend accepte jusqu'à 100 configurations Filebase. La première utilise les noms historiques :
+
+```env
+FILEBASE_KEY=
+FILEBASE_SECRET=
+FILEBASE_BUCKET=
+```
+
+Les stockages supplémentaires utilisent un numéro :
+
+```env
+FILEBASE_KEY2=
+FILEBASE_SECRET2=
+FILEBASE_BUCKET2=
+
+FILEBASE_KEY3=
+FILEBASE_SECRET3=
+FILEBASE_BUCKET3=
+```
+
+Les variables `FILEBASE_ENDPOINT` et `FILEBASE_REGION` sont communes aux stockages. Chaque configuration doit fournir les trois variables de clé, secret et bucket. Une configuration partielle provoque une erreur au lieu d'être ignorée.
+
+Les morceaux de fichiers sont répartis entre les stockages configurés. Leur identifiant de stockage est conservé dans le manifeste de chaque morceau afin que les téléchargements et suppressions utilisent le bon bucket. Ne retire pas les variables d'un stockage tant que des fichiers y sont encore enregistrés, sinon ces fichiers ne pourront plus être téléchargés ni supprimés correctement.
+
 ### Web Push
 
 ```env
