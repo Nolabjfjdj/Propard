@@ -3737,6 +3737,7 @@ const styles = {
 
   inputBar: {
     display: 'flex',
+    flexWrap: 'wrap',
     padding: '16px',
     gap: '8px',
     borderTop:
