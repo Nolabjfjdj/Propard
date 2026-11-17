@@ -12,6 +12,7 @@ import GroupProfile from './GroupProfile';
 import MessageReactions from './MessageReactions';
 import FileAttachments from './FileAttachments';
 import ConversationGallery from './ConversationGallery';
+import ConversationSharedNote from './ConversationSharedNote';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
 import LinkText from './LinkText';
@@ -2430,6 +2431,7 @@ export default function GroupChat({
           }}
         >
           <ConversationGallery messages={messages} token={token} userId={myId} />
+          <ConversationSharedNote scope="group" conversationId={group._id} userId={myId} token={token} encryptionKey={key} />
           <button
             type="button"
             onClick={e => {
