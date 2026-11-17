@@ -68,6 +68,7 @@ export default function GroupChat({
 
   const [input, setInput] =
     useState('');
+  const [messageExpiry, setMessageExpiry] = useState(0);
 
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [awaitingAttachmentAck, setAwaitingAttachmentAck] = useState(false);
@@ -1858,7 +1859,8 @@ export default function GroupChat({
         socket.emit('sendGroupMessage', {
           groupId: group._id,
           content: encryptedContent,
-          keyVersion: group.keyVersion || 1
+          keyVersion: group.keyVersion || 1,
+          expiresIn: messageExpiry
         });
 
         setInput('');
@@ -1875,6 +1877,10 @@ export default function GroupChat({
 
 
   const handleFilesSelected = async files => {
+    if (messageExpiry > 0) {
+      setLoadError('Les messages éphémères sont actuellement limités au texte, sans pièce jointe.');
+      return;
+    }
     if (!key || !myId || !group?._id) {
       setLoadError('Chiffrement indisponible pour ce groupe.');
       return;
@@ -3071,9 +3077,21 @@ export default function GroupChat({
           styles.inputBar
         }
       >
+        <select
+          aria-label="Durée avant disparition du message"
+          value={messageExpiry}
+          onChange={event => setMessageExpiry(Number(event.target.value))}
+          disabled={!key || uploadingFiles || awaitingAttachmentAck}
+          style={{ maxWidth: 96, minWidth: 78, padding: '7px 4px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontSize: 11 }}
+        >
+          <option value={0}>Normal</option>
+          <option value={3600}>1 heure</option>
+          <option value={86400}>24 heures</option>
+          <option value={604800}>7 jours</option>
+        </select>
         <FileUploadButton
           onFilesSelected={handleFilesSelected}
-          disabled={!key || awaitingAttachmentAck}
+          disabled={!key || awaitingAttachmentAck || messageExpiry > 0}
           uploading={uploadingFiles}
           progress={uploadProgress}
         />
