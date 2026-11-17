@@ -172,10 +172,10 @@ function signToken(user) {
   );
 }
 
-async function recordIssuedSession(userId, token, req) {
+async function recordIssuedSession(userId, token, req, eventType = 'password_login') {
   const decoded = jwt.decode(token);
   if (!decoded?.jti || !decoded?.exp) return;
-  const user = await User.findById(userId).select('+activeSessions +revokedSessions');
+  const user = await User.findById(userId).select('+activeSessions +revokedSessions +securityEvents');
   if (!user) throw new Error('Utilisateur introuvable lors de la création de session.');
   const now = new Date();
   user.activeSessions = (user.activeSessions || []).filter(session => session.expiresAt > now);
@@ -195,6 +195,11 @@ async function recordIssuedSession(userId, token, req) {
     }
   }
   user.revokedSessions = user.revokedSessions.slice(-100);
+  user.securityEvents = [...(user.securityEvents || []), {
+    eventType,
+    createdAt: now,
+    userAgent: String(req.get('user-agent') || '').slice(0, 300) || null
+  }].slice(-50);
   await user.save();
 }
 
@@ -437,7 +442,7 @@ router.post('/register', registerRateLimiter, async (req, res) => {
     await user.save();
 
     const token = signToken(user);
-    await recordIssuedSession(user._id, token, req);
+    await recordIssuedSession(user._id, token, req, 'registration');
 
     res.status(201).json({
       message: 'Compte créé avec succès',
@@ -510,7 +515,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     }
 
     const token = signToken(user);
-    await recordIssuedSession(user._id, token, req);
+    await recordIssuedSession(user._id, token, req, 'password_login');
 
     const deletionExpiresAt = user.pendingDeletionAt
       ? new Date(user.pendingDeletionAt.getTime() + THIRTY_DAYS_MS)
@@ -550,7 +555,6 @@ router.get('/sessions', authMiddleware, async (req, res) => {
         jti: session.jti,
         createdAt: session.createdAt,
         expiresAt: session.expiresAt,
-        ip: session.ip,
         userAgent: session.userAgent,
         current: session.jti === req.user.jti
       }))
@@ -558,6 +562,23 @@ router.get('/sessions', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Session listing failed:', error);
     res.status(500).json({ error: 'Impossible de charger les sessions.' });
+  }
+});
+
+router.get('/security-events', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('+securityEvents');
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+    res.json({
+      events: (user.securityEvents || []).slice(-50).reverse().map(event => ({
+        eventType: event.eventType,
+        createdAt: event.createdAt,
+        userAgent: event.userAgent
+      }))
+    });
+  } catch (error) {
+    console.error('Security event history failed:', error);
+    res.status(500).json({ error: 'Impossible de charger l’historique de sécurité.' });
   }
 });
 
