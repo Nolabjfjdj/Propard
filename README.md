@@ -567,7 +567,7 @@ Pour toute utilisation, reproduction, modification, redistribution ou exploitati
 
 ### Galerie des médias et fichiers
 
-Les conversations privées et les groupes disposent d'un accès « Médias et fichiers » dans leur en-tête. La galerie rassemble les pièces jointes des messages encore visibles, déduplique les identifiants et réutilise le même parcours de téléchargement et de déchiffrement côté client que les messages. Le serveur ne reçoit pas de contenu déchiffré supplémentaire pour afficher la galerie.
+Les conversations privées et les groupes disposent d'un accès « Médias et fichiers » dans leur en-tête. La galerie charge les identifiants de pièces jointes de tout l'historique non supprimé et non expiré, déduplique les identifiants et réutilise le même parcours de téléchargement et de déchiffrement côté client que les messages. Le serveur ne reçoit pas de contenu déchiffré supplémentaire pour afficher la galerie.
 
 
 ### Dossiers de conversations
