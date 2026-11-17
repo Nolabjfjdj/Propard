@@ -19,17 +19,22 @@ function applyAccent(name) {
 }
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState('dark');
-  const [accent, setAccentState] = useState('blue');
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('propard_theme') || 'dark'; } catch { return 'dark'; }
+  });
+  const [accent, setAccentState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('propard_accent') || 'blue';
+      return accents[saved] ? saved : 'blue';
+    } catch {
+      return 'blue';
+    }
+  });
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('propard_theme') || 'dark';
-    const savedAccent = localStorage.getItem('propard_accent') || 'blue';
-    setTheme(savedTheme);
-    setAccentState(accents[savedAccent] ? savedAccent : 'blue');
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    applyAccent(savedAccent);
-  }, []);
+    document.documentElement.setAttribute('data-theme', theme);
+    applyAccent(accent);
+  }, [theme, accent]);
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
