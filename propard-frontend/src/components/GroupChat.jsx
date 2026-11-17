@@ -910,6 +910,17 @@ export default function GroupChat({
       ));
     };
 
+    const handleGroupMessagePinUpdated = data => {
+      if (data.groupId?.toString() !== initialGroup?._id?.toString()) return;
+      setMessages(prev => prev.map(message =>
+        message._id?.toString() === data.messageId?.toString()
+          ? { ...message, pinned: data.pinned, pinnedAt: data.pinnedAt, pinnedBy: data.pinnedBy }
+          : message
+      ));
+    };
+
+    socket.on('groupMessagePinUpdated', handleGroupMessagePinUpdated);
+
     socket.on(
       'groupMessageReactionsUpdated',
       handleGroupReactionsUpdated
@@ -959,6 +970,8 @@ export default function GroupChat({
         'groupDeleted',
         handleGroupDeleted
       );
+
+      socket.off('groupMessagePinUpdated', handleGroupMessagePinUpdated);
 
       socket.off(
         'groupMessageReactionsUpdated',
@@ -1391,6 +1404,25 @@ export default function GroupChat({
       ));
     } catch (err) {
       console.error('Erreur réaction message de groupe:', err);
+    }
+  };
+
+  const toggleGroupMessagePin = async (message, pinned) => {
+    try {
+      const res = await api.patch(
+        `/api/groups/${group._id}/messages/${message._id}/pin`,
+        { pinned },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setMessages(prev => prev.map(item =>
+        item._id?.toString() === message._id?.toString()
+          ? { ...item, pinned: res.data.pinned, pinnedAt: res.data.pinnedAt, pinnedBy: res.data.pinnedBy }
+          : item
+      ));
+      setContextMenu(null);
+    } catch (error) {
+      console.error('Erreur épinglage du message de groupe:', error);
+      setLoadError(error.response?.data?.error || 'Impossible de modifier l’épinglage.');
     }
   };
 
@@ -2875,6 +2907,13 @@ export default function GroupChat({
               }}
             />
           )}
+          <button
+            type="button"
+            style={styles.contextItem}
+            onClick={() => toggleGroupMessagePin(contextMenu.message, !contextMenu.message.pinned)}
+          >
+            {contextMenu.message.pinned ? 'Désépingler' : 'Épingler'}
+          </button>
           <button
             type="button"
             style={styles.contextItem}
