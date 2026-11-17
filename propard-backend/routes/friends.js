@@ -460,6 +460,38 @@ router.patch('/messages/read/:friendId', async (req, res) => {
   }
 });
 
+router.get('/messages/:friendId/attachments', async (req, res) => {
+  try {
+    const friendId = req.params.friendId;
+    if (!mongoose.isValidObjectId(friendId) || !await areFriends(req.user.id, friendId)) {
+      return res.status(403).json({ error: 'Conversation inaccessible.' });
+    }
+    const participants = await User.find({ _id: { $in: [req.user.id, friendId] } }).select('blockedUsers');
+    if (participants.some(user => (user.blockedUsers || []).some(id => id.toString() === (user._id.toString() === req.user.id.toString() ? friendId : req.user.id.toString())))) {
+      return res.status(403).json({ error: 'Cette conversation n’est pas accessible.' });
+    }
+    const messages = await Message.find({
+      $or: [
+        { sender: req.user.id, receiver: friendId },
+        { sender: friendId, receiver: req.user.id }
+      ],
+      deleted: { $ne: true },
+      attachments: { $exists: true, $ne: [] },
+      $and: [{
+        $or: [
+          { expiresAt: null },
+          { expiresAt: { $gt: new Date() } }
+        ]
+      }]
+    }).select('attachments');
+    const attachments = [...new Set(messages.flatMap(message => (message.attachments || []).map(id => id.toString())))];
+    res.json({ attachments });
+  } catch (error) {
+    console.error('Private conversation gallery failed:', error);
+    res.status(500).json({ error: 'Impossible de charger la galerie.' });
+  }
+});
+
 router.get('/messages/:friendId', createRateLimiter({
   windowMs: 60 * 1000,
   max: 120,
