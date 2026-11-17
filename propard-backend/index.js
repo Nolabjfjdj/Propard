@@ -526,7 +526,7 @@ io.on('connection',async socket=>{
     );
   });
 
-  registerSocketHandler('sendMessage',async({receiverId,content,attachmentIds=[],expiresIn=0}={})=>{
+  registerSocketHandler('sendMessage',async({receiverId,content,attachmentIds=[],expiresIn=0,messageType='text'}={})=>{
     try{
       if(!socket.userId) return;
       if(!allowSocketEvent(socket,'sendMessage',20,10000)){
@@ -567,6 +567,12 @@ io.on('connection',async socket=>{
         return socket.emit('messageError',{message:'Pièces jointes invalides.'});
       }
 
+      if(!['text','poll'].includes(messageType)){
+        return socket.emit('messageError',{message:'Type de message invalide.'});
+      }
+      if(messageType === 'poll' && (attachmentIds.length || expiresIn > 0)){
+        return socket.emit('messageError',{message:'Les sondages ne prennent pas encore en charge les fichiers ni l’expiration.'});
+      }
       if(![0,3600,86400,604800].includes(expiresIn)){
         return socket.emit('messageError',{message:'Durée éphémère invalide.'});
       }
@@ -615,6 +621,7 @@ io.on('connection',async socket=>{
         attachments:attachmentIds,
         originalContent:null,
         encrypted:true,
+        messageType,
         expiresAt
       });
 
@@ -637,6 +644,7 @@ io.on('connection',async socket=>{
         content:message.content,
         attachments:message.attachments.map(id=>id.toString()),
         encrypted:true,
+        messageType:message.messageType,
         expiresAt:message.expiresAt,
         createdAt:message.createdAt
       };
@@ -691,7 +699,7 @@ io.on('connection',async socket=>{
   // MESSAGES DE GROUPE
   // ─────────────────────────────────────
 
-  registerSocketHandler('sendGroupMessage',async({groupId,content,keyVersion,attachmentIds=[],expiresIn=0}={})=>{
+  registerSocketHandler('sendGroupMessage',async({groupId,content,keyVersion,attachmentIds=[],expiresIn=0,messageType='text'}={})=>{
     try{
       if(!socket.userId) return;
       if(!allowSocketEvent(socket,'sendGroupMessage',20,10000)){
@@ -746,6 +754,12 @@ io.on('connection',async socket=>{
         return socket.emit('groupMessageError',{message:'Pièces jointes invalides.'});
       }
 
+      if(!['text','poll'].includes(messageType)){
+        return socket.emit('groupMessageError',{message:'Type de message invalide.'});
+      }
+      if(messageType === 'poll' && (attachmentIds.length || expiresIn > 0)){
+        return socket.emit('groupMessageError',{message:'Les sondages ne prennent pas encore en charge les fichiers ni l’expiration.'});
+      }
       if(![0,3600,86400,604800].includes(expiresIn)){
         return socket.emit('groupMessageError',{message:'Durée éphémère invalide.'});
       }
@@ -775,6 +789,7 @@ io.on('connection',async socket=>{
         content:content.trim(),
         attachments:attachmentIds,
         encrypted:true,
+        messageType,
         keyVersion:currentKeyVersion,
         expiresAt
       });
@@ -800,6 +815,7 @@ io.on('connection',async socket=>{
         content:message.content,
         attachments:message.attachments.map(id=>id.toString()),
         encrypted:true,
+        messageType:message.messageType,
         keyVersion:message.keyVersion,
         expiresAt:message.expiresAt,
         createdAt:message.createdAt
