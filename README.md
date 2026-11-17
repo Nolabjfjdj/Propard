@@ -603,3 +603,8 @@ Lorsqu'une connexion par mot de passe, clé d'accès ou code de récupération e
 ### Messages éphémères
 
 Les conversations privées et les groupes permettent de choisir une expiration de 1 heure, 24 heures ou 7 jours pour un nouveau message texte. Le serveur conserve uniquement le contenu chiffré et la date d'expiration ; les messages expirés sont exclus de l'historique et des compteurs non lus, puis supprimés automatiquement par l'index TTL MongoDB. Les pièces jointes sont volontairement désactivées pour les messages éphémères afin d'éviter de laisser des fichiers orphelins.
+
+
+### Sondages chiffrés
+
+Les conversations privées et les groupes permettent de créer des sondages contenant une question et de 2 à 6 réponses. Le texte du sondage est chiffré côté client avant l'envoi. Les votes utilisent les réactions numérotées ; le serveur impose un seul choix actif par participant et ne connaît pas le texte des réponses. Les sondages ne prennent pas en charge les pièces jointes ni l'expiration éphémère.
