@@ -573,3 +573,8 @@ Les conversations privées et les groupes disposent d'un accès « Médias et fi
 ### Dossiers de conversations
 
 La liste des amis et des groupes permet de créer jusqu'à 30 dossiers locaux et d'y classer chaque conversation. Le filtre affiche toutes les conversations, celles sans dossier ou un dossier précis. Ces préférences restent dans le stockage local du navigateur et sont séparées par compte ; elles ne sont pas envoyées au serveur.
+
+
+### Historique de sécurité du compte
+
+La rubrique Sécurité affiche les 50 derniers événements de création de compte et de connexion par mot de passe, clé d’accès ou code de récupération. Chaque entrée conserve uniquement le type d’événement, sa date et l’agent utilisateur du navigateur. Aucune adresse IP n’est enregistrée dans cet historique.
