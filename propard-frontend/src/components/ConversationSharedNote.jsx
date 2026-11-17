@@ -11,6 +11,7 @@ export default function ConversationSharedNote({ scope, conversationId, userId, 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [updatedAt, setUpdatedAt] = useState(null);
+  const [noteLoaded, setNoteLoaded] = useState(false);
 
   const headers = { Authorization: 'Bearer ' + token };
   const endpoint = scope === 'private'
@@ -25,6 +26,7 @@ export default function ConversationSharedNote({ scope, conversationId, userId, 
     if (!encryptionKey || !conversationId) return;
     setLoading(true);
     setError('');
+    setNoteLoaded(false);
     try {
       const response = await api.get(endpoint, { headers });
       if (response.data?.encryptedContent) {
@@ -50,6 +52,7 @@ export default function ConversationSharedNote({ scope, conversationId, userId, 
         setContent('');
         setUpdatedAt(null);
       }
+      setNoteLoaded(true);
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Impossible de charger la note.');
     } finally {
@@ -82,6 +85,7 @@ export default function ConversationSharedNote({ scope, conversationId, userId, 
       const payload = scope === 'group' ? { encryptedContent, keyVersion: Number(keyVersion || 1) } : { encryptedContent };
       const response = await api.put(endpoint, payload, { headers });
       setUpdatedAt(response.data?.updatedAt || new Date().toISOString());
+      setNoteLoaded(true);
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Impossible d’enregistrer la note.');
     } finally {
@@ -174,7 +178,7 @@ export default function ConversationSharedNote({ scope, conversationId, userId, 
               <small style={{ color: 'var(--text-secondary)' }}>
                 {updatedAt ? 'Modifiée le ' + new Date(updatedAt).toLocaleString('fr-FR') : 'Pas encore enregistrée'}
               </small>
-              <button type="button" onClick={saveNote} disabled={loading || saving || !encryptionKey} style={{ border: 0, borderRadius: 8, padding: '9px 14px', background: 'var(--accent)', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>
+              <button type="button" onClick={saveNote} disabled={loading || saving || !encryptionKey || !noteLoaded} style={{ border: 0, borderRadius: 8, padding: '9px 14px', background: 'var(--accent)', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>
                 {saving ? 'Enregistrement…' : 'Enregistrer'}
               </button>
             </div>
