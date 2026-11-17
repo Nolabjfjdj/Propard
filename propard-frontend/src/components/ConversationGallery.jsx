@@ -7,6 +7,7 @@ export default function ConversationGallery({ messages, token, userId, scope, co
   const [attachments, setAttachments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [galleryLoaded, setGalleryLoaded] = useState(false);
 
   const fallbackAttachments = useMemo(() => {
     const seen = new Set();
@@ -30,6 +31,7 @@ export default function ConversationGallery({ messages, token, userId, scope, co
     const load = async () => {
       setLoading(true);
       setError('');
+      setGalleryLoaded(false);
       try {
         const endpoint = scope === 'private'
           ? '/api/friends/messages/' + conversationId + '/attachments'
@@ -40,11 +42,13 @@ export default function ConversationGallery({ messages, token, userId, scope, co
         if (!cancelled) {
           const unique = [...new Set((response.data?.attachments || []).map(id => id.toString()))];
           setAttachments(unique);
+          setGalleryLoaded(true);
         }
       } catch (err) {
         if (!cancelled) {
           setError(err.response?.data?.error || 'Impossible de charger tous les fichiers. Affichage des fichiers déjà chargés.');
           setAttachments(fallbackAttachments);
+          setGalleryLoaded(true);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -56,7 +60,7 @@ export default function ConversationGallery({ messages, token, userId, scope, co
     };
   }, [open, scope, conversationId, token, fallbackAttachments]);
 
-  const count = attachments.length || fallbackAttachments.length;
+  const count = galleryLoaded ? attachments.length : fallbackAttachments.length;
 
   return (
     <>
