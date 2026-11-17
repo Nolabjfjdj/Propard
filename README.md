@@ -568,3 +568,8 @@ Pour toute utilisation, reproduction, modification, redistribution ou exploitati
 ### Galerie des médias et fichiers
 
 Les conversations privées et les groupes disposent d'un accès « Médias et fichiers » dans leur en-tête. La galerie rassemble les pièces jointes des messages encore visibles, déduplique les identifiants et réutilise le même parcours de téléchargement et de déchiffrement côté client que les messages. Le serveur ne reçoit pas de contenu déchiffré supplémentaire pour afficher la galerie.
+
+
+### Dossiers de conversations
+
+La liste des amis et des groupes permet de créer jusqu'à 30 dossiers locaux et d'y classer chaque conversation. Le filtre affiche toutes les conversations, celles sans dossier ou un dossier précis. Ces préférences restent dans le stockage local du navigateur et sont séparées par compte ; elles ne sont pas envoyées au serveur.
