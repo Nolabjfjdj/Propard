@@ -10,6 +10,7 @@ const groupMessageSchema = new mongoose.Schema({
   keyVersion:{type:Number,min:1,default:null},
   edited:{type:Boolean,default:false},
   deleted:{type:Boolean,default:false},
+  expiresAt:{type:Date,default:null},
   pinned:{type:Boolean,default:false},
   pinnedAt:{type:Date,default:null},  pinnedBy:{type:mongoose.Schema.Types.ObjectId,ref:'User',default:null},
   reactions: [{
@@ -21,5 +22,7 @@ const groupMessageSchema = new mongoose.Schema({
 });
 
 groupMessageSchema.index({group:1,createdAt:-1});
+
+groupMessageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = registerModel('GroupMessage', groupMessageSchema);
