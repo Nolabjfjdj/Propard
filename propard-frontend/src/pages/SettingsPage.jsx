@@ -404,7 +404,7 @@ export default function SettingsPage() {
                 />
                 Envoyer les confirmations de lecture
               </label>
-              <p style={styles.description}>Si tu désactives cette option, les autres membres ne verront plus quand tu as lu leurs messages privés ou de groupe. Tu continueras à voir les confirmations des autres.</p>
+              <p style={styles.description}>Si tu désactives cette option, les autres ne verront plus quand tu as lu leurs messages privés. Tu continueras à voir les confirmations des autres.</p>
             </div>
             {error && <p role="alert" style={styles.error}>{error}</p>}
           </>
