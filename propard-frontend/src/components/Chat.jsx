@@ -1714,10 +1714,12 @@ export default function Chat({
                                 : ''}
                             </p>
                           </div>
-                          <MessageReactions
-                            reactions={msg.reactions}
-                            userId={myId}
-                          />
+                          {msg.messageType !== 'poll' && (
+                            <MessageReactions
+                              reactions={msg.reactions}
+                              userId={myId}
+                            />
+                          )}
                         </>
                       )}
                     </div>
