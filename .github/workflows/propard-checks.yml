@@ -32,8 +32,8 @@ jobs:
       - name: Run tests
         run: npm test
 
-  frontend-checks:
-    name: Frontend lint and build
+  frontend-lint:
+    name: Frontend lint
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -51,5 +51,23 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+
+  frontend-build:
+    name: Frontend production build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: propard-frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: propard-frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
       - name: Build
         run: npm run build
