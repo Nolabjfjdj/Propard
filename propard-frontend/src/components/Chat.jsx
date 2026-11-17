@@ -93,6 +93,25 @@ export default function Chat({
     }
   };
 
+  const toggleMessagePin = async (message, pinned) => {
+    try {
+      const res = await api.patch(
+        `/api/friends/messages/${message._id}/pin`,
+        { pinned },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setMessages(prev => prev.map(item =>
+        item._id?.toString() === message._id?.toString()
+          ? { ...item, pinned: res.data.pinned, pinnedAt: res.data.pinnedAt, pinnedBy: res.data.pinnedBy }
+          : item
+      ));
+      setContextMenu(null);
+    } catch (error) {
+      console.error('Erreur épinglage du message:', error);
+      setLoadError(error.response?.data?.error || 'Impossible de modifier l’épinglage.');
+    }
+  };
+
   const friendName =
     friend.nickname?.trim() ||
     friend.displayName?.trim() ||
@@ -606,6 +625,16 @@ export default function Chat({
       ));
     };
 
+    const handleMessagePinUpdated = data => {
+      setMessages(prev => prev.map(message =>
+        message._id?.toString() === data.messageId?.toString()
+          ? { ...message, pinned: data.pinned, pinnedAt: data.pinnedAt, pinnedBy: data.pinnedBy }
+          : message
+      ));
+    };
+
+    socket.on('messagePinUpdated', handleMessagePinUpdated);
+
     socket.on(
       'messageReactionsUpdated',
       handleReactionsUpdated
@@ -645,6 +674,8 @@ export default function Chat({
         'messageSent',
         handleNewMessage
       );
+
+      socket.off('messagePinUpdated', handleMessagePinUpdated);
 
       socket.off(
         'messageReactionsUpdated',
@@ -1676,6 +1707,12 @@ export default function Chat({
                 }}
               />
             )}
+            <button
+              style={styles.contextItem}
+              onClick={() => toggleMessagePin(contextMenu.msg, !contextMenu.msg.pinned)}
+            >
+              {contextMenu.msg.pinned ? 'Désépingler' : 'Épingler'}
+            </button>
             <button
               style={styles.contextItem}
               onClick={() =>
