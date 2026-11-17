@@ -1379,7 +1379,7 @@ export default function Chat({
             gap: '10px'
           }}
         >
-          <ConversationGallery messages={messages} token={token} userId={userId} />
+          <ConversationGallery messages={messages} token={token} userId={userId} scope="private" conversationId={friend._id} />
           <ConversationSharedNote scope="private" conversationId={friend._id} userId={myId} token={token} encryptionKey={sharedKey} />
           <E2EEVerification scope="private" token={token} encryptionKey={sharedKey} friendPublicKey={friendPublicKey} />
           <button
