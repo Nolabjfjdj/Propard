@@ -593,3 +593,8 @@ Les conversations privées et les groupes disposent d'une note partagée modifia
 ### Vérification manuelle des clés E2EE
 
 Les conversations privées affichent une empreinte SHA-256 calculée à partir des deux clés publiques, triées de façon canonique pour obtenir la même empreinte des deux côtés. Les groupes affichent l’empreinte SHA-256 de la clé de groupe courante et sa version. Les participants doivent comparer ces empreintes par un canal indépendant ; Propard ne marque pas automatiquement une conversation comme vérifiée.
+
+
+### Alertes de nouvelle connexion
+
+Lorsqu'une connexion par mot de passe, clé d'accès ou code de récupération est créée alors qu'une autre session est déjà active, Propard tente d'envoyer une notification push de sécurité aux appareils enregistrés. L'alerte ne contient ni adresse IP ni mot de passe. Elle dépend de la configuration Web Push ou APNs du compte.
