@@ -2997,19 +2997,21 @@ export default function GroupChat({
             contextMenu.message
           ) ? (
             <>
-              <button
-                type="button"
-                style={
-                  styles.contextItem
-                }
-                onClick={() =>
-                  startEditGroupMessage(
-                    contextMenu.message
-                  )
-                }
-              >
-                Modifier
-              </button>
+              {contextMenu.message.messageType !== 'poll' && (
+                <button
+                  type="button"
+                  style={
+                    styles.contextItem
+                  }
+                  onClick={() =>
+                    startEditGroupMessage(
+                      contextMenu.message
+                    )
+                  }
+                >
+                  Modifier
+                </button>
+              )}
 
               <button
                 type="button"
