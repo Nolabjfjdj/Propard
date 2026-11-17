@@ -1600,6 +1600,7 @@ export default function Chat({
                         </div>
                       ) : (
                         <>
+                          {msg.pinned && <p style={{ fontSize: '11px', color: isMe ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)', margin: '0 0 5px' }}>Épinglé</p>}
                           {content && (
                             <p
                               style={{
