@@ -22,6 +22,7 @@ export default function ProfilePage({
 
   const [isEditing, setIsEditing] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState('');
+  const [editStatusMessage, setEditStatusMessage] = useState('');
   const [editUsername, setEditUsername] = useState('');
   const [editAvatarPreview, setEditAvatarPreview] = useState(null);
   const [editAvatarData, setEditAvatarData] = useState(undefined);
@@ -208,6 +209,7 @@ export default function ProfilePage({
       profile.displayName || ''
     );
     setEditUsername(profile.username || '');
+    setEditStatusMessage(profile.statusMessage || '');
 
     setEditAvatarPreview(
       profile.avatar || null
@@ -336,6 +338,7 @@ export default function ProfilePage({
     try {
       const body = {
         displayName: editDisplayName,
+        statusMessage: editStatusMessage,
         username: editUsername
       };
 
@@ -363,6 +366,7 @@ export default function ProfilePage({
       updateUser({
         username: res.data.user.username,
         displayName: res.data.user.displayName,
+        statusMessage: res.data.user.statusMessage,
         avatar: res.data.user.avatar
       });
 
@@ -757,11 +761,15 @@ export default function ProfilePage({
             value={editDisplayName}
             maxLength={32}
             placeholder={profile.username}
-            onChange={e =>
-              setEditDisplayName(
-                e.target.value
-              )
-            }
+            onChange={e => setEditDisplayName(e.target.value)}
+          />
+          <input
+            style={styles.editNameInput}
+            value={editStatusMessage}
+            maxLength={80}
+            placeholder="Ton statut (80 caractères maximum)"
+            aria-label="Statut du profil"
+            onChange={e => setEditStatusMessage(e.target.value)}
           />
           </>
         ) : (
@@ -776,6 +784,11 @@ export default function ProfilePage({
             <p style={styles.username}>
               @{profile.username}
             </p>
+            {profile.statusMessage && (
+              <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 8, textAlign: 'center', overflowWrap: 'anywhere' }}>
+                {profile.statusMessage}
+              </p>
+            )}
           </>
         )}
 
