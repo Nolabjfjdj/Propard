@@ -5,6 +5,15 @@ const getRecognition = () => {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 };
 
+function MicrophoneIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+      <rect x="9" y="2.5" width="6" height="12" rx="3" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M8.5 21.5h7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function VoiceMode({ onSend, sending }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState('classic');
@@ -173,7 +182,7 @@ export default function VoiceMode({ onSend, sending }) {
   return (
     <>
       <button type="button" onClick={() => { setOpen(true); setStatus('Choisis un mode vocal pour commencer.'); }} style={{ border: '1px solid var(--border)', borderRadius: 9, padding: '7px 10px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 650 }}>
-        ♫ Mode vocal
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><MicrophoneIcon /> Mode vocal</span>
       </button>
       {open && <div role="dialog" aria-modal="true" aria-label="Mode vocal Propard AI" style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.62)', display: 'grid', placeItems: 'center', padding: 16 }}>
         <section style={{ width: '100%', maxWidth: 440, maxHeight: '90dvh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 18, padding: 20, boxShadow: '0 20px 70px rgba(0,0,0,.35)' }}>
