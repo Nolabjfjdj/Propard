@@ -2797,6 +2797,7 @@ export default function GroupChat({
                           </div>
                         ) : (
                           <>
+                            {message.expiresAt && <p style={{ fontSize: '10px', color: isMe ? 'rgba(255,255,255,0.75)' : 'var(--text-secondary)', margin: '0 0 5px' }}>Message éphémère</p>}
                             {message.pinned && <p style={{ fontSize: '11px', color: isMe ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)', margin: '0 0 5px' }}>Épinglé</p>}
                             {content && (
                               <p
