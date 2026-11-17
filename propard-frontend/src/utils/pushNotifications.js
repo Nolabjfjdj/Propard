@@ -163,11 +163,11 @@ async function enableNativePushNotifications(token) {
     const cleanup = async () => {
       try {
         await registrationListener?.remove();
-      } catch {}
+      } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
 
       try {
         await registrationErrorListener?.remove();
-      } catch {}
+      } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
     };
 
     const finish = async value => {
@@ -234,7 +234,7 @@ async function enableNativePushNotifications(token) {
       NATIVE_PUSH_TOKEN_STORAGE_KEY,
       nativeToken
     );
-  } catch {}
+  } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
 
   return true;
 }
@@ -249,7 +249,7 @@ async function disableNativePushNotifications(token) {
       localStorage.getItem(
         NATIVE_PUSH_TOKEN_STORAGE_KEY
       ) || '';
-  } catch {}
+  } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
 
   try {
     if (nativeToken) {
@@ -273,7 +273,7 @@ async function disableNativePushNotifications(token) {
       localStorage.removeItem(
         NATIVE_PUSH_TOKEN_STORAGE_KEY
       );
-    } catch {}
+    } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
 
     try {
       await withTimeout(
@@ -281,7 +281,7 @@ async function disableNativePushNotifications(token) {
         10000,
         'Délai dépassé lors de la désactivation des notifications.'
       );
-    } catch {}
+    } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
   }
 }
 
