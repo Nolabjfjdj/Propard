@@ -578,3 +578,8 @@ La liste des amis et des groupes permet de créer jusqu'à 30 dossiers locaux et
 ### Historique de sécurité du compte
 
 La rubrique Sécurité affiche les 50 derniers événements de création de compte et de connexion par mot de passe, clé d’accès ou code de récupération. Chaque entrée conserve uniquement le type d’événement, sa date et l’agent utilisateur du navigateur. Aucune adresse IP n’est enregistrée dans cet historique.
+
+
+### Confirmations de lecture facultatives
+
+Chaque compte peut désactiver l’envoi des confirmations de lecture depuis les paramètres de sécurité. Quand l’option est désactivée, Propard ne met plus à jour l’état « lu » des messages privés ni la date de dernière lecture des groupes pour ce compte. Les confirmations reçues des autres utilisateurs restent visibles.
