@@ -74,11 +74,21 @@ router.put('/private/:friendId', saveLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Contenu chiffré invalide.' });
     }
     const now = new Date();
-    const note = await ConversationNote.findOneAndUpdate(
-      { scope: 'private', conversationKey: key },
-      { $set: { encryptedContent, updatedBy: req.user.id, updatedAt: now } },
-      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-    ).select('updatedAt updatedBy');
+    let note = await ConversationNote.findOne({ scope: 'private', conversationKey: key });
+    if (note) {
+      note.encryptedContent = encryptedContent;
+      note.updatedBy = req.user.id;
+      note.updatedAt = now;
+      await note.save();
+    } else {
+      note = await ConversationNote.create({
+        scope: 'private',
+        conversationKey: key,
+        encryptedContent,
+        updatedBy: req.user.id,
+        updatedAt: now
+      });
+    }
     emitNoteUpdate(req, 'private', key, note.updatedAt, note.updatedBy);
     res.json({ success: true, updatedAt: note.updatedAt });
   } catch (error) {
@@ -121,11 +131,23 @@ router.put('/group/:groupId', saveLimiter, async (req, res) => {
     }
     const key = group._id.toString();
     const now = new Date();
-    const note = await ConversationNote.findOneAndUpdate(
-      { scope: 'group', conversationKey: key },
-      { $set: { encryptedContent, keyVersion, updatedBy: req.user.id, updatedAt: now } },
-      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-    ).select('updatedAt updatedBy');
+    let note = await ConversationNote.findOne({ scope: 'group', conversationKey: key });
+    if (note) {
+      note.encryptedContent = encryptedContent;
+      note.keyVersion = keyVersion;
+      note.updatedBy = req.user.id;
+      note.updatedAt = now;
+      await note.save();
+    } else {
+      note = await ConversationNote.create({
+        scope: 'group',
+        conversationKey: key,
+        encryptedContent,
+        keyVersion,
+        updatedBy: req.user.id,
+        updatedAt: now
+      });
+    }
     emitNoteUpdate(req, 'group', key, note.updatedAt, note.updatedBy, group);
     res.json({ success: true, updatedAt: note.updatedAt });
   } catch (error) {
