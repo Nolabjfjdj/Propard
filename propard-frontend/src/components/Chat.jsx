@@ -31,6 +31,7 @@ export default function Chat({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [input, setInput] = useState('');
+  const [messageExpiry, setMessageExpiry] = useState(0);
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [awaitingAttachmentAck, setAwaitingAttachmentAck] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -763,7 +764,8 @@ export default function Chat({
 
       socket.emit('sendMessage', {
         receiverId: friend._id,
-        content: encryptedContent
+        content: encryptedContent,
+        expiresIn: messageExpiry
       });
 
       setInput('');
@@ -778,6 +780,10 @@ export default function Chat({
 
 
   const handleFilesSelected = async files => {
+    if (messageExpiry > 0) {
+      setLoadError('Les messages éphémères sont actuellement limités au texte, sans pièce jointe.');
+      return;
+    }
     if (!sharedKey || !friendPublicKey) {
       setLoadError('Chiffrement indisponible pour cette conversation.');
       return;
@@ -1785,9 +1791,21 @@ export default function Chat({
       })()}
 
        <div style={styles.inputBar}>
+        <select
+          aria-label="Durée avant disparition du message"
+          value={messageExpiry}
+          onChange={event => setMessageExpiry(Number(event.target.value))}
+          disabled={!sharedKey || uploadingFiles || awaitingAttachmentAck}
+          style={{ maxWidth: 96, minWidth: 78, padding: '7px 4px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontSize: 11 }}
+        >
+          <option value={0}>Normal</option>
+          <option value={3600}>1 heure</option>
+          <option value={86400}>24 heures</option>
+          <option value={604800}>7 jours</option>
+        </select>
         <FileUploadButton
           onFilesSelected={handleFilesSelected}
-          disabled={!sharedKey || awaitingAttachmentAck}
+          disabled={!sharedKey || awaitingAttachmentAck || messageExpiry > 0}
           uploading={uploadingFiles}
           progress={uploadProgress}
         />
