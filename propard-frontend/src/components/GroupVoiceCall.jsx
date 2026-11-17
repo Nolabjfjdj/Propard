@@ -43,6 +43,7 @@ const normalizeId = value => value?.toString();
 
 export default function GroupVoiceCall({
   group,
+  userId,
   token,
   onClose,
   friendNicknames = new Map(),
