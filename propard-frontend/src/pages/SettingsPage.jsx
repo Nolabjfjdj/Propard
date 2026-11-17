@@ -11,6 +11,7 @@ export default function SettingsPage() {
   const [section, setSection] = useState('main');
   const [passkeys, setPasskeys] = useState([]);
   const [sessions, setSessions] = useState([]);
+  const [securityEvents, setSecurityEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -41,6 +42,19 @@ export default function SettingsPage() {
       setSessions(response.data.sessions || []);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de charger les sessions.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSecurityEvents = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.get('/api/auth/security-events', { headers });
+      setSecurityEvents(response.data.events || []);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de charger l’historique de sécurité.');
     } finally {
       setLoading(false);
     }
@@ -87,6 +101,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (section === 'a2f') loadPasskeys();
     if (section === 'sessions') loadSessions();
+    if (section === 'security-history') loadSecurityEvents();
   }, [section]);
 
   const goBack = () => {
@@ -94,7 +109,7 @@ export default function SettingsPage() {
       setSection('security');
       return;
     }
-    if (section === 'a2f' || section === 'sessions') {
+    if (section === 'a2f' || section === 'sessions' || section === 'security-history') {
       setSection('security');
       return;
     }
@@ -252,7 +267,9 @@ export default function SettingsPage() {
       ? 'Personnalisation'
        : section === 'sessions'
         ? 'Appareils connectés'
-        : section === 'security'
+        : section === 'security-history'
+        ? 'Historique de sécurité'
+      : section === 'security'
       ? 'Sécurité'
       : section === 'e2ee'
         ? 'Récupération E2EE'
@@ -331,6 +348,14 @@ export default function SettingsPage() {
               </span>
               <span style={styles.arrow}>›</span>
             </button>
+            <button type="button" style={{ ...styles.row, marginTop: '12px' }} onClick={() => setSection('security-history')}>
+              <span style={styles.icon}>◷</span>
+              <span style={styles.rowContent}>
+                <strong>Historique de sécurité</strong>
+                <small>Voir les 50 dernières connexions à ton compte</small>
+              </span>
+              <span style={styles.arrow}>›</span>
+            </button>
             <button type="button" style={{ ...styles.row, marginTop: '12px' }} onClick={() => setSection('a2f')}>
               <span style={styles.icon}>⌑</span>
               <span style={styles.rowContent}>
@@ -381,6 +406,30 @@ export default function SettingsPage() {
             <button type="button" style={{ ...styles.danger, width: '100%', marginTop: 12 }} onClick={revokeAllSessions} disabled={loading}>
               Déconnecter tous les appareils
             </button>
+          </div>
+        )}
+        {section === 'security-history' && (
+          <div style={styles.card}>
+            <strong>Connexions récentes</strong>
+            <p style={styles.description}>Historique limité aux 50 derniers événements. Seules la date, la méthode de connexion et les informations du navigateur sont conservées. Aucune adresse IP n’est enregistrée dans cet historique.</p>
+            {error && <p role="alert" style={styles.error}>{error}</p>}
+            {loading && <p style={styles.description}>Chargement…</p>}
+            {!loading && securityEvents.length === 0 && (
+              <div style={styles.empty}>
+                <strong>Aucun événement enregistré</strong>
+                <p>Les prochaines connexions apparaîtront ici.</p>
+              </div>
+            )}
+            {securityEvents.map((event, index) => (
+              <div key={event.createdAt + '-' + index} style={styles.passkey}>
+                <div style={styles.passkeyInfo}>
+                  <strong>{event.eventType === 'registration' ? 'Création du compte' : event.eventType === 'passkey_login' ? 'Connexion avec une clé d’accès' : 'Connexion avec mot de passe'}</strong>
+                  <small>{new Date(event.createdAt).toLocaleString('fr-FR')}</small>
+                  <small>{event.userAgent || 'Navigateur inconnu'}</small>
+                </div>
+              </div>
+            ))}
+            <button type="button" style={styles.secondary} onClick={loadSecurityEvents} disabled={loading}>Actualiser</button>
           </div>
         )}
         {section === 'e2ee' && (
