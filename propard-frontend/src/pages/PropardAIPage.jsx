@@ -37,7 +37,6 @@ export default function PropardAIPage({ initialConversationId = null }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [available, setAvailable] = useState(null);
-  const [keyCount, setKeyCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
