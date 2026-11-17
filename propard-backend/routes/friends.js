@@ -551,6 +551,66 @@ router.get('/messages/:friendId', createRateLimiter({
   }
 });
 
+router.patch('/messages/:messageId/pin', createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 60,
+  keyFn: req => `message-pin:${req.user.id}`,
+  message: 'Trop de modifications des messages épinglés. Réessaie plus tard.'
+}), async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { pinned } = req.body || {};
+    if (!mongoose.isValidObjectId(messageId) || typeof pinned !== 'boolean') {
+      return res.status(400).json({ error: 'Demande invalide.' });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message || message.deleted) {
+      return res.status(404).json({ error: 'Message introuvable.' });
+    }
+
+    const userId = req.user.id.toString();
+    const senderId = message.sender.toString();
+    const receiverId = message.receiver.toString();
+    if (userId !== senderId && userId !== receiverId) {
+      return res.status(403).json({ error: 'Accès refusé.' });
+    }
+
+    const otherId = userId === senderId ? receiverId : senderId;
+    if (!await areFriends(userId, otherId)) {
+      return res.status(403).json({ error: 'Cette conversation n’est plus accessible.' });
+    }
+
+    const participants = await User.find({ _id: { $in: [userId, otherId] } }).select('blockedUsers');
+    if (participants.some(user => (user.blockedUsers || []).some(id => id.toString() === (user._id.toString() === userId ? otherId : userId)))) {
+      return res.status(403).json({ error: 'Cette interaction n’est pas autorisée.' });
+    }
+
+    message.pinnedAt = pinned ? new Date() : null;
+    message.pinnedBy = pinned ? userId : null;
+    await message.save();
+
+    const payload = {
+      messageId,
+      pinned,
+      pinnedAt: message.pinnedAt,
+      pinnedBy: message.pinnedBy?.toString() || null
+    };
+    const io = req.app.get('io');
+    const emitToUser = req.app.get('emitToUser');
+    if (io && emitToUser) {
+      for (const participantId of new Set([senderId, receiverId])) {
+        emitToUser(io, participantId, 'messagePinUpdated', payload);
+      }
+    }
+
+    res.json({ success: true, ...payload });
+  } catch (error) {
+    console.error('Message pin error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 router.delete('/messages/:messageId', createRateLimiter({
   windowMs: 10 * 60 * 1000,
   max: 120,
