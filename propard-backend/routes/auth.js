@@ -692,7 +692,7 @@ router.post('/logout-all', authMiddleware, logoutAllLimiter, async (req, res) =>
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id)
-      .select('_id username displayName avatar ipAlias publicKey staffRole isOnline friends friendRequests pendingDeletionAt')
+      .select('_id username displayName avatar ipAlias publicKey staffRole isOnline friends friendRequests pendingDeletionAt readReceiptsEnabled')
       .populate(
         'friends.userId',
         'username displayName avatar ipAlias isOnline publicKey'
@@ -718,6 +718,7 @@ router.get('/me', authMiddleware, async (req, res) => {
       publicKey: user.publicKey,
       staffRole: effectiveStaffRole(user._id, user.staffRole),
       isOnline: user.isOnline,
+      readReceiptsEnabled: user.readReceiptsEnabled !== false,
       friends: user.friends,
       friendRequests: user.friendRequests,
       pendingDeletion,
@@ -739,6 +740,13 @@ router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
       return res.status(404).json({
         error: 'Utilisateur introuvable'
       });
+    }
+
+    if (req.body?.readReceiptsEnabled !== undefined) {
+      if (typeof req.body.readReceiptsEnabled !== 'boolean') {
+        return res.status(400).json({ error: 'Préférence de confirmation de lecture invalide.' });
+      }
+      user.readReceiptsEnabled = req.body.readReceiptsEnabled;
     }
 
     if (username !== undefined) {
