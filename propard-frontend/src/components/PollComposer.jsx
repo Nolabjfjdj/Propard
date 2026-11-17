@@ -23,14 +23,15 @@ export default function PollComposer({ onClose, onCreate }) {
     }
     setSaving(true);
     setError('');
+    let success = false;
     try {
-      const success = await onCreate(cleanQuestion, cleanOptions);
-      if (success) onClose();
+      success = await onCreate(cleanQuestion, cleanOptions);
     } catch (err) {
       setError(err.message || 'Impossible de créer le sondage.');
     } finally {
       setSaving(false);
     }
+    if (success) onClose();
   };
 
   return (
