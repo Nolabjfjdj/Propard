@@ -5,6 +5,12 @@ const getRecognition = () => {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 };
 
+const normalizeTranscript = value => String(value || '')
+  .replace(/\\bpro\\s*dromes?\\s+ai\\b/gi, 'Propard AI')
+  .replace(/\\bpro\\s*part\\s+ai\\b/gi, 'Propard AI')
+  .replace(/\\bpropard\\s+ia\\b/gi, 'Propard AI')
+  .replace(/\\bpropard\\s+ai\\b/gi, 'Propard AI');
+
 function MicrophoneIcon() {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
@@ -123,11 +129,14 @@ export default function VoiceMode({ onSend, sending }) {
     recognition.lang = 'fr-FR';
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    recognition.maxAlternatives = 3;
     transcriptRef.current = '';
     recognition.onstart = () => setListening(true);
     recognition.onresult = event => {
-      transcriptRef.current = event.results?.[0]?.[0]?.transcript || '';
+      const alternatives = Array.from(event.results?.[0] || []);
+      const preferred = alternatives.find(item => /\\b(?:propard|pro\\s*dromes?)\\s+ai\\b/i.test(item.transcript))
+        || alternatives[0];
+      transcriptRef.current = normalizeTranscript(preferred?.transcript || '');
       setListening(false);
       if (modeRef.current === 'direct') {
         recognition.stop();
