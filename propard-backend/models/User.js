@@ -6,6 +6,7 @@ const userSchema = new mongoose.Schema({
   usernameHistory:{type:[{username:{type:String,required:true},normalized:{type:String,required:true},changedAt:{type:Date,default:Date.now}}],default:[]},
   displayName:{type:String,default:null,trim:true,maxlength:32},
   statusMessage:{type:String,default:null,trim:true,maxlength:80},
+  readReceiptsEnabled:{type:Boolean,default:true},
   avatar:{type:String,default:null},
   password:{type:String,required:true,select:false},
   sessionVersion:{type:Number,default:0},
