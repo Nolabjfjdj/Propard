@@ -460,7 +460,7 @@ router.patch('/messages/read/:friendId', async (req, res) => {
   }
 });
 
-router.get('/messages/:friendId/attachments', async (req, res) => {
+router.get('/messages/:friendId/attachments', createRateLimiter({ windowMs: 60 * 1000, max: 60, keyFn: req => 'private-gallery:' + req.user.id, message: 'Trop de chargements de galerie. Réessaie dans un instant.' }), async (req, res) => {
   try {
     const friendId = req.params.friendId;
     if (!mongoose.isValidObjectId(friendId) || !await areFriends(req.user.id, friendId)) {
