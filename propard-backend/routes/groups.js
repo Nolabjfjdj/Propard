@@ -1926,6 +1926,48 @@ router.post(
 
 
 
+router.patch('/:groupId/messages/:messageId/pin', createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 60,
+  keyFn: req => `group-message-pin:${req.user.id}`,
+  message: 'Trop de modifications des messages épinglés. Réessaie plus tard.'
+}), async (req, res) => {
+  try {
+    const { groupId, messageId } = req.params;
+    const { pinned } = req.body || {};
+    if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(messageId) || typeof pinned !== 'boolean') {
+      return res.status(400).json({ error: 'Demande invalide.' });
+    }
+
+    const group = await Group.findById(groupId);
+    if (!group || !memberOf(group, req.user.id)) {
+      return res.status(403).json({ error: 'Accès refusé.' });
+    }
+
+    const message = await GroupMessage.findOne({ _id: messageId, group: groupId });
+    if (!message || message.deleted) {
+      return res.status(404).json({ error: 'Message introuvable.' });
+    }
+
+    message.pinnedAt = pinned ? new Date() : null;
+    message.pinnedBy = pinned ? req.user.id : null;
+    await message.save();
+
+    const payload = {
+      groupId,
+      messageId,
+      pinned,
+      pinnedAt: message.pinnedAt,
+      pinnedBy: message.pinnedBy?.toString() || null
+    };
+    emitGroupEvent(req, group, 'groupMessagePinUpdated', payload);
+    res.json({ success: true, ...payload });
+  } catch (error) {
+    console.error('Group message pin error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 router.post('/:groupId/messages/:messageId/reactions', createRateLimiter({
   windowMs: 10 * 60 * 1000,
   max: 120,
