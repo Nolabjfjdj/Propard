@@ -5,6 +5,7 @@ const userSchema = new mongoose.Schema({
   username:{type:String,required:true,unique:true,trim:true,minlength:3,maxlength:32},
   usernameHistory:{type:[{username:{type:String,required:true},normalized:{type:String,required:true},changedAt:{type:Date,default:Date.now}}],default:[]},
   displayName:{type:String,default:null,trim:true,maxlength:32},
+  statusMessage:{type:String,default:null,trim:true,maxlength:80},
   avatar:{type:String,default:null},
   password:{type:String,required:true,select:false},
   sessionVersion:{type:Number,default:0},
