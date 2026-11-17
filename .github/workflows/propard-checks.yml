@@ -1,4 +1,4 @@
-name: Propard checks
+name: Propard feature validation
 
 on:
   push:
