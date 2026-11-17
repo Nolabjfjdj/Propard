@@ -138,7 +138,7 @@ export default function VoiceMode({ onSend, sending }) {
     recognition.onstart = () => setListening(true);
     recognition.onresult = event => {
       const alternatives = Array.from(event.results?.[0] || []);
-      const preferred = alternatives.find(item => /\b(?:propard|pro\s*dromes?)\s+ai\b/i.test(item.transcript))
+      const preferred = alternatives.find(item => /\b(?:propard|pro\s*dromes?\s+ai|pro\s*part\s+ai|la\s*banane\s*415|banane\s*vr)\b/i.test(item.transcript))
         || alternatives[0];
       transcriptRef.current = normalizeTranscript(preferred?.transcript || '');
       setListening(false);
