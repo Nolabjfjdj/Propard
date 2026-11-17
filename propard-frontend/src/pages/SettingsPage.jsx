@@ -367,7 +367,6 @@ export default function SettingsPage() {
                 <div style={styles.passkeyInfo}>
                   <strong>{session.current ? 'Cet appareil' : 'Autre appareil'}</strong>
                   <small>{session.userAgent || 'Navigateur inconnu'}</small>
-                  <small>IP : {session.ip || 'Non disponible'}</small>
                   <small>Connecté le {new Date(session.createdAt).toLocaleString('fr-FR')}</small>
                   <small>Expire le {new Date(session.expiresAt).toLocaleString('fr-FR')}</small>
                 </div>
