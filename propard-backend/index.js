@@ -270,6 +270,7 @@ app.use('/api',require('./routes/turn'));
 app.use('/api/reports',require('./routes/reports'));
 app.use('/api/groups',require('./routes/groups'));
 app.use('/api/files',require('./routes/files'));
+app.use('/api/notes',require('./routes/notes'));
 app.use('/api/push',require('./routes/push'));
 app.use('/api/ai',require('./routes/ai'));
 
