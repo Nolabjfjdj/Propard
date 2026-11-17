@@ -1747,22 +1747,26 @@ export default function Chat({
             onClick={e => e.stopPropagation()}
             onTouchStart={e => e.stopPropagation()}
           >
-            <button
-              style={styles.contextItem}
-              onClick={() => setContextMenu(current => ({ ...current, showReactions: !current.showReactions }))}
-            >
-              Réagir
-            </button>
-            {contextMenu.showReactions && (
-              <MessageReactions
-                reactions={contextMenu.msg.reactions}
-                userId={myId}
-                showPicker
-                onReact={emoji => {
-                  toggleMessageReaction(contextMenu.msg._id, emoji);
-                  setContextMenu(null);
-                }}
-              />
+            {contextMenu.msg.messageType !== 'poll' && (
+              <>
+                <button
+                  style={styles.contextItem}
+                  onClick={() => setContextMenu(current => ({ ...current, showReactions: !current.showReactions }))}
+                >
+                  Réagir
+                </button>
+                {contextMenu.showReactions && (
+                  <MessageReactions
+                    reactions={contextMenu.msg.reactions}
+                    userId={myId}
+                    showPicker
+                    onReact={emoji => {
+                      toggleMessageReaction(contextMenu.msg._id, emoji);
+                      setContextMenu(null);
+                    }}
+                  />
+                )}
+              </>
             )}
             <button
               style={styles.contextItem}
