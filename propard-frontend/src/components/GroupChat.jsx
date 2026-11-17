@@ -47,7 +47,6 @@ export default function GroupChat({
   const [messages, setMessages] =
     useState([]);
 
-  const [showGallery, setShowGallery] = useState(false);
 
   const reactionNotificationAudioRef = useRef(null);
 
