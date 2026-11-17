@@ -10,6 +10,8 @@ const messageSchema = new mongoose.Schema({
   encrypted:{type:Boolean,default:true},
   edited:{type:Boolean,default:false},
   deleted:{type:Boolean,default:false},
+  pinnedAt:{type:Date,default:null},
+  pinnedBy:{type:mongoose.Schema.Types.ObjectId,ref:'User',default:null},
   read:{type:Boolean,default:false},
   reactions: [{
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
