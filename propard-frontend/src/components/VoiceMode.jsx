@@ -32,6 +32,7 @@ export default function VoiceMode({ onSend, sending }) {
   });
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [active, setActive] = useState(false);
   const [status, setStatus] = useState('');
   const recognitionRef = useRef(null);
   const activeRef = useRef(false);
@@ -87,6 +88,7 @@ export default function VoiceMode({ onSend, sending }) {
 
   const stop = () => {
     activeRef.current = false;
+    setActive(false);
     processingRef.current = false;
     window.clearTimeout(restartRef.current);
     recognitionRef.current?.stop?.();
@@ -172,18 +174,19 @@ export default function VoiceMode({ onSend, sending }) {
     modeRef.current = selectedMode;
     setMode(selectedMode);
     activeRef.current = true;
+    setActive(true);
     processingRef.current = false;
     startRecognition();
   };
 
   const saveVoice = value => {
     setVoiceURI(value);
-    try { localStorage.setItem('propard_ai_voice', value); } catch {}
+    try { localStorage.setItem('propard_ai_voice', value); } catch (error) { console.warn('Impossible de sauvegarder la voix choisie:', error.message); }
   };
 
   const saveRate = value => {
     setRate(value);
-    try { localStorage.setItem('propard_ai_voice_rate', String(value)); } catch {}
+    try { localStorage.setItem('propard_ai_voice_rate', String(value)); } catch (error) { console.warn('Impossible de sauvegarder la vitesse vocale:', error.message); }
   };
 
   const preview = () => speak('Bonjour, je suis Propard AI. Comment puis-je t’aider aujourd’hui ?');
@@ -229,7 +232,7 @@ export default function VoiceMode({ onSend, sending }) {
           <div aria-live="polite" style={{ marginTop: 18, padding: 12, borderRadius: 10, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontSize: 13 }}>
             {listening ? '🎙️ Micro actif, je t’écoute…' : speaking ? '🔊 Propard AI parle…' : status}
           </div>
-          {(listening || speaking || activeRef.current) && <button type="button" onClick={stop} style={{ width: '100%', marginTop: 12, border: 0, borderRadius: 9, padding: 12, background: 'var(--danger)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Arrêter le mode vocal</button>}
+          {(listening || speaking || active) && <button type="button" onClick={stop} style={{ width: '100%', marginTop: 12, border: 0, borderRadius: 9, padding: 12, background: 'var(--danger)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Arrêter le mode vocal</button>}
           <p style={{ color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.5, margin: '14px 0 0' }}>La voix et la reconnaissance sont fournies par le navigateur et l’appareil. La disponibilité des voix et du micro dépend du navigateur. L’audio n’est pas enregistré par Propard.</p>
         </section>
       </div>}
