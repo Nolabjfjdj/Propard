@@ -5,6 +5,7 @@ const conversationNoteSchema = new mongoose.Schema({
   scope: { type: String, enum: ['private', 'group'], required: true },
   conversationKey: { type: String, required: true, maxlength: 80 },
   encryptedContent: { type: String, required: true, maxlength: 20000 },
+  keyVersion: { type: Number, default: null, min: 1 },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   updatedAt: { type: Date, default: Date.now }
 });
