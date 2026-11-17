@@ -8,6 +8,7 @@ const path=require('path');
 const {randomUUID}=require('crypto');
 const {createCallStateManager}=require('./services/callState');
 const {createSocketRateLimiter}=require('./services/socketRateLimit');
+const { disconnectUserSessionSockets: disconnectSessionSockets } = require('./services/socketSessions');
 const {connectShards}=require('./db/shards');
 const {
   isEncryptedMessagePayload,
@@ -246,8 +247,13 @@ function disconnectUserSockets(userId,event='sessionExpired',payload={message:'S
   return disconnected;
 }
 
+function disconnectUserSessionSockets(userId, sessionJti) {
+  return disconnectSessionSockets(io, connectedUsers, userId, sessionJti);
+}
+
 app.set('io',io);
 app.set('disconnectUserSockets',disconnectUserSockets);
+app.set('disconnectUserSessionSockets',disconnectUserSessionSockets);
 app.set('connectedUsers',connectedUsers);
 app.set('emitToUser',emitToUser);
 
@@ -418,6 +424,7 @@ io.use(async(socket,next)=>{
     }
 
     socket.userId=decoded.id;
+    socket.sessionJti=typeof decoded.jti === 'string' ? decoded.jti : null;
     next();
   }catch{
     next(new Error('Unauthorized'));
