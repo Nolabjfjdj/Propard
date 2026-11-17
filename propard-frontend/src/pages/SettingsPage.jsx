@@ -10,6 +10,7 @@ export default function SettingsPage() {
   const { accent, setAccent } = useTheme();
   const [section, setSection] = useState('main');
   const [passkeys, setPasskeys] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -32,8 +33,45 @@ export default function SettingsPage() {
     }
   };
 
+  const loadSessions = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.get('/api/auth/sessions', { headers });
+      setSessions(response.data.sessions || []);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de charger les sessions.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const revokeSession = async session => {
+    if (!window.confirm(session.current
+      ? 'Révoquer cette session déconnectera cet appareil. Continuer ?'
+      : 'Déconnecter cet appareil ?')) return;
+    setLoading(true);
+    setError('');
+    try {
+      await api.delete(`/api/auth/sessions/${encodeURIComponent(session.jti)}`, { headers });
+      setSessions(previous => previous.filter(item => item.jti !== session.jti));
+      if (session.current) {
+        localStorage.removeItem('propard_token');
+        localStorage.removeItem('propard_user');
+        window.location.href = '/';
+        return;
+      }
+      setNotice('La session a été révoquée.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de révoquer cette session.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (section === 'a2f') loadPasskeys();
+    if (section === 'sessions') loadSessions();
   }, [section]);
 
   const goBack = () => {
@@ -41,7 +79,7 @@ export default function SettingsPage() {
       setSection('security');
       return;
     }
-    if (section === 'a2f') {
+    if (section === 'a2f' || section === 'sessions') {
       setSection('security');
       return;
     }
@@ -197,7 +235,9 @@ export default function SettingsPage() {
     ? 'Paramètres'
     : section === 'appearance'
       ? 'Personnalisation'
-      : section === 'security'
+       : section === 'sessions'
+        ? 'Appareils connectés'
+        : section === 'security'
       ? 'Sécurité'
       : section === 'e2ee'
         ? 'Récupération E2EE'
@@ -268,7 +308,15 @@ export default function SettingsPage() {
         )}
         {section === 'security' && (
           <>
-            <button type="button" style={styles.row} onClick={() => setSection('a2f')}>
+            <button type="button" style={styles.row} onClick={() => setSection('sessions')}>
+              <span style={styles.icon}>▣</span>
+              <span style={styles.rowContent}>
+                <strong>Appareils connectés</strong>
+                <small>Consulter et déconnecter les sessions de ton compte</small>
+              </span>
+              <span style={styles.arrow}>›</span>
+            </button>
+            <button type="button" style={{ ...styles.row, marginTop: '12px' }} onClick={() => setSection('a2f')}>
               <span style={styles.icon}>⌑</span>
               <span style={styles.rowContent}>
                 <strong>A2F</strong>
@@ -285,6 +333,38 @@ export default function SettingsPage() {
               <span style={styles.arrow}>›</span>
             </button>
           </>
+        )}
+        {section === 'sessions' && (
+          <div style={styles.card}>
+            <strong>Sessions de ton compte</strong>
+            <p style={styles.description}>Les connexions récentes sont conservées avec leur navigateur et leur adresse IP. Tu peux révoquer chaque session séparément.</p>
+            {error && <p role="alert" style={styles.error}>{error}</p>}
+            {notice && <p role="status" style={styles.success}>{notice}</p>}
+            {loading && <p style={styles.description}>Chargement…</p>}
+            {!loading && sessions.length === 0 && (
+              <div style={styles.empty}>
+                <strong>Aucune session enregistrée</strong>
+                <p>Les nouvelles connexions apparaîtront ici.</p>
+              </div>
+            )}
+            {sessions.map(session => (
+              <div key={session.jti} style={styles.passkey}>
+                <div style={styles.passkeyInfo}>
+                  <strong>{session.current ? 'Cet appareil' : 'Autre appareil'}</strong>
+                  <small>{session.userAgent || 'Navigateur inconnu'}</small>
+                  <small>IP : {session.ip || 'Non disponible'}</small>
+                  <small>Connecté le {new Date(session.createdAt).toLocaleString('fr-FR')}</small>
+                  <small>Expire le {new Date(session.expiresAt).toLocaleString('fr-FR')}</small>
+                </div>
+                <div style={styles.actions}>
+                  <button type="button" style={styles.danger} onClick={() => revokeSession(session)} disabled={loading}>
+                    {session.current ? 'Déconnecter cet appareil' : 'Révoquer'}
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button type="button" style={styles.secondary} onClick={loadSessions} disabled={loading}>Actualiser</button>
+          </div>
         )}
         {section === 'e2ee' && (
           <div style={styles.card}>
