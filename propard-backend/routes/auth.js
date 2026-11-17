@@ -419,6 +419,7 @@ router.post('/register', registerRateLimiter, async (req, res) => {
         id: user._id,
         username: user.username,
         displayName: user.displayName,
+        statusMessage: user.statusMessage,
         avatar: user.avatar,
         ipAlias: user.ipAlias,
         publicKey: user.publicKey,
@@ -624,7 +625,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 
 router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
   try {
-    const { displayName, avatar, username } = req.body;
+    const { displayName, statusMessage, avatar, username } = req.body;
 
     const user = await User.findById(req.user.id);
 
@@ -692,6 +693,17 @@ router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
       user.displayName = trimmed || null;
     }
 
+    if (statusMessage !== undefined) {
+      if (typeof statusMessage !== 'string' && statusMessage !== null) {
+        return res.status(400).json({ error: 'Statut invalide.' });
+      }
+      const trimmedStatus = typeof statusMessage === 'string' ? statusMessage.trim() : '';
+      if (trimmedStatus.length > 80) {
+        return res.status(400).json({ error: 'Le statut ne peut pas dépasser 80 caractères.' });
+      }
+      user.statusMessage = trimmedStatus || null;
+    }
+
     if (avatar !== undefined) {
       if (avatar !== null && typeof avatar !== 'string') {
         return res.status(400).json({
@@ -750,7 +762,7 @@ router.get('/user/:id', authMiddleware, async (req, res) => {
 
       User.findById(profileId)
         .select(
-          'username displayName avatar ipAlias publicKey isOnline friends friendRequests'
+          'username displayName statusMessage avatar ipAlias publicKey isOnline friends friendRequests'
         )
     ]);
 
@@ -827,6 +839,7 @@ router.get('/user/:id', authMiddleware, async (req, res) => {
       _id: profile._id,
       username: profile.username,
       displayName: profile.displayName,
+      statusMessage: profile.statusMessage,
       avatar: profile.avatar,
       ipAlias: canViewPrivateDetails ? profile.ipAlias : null,
       publicKey: canViewPrivateDetails ? profile.publicKey : null,
