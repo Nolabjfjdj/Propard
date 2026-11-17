@@ -13,6 +13,7 @@ const messageSchema = new mongoose.Schema({
   pinned:{type:Boolean,default:false},
   pinnedAt:{type:Date,default:null},  pinnedBy:{type:mongoose.Schema.Types.ObjectId,ref:'User',default:null},
   read:{type:Boolean,default:false},
+  readReceiptSent:{type:Boolean,default:true},
   reactions: [{
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     emoji: { type: String, required: true, maxlength: 32 },
