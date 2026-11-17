@@ -26,8 +26,8 @@ export async function startMobileScreenCapture() {
   const stopCapture = async () => {
     if (stopped) return;
     stopped = true;
-    try { await listener?.remove(); } catch {}
-    try { await NativeScreenCapture.stop(); } catch {}
+    try { await listener?.remove(); } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
+    try { await NativeScreenCapture.stop(); } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
     stream.getTracks().forEach(track => track.stop());
     context.clearRect(0, 0, canvas.width, canvas.height);
   };
