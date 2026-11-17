@@ -195,7 +195,8 @@ export default function FriendList({
 
           usersMap[req.from] = userRes.data;
           validRequests.push(req);
-        } catch {
+        } catch (error) {
+          console.warn('Demande d’ami ignorée car son profil est indisponible:', error.message);
         }
       }
 
