@@ -109,7 +109,7 @@ router.get('/group/:groupId', async (req, res) => {
 router.put('/group/:groupId', saveLimiter, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.groupId)) return res.status(400).json({ error: 'Groupe invalide.' });
-    const group = await Group.findOne({ _id: req.params.groupId, 'members.userId': req.user.id }).select('_id members');
+    const group = await Group.findOne({ _id: req.params.groupId, 'members.userId': req.user.id }).select('_id keyVersion members');
     if (!group) return res.status(403).json({ error: 'Groupe inaccessible.' });
     const encryptedContent = req.body?.encryptedContent;
     const keyVersion = req.body?.keyVersion;
