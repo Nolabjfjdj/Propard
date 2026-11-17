@@ -215,7 +215,9 @@ export default function StaffPage() {
       try {
         const response = await request('get', '/api/staff/notifications/preferences');
         setStaffEventPreferences(response.data.preferences || { reports: true, bans: true, staffActions: true });
-      } catch {}
+      } catch (refreshError) {
+        console.warn('Impossible de recharger les préférences du personnel:', refreshError.message);
+      }
     } finally {
       setStaffEventPreferencesSaving(false);
     }
