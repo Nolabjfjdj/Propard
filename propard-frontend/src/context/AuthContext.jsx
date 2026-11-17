@@ -502,12 +502,28 @@ export function AuthProvider({ children }) {
       'true'
     );
 
+    let currentUser = normalized;
+    try {
+      const profileResponse = await api.get('/api/auth/me', {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      currentUser = {
+        ...normalized,
+        ...profileResponse.data,
+        id: profileResponse.data.id || profileResponse.data._id || normalized.id
+      };
+      setUser(currentUser);
+      localStorage.setItem('propard_user', JSON.stringify(currentUser));
+    } catch (profileError) {
+      console.warn('Impossible de recharger le profil après connexion :', profileError);
+    }
+
     try {
       await ensureEncryptionKeys(
-        normalized.id,
+        currentUser.id,
         userToken,
         password,
-        normalized.publicKey,
+        currentUser.publicKey,
         captchaToken
       );
     } catch (err) {
@@ -518,10 +534,10 @@ export function AuthProvider({ children }) {
         )
       ) {
         await ensureEncryptionKeys(
-          normalized.id,
+          currentUser.id,
           userToken,
           password,
-          normalized.publicKey,
+          currentUser.publicKey,
           captchaToken,
           true
         );
