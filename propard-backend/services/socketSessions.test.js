@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { disconnectUserSessionSockets } = require('./socketSessions');
+const { disconnectUserSessionSockets, scheduleSocketSessionExpiry } = require('./socketSessions');
 
 const createSocket = sessionJti => ({
   sessionJti,
