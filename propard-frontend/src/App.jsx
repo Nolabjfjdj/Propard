@@ -173,7 +173,7 @@ export default function App() {
 
       if (path !== destination) {
         window.history.replaceState({}, '', destination);
-        setPath(destination);
+        window.dispatchEvent(new PopStateEvent('popstate'));
       }
 
       return;
@@ -181,7 +181,7 @@ export default function App() {
 
     if ((path === '/login' || path === '/register') && user) {
       window.history.replaceState({}, '', '/');
-      setPath('/');
+      window.dispatchEvent(new PopStateEvent('popstate'));
     }
   }, [loading, user, path]);
 
