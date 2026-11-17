@@ -591,6 +591,8 @@ export default function OfflineGame({
       const star of
       game.stars
     ) {
+      // The canvas game loop intentionally mutates its private animation state.
+      // eslint-disable-next-line react-hooks/immutability
       star.y +=
         star.speed *
         70 *
