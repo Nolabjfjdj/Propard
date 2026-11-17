@@ -73,7 +73,6 @@ export default function PropardAIPage({ initialConversationId = null }) {
     ]).then(async ([status, list]) => {
       if (!mounted) return;
       setAvailable(status.data.available);
-      setKeyCount(status.data.keyCount || 0);
       setConversations(list.data || []);
       const conversationId = initialConversationId || list.data?.[0]?.id || null;
       if (!conversationId) {
