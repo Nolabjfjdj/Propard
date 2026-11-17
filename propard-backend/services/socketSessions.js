@@ -19,4 +19,23 @@ function disconnectUserSessionSockets(io, connectedUsers, userId, sessionJti, ev
   return disconnected;
 }
 
-module.exports = { disconnectUserSessionSockets };
+function scheduleSocketSessionExpiry(socket, expiresAt, now = Date.now(), setTimer = setTimeout, clearTimer = clearTimeout) {
+  const delay = Number(expiresAt) - Number(now);
+  const payload = { message: 'Session expirée. Reconnecte-toi.' };
+
+  if (!Number.isFinite(delay) || delay <= 0) {
+    socket.emit('sessionExpired', payload);
+    socket.disconnect(true);
+    return null;
+  }
+
+  const timer = setTimer(() => {
+    socket.emit('sessionExpired', payload);
+    socket.disconnect(true);
+  }, delay);
+
+  socket.once('disconnect', () => clearTimer(timer));
+  return timer;
+}
+
+module.exports = { disconnectUserSessionSockets, scheduleSocketSessionExpiry };
