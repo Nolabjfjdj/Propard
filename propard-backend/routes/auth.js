@@ -529,6 +529,11 @@ router.post('/logout', authMiddleware, async (req, res) => {
           }
         }
       );
+
+      const disconnectUserSessionSockets = req.app.get('disconnectUserSessionSockets');
+      if (typeof disconnectUserSessionSockets === 'function') {
+        disconnectUserSessionSockets(req.user.id, req.user.jti);
+      }
     } else {
       const user = await User.findByIdAndUpdate(
         req.user.id,
