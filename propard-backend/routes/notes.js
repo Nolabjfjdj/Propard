@@ -49,7 +49,7 @@ function emitNoteUpdate(req, scope, key, updatedAt, updatedBy, group = null) {
   }
 }
 
-router.get('/private/:friendId', async (req, res) => {
+router.get('/private/:friendId', createRateLimiter({ windowMs: 60 * 1000, max: 60, keyFn: req => 'private-note-read:' + req.user.id }), async (req, res) => {
   try {
     const key = await getPrivateConversation(req, req.params.friendId);
     if (!key) return res.status(403).json({ error: 'Conversation privée inaccessible.' });
@@ -97,7 +97,7 @@ router.put('/private/:friendId', saveLimiter, async (req, res) => {
   }
 });
 
-router.get('/group/:groupId', async (req, res) => {
+router.get('/group/:groupId', createRateLimiter({ windowMs: 60 * 1000, max: 60, keyFn: req => 'group-note-read:' + req.user.id }), async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.groupId)) return res.status(400).json({ error: 'Groupe invalide.' });
     const group = await Group.findOne({ _id: req.params.groupId, 'members.userId': req.user.id }).select('_id');
