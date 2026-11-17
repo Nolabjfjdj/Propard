@@ -526,7 +526,7 @@ io.on('connection',async socket=>{
     );
   });
 
-  registerSocketHandler('sendMessage',async({receiverId,content,attachmentIds=[]}={})=>{
+  registerSocketHandler('sendMessage',async({receiverId,content,attachmentIds=[],expiresIn=0}={})=>{
     try{
       if(!socket.userId) return;
       if(!allowSocketEvent(socket,'sendMessage',20,10000)){
@@ -567,6 +567,14 @@ io.on('connection',async socket=>{
         return socket.emit('messageError',{message:'Pièces jointes invalides.'});
       }
 
+      if(![0,3600,86400,604800].includes(expiresIn)){
+        return socket.emit('messageError',{message:'Durée éphémère invalide.'});
+      }
+      if(expiresIn > 0 && attachmentIds.length){
+        return socket.emit('messageError',{message:'Les messages éphémères ne peuvent pas contenir de pièces jointes.'});
+      }
+      const expiresAt = expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000) : null;
+
       if(attachmentIds.length){
         const [readyAttachments, recipientAccount, senderAccount]=await Promise.all([
           FileAttachment.find({
@@ -606,7 +614,8 @@ io.on('connection',async socket=>{
         content:content.trim(),
         attachments:attachmentIds,
         originalContent:null,
-        encrypted:true
+        encrypted:true,
+        expiresAt
       });
 
       if(attachmentIds.length){
@@ -628,6 +637,7 @@ io.on('connection',async socket=>{
         content:message.content,
         attachments:message.attachments.map(id=>id.toString()),
         encrypted:true,
+        expiresAt:message.expiresAt,
         createdAt:message.createdAt
       };
 
@@ -681,7 +691,7 @@ io.on('connection',async socket=>{
   // MESSAGES DE GROUPE
   // ─────────────────────────────────────
 
-  registerSocketHandler('sendGroupMessage',async({groupId,content,keyVersion,attachmentIds=[]}={})=>{
+  registerSocketHandler('sendGroupMessage',async({groupId,content,keyVersion,attachmentIds=[],expiresIn=0}={})=>{
     try{
       if(!socket.userId) return;
       if(!allowSocketEvent(socket,'sendGroupMessage',20,10000)){
@@ -736,6 +746,14 @@ io.on('connection',async socket=>{
         return socket.emit('groupMessageError',{message:'Pièces jointes invalides.'});
       }
 
+      if(![0,3600,86400,604800].includes(expiresIn)){
+        return socket.emit('groupMessageError',{message:'Durée éphémère invalide.'});
+      }
+      if(expiresIn > 0 && attachmentIds.length){
+        return socket.emit('groupMessageError',{message:'Les messages éphémères ne peuvent pas contenir de pièces jointes.'});
+      }
+      const expiresAt = expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000) : null;
+
       if(attachmentIds.length){
         const readyAttachments=await FileAttachment.find({
           _id:{$in:attachmentIds},
@@ -757,7 +775,8 @@ io.on('connection',async socket=>{
         content:content.trim(),
         attachments:attachmentIds,
         encrypted:true,
-        keyVersion:currentKeyVersion
+        keyVersion:currentKeyVersion,
+        expiresAt
       });
 
       if(attachmentIds.length){
@@ -782,6 +801,7 @@ io.on('connection',async socket=>{
         attachments:message.attachments.map(id=>id.toString()),
         encrypted:true,
         keyVersion:message.keyVersion,
+        expiresAt:message.expiresAt,
         createdAt:message.createdAt
       };
 
