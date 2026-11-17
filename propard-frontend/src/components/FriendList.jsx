@@ -44,6 +44,10 @@ export default function FriendList({
   };
 
   const createFolder = () => {
+    if (folderData.names.length >= 30) {
+      window.alert('La limite de 30 dossiers est atteinte.');
+      return;
+    }
     const name = window.prompt('Nom du dossier (24 caractères maximum) :');
     const cleanName = typeof name === 'string' ? name.trim().slice(0, 24) : '';
     if (!cleanName) return;
