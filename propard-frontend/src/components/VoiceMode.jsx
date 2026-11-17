@@ -6,10 +6,10 @@ const getRecognition = () => {
 };
 
 const normalizeTranscript = value => String(value || '')
-  .replace(/\\bpro\\s*dromes?\\s+ai\\b/gi, 'Propard AI')
-  .replace(/\\bpro\\s*part\\s+ai\\b/gi, 'Propard AI')
-  .replace(/\\bpropard\\s+ia\\b/gi, 'Propard AI')
-  .replace(/\\bpropard\\s+ai\\b/gi, 'Propard AI');
+  .replace(/\bpro\s*dromes?\s+ai\b/gi, 'Propard AI')
+  .replace(/\bpro\s*part\s+ai\b/gi, 'Propard AI')
+  .replace(/\bpropard\s+ia\b/gi, 'Propard AI')
+  .replace(/\bpropard\s+ai\b/gi, 'Propard AI');
 
 function MicrophoneIcon() {
   return (
