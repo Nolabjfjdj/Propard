@@ -46,6 +46,21 @@ export default function SettingsPage() {
     }
   };
 
+  const revokeAllSessions = async () => {
+    if (!window.confirm('Déconnecter tous les appareils, y compris celui-ci ? Tu devras te reconnecter.')) return;
+    setLoading(true);
+    setError('');
+    try {
+      await api.post('/api/auth/logout-all', {}, { headers });
+      localStorage.removeItem('propard_token');
+      localStorage.removeItem('propard_user');
+      window.location.href = '/';
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de déconnecter tous les appareils.');
+      setLoading(false);
+    }
+  };
+
   const revokeSession = async session => {
     if (!window.confirm(session.current
       ? 'Révoquer cette session déconnectera cet appareil. Continuer ?'
@@ -364,6 +379,9 @@ export default function SettingsPage() {
               </div>
             ))}
             <button type="button" style={styles.secondary} onClick={loadSessions} disabled={loading}>Actualiser</button>
+            <button type="button" style={{ ...styles.danger, width: '100%', marginTop: 12 }} onClick={revokeAllSessions} disabled={loading}>
+              Déconnecter tous les appareils
+            </button>
           </div>
         )}
         {section === 'e2ee' && (
