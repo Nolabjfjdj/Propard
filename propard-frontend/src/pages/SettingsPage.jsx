@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { findStoredPrivateKeyForRecovery, publicKeyFromPrivateJwk, encryptPrivateKeyBackup } from '../utils/crypto';
 
 export default function SettingsPage() {
   const { token, user } = useAuth();
+  const { accent, setAccent } = useTheme();
   const [section, setSection] = useState('main');
   const [passkeys, setPasskeys] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -43,7 +45,7 @@ export default function SettingsPage() {
       setSection('security');
       return;
     }
-    if (section === 'security') {
+    if (section === 'security' || section === 'appearance') {
       setSection('main');
       return;
     }
@@ -193,7 +195,9 @@ export default function SettingsPage() {
 
   const heading = section === 'main'
     ? 'Paramètres'
-    : section === 'security'
+    : section === 'appearance'
+      ? 'Personnalisation'
+      : section === 'security'
       ? 'Sécurité'
       : section === 'e2ee'
         ? 'Récupération E2EE'
@@ -207,7 +211,16 @@ export default function SettingsPage() {
         </button>
         <h1 style={styles.title}>{heading}</h1>
         {section === 'main' && (
-          <button type="button" style={styles.row} onClick={() => setSection('security')}>
+          <>
+          <button type="button" style={styles.row} onClick={() => setSection('appearance')}>
+            <span style={styles.icon}>◉</span>
+            <span style={styles.rowContent}>
+              <strong>Personnalisation</strong>
+              <small>Choisir la couleur de Propard</small>
+            </span>
+            <span style={styles.arrow}>›</span>
+          </button>
+          <button type="button" style={{ ...styles.row, marginTop: '12px' }} onClick={() => setSection('security')}>
             <span style={styles.icon}>♙</span>
             <span style={styles.rowContent}>
               <strong>Sécurité et A2F</strong>
@@ -215,6 +228,43 @@ export default function SettingsPage() {
             </span>
             <span style={styles.arrow}>›</span>
           </button>
+          </>
+        )}
+        {section === 'appearance' && (
+          <div style={styles.card}>
+            <strong>Couleur d’accent</strong>
+            <p style={styles.description}>Cette couleur est appliquée aux boutons, aux liens et aux éléments importants. Le choix est enregistré sur cet appareil.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(92px, 1fr))', gap: 10, marginTop: 18 }}>
+              {[
+                ['blue', 'Bleu', '#5b8af0'],
+                ['purple', 'Violet', '#9b72f2'],
+                ['green', 'Vert', '#38b879'],
+                ['pink', 'Rose', '#e46ca8'],
+                ['orange', 'Orange', '#e58a42']
+              ].map(([value, label, color]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setAccent(value)}
+                  aria-pressed={accent === value}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '10px',
+                    borderRadius: 9,
+                    border: accent === value ? '2px solid var(--accent)' : '1px solid var(--border)',
+                    background: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <span style={{ width: 18, height: 18, borderRadius: 99, background: color, flexShrink: 0 }} />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         )}
         {section === 'security' && (
           <>
