@@ -2469,7 +2469,7 @@ export default function GroupChat({
             gap: '8px'
           }}
         >
-          <ConversationGallery messages={messages} token={token} userId={myId} />
+          <ConversationGallery messages={messages} token={token} userId={myId} scope="group" conversationId={group._id} />
           <ConversationSharedNote scope="group" conversationId={group._id} userId={myId} token={token} encryptionKey={key} keyVersion={group.keyVersion || 1} />
           <E2EEVerification scope="group" token={token} encryptionKey={key} keyVersion={group.keyVersion || 1} />
           <button
