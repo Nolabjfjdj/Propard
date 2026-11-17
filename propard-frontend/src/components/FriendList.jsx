@@ -214,7 +214,7 @@ export default function FriendList({
     if (!captchaRequired) return;
     const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
     if (!siteKey) {
-      setRequestActionError('La protection anti-bot n’est pas configurée.');
+      window.setTimeout(() => setRequestActionError('La protection anti-bot n’est pas configurée.'), 0);
       return;
     }
     const renderCaptcha = () => {
@@ -254,9 +254,11 @@ export default function FriendList({
   }, [captchaRequired]);
 
   useEffect(() => {
-    fetchData();
-    fetchUnread();
-    fetchGroups();
+    const initialLoad = window.setTimeout(() => {
+      fetchData();
+      fetchUnread();
+      fetchGroups();
+    }, 0);
 
     const interval = setInterval(() => {
       fetchData();
@@ -264,7 +266,10 @@ export default function FriendList({
       fetchGroups();
     }, 5000);
 
-    return () => clearInterval(interval);
+    return () => {
+      window.clearTimeout(initialLoad);
+      clearInterval(interval);
+    };
   }, [token, refreshKey]);
 
   useEffect(() => {
