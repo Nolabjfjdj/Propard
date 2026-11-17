@@ -1,4 +1,4 @@
-name: Propard pre-release validation final
+name: Propard final validation
 
 on:
   push:
