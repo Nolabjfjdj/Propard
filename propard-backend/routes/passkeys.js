@@ -78,23 +78,28 @@ const issueToken = user => jwt.sign(
 async function recordIssuedSession(userId, token, req) {
   const decoded = jwt.decode(token);
   if (!decoded?.jti || !decoded?.exp) return;
-  await User.updateOne(
-    { _id: userId },
-    {
-      $push: {
-        activeSessions: {
-          $each: [{
-            jti: decoded.jti,
-            createdAt: new Date(),
-            expiresAt: new Date(decoded.exp * 1000),
-            ip: String(req.ip || '').slice(0, 64) || null,
-            userAgent: String(req.get('user-agent') || '').slice(0, 300) || null
-          }],
-          $slice: -10
-        }
-      }
+  const user = await User.findById(userId).select('+activeSessions +revokedSessions');
+  if (!user) throw new Error('Utilisateur introuvable lors de la création de session.');
+  const now = new Date();
+  user.activeSessions = (user.activeSessions || []).filter(session => session.expiresAt > now);
+  user.revokedSessions = (user.revokedSessions || []).filter(session => session.expiresAt > now);
+  user.activeSessions.push({
+    jti: decoded.jti,
+    createdAt: now,
+    expiresAt: new Date(decoded.exp * 1000),
+    ip: String(req.ip || '').slice(0, 64) || null,
+    userAgent: String(req.get('user-agent') || '').slice(0, 300) || null
+  });
+  while (user.activeSessions.length > 10) {
+    const oldest = user.activeSessions.shift();
+    if (oldest.expiresAt > now) {
+      user.revokedSessions.push({ jti: oldest.jti, expiresAt: oldest.expiresAt });
+      const disconnect = req.app.get('disconnectUserSessionSockets');
+      if (typeof disconnect === 'function') disconnect(userId, oldest.jti);
     }
-  );
+  }
+  user.revokedSessions = user.revokedSessions.slice(-100);
+  await user.save();
 }
 const publicUser = user => ({
   id: user._id,
