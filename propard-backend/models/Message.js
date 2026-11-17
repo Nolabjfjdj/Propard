@@ -14,6 +14,7 @@ const messageSchema = new mongoose.Schema({
   pinnedAt:{type:Date,default:null},  pinnedBy:{type:mongoose.Schema.Types.ObjectId,ref:'User',default:null},
   read:{type:Boolean,default:false},
   readReceiptSent:{type:Boolean,default:true},
+  expiresAt:{type:Date,default:null},
   reactions: [{
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     emoji: { type: String, required: true, maxlength: 32 },
@@ -21,5 +22,7 @@ const messageSchema = new mongoose.Schema({
   }],
   createdAt:{type:Date,default:Date.now}
 });
+
+messageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = registerModel('Message', messageSchema);
