@@ -1090,13 +1090,19 @@ router.patch(
         });
       }
 
+      const currentUser = await User.findById(req.user.id).select('readReceiptsEnabled');
+      if (currentUser?.readReceiptsEnabled === false) {
+        return res.json({ success: true, readReceiptsEnabled: false });
+      }
+
       me.lastReadAt =
         new Date();
 
       await group.save();
 
       res.json({
-        success: true
+        success: true,
+        readReceiptsEnabled: true
       });
     } catch (e) {
       console.error(
