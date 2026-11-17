@@ -172,6 +172,28 @@ function signToken(user) {
   );
 }
 
+async function recordIssuedSession(userId, token, req) {
+  const decoded = jwt.decode(token);
+  if (!decoded?.jti || !decoded?.exp) return;
+  await User.updateOne(
+    { _id: userId },
+    {
+      $push: {
+        activeSessions: {
+          $each: [{
+            jti: decoded.jti,
+            createdAt: new Date(),
+            expiresAt: new Date(decoded.exp * 1000),
+            ip: String(req.ip || '').slice(0, 64) || null,
+            userAgent: String(req.get('user-agent') || '').slice(0, 300) || null
+          }],
+          $slice: -10
+        }
+      }
+    }
+  );
+}
+
 const escapeRegExp = value =>
   value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -411,6 +433,7 @@ router.post('/register', registerRateLimiter, async (req, res) => {
     await user.save();
 
     const token = signToken(user);
+    await recordIssuedSession(user._id, token, req);
 
     res.status(201).json({
       message: 'Compte créé avec succès',
@@ -483,6 +506,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     }
 
     const token = signToken(user);
+    await recordIssuedSession(user._id, token, req);
 
     const deletionExpiresAt = user.pendingDeletionAt
       ? new Date(user.pendingDeletionAt.getTime() + THIRTY_DAYS_MS)
@@ -510,6 +534,57 @@ router.post('/login', loginRateLimiter, async (req, res) => {
 });
 
 
+router.get('/sessions', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('+activeSessions');
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+    const now = new Date();
+    user.activeSessions = (user.activeSessions || []).filter(session => session.expiresAt > now);
+    await user.save();
+    res.json({
+      sessions: user.activeSessions.map(session => ({
+        jti: session.jti,
+        createdAt: session.createdAt,
+        expiresAt: session.expiresAt,
+        ip: session.ip,
+        userAgent: session.userAgent,
+        current: session.jti === req.user.jti
+      }))
+    });
+  } catch (error) {
+    console.error('Session listing failed:', error);
+    res.status(500).json({ error: 'Impossible de charger les sessions.' });
+  }
+});
+
+router.delete('/sessions/:jti', authMiddleware, async (req, res) => {
+  try {
+    const jti = req.params.jti;
+    if (typeof jti !== 'string' || !/^[a-f0-9-]{36}$/i.test(jti)) {
+      return res.status(400).json({ error: 'Identifiant de session invalide.' });
+    }
+    const user = await User.findById(req.user.id).select('+activeSessions +revokedSessions');
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+    const session = (user.activeSessions || []).find(item => item.jti === jti);
+    if (!session) return res.status(404).json({ error: 'Session introuvable ou déjà révoquée.' });
+    user.activeSessions = user.activeSessions.filter(item => item.jti !== jti);
+    if (session.expiresAt > new Date()) {
+      user.revokedSessions = [...(user.revokedSessions || []), { jti, expiresAt: session.expiresAt }]
+        .filter(item => item.expiresAt > new Date())
+        .slice(-100);
+    }
+    await user.save();
+    const disconnectUserSessionSockets = req.app.get('disconnectUserSessionSockets');
+    if (typeof disconnectUserSessionSockets === 'function') {
+      disconnectUserSessionSockets(req.user.id, jti);
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Session revocation failed:', error);
+    res.status(500).json({ error: 'Impossible de révoquer cette session.' });
+  }
+});
+
 router.post('/logout', authMiddleware, async (req, res) => {
   try {
     if (typeof req.user.jti === 'string' && req.user.jti.length >= 16) {
@@ -517,7 +592,7 @@ router.post('/logout', authMiddleware, async (req, res) => {
 
       await User.updateOne(
         { _id: req.user.id },
-        { $pull: { revokedSessions: { expiresAt: { $lte: new Date() } } } }
+        { $pull: { revokedSessions: { expiresAt: { $lte: new Date() } }, activeSessions: { expiresAt: { $lte: new Date() } } } }
       );
 
       await User.updateOne(
@@ -530,6 +605,11 @@ router.post('/logout', authMiddleware, async (req, res) => {
             }
           }
         }
+      );
+
+      await User.updateOne(
+        { _id: req.user.id },
+        { $pull: { activeSessions: { jti: req.user.jti } } }
       );
 
       const disconnectUserSessionSockets = req.app.get('disconnectUserSessionSockets');
@@ -564,7 +644,7 @@ router.post('/logout-all', authMiddleware, logoutAllLimiter, async (req, res) =>
   try {
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { $inc: { sessionVersion: 1 } },
+      { $inc: { sessionVersion: 1 }, $set: { activeSessions: [] } },
       { new: true, select: '_id sessionVersion' }
     );
 
