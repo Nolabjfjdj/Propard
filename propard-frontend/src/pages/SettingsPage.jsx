@@ -12,6 +12,8 @@ export default function SettingsPage() {
   const [passkeys, setPasskeys] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [securityEvents, setSecurityEvents] = useState([]);
+  const [readReceiptsEnabled, setReadReceiptsEnabled] = useState(true);
+  const [readReceiptsLoading, setReadReceiptsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -19,6 +21,26 @@ export default function SettingsPage() {
   const [recoveryCodesAvailable, setRecoveryCodesAvailable] = useState(false);
 
   const headers = { Authorization: `Bearer ${token}` };
+
+  useEffect(() => {
+    if (!token) return;
+    api.get('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+      .then(response => setReadReceiptsEnabled(response.data.readReceiptsEnabled !== false))
+      .catch(error => console.error('Impossible de charger les préférences de lecture:', error));
+  }, [token]);
+
+  const updateReadReceipts = async enabled => {
+    setReadReceiptsLoading(true);
+    setError('');
+    try {
+      await api.patch('/api/auth/me', { readReceiptsEnabled: enabled }, { headers });
+      setReadReceiptsEnabled(enabled);
+    } catch (error) {
+      setError(error.response?.data?.error || 'Impossible de modifier cette préférence.');
+    } finally {
+      setReadReceiptsLoading(false);
+    }
+  };
 
   const loadPasskeys = async () => {
     setLoading(true);
@@ -372,6 +394,19 @@ export default function SettingsPage() {
               </span>
               <span style={styles.arrow}>›</span>
             </button>
+            <div style={{ ...styles.card, marginTop: 14 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-primary)', fontWeight: 600 }}>
+                <input
+                  type="checkbox"
+                  checked={readReceiptsEnabled}
+                  disabled={readReceiptsLoading}
+                  onChange={event => updateReadReceipts(event.target.checked)}
+                />
+                Envoyer les confirmations de lecture
+              </label>
+              <p style={styles.description}>Si tu désactives cette option, les autres membres ne verront plus quand tu as lu leurs messages privés ou de groupe. Tu continueras à voir les confirmations des autres.</p>
+            </div>
+            {error && <p role="alert" style={styles.error}>{error}</p>}
           </>
         )}
         {section === 'sessions' && (
