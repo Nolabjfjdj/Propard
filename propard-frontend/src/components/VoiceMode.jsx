@@ -9,7 +9,9 @@ const normalizeTranscript = value => String(value || '')
   .replace(/\bpro\s*dromes?\s+ai\b/gi, 'Propard AI')
   .replace(/\bpro\s*part\s+ai\b/gi, 'Propard AI')
   .replace(/\bpropard\s+ia\b/gi, 'Propard AI')
-  .replace(/\bpropard\s+ai\b/gi, 'Propard AI');
+  .replace(/\bpropard\s+ai\b/gi, 'Propard AI')
+  .replace(/\bla\s*banane\s*415\b/gi, 'LaBanane415')
+  .replace(/\bbanane\s*vr\b/gi, 'BananeVR');
 
 function MicrophoneIcon() {
   return (
