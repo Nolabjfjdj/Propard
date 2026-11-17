@@ -427,6 +427,11 @@ router.patch('/messages/read/:friendId', async (req, res) => {
       });
     }
 
+    const currentUser = await User.findById(req.user.id).select('readReceiptsEnabled');
+    if (currentUser?.readReceiptsEnabled === false) {
+      return res.json({ success: true, readReceiptsEnabled: false });
+    }
+
     await Message.updateMany(
       {
         sender: req.params.friendId,
@@ -439,7 +444,8 @@ router.patch('/messages/read/:friendId', async (req, res) => {
     );
 
     res.json({
-      success: true
+      success: true,
+      readReceiptsEnabled: true
     });
   } catch (e) {
     console.error(e);
