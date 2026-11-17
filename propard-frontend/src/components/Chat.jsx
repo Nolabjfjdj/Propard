@@ -23,7 +23,6 @@ export default function Chat({
   token,
   userId,
   hideFriendIps,
-  isMobile,
   onGrabStart,
   grabbedMessageId
 }) {
@@ -116,9 +115,9 @@ export default function Chat({
   };
 
   const friendName =
-    friend.nickname?.trim() ||
-    friend.displayName?.trim() ||
-    friend.username ||
+    friend?.nickname?.trim() ||
+    friend?.displayName?.trim() ||
+    friend?.username ||
     'Ami';
 
   useEffect(() => {
@@ -168,11 +167,8 @@ export default function Chat({
     };
   }, [captchaRequired]);
 
-  if (!friend || !friend._id) {
-    return <div style={styles.container} />;
-  }
-
   useEffect(() => {
+    if (!friend?._id) return undefined;
     let cancelled = false;
 
     const loadFriendKey = async () => {
@@ -237,7 +233,7 @@ export default function Chat({
     return () => {
       cancelled = true;
     };
-  }, [friend._id, friend.publicKey, token]);
+  }, [friend?._id, friend?.publicKey, token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -335,6 +331,7 @@ export default function Chat({
   };
 
   useEffect(() => {
+    if (!friend?._id) return undefined;
     let cancelled = false;
 
     const fetchMessages = async () => {
@@ -405,7 +402,7 @@ export default function Chat({
     return () => {
       cancelled = true;
     };
-  }, [friend._id, token, sharedKey, friendKeyLoading, keyError]);
+  }, [friend?._id, token, sharedKey, friendKeyLoading, keyError]);
 
   useEffect(() => {
     const conversationId = friend?._id?.toString();
@@ -439,6 +436,7 @@ export default function Chat({
   }, [friend?._id]);
 
   useEffect(() => {
+    if (!friend?._id) return undefined;
     const handleNewMessage = async msg => {
       const senderId = (
         msg.sender?._id ||
@@ -698,7 +696,7 @@ export default function Chat({
       socket.off('messageError', handleMessageError);
     };
   }, [
-    friend._id,
+    friend?._id,
     messages,
     myId,
     sharedKey,
@@ -1300,6 +1298,8 @@ export default function Chat({
       prev.toDateString()
     );
   };
+
+  if (!friend || !friend._id) return <div style={styles.container} />;
 
   return (
     <div style={styles.container}>
