@@ -598,3 +598,8 @@ Les conversations privées affichent une empreinte SHA-256 calculée à partir d
 ### Alertes de nouvelle connexion
 
 Lorsqu'une connexion par mot de passe, clé d'accès ou code de récupération est créée alors qu'une autre session est déjà active, Propard tente d'envoyer une notification push de sécurité aux appareils enregistrés. L'alerte ne contient ni adresse IP ni mot de passe. Elle dépend de la configuration Web Push ou APNs du compte.
+
+
+### Messages éphémères
+
+Les conversations privées et les groupes permettent de choisir une expiration de 1 heure, 24 heures ou 7 jours pour un nouveau message texte. Le serveur conserve uniquement le contenu chiffré et la date d'expiration ; les messages expirés sont exclus de l'historique et des compteurs non lus, puis supprimés automatiquement par l'index TTL MongoDB. Les pièces jointes sont volontairement désactivées pour les messages éphémères afin d'éviter de laisser des fichiers orphelins.
