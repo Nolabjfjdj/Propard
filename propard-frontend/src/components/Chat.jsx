@@ -1794,16 +1794,18 @@ export default function Chat({
 
             {isMe ? (
               <>
-                <button
-                  style={styles.contextItem}
-                  onClick={() =>
-                    startEdit(
-                      contextMenu.msg
-                    )
-                  }
-                >
-                  Modifier
-                </button>
+                {contextMenu.msg.messageType !== 'poll' && (
+                  <button
+                    style={styles.contextItem}
+                    onClick={() =>
+                      startEdit(
+                        contextMenu.msg
+                      )
+                    }
+                  >
+                    Modifier
+                  </button>
+                )}
 
                 <button
                   style={{
