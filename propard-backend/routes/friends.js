@@ -399,7 +399,11 @@ router.get('/unread', createRateLimiter({
         sender: friendId,
         receiver: req.user.id,
         read: false,
-        deleted: { $ne: true }
+        deleted: { $ne: true },
+        $or: [
+          { expiresAt: null },
+          { expiresAt: { $gt: new Date() } }
+        ]
       });
 
       if (count > 0) {
@@ -493,7 +497,13 @@ router.get('/messages/:friendId', createRateLimiter({
           receiver: req.user.id
         }
       ],
-      deleted: { $ne: true }
+      deleted: { $ne: true },
+      $and: [{
+        $or: [
+          { expiresAt: null },
+          { expiresAt: { $gt: new Date() } }
+        ]
+      }]
     };
 
     if (req.query.direction === 'sent') {
