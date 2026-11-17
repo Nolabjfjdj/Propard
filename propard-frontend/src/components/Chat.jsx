@@ -4,6 +4,7 @@ import socket from '../socket';
 import VoiceCall from './VoiceCall';
 import MessageReactions from './MessageReactions';
 import FileAttachments from './FileAttachments';
+import ConversationGallery from './ConversationGallery';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
 import LinkText from './LinkText';
@@ -25,6 +26,7 @@ export default function Chat({
   grabbedMessageId
 }) {
   const [messages, setMessages] = useState([]);
+  const [showGallery, setShowGallery] = useState(false);
   const reactionNotificationAudioRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -1335,6 +1337,7 @@ export default function Chat({
             gap: '10px'
           }}
         >
+          <ConversationGallery messages={messages} token={token} userId={userId} />
           <button
             type="button"
             onClick={reportConversation}
