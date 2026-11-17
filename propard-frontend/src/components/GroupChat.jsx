@@ -1008,6 +1008,19 @@ export default function GroupChat({
     });
   }, [messages]);
 
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setMessages(previous => {
+        const now = Date.now();
+        const visible = previous.filter(message =>
+          !message.expiresAt || new Date(message.expiresAt).getTime() > now
+        );
+        return visible.length === previous.length ? previous : visible;
+      });
+    }, 5000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   /*
    * Fermer les menus / suggestions.
    */
