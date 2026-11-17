@@ -8,7 +8,10 @@ const path=require('path');
 const {randomUUID}=require('crypto');
 const {createCallStateManager}=require('./services/callState');
 const {createSocketRateLimiter}=require('./services/socketRateLimit');
-const { disconnectUserSessionSockets: disconnectSessionSockets } = require('./services/socketSessions');
+const {
+  disconnectUserSessionSockets: disconnectSessionSockets,
+  scheduleSocketSessionExpiry
+} = require('./services/socketSessions');
 const {connectShards}=require('./db/shards');
 const {
   isEncryptedMessagePayload,
@@ -403,7 +406,7 @@ io.use(async(socket,next)=>{
 
     const decoded=jwt.verify(token,process.env.JWT_SECRET,{ algorithms:['HS256'] });
 
-    if(!decoded?.id){
+    if(!decoded?.id || !Number.isFinite(decoded.exp)){
       return next(new Error('Unauthorized'));
     }
 
@@ -425,6 +428,7 @@ io.use(async(socket,next)=>{
 
     socket.userId=decoded.id;
     socket.sessionJti=typeof decoded.jti === 'string' ? decoded.jti : null;
+    socket.sessionExpiresAt=decoded.exp * 1000;
     next();
   }catch{
     next(new Error('Unauthorized'));
@@ -432,6 +436,8 @@ io.use(async(socket,next)=>{
 });
 
 io.on('connection',async socket=>{
+
+  scheduleSocketSessionExpiry(socket, socket.sessionExpiresAt);
 
   const originalSocketOn=socket.on.bind(socket);
   const registerSocketHandler=(event,handler)=>{
