@@ -2431,7 +2431,7 @@ export default function GroupChat({
           }}
         >
           <ConversationGallery messages={messages} token={token} userId={myId} />
-          <ConversationSharedNote scope="group" conversationId={group._id} userId={myId} token={token} encryptionKey={key} />
+          <ConversationSharedNote scope="group" conversationId={group._id} userId={myId} token={token} encryptionKey={key} keyVersion={group.keyVersion || 1} />
           <button
             type="button"
             onClick={e => {
