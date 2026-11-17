@@ -2210,6 +2210,7 @@ const styles = {
 
   inputBar: {
     display: 'flex',
+    flexWrap: 'wrap',
     padding: '16px',
     gap: '8px',
     borderTop:
@@ -2220,6 +2221,7 @@ const styles = {
 
   input: {
     flex: 1,
+    minWidth: 0,
     padding: '12px',
     borderRadius: '8px',
     border:
