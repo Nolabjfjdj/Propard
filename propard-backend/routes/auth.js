@@ -619,7 +619,7 @@ router.post('/logout', authMiddleware, async (req, res) => {
     } else {
       const user = await User.findByIdAndUpdate(
         req.user.id,
-        { $inc: { sessionVersion: 1 } },
+        { $inc: { sessionVersion: 1 }, $set: { activeSessions: [] } },
         { new: true, select: '_id sessionVersion' }
       );
 
