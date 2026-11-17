@@ -495,6 +495,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
         id: user._id,
         username: user.username,
         displayName: user.displayName,
+        statusMessage: user.statusMessage,
         avatar: user.avatar,
         ipAlias: user.ipAlias,
         publicKey: user.publicKey,
