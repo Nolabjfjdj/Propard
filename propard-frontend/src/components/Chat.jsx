@@ -7,6 +7,7 @@ import FileAttachments from './FileAttachments';
 import ConversationGallery from './ConversationGallery';
 import ConversationSharedNote from './ConversationSharedNote';
 import E2EEVerification from './E2EEVerification';
+import PollMessage from './PollMessage';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
 import LinkText from './LinkText';
@@ -1627,7 +1628,15 @@ export default function Chat({
                         <>
                           {msg.expiresAt && <p style={{ fontSize: '10px', color: isMe ? 'rgba(255,255,255,0.75)' : 'var(--text-secondary)', margin: '0 0 5px' }}>Message éphémère</p>}
                           {msg.pinned && <p style={{ fontSize: '11px', color: isMe ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)', margin: '0 0 5px' }}>Épinglé</p>}
-                          {content && (
+                          {msg.messageType === 'poll' ? (
+                            <PollMessage
+                              content={content}
+                              reactions={msg.reactions}
+                              userId={myId}
+                              onVote={emoji => toggleMessageReaction(msg._id, emoji)}
+                              disabled={msg.decryptionError}
+                            />
+                          ) : content && (
                             <p
                               style={{
                                 ...styles.text,
