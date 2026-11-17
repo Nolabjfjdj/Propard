@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - feature/propard-full-upgrade
+    paths:
+      - .github/workflows/propard-checks.yml
   pull_request:
     branches:
       - main
