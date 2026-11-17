@@ -423,7 +423,7 @@ export default function SettingsPage() {
             {securityEvents.map((event, index) => (
               <div key={event.createdAt + '-' + index} style={styles.passkey}>
                 <div style={styles.passkeyInfo}>
-                  <strong>{event.eventType === 'registration' ? 'Création du compte' : event.eventType === 'passkey_login' ? 'Connexion avec une clé d’accès' : 'Connexion avec mot de passe'}</strong>
+                  <strong>{event.eventType === 'registration' ? 'Création du compte' : event.eventType === 'passkey_login' ? 'Connexion avec une clé d’accès' : event.eventType === 'recovery_code_login' ? 'Connexion avec un code de récupération' : 'Connexion avec mot de passe'}</strong>
                   <small>{new Date(event.createdAt).toLocaleString('fr-FR')}</small>
                   <small>{event.userAgent || 'Navigateur inconnu'}</small>
                 </div>
