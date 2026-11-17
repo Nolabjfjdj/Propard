@@ -2944,23 +2944,27 @@ export default function GroupChat({
             e.stopPropagation()
           }
         >
-          <button
-            type="button"
-            style={styles.contextItem}
-            onClick={() => setContextMenu(current => ({ ...current, showReactions: !current.showReactions }))}
-          >
-            Réagir
-          </button>
-          {contextMenu.showReactions && (
-            <MessageReactions
-              reactions={contextMenu.message.reactions}
-              userId={myId}
-              showPicker
-              onReact={emoji => {
-                toggleGroupMessageReaction(contextMenu.message._id, emoji);
-                setContextMenu(null);
-              }}
-            />
+          {contextMenu.message.messageType !== 'poll' && (
+            <>
+              <button
+                type="button"
+                style={styles.contextItem}
+                onClick={() => setContextMenu(current => ({ ...current, showReactions: !current.showReactions }))}
+              >
+                Réagir
+              </button>
+              {contextMenu.showReactions && (
+                <MessageReactions
+                  reactions={contextMenu.message.reactions}
+                  userId={myId}
+                  showPicker
+                  onReact={emoji => {
+                    toggleGroupMessageReaction(contextMenu.message._id, emoji);
+                    setContextMenu(null);
+                  }}
+                />
+              )}
+            </>
           )}
           <button
             type="button"
