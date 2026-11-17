@@ -77,7 +77,6 @@ const getIceServers = async (token) => {
 
 export default function VoiceCall({
   friend,
-  userId,
   token,
   onClose,
   incomingOffer,
@@ -97,7 +96,6 @@ export default function VoiceCall({
   const [screenShareSettingsOpen, setScreenShareSettingsOpen] = useState(false);
   const [screenShareError, setScreenShareError] = useState('');
   const [screenShareSettings, setScreenShareSettings] = useState({ width: 2560, height: 1440, fps: 60, automatic: true, audio: true });
-  const screenShareSupported = typeof navigator !== 'undefined' && (Boolean(navigator.mediaDevices?.getDisplayMedia) || Boolean(window.Capacitor?.isNativePlatform?.()));
   const [remoteVideoAvailable, setRemoteVideoAvailable] = useState(false);
   const [isWatchingRemoteStream, setIsWatchingRemoteStream] = useState(false);
   const remoteViewerRef = useRef(null);
@@ -1982,7 +1980,7 @@ export default function VoiceCall({
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', paddingBottom: '10px' }}>
               <button
                 type="button"
-                onClick={() => { try { remoteViewerRef.current?.requestFullscreen?.()?.catch?.(() => {}); } catch {} }}
+                onClick={() => { try { remoteViewerRef.current?.requestFullscreen?.()?.catch?.(() => {}); } catch (error) { console.warn('Opération ignorée:', error?.message || error); } }}
                 aria-label="Mettre le stream en plein écran"
                 title="Mettre en plein écran"
                 style={{ width: '42px', height: '42px', border: '1px solid #555', borderRadius: '10px', background: '#222', color: '#fff', fontSize: '22px', cursor: 'pointer' }}
