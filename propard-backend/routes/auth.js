@@ -605,8 +605,8 @@ router.post('/logout', authMiddleware, async (req, res) => {
         {
           $push: {
             revokedSessions: {
-              jti: req.user.jti,
-              expiresAt
+              $each: [{ jti: req.user.jti, expiresAt }],
+              $slice: -100
             }
           }
         }
