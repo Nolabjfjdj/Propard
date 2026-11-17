@@ -87,7 +87,6 @@ async function recordIssuedSession(userId, token, req) {
     jti: decoded.jti,
     createdAt: now,
     expiresAt: new Date(decoded.exp * 1000),
-    ip: String(req.ip || '').slice(0, 64) || null,
     userAgent: String(req.get('user-agent') || '').slice(0, 300) || null
   });
   while (user.activeSessions.length > 10) {
