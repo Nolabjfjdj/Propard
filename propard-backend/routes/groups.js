@@ -1949,6 +1949,7 @@ router.patch('/:groupId/messages/:messageId/pin', createRateLimiter({
       return res.status(404).json({ error: 'Message introuvable.' });
     }
 
+    message.pinned = pinned;
     message.pinnedAt = pinned ? new Date() : null;
     message.pinnedBy = pinned ? req.user.id : null;
     await message.save();
