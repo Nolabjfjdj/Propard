@@ -5,13 +5,10 @@ import { enablePushNotifications, disablePushNotifications, isPushEnabled } from
 
 export default function ProfilePage({
   userId,
-  isMobile,
-  onBack,
   onOpenChat,
   onRelationshipChanged
 }) {
   const {
-    user: currentUser,
     token,
     updateUser
   } = useAuth();
