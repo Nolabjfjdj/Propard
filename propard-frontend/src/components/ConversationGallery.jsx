@@ -1,9 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import api from '../utils/api';
 import FileAttachments from './FileAttachments';
 
-export default function ConversationGallery({ messages, token, userId }) {
+export default function ConversationGallery({ messages, token, userId, scope, conversationId }) {
   const [open, setOpen] = useState(false);
-  const attachments = useMemo(() => {
+  const [attachments, setAttachments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const fallbackAttachments = useMemo(() => {
     const seen = new Set();
     const result = [];
     for (const message of messages || []) {
@@ -13,20 +18,54 @@ export default function ConversationGallery({ messages, token, userId }) {
         const key = id?.toString?.() || '';
         if (!key || seen.has(key)) continue;
         seen.add(key);
-        result.push(id);
+        result.push(key);
       }
     }
     return result;
   }, [messages]);
+
+  useEffect(() => {
+    if (!open || !conversationId) return undefined;
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const endpoint = scope === 'private'
+          ? '/api/friends/messages/' + conversationId + '/attachments'
+          : '/api/groups/' + conversationId + '/attachments';
+        const response = await api.get(endpoint, {
+          headers: { Authorization: 'Bearer ' + token }
+        });
+        if (!cancelled) {
+          const unique = [...new Set((response.data?.attachments || []).map(id => id.toString()))];
+          setAttachments(unique);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.response?.data?.error || 'Impossible de charger tous les fichiers. Affichage des fichiers déjà chargés.');
+          setAttachments(fallbackAttachments);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, scope, conversationId, token, fallbackAttachments]);
+
+  const count = attachments.length || fallbackAttachments.length;
 
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        disabled={!attachments.length}
-        title="Afficher les médias et fichiers partagés"
-        aria-label={`Médias et fichiers partagés : ${attachments.length}`}
+        disabled={!conversationId}
+        title="Afficher tous les médias et fichiers partagés"
+        aria-label={`Médias et fichiers partagés : ${count}`}
         style={{
           border: '1px solid var(--border)',
           borderRadius: 8,
@@ -34,12 +73,12 @@ export default function ConversationGallery({ messages, token, userId }) {
           background: 'var(--bg-tertiary)',
           color: 'var(--text-primary)',
           fontSize: 12,
-          cursor: attachments.length ? 'pointer' : 'not-allowed',
-          opacity: attachments.length ? 1 : 0.55,
+          cursor: conversationId ? 'pointer' : 'not-allowed',
+          opacity: conversationId ? 1 : 0.55,
           whiteSpace: 'nowrap'
         }}
       >
-        Médias et fichiers ({attachments.length})
+        Médias et fichiers ({count})
       </button>
       {open && (
         <div
@@ -75,18 +114,20 @@ export default function ConversationGallery({ messages, token, userId }) {
               <div>
                 <h2 style={{ margin: 0, fontSize: 18 }}>Médias et fichiers</h2>
                 <p style={{ margin: '5px 0 0', color: 'var(--text-secondary)', fontSize: 12 }}>
-                  {attachments.length} fichier(s) partagé(s) dans cette conversation
+                  {count} fichier(s) partagé(s) dans cette conversation
                 </p>
               </div>
               <button type="button" onClick={() => setOpen(false)} aria-label="Fermer la galerie" style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: 'pointer' }}>
                 Fermer
               </button>
             </div>
-            {attachments.length ? (
+            {loading && <p style={{ color: 'var(--text-secondary)' }}>Chargement de tous les fichiers…</p>}
+            {error && <p role="alert" style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{error}</p>}
+            {!loading && attachments.length ? (
               <FileAttachments attachments={attachments} token={token} userId={userId} />
-            ) : (
+            ) : !loading && !attachments.length ? (
               <p style={{ color: 'var(--text-secondary)' }}>Aucun fichier partagé pour le moment.</p>
-            )}
+            ) : null}
           </section>
         </div>
       )}
