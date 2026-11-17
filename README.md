@@ -564,3 +564,7 @@ Tous droits réservés à **BananeVR**, sous réserve des droits de tiers et des
 Les dépendances tierces restent soumises à leurs propres licences.
 
 Pour toute utilisation, reproduction, modification, redistribution ou exploitation du code de Propard qui n’est pas expressément autorisée par la licence du projet, une autorisation écrite préalable du titulaire des droits est requise.
+
+### Galerie des médias et fichiers
+
+Les conversations privées et les groupes disposent d'un accès « Médias et fichiers » dans leur en-tête. La galerie rassemble les pièces jointes des messages encore visibles, déduplique les identifiants et réutilise le même parcours de téléchargement et de déchiffrement côté client que les messages. Le serveur ne reçoit pas de contenu déchiffré supplémentaire pour afficher la galerie.
