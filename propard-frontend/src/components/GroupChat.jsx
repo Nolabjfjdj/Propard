@@ -11,6 +11,7 @@ import socket from '../socket';
 import GroupProfile from './GroupProfile';
 import MessageReactions from './MessageReactions';
 import FileAttachments from './FileAttachments';
+import ConversationGallery from './ConversationGallery';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
 import LinkText from './LinkText';
@@ -45,6 +46,8 @@ export default function GroupChat({
 
   const [messages, setMessages] =
     useState([]);
+
+  const [showGallery, setShowGallery] = useState(false);
 
   const reactionNotificationAudioRef = useRef(null);
 
@@ -2427,6 +2430,7 @@ export default function GroupChat({
             gap: '8px'
           }}
         >
+          <ConversationGallery messages={messages} token={token} userId={myId} />
           <button
             type="button"
             onClick={e => {
