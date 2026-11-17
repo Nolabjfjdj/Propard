@@ -588,3 +588,8 @@ Chaque compte peut désactiver l’envoi des confirmations de lecture depuis les
 ### Notes partagées chiffrées
 
 Les conversations privées et les groupes disposent d'une note partagée modifiable depuis leur en-tête. Le navigateur chiffre le texte avec la clé E2EE de la conversation avant l'envoi ; le serveur ne stocke que le texte chiffré et les métadonnées de mise à jour. Les accès sont limités aux amis de la conversation privée ou aux membres du groupe. Pour les groupes, la note conserve sa version de clé et les membres qui possèdent encore l'ancienne clé peuvent la migrer vers la version actuelle lors de son ouverture.
+
+
+### Vérification manuelle des clés E2EE
+
+Les conversations privées affichent une empreinte SHA-256 calculée à partir des deux clés publiques, triées de façon canonique pour obtenir la même empreinte des deux côtés. Les groupes affichent l’empreinte SHA-256 de la clé de groupe courante et sa version. Les participants doivent comparer ces empreintes par un canal indépendant ; Propard ne marque pas automatiquement une conversation comme vérifiée.
