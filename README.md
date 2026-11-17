@@ -582,7 +582,7 @@ La rubrique Sécurité affiche les 50 derniers événements de création de comp
 
 ### Confirmations de lecture facultatives
 
-Chaque compte peut désactiver l’envoi des confirmations de lecture depuis les paramètres de sécurité. Quand l’option est désactivée, Propard ne met plus à jour l’état « lu » des messages privés ni la date de dernière lecture des groupes pour ce compte. Les confirmations reçues des autres utilisateurs restent visibles.
+Chaque compte peut désactiver l’envoi des confirmations de lecture depuis les paramètres de sécurité. Quand l’option est désactivée, Propard ne met plus à jour l’état « lu » des messages privés pour ce compte. Le suivi des messages non lus dans les groupes reste indépendant et continue de fonctionner. Les confirmations reçues des autres utilisateurs restent visibles.
 
 
 ### Notes partagées chiffrées
