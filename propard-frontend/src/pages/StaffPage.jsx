@@ -102,7 +102,6 @@ export default function StaffPage() {
   const [reportsPage, setReportsPage] = useState(1);
   const [reportsPageSize, setReportsPageSize] = useState(5);
   const [selectedReport, setSelectedReport] = useState(null);
-  const [reportStatus, setReportStatus] = useState('new');
   const [targetUserId, setTargetUserId] = useState('');
   const [banReason, setBanReason] = useState('');
   const [banDuration, setBanDuration] = useState('24h');
@@ -494,7 +493,6 @@ export default function StaffPage() {
       const found = response.data.user;
       setLookupResult(found);
       setTargetUserId(found._id);
-      setResetUserId(found._id);
       setRoleUserId(found._id);
       setNotice(`Compte trouvé : ${found.username}`);
     } catch (err) {
@@ -520,9 +518,7 @@ export default function StaffPage() {
       setLookupResult(null);
       setLookupUsername('');
       setTargetUserId('');
-      setResetUserId('');
       setRoleUserId('');
-      setResetToken('');
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible d’anonymiser définitivement ce compte.');
     }
