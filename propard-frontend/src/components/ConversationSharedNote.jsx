@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import api from '../utils/api';
 import socket from '../socket';
 import { decryptMessage, encryptMessage } from '../utils/crypto';
+import { getStoredGroupKey } from '../utils/groupCrypto';
 
-export default function ConversationSharedNote({ scope, conversationId, userId, token, encryptionKey }) {
+export default function ConversationSharedNote({ scope, conversationId, userId, token, encryptionKey, keyVersion = 1 }) {
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,9 +28,24 @@ export default function ConversationSharedNote({ scope, conversationId, userId, 
     try {
       const response = await api.get(endpoint, { headers });
       if (response.data?.encryptedContent) {
-        const plaintext = await decryptMessage(encryptionKey, response.data.encryptedContent);
+        let plaintext;
+        if (scope === 'group' && Number(response.data.keyVersion || 1) !== Number(keyVersion || 1)) {
+          const oldKey = await getStoredGroupKey(conversationId, Number(response.data.keyVersion || 1));
+          if (!oldKey) {
+            throw new Error('Cette note utilise une ancienne clé de groupe qui n’est plus disponible sur cet appareil. Un membre disposant encore de cette clé doit ouvrir la note pour la migrer.');
+          }
+          plaintext = await decryptMessage(oldKey, response.data.encryptedContent);
+          const migratedContent = await encryptMessage(encryptionKey, plaintext);
+          const migrated = await api.put(endpoint, {
+            encryptedContent: migratedContent,
+            keyVersion: Number(keyVersion || 1)
+          }, { headers });
+          setUpdatedAt(migrated.data?.updatedAt || response.data.updatedAt || null);
+        } else {
+          plaintext = await decryptMessage(encryptionKey, response.data.encryptedContent);
+          setUpdatedAt(response.data.updatedAt || null);
+        }
         setContent(typeof plaintext === 'string' ? plaintext : '');
-        setUpdatedAt(response.data.updatedAt || null);
       } else {
         setContent('');
         setUpdatedAt(null);
@@ -63,7 +79,8 @@ export default function ConversationSharedNote({ scope, conversationId, userId, 
     setError('');
     try {
       const encryptedContent = await encryptMessage(encryptionKey, content);
-      const response = await api.put(endpoint, { encryptedContent }, { headers });
+      const payload = scope === 'group' ? { encryptedContent, keyVersion: Number(keyVersion || 1) } : { encryptedContent };
+      const response = await api.put(endpoint, payload, { headers });
       setUpdatedAt(response.data?.updatedAt || new Date().toISOString());
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Impossible d’enregistrer la note.');
