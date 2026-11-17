@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import socket from '../socket';
 import { API_URL } from '../utils/api';
 import { startMobileScreenCapture } from '../utils/mobileScreenCapture';
-import { ensureCallMediaPermissions } from '../utils/callMediaPermissions';
 
 const POSITION_STORAGE_KEY = 'propard_group_voice_call_position';
 
@@ -44,7 +43,6 @@ const normalizeId = value => value?.toString();
 
 export default function GroupVoiceCall({
   group,
-  userId,
   token,
   onClose,
   friendNicknames = new Map(),
@@ -53,7 +51,6 @@ export default function GroupVoiceCall({
   videoCall = false
 }) {
   const myId = normalizeId(userId);
-  const screenShareSupported = typeof navigator !== 'undefined' && (Boolean(navigator.mediaDevices?.getDisplayMedia) || Boolean(window.Capacitor?.isNativePlatform?.()));
   const groupId = normalizeId(group?._id);
 
   const [status, setStatus] = useState(
@@ -124,11 +121,6 @@ export default function GroupVoiceCall({
 
   const getMemberAvatar = id => getMember(id)?.avatar;
 
-  const getMemberIds = () =>
-    (group?.members || [])
-      .map(member => normalizeId(member?._id || member?.userId))
-      .filter(Boolean);
-
   const startTimer = (serverStartedAt = null) => {
     if (serverStartedAt) {
       const timestamp = Number(serverStartedAt);
@@ -173,7 +165,7 @@ export default function GroupVoiceCall({
         POSITION_STORAGE_KEY,
         JSON.stringify(position)
       );
-    } catch {}
+    } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
   };
 
   useEffect(() => {
@@ -186,7 +178,7 @@ export default function GroupVoiceCall({
         setWindowPosition(clampWindowPosition(saved.x, saved.y));
         return;
       }
-    } catch {}
+    } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
 
     const width = cardRef.current?.offsetWidth || 330;
     const height = cardRef.current?.offsetHeight || 240;
@@ -229,7 +221,7 @@ export default function GroupVoiceCall({
 
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {}
+    } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
   };
 
   const handleDragMove = event => {
@@ -259,7 +251,7 @@ export default function GroupVoiceCall({
 
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {}
+    } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
   };
 
   const ensureLocalStream = async () => {
@@ -515,7 +507,7 @@ export default function GroupVoiceCall({
       peer.onicecandidate = null;
       peer.ontrack = null;
       peer.oniceconnectionstatechange = null;
-      try { peer.close(); } catch {}
+      try { peer.close(); } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
     }
 
     peersRef.current.clear();
@@ -529,7 +521,7 @@ export default function GroupVoiceCall({
     }
 
     for (const audio of remoteAudioRef.current.values()) {
-      try { audio.pause(); } catch {}
+      try { audio.pause(); } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
       audio.srcObject = null;
     }
     remoteAudioRef.current.clear();
@@ -1038,13 +1030,13 @@ export default function GroupVoiceCall({
 
       const peer = peersRef.current.get(id);
       if (peer) {
-        try { peer.close(); } catch {}
+        try { peer.close(); } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
         peersRef.current.delete(id);
       }
 
       const audio = remoteAudioRef.current.get(id);
       if (audio) {
-        try { audio.pause(); } catch {}
+        try { audio.pause(); } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
         audio.srcObject = null;
         remoteAudioRef.current.delete(id);
       }
@@ -1239,7 +1231,7 @@ export default function GroupVoiceCall({
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', paddingBottom: '10px' }}>
               <button
                 type="button"
-                onClick={() => { try { remoteViewerRef.current?.requestFullscreen?.()?.catch?.(() => {}); } catch {} }}
+                onClick={() => { try { remoteViewerRef.current?.requestFullscreen?.()?.catch?.(() => {}); } catch (error) { console.warn('Opération ignorée:', error?.message || error); } }}
                 aria-label="Mettre le stream en plein écran"
                 title="Mettre en plein écran"
                 style={{ width: '42px', height: '42px', border: '1px solid #555', borderRadius: '10px', background: '#222', color: '#fff', fontSize: '22px', cursor: 'pointer' }}
