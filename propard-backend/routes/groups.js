@@ -613,7 +613,7 @@ router.get(
    MESSAGES D'UN GROUPE
 ========================= */
 
-router.get('/:groupId/attachments', async (req, res) => {
+router.get('/:groupId/attachments', createRateLimiter({ windowMs: 60 * 1000, max: 60, keyFn: req => 'group-gallery:' + req.user.id, message: 'Trop de chargements de galerie. Réessaie dans un instant.' }), async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.groupId)) {
       return res.status(400).json({ error: 'Groupe invalide.' });
