@@ -26,7 +26,6 @@ export default function Chat({
   grabbedMessageId
 }) {
   const [messages, setMessages] = useState([]);
-  const [showGallery, setShowGallery] = useState(false);
   const reactionNotificationAudioRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
