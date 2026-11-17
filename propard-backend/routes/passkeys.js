@@ -75,10 +75,10 @@ const issueToken = user => jwt.sign(
   process.env.JWT_SECRET,
   { algorithm: 'HS256', expiresIn: '7d' }
 );
-async function recordIssuedSession(userId, token, req) {
+async function recordIssuedSession(userId, token, req, eventType = 'passkey_login') {
   const decoded = jwt.decode(token);
   if (!decoded?.jti || !decoded?.exp) return;
-  const user = await User.findById(userId).select('+activeSessions +revokedSessions');
+  const user = await User.findById(userId).select('+activeSessions +revokedSessions +securityEvents');
   if (!user) throw new Error('Utilisateur introuvable lors de la création de session.');
   const now = new Date();
   user.activeSessions = (user.activeSessions || []).filter(session => session.expiresAt > now);
@@ -98,6 +98,11 @@ async function recordIssuedSession(userId, token, req) {
     }
   }
   user.revokedSessions = user.revokedSessions.slice(-100);
+  user.securityEvents = [...(user.securityEvents || []), {
+    eventType,
+    createdAt: now,
+    userAgent: String(req.get('user-agent') || '').slice(0, 300) || null
+  }].slice(-50);
   await user.save();
 }
 const publicUser = user => ({
