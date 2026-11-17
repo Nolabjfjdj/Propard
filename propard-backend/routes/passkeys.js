@@ -447,7 +447,7 @@ router.post('/login/recovery', loginLimiter, async (req, res) => {
     );
     if (!claimedUser) return res.status(401).json({ error: 'Code de récupération invalide ou déjà utilisé.' });
     const token = issueToken(claimedUser);
-    await recordIssuedSession(claimedUser._id, token, req);
+    await recordIssuedSession(claimedUser._id, token, req, 'recovery_code_login');
     return res.json({
       token,
       user: publicUser(claimedUser),
