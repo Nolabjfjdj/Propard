@@ -2015,9 +2015,29 @@ router.post('/:groupId/messages/:messageId/reactions', createRateLimiter({
     const existingIndex = message.reactions.findIndex(reaction =>
       reaction.userId.toString() === userId && reaction.emoji === emoji
     );
-    const isAddingReaction = existingIndex < 0;
+    let isAddingReaction = existingIndex < 0;
 
-    if (existingIndex >= 0) {
+    if (message.messageType === 'poll') {
+      const pollEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣'];
+      if (!pollEmojis.includes(emoji)) {
+        return res.status(400).json({ error: 'Choix de vote invalide.' });
+      }
+      const ownVoteIndex = message.reactions.findIndex(reaction =>
+        reaction.userId.toString() === userId
+      );
+      if (ownVoteIndex >= 0 && message.reactions[ownVoteIndex].emoji === emoji) {
+        message.reactions.splice(ownVoteIndex, 1);
+        isAddingReaction = false;
+      } else if (ownVoteIndex >= 0) {
+        message.reactions[ownVoteIndex].emoji = emoji;
+        isAddingReaction = true;
+      } else {
+        if (message.reactions.length >= 500) {
+          return res.status(409).json({ error: 'Trop de réactions sur ce message.' });
+        }
+        message.reactions.push({ userId, emoji });
+      }
+    } else if (existingIndex >= 0) {
       message.reactions.splice(existingIndex, 1);
     } else {
       if (message.reactions.length >= 500) {
