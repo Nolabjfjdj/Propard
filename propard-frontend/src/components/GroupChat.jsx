@@ -2907,10 +2907,12 @@ export default function GroupChat({
                           </p>
 
                         </div>
-                        <MessageReactions
-                          reactions={message.reactions}
-                          userId={myId}
-                        />
+                        {message.messageType !== 'poll' && (
+                          <MessageReactions
+                            reactions={message.reactions}
+                            userId={myId}
+                          />
+                        )}
 
                       </div>
 
