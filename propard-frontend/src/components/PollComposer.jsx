@@ -4,6 +4,7 @@ export default function PollComposer({ onClose, onCreate }) {
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '']);
   const [saving, setSaving] = useState(false);
+  const [expiresIn, setExpiresIn] = useState(0);
   const [error, setError] = useState('');
 
   const updateOption = (index, value) => {
@@ -25,7 +26,7 @@ export default function PollComposer({ onClose, onCreate }) {
     setError('');
     let success = false;
     try {
-      success = await onCreate(cleanQuestion, cleanOptions);
+      success = await onCreate(cleanQuestion, cleanOptions, expiresIn);
     } catch (err) {
       setError(err.message || 'Impossible de créer le sondage.');
     } finally {
@@ -41,6 +42,13 @@ export default function PollComposer({ onClose, onCreate }) {
         <p style={{ color: 'var(--text-secondary)', fontSize: 12 }}>La question et les réponses sont chiffrées avant l’envoi.</p>
         <label style={{ display: 'block', fontSize: 12, marginBottom: 6 }}>Question</label>
         <input value={question} onChange={event => setQuestion(event.target.value.slice(0, 200))} maxLength={200} placeholder="Ta question..." style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)' }} />
+        <label style={{ display: 'block', fontSize: 12, marginTop: 16, marginBottom: 6 }}>Durée du sondage</label>
+        <select value={expiresIn} onChange={event => setExpiresIn(Number(event.target.value))} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}>
+          <option value={0}>Aucune expiration</option>
+          <option value={3600}>1 heure</option>
+          <option value={86400}>24 heures</option>
+          <option value={604800}>7 jours</option>
+        </select>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
           <strong style={{ fontSize: 13 }}>Réponses</strong>
           <small style={{ color: 'var(--text-secondary)' }}>{options.length}/6</small>
