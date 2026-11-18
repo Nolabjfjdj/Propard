@@ -1914,7 +1914,7 @@ export default function GroupChat({
     return true;
   };
 
-  const createPoll = async (question, options) => {
+  const createPoll = async (question, options, expiresIn = 0) => {
     if (!key || !group?._id) {
       setLoadError('Chiffrement indisponible pour créer ce sondage.');
       return false;
@@ -1929,7 +1929,7 @@ export default function GroupChat({
       content: encryptedContent,
       keyVersion: group.keyVersion || 1,
       messageType: 'poll',
-      expiresIn: 0
+      expiresIn
     });
     return true;
   };
