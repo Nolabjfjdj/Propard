@@ -19,8 +19,32 @@ export default function SettingsPage() {
   const [notice, setNotice] = useState('');
   const [recoveryCodes, setRecoveryCodes] = useState([]);
   const [recoveryCodesAvailable, setRecoveryCodesAvailable] = useState(false);
+  const [reminders, setReminders] = useState([]);
+  const [reminderTitle, setReminderTitle] = useState('');
+  const [reminderNote, setReminderNote] = useState('');
+  const [reminderDueAt, setReminderDueAt] = useState('');
+  const [remindersLoading, setRemindersLoading] = useState(false);
 
   const headers = { Authorization: `Bearer ${token}` };
+
+  useEffect(() => {
+    if (section !== 'reminders' || !token) return;
+    let cancelled = false;
+    setRemindersLoading(true);
+    api.get('/api/reminders', { headers })
+      .then(response => {
+        if (!cancelled) setReminders(response.data?.reminders || []);
+      })
+      .catch(error => {
+        if (!cancelled) setError(error.response?.data?.error || 'Impossible de charger les rappels.');
+      })
+      .finally(() => {
+        if (!cancelled) setRemindersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [section, token]);
 
   useEffect(() => {
     if (!token) return;
@@ -283,10 +307,63 @@ export default function SettingsPage() {
     }
   };
 
+  const createReminder = async () => {
+    if (!reminderTitle.trim() || !reminderDueAt) {
+      setError('Ajoute un titre et une date pour le rappel.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.post('/api/reminders', {
+        title: reminderTitle.trim(),
+        note: reminderNote.trim() || null,
+        dueAt: new Date(reminderDueAt).toISOString()
+      }, { headers });
+      setReminders(current => [...current, response.data.reminder].sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt)));
+      setReminderTitle('');
+      setReminderNote('');
+      setReminderDueAt('');
+      setNotice('Rappel créé. Il sera envoyé par notification à la date choisie.');
+    } catch (error) {
+      setError(error.response?.data?.error || 'Impossible de créer le rappel.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelReminder = async reminder => {
+    setLoading(true);
+    setError('');
+    try {
+      await api.patch('/api/reminders/' + reminder._id + '/cancel', {}, { headers });
+      setReminders(current => current.filter(item => item._id !== reminder._id));
+    } catch (error) {
+      setError(error.response?.data?.error || 'Impossible d’annuler le rappel.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteReminder = async reminder => {
+    setLoading(true);
+    setError('');
+    try {
+      await api.delete('/api/reminders/' + reminder._id, { headers });
+      setReminders(current => current.filter(item => item._id !== reminder._id));
+    } catch (error) {
+      setError(error.response?.data?.error || 'Impossible de supprimer le rappel.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const heading = section === 'main'
     ? 'Paramètres'
     : section === 'appearance'
       ? 'Personnalisation'
+      : section === 'reminders'
+        ? 'Rappels'
        : section === 'sessions'
         ? 'Appareils connectés'
         : section === 'security-history'
@@ -314,6 +391,14 @@ export default function SettingsPage() {
             </span>
             <span style={styles.arrow}>›</span>
           </button>
+          <button type="button" style={{ ...styles.row, marginTop: '12px' }} onClick={() => setSection('reminders')}>
+            <span style={styles.icon}>◷</span>
+            <span style={styles.rowContent}>
+              <strong>Rappels</strong>
+              <small>Recevoir une notification à une date précise</small>
+            </span>
+            <span style={styles.arrow}>›</span>
+          </button>
           <button type="button" style={{ ...styles.row, marginTop: '12px' }} onClick={() => setSection('security')}>
             <span style={styles.icon}>♙</span>
             <span style={styles.rowContent}>
@@ -323,6 +408,44 @@ export default function SettingsPage() {
             <span style={styles.arrow}>›</span>
           </button>
           </>
+        )}
+        {section === 'reminders' && (
+          <div style={styles.card}>
+            <strong>Créer un rappel</strong>
+            <p style={styles.description}>Les rappels sont personnels. Ils sont envoyés par notification push, si les notifications sont activées sur ton appareil.</p>
+            <input style={{ ...styles.input, marginTop: 14 }} value={reminderTitle} maxLength={80} placeholder="Titre du rappel" onChange={event => setReminderTitle(event.target.value)} />
+            <textarea style={{ ...styles.input, marginTop: 10, minHeight: 76, resize: 'vertical' }} value={reminderNote} maxLength={240} placeholder="Note facultative" onChange={event => setReminderNote(event.target.value)} />
+            <label style={{ display: 'block', marginTop: 12, marginBottom: 6, color: 'var(--text-secondary)', fontSize: 13 }}>Date et heure</label>
+            <input style={styles.input} type="datetime-local" value={reminderDueAt} onChange={event => setReminderDueAt(event.target.value)} />
+            <button type="button" style={styles.primary} onClick={createReminder} disabled={loading}>Créer le rappel</button>
+            <div style={{ marginTop: 22 }}>
+              <strong>Rappels à venir</strong>
+              {remindersLoading ? <p style={styles.description}>Chargement…</p> : reminders.filter(item => item.status === 'pending' || item.status === 'processing').length === 0 ? (
+                <p style={styles.empty}>Aucun rappel en attente.</p>
+              ) : reminders.filter(item => item.status === 'pending' || item.status === 'processing').map(reminder => (
+                <div key={reminder._id} style={styles.passkey}>
+                  <div style={styles.passkeyInfo}>
+                    <strong>{reminder.title}</strong>
+                    {reminder.note && <small>{reminder.note}</small>}
+                    <small>{new Date(reminder.dueAt).toLocaleString()}</small>
+                  </div>
+                  <button type="button" style={styles.danger} onClick={() => cancelReminder(reminder)} disabled={loading}>Annuler</button>
+                </div>
+              ))}
+              <strong style={{ display: 'block', marginTop: 18 }}>Déjà envoyés</strong>
+              {reminders.filter(item => item.status === 'sent').map(reminder => (
+                <div key={reminder._id} style={styles.passkey}>
+                  <div style={styles.passkeyInfo}>
+                    <strong>{reminder.title}</strong>
+                    <small>{new Date(reminder.sentAt || reminder.dueAt).toLocaleString()}</small>
+                  </div>
+                  <button type="button" style={styles.secondary} onClick={() => deleteReminder(reminder)} disabled={loading}>Supprimer</button>
+                </div>
+              ))}
+            </div>
+            {error && <p style={styles.error}>{error}</p>}
+            {notice && <p style={styles.success}>{notice}</p>}
+          </div>
         )}
         {section === 'appearance' && (
           <div style={styles.card}>
@@ -619,7 +742,7 @@ const styles = {
     alignItems: 'center',
     gap: '12px'
   },
-  description: {
+  input: {\n    width: '100%',\n    boxSizing: 'border-box',\n    border: '1px solid var(--border)',\n    borderRadius: '8px',\n    padding: '11px',\n    background: 'var(--bg-secondary)',\n    color: 'var(--text-primary)',\n    font: 'inherit'\n  },\n  description: {
     margin: '6px 0 0',
     color: 'var(--text-secondary)',
     fontSize: '13px',
