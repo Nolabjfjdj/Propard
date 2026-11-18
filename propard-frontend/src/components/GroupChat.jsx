@@ -16,6 +16,7 @@ import ConversationSharedNote from './ConversationSharedNote';
 import E2EEVerification from './E2EEVerification';
 import PollMessage from './PollMessage';
 import PollComposer from './PollComposer';
+import ScheduledMessageControl from './ScheduledMessageControl';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
 import LinkText from './LinkText';
@@ -1892,6 +1893,26 @@ export default function GroupChat({
     };
 
 
+  const scheduleMessage = async dueAt => {
+    const plaintext = input.trim();
+    if (!plaintext || !key || !group?._id) {
+      setLoadError(!key ? 'Chiffrement indisponible pour programmer ce message.' : 'Écris un message avant de le programmer.');
+      return false;
+    }
+    const encryptedContent = await encryptMessage(key, plaintext);
+    await api.post('/api/scheduled-messages', {
+      groupId: group._id,
+      content: encryptedContent,
+      keyVersion: group.keyVersion || 1,
+      dueAt
+    }, { headers: { Authorization: 'Bearer ' + token } });
+    setInput('');
+    setMentionQuery(null);
+    setMentionStart(-1);
+    setLoadError(null);
+    return true;
+  };
+
   const createPoll = async (question, options) => {
     if (!key || !group?._id) {
       setLoadError('Chiffrement indisponible pour créer ce sondage.');
@@ -3318,6 +3339,7 @@ export default function GroupChat({
         </div>
 
         <button type="button" onClick={() => setPollOpen(true)} disabled={!key || uploadingFiles || awaitingAttachmentAck} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 9px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: 11 }}>Sondage</button>
+        <ScheduledMessageControl token={token} scope="group" conversationId={group?._id} disabled={!key || !input.trim() || uploadingFiles || awaitingAttachmentAck} onSchedule={scheduleMessage} />
         <EmojiPicker onSelect={emoji => setInput(value => value + emoji)} />
         <button
           onClick={sendMessage}
