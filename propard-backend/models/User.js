@@ -39,6 +39,7 @@ const userSchema = new mongoose.Schema({
   apnsTokens:[{token:{type:String,required:true,maxlength:512},platform:{type:String,enum:['ios'],required:true},createdAt:{type:Date,default:Date.now}}],
   pushSubscriptions:[{endpoint:{type:String,required:true,maxlength:2048},keys:{p256dh:{type:String,required:true,maxlength:256},auth:{type:String,required:true,maxlength:256}},createdAt:{type:Date,default:Date.now}}],
   e2eeKeyBackup:{type:mongoose.Schema.Types.Mixed,default:null},
+  e2eeVault:{type:mongoose.Schema.Types.Mixed,default:null,select:false},
   realUsername:{type:String,default:null},
   pendingDeletionAt:{type:Date,default:null},
   bannedAt:{type:Date,default:null},
