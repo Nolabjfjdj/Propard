@@ -67,6 +67,9 @@ export default function AppPage({
   );
 
   const [friendNotFound, setFriendNotFound] = useState(false);
+  const [staffAccess, setStaffAccess] = useState(() =>
+    ['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(user?.staffRole)
+  );
 
   const [incomingCall, setIncomingCall] = useState(null);
   const [incomingGroupCall, setIncomingGroupCall] = useState(null);
@@ -95,6 +98,28 @@ export default function AppPage({
   const sidebarRef = useRef(null);
 
   const [grabVisual, setGrabVisual] = useState(null);
+
+  useEffect(() => {
+    if (!token) {
+      setStaffAccess(false);
+      return undefined;
+    }
+    let cancelled = false;
+    api.get('/api/staff/me', {
+      headers: { Authorization: `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+    }).then(response => {
+      if (!cancelled) setStaffAccess(Boolean(response.data?.staffRole));
+    }).catch(error => {
+      if (!cancelled) {
+        setStaffAccess(error.response?.status === 403
+          ? false
+          : ['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(user?.staffRole));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user?.staffRole]);
 
   useEffect(() => {
     const check = () =>
@@ -1132,7 +1157,7 @@ export default function AppPage({
               help
             </a>
 
-            {['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(user?.staffRole) && (
+            {staffAccess && (
               <a
                 href="/staff"
                 style={styles.staffLink}
