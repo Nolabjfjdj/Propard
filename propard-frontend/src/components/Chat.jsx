@@ -9,6 +9,7 @@ import ConversationSharedNote from './ConversationSharedNote';
 import E2EEVerification from './E2EEVerification';
 import PollMessage from './PollMessage';
 import PollComposer from './PollComposer';
+import ScheduledMessageControl from './ScheduledMessageControl';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
 import LinkText from './LinkText';
@@ -794,6 +795,23 @@ export default function Chat({
     }
   };
 
+
+  const scheduleMessage = async dueAt => {
+    const plaintext = input.trim();
+    if (!plaintext || !sharedKey || !friend?._id) {
+      setLoadError(!sharedKey ? 'Chiffrement indisponible pour programmer ce message.' : 'Écris un message avant de le programmer.');
+      return false;
+    }
+    const encryptedContent = await encryptMessage(sharedKey, plaintext);
+    await api.post('/api/scheduled-messages', {
+      recipientId: friend._id,
+      content: encryptedContent,
+      dueAt
+    }, { headers: { Authorization: 'Bearer ' + token } });
+    setInput('');
+    setLoadError(null);
+    return true;
+  };
 
   const createPoll = async (question, options) => {
     if (!sharedKey || !friend?._id) {
@@ -1878,6 +1896,7 @@ export default function Chat({
         />
 
         <button type="button" onClick={() => setPollOpen(true)} disabled={!sharedKey || uploadingFiles || awaitingAttachmentAck} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 9px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: 11 }}>Sondage</button>
+        <ScheduledMessageControl token={token} scope="private" conversationId={friend?._id} disabled={!sharedKey || !input.trim() || uploadingFiles || awaitingAttachmentAck} onSchedule={scheduleMessage} />
         <EmojiPicker onSelect={emoji => setInput(value => value + emoji)} />
         <button
           onClick={sendMessage}
