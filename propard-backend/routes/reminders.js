@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
   try {
     const reminders = await Reminder.find({
       user: req.user.id,
-      status: { $in: ['pending', 'sent'] }
+      status: { $in: ['pending', 'sent', 'failed'] }
     }).sort({ dueAt: 1 }).limit(100).select('title note dueAt status sentAt createdAt');
     res.json({ reminders });
   } catch (error) {
