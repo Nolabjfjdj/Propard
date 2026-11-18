@@ -10,6 +10,7 @@ Propard est une plateforme web française de communication développée avec Rea
 - Protection des mots de passe avec bcryptjs
 - Profils utilisateurs, avatars, statuts, badges personnels décoratifs, surnoms et blocage
 - Système d'amis
+- Dossiers de conversations synchronisés entre les appareils du compte
 - Messagerie privée en temps réel
 - Messages privés et de groupe programmés avec stockage du seul contenu chiffré
 - Chiffrement de bout en bout des messages privés
@@ -33,6 +34,12 @@ Propard est une plateforme web française de communication développée avec Rea
 - Gestion administrative des signalements
 - Pages d'aide, CGU et politique de confidentialité
 - Suppression de compte avec traitement côté serveur
+
+## Dossiers de conversations
+
+Les dossiers et leurs affectations sont synchronisés sur le compte, avec un cache local pour garder l'affichage réactif. Chaque compte peut créer jusqu'à 30 dossiers de 24 caractères et affecter les conversations privées ou les groupes. L'API n'accepte que des identifiants de conversation valides et des dossiers existants.
+
+API authentifiée : `GET /api/conversation-folders` et `PUT /api/conversation-folders`.
 
 ## Coffre-fort personnel E2EE
 
