@@ -8,7 +8,7 @@ import PersonalVault from '../components/PersonalVault';
 
 export default function SettingsPage() {
   const { token, user } = useAuth();
-  const { accent, setAccent } = useTheme();
+  const { theme, toggleTheme, accent, setAccent } = useTheme();
   const [section, setSection] = useState('main');
   const [passkeys, setPasskeys] = useState([]);
   const [sessions, setSessions] = useState([]);
@@ -461,6 +461,28 @@ export default function SettingsPage() {
         )}
         {section === 'appearance' && (
           <div style={styles.card}>
+            <strong>Mode d’affichage</strong>
+            <p style={styles.description}>Choisis entre le thème sombre et le thème clair. Le réglage est conservé sur cet appareil.</p>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-pressed={theme === 'dark'}
+              style={{
+                width: '100%',
+                marginTop: 10,
+                padding: '12px 14px',
+                borderRadius: 9,
+                border: '1px solid var(--border)',
+                background: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                textAlign: 'left',
+                fontWeight: 600
+              }}
+            >
+              {theme === 'dark' ? '☾ Thème sombre activé · Passer au thème clair' : '☀ Thème clair activé · Passer au thème sombre'}
+            </button>
+            <div style={{ height: 1, background: 'var(--border)', margin: '22px 0' }} />
             <strong>Couleur d’accent</strong>
             <p style={styles.description}>Cette couleur est appliquée aux boutons, aux liens et aux éléments importants. Le choix est enregistré sur cet appareil.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(92px, 1fr))', gap: 10, marginTop: 18 }}>
