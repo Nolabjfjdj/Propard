@@ -390,7 +390,7 @@ export default function SettingsPage() {
             <span style={styles.icon}>◉</span>
             <span style={styles.rowContent}>
               <strong>Personnalisation</strong>
-              <small>Choisir la couleur de Propard</small>
+              <small>Choisir le thème et la couleur de Propard</small>
             </span>
             <span style={styles.arrow}>›</span>
           </button>
