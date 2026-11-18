@@ -274,6 +274,7 @@ app.use('/api/notes',require('./routes/notes'));
 app.use('/api/push',require('./routes/push'));
 app.use('/api/reminders',require('./routes/reminders'));
 app.use('/api/scheduled-messages',require('./routes/scheduledMessages'));
+app.use('/api/vault',require('./routes/vault'));
 app.use('/api/ai',require('./routes/ai'));
 
 app.get('/health',(req,res)=>res.status(200).send('OK'));
