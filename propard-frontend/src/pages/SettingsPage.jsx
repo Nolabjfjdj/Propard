@@ -4,6 +4,7 @@ import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { findStoredPrivateKeyForRecovery, publicKeyFromPrivateJwk, encryptPrivateKeyBackup } from '../utils/crypto';
+import PersonalVault from '../components/PersonalVault';
 
 export default function SettingsPage() {
   const { token, user } = useAuth();
@@ -372,7 +373,9 @@ export default function SettingsPage() {
       ? 'Sécurité'
       : section === 'e2ee'
         ? 'Récupération E2EE'
-        : 'Authentification à deux facteurs';
+        : section === 'vault'
+          ? 'Coffre-fort E2EE'
+          : 'Authentification à deux facteurs';
 
   return (
     <main style={styles.page}>
@@ -526,6 +529,14 @@ export default function SettingsPage() {
               </span>
               <span style={styles.arrow}>›</span>
             </button>
+            <button type="button" style={{ ...styles.row, marginTop: '12px' }} onClick={() => setSection('vault')}>
+              <span style={styles.icon}>▣</span>
+              <span style={styles.rowContent}>
+                <strong>Coffre-fort personnel E2EE</strong>
+                <small>Protéger tes notes avec une phrase secrète</small>
+              </span>
+              <span style={styles.arrow}>›</span>
+            </button>
             <div style={{ ...styles.card, marginTop: 14 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-primary)', fontWeight: 600 }}>
                 <input
@@ -597,6 +608,11 @@ export default function SettingsPage() {
               </div>
             ))}
             <button type="button" style={styles.secondary} onClick={loadSecurityEvents} disabled={loading}>Actualiser</button>
+          </div>
+        )}
+        {section === 'vault' && (
+          <div style={styles.card}>
+            <PersonalVault token={token} />
           </div>
         )}
         {section === 'e2ee' && (
