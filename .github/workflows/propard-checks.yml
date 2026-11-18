@@ -1,4 +1,4 @@
-name: Propard account deletion and privacy validation
+name: Propard final feature and deletion checks
 
 on:
   push:
