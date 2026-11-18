@@ -1,4 +1,4 @@
-name: Propard final feature and deletion checks
+name: Propard final account lifecycle checks
 
 on:
   push:
