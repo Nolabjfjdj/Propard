@@ -442,6 +442,15 @@ export default function SettingsPage() {
                   <button type="button" style={styles.secondary} onClick={() => deleteReminder(reminder)} disabled={loading}>Supprimer</button>
                 </div>
               ))}
+              {reminders.filter(item => item.status === 'failed').map(reminder => (
+                <div key={reminder._id} style={styles.passkey}>
+                  <div style={styles.passkeyInfo}>
+                    <strong>{reminder.title}</strong>
+                    <small style={{ color: 'var(--danger)' }}>Échec de livraison après plusieurs tentatives</small>
+                  </div>
+                  <button type="button" style={styles.secondary} onClick={() => deleteReminder(reminder)} disabled={loading}>Supprimer</button>
+                </div>
+              ))}
             </div>
             {error && <p style={styles.error}>{error}</p>}
             {notice && <p style={styles.success}>{notice}</p>}
