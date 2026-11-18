@@ -272,6 +272,7 @@ app.use('/api/groups',require('./routes/groups'));
 app.use('/api/files',require('./routes/files'));
 app.use('/api/notes',require('./routes/notes'));
 app.use('/api/push',require('./routes/push'));
+app.use('/api/reminders',require('./routes/reminders'));
 app.use('/api/ai',require('./routes/ai'));
 
 app.get('/health',(req,res)=>res.status(200).send('OK'));
@@ -281,8 +282,70 @@ const User=require('./models/User');
 const Group=require('./models/Group');
 const GroupMessage=require('./models/GroupMessage');
 const FileAttachment=require('./models/FileAttachment');
+const Reminder=require('./models/Reminder');
 const {sendPushNotification}=require('./services/push');
 const {retryPendingFileCleanup}=require('./services/fileCleanup');
+
+let reminderWorkerRunning = false;
+async function deliverDueReminders() {
+  if (reminderWorkerRunning || mongoose.connection.readyState !== 1) return;
+  reminderWorkerRunning = true;
+  try {
+    for (let index = 0; index < 20; index += 1) {
+      const now = new Date();
+      const reminder = await Reminder.findOneAndUpdate(
+        {
+          dueAt: { $lte: now },
+          nextAttemptAt: { $lte: now },
+          attempts: { $lt: 20 },
+          $or: [
+            { status: 'pending' },
+            { status: 'processing', claimedAt: { $lte: new Date(now.getTime() - 5 * 60 * 1000) } }
+          ]
+        },
+        {
+          $set: { status: 'processing', claimedAt: now }
+        },
+        { new: true, sort: { dueAt: 1 } }
+      );
+      if (!reminder) break;
+      try {
+        await sendPushNotification(reminder.user, {
+          title: 'Rappel Propard',
+          body: reminder.note ? reminder.title + ' · ' + reminder.note : reminder.title,
+          url: '/settings',
+          tag: 'reminder-' + reminder._id.toString(),
+          data: { type: 'reminder', reminderId: reminder._id.toString(), url: '/settings' }
+        });
+        await Reminder.updateOne(
+          { _id: reminder._id, status: 'processing' },
+          { $set: { status: 'sent', sentAt: new Date(), claimedAt: null } }
+        );
+      } catch (error) {
+        await Reminder.updateOne(
+          { _id: reminder._id, status: 'processing' },
+          {
+            $set: {
+              status: 'pending',
+              claimedAt: null,
+              nextAttemptAt: new Date(Date.now() + 5 * 60 * 1000)
+            },
+            $inc: { attempts: 1 }
+          }
+        );
+        console.error('Reminder delivery failed:', error?.message || error);
+      }
+    }
+  } catch (error) {
+    console.error('Reminder worker error:', error);
+  } finally {
+    reminderWorkerRunning = false;
+  }
+}
+
+const reminderWorkerInterval = setInterval(deliverDueReminders, 15000);
+reminderWorkerInterval.unref?.();
+
 
 async function areFriends(userId,friendId){
   const user=await User.findById(userId).select('friends');
