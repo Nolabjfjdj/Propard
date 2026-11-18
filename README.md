@@ -14,6 +14,7 @@ Propard est une plateforme web française de communication développée avec Rea
 - Messages privés et de groupe programmés avec stockage du seul contenu chiffré
 - Chiffrement de bout en bout des messages privés
 - Sauvegarde chiffrée de la clé privée E2EE
+- Coffre-fort personnel de notes chiffrées côté navigateur
 - Système de groupes
 - Messagerie de groupe en temps réel
 - Chiffrement des messages de groupe
@@ -32,6 +33,12 @@ Propard est une plateforme web française de communication développée avec Rea
 - Gestion administrative des signalements
 - Pages d'aide, CGU et politique de confidentialité
 - Suppression de compte avec traitement côté serveur
+
+## Coffre-fort personnel E2EE
+
+Le coffre-fort permet de conserver jusqu'à 50 notes personnelles. Le navigateur chiffre le JSON avec AES-256-GCM et une clé dérivée de la phrase secrète par PBKDF2-HMAC-SHA-256 (600 000 itérations), avec un sel de 16 octets et un IV aléatoire de 12 octets. La phrase secrète et le texte clair ne sont jamais envoyés à l'API. Le serveur stocke uniquement la version, le sel, l'IV et le texte chiffré. Une phrase secrète oubliée ne peut pas être réinitialisée par le serveur : les données deviennent irrécupérables.
+
+API authentifiée : `GET /api/vault`, `PUT /api/vault` et `DELETE /api/vault`.
 
 ## Messages programmés
 
