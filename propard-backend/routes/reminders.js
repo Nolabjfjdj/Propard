@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const Reminder = require('../models/Reminder');
+const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 
@@ -40,6 +41,10 @@ router.post('/', reminderLimiter, async (req, res) => {
     const now = Date.now();
     if (!dueAt || !Number.isFinite(parsedDate.getTime()) || parsedDate.getTime() < now + 60 * 1000 || parsedDate.getTime() > now + 366 * 24 * 60 * 60 * 1000) {
       return res.status(400).json({ error: 'Choisis une date située entre 1 minute et 1 an dans le futur.' });
+    }
+    const account = await User.findById(req.user.id).select('pushSubscriptions apnsTokens');
+    if (!account || (!(account.pushSubscriptions || []).length && !(account.apnsTokens || []).length)) {
+      return res.status(409).json({ error: 'Active les notifications sur ton appareil avant de créer un rappel.' });
     }
     const reminder = await Reminder.create({
       user: req.user.id,
