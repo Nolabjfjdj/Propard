@@ -751,7 +751,17 @@ const styles = {
     alignItems: 'center',
     gap: '12px'
   },
-  input: {\n    width: '100%',\n    boxSizing: 'border-box',\n    border: '1px solid var(--border)',\n    borderRadius: '8px',\n    padding: '11px',\n    background: 'var(--bg-secondary)',\n    color: 'var(--text-primary)',\n    font: 'inherit'\n  },\n  description: {
+  input: {
+    width: '100%',
+    boxSizing: 'border-box',
+    border: '1px solid var(--border)',
+    borderRadius: '8px',
+    padding: '11px',
+    background: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+    font: 'inherit'
+  },
+  description: {
     margin: '6px 0 0',
     color: 'var(--text-secondary)',
     fontSize: '13px',
