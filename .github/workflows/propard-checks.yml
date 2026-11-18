@@ -1,4 +1,4 @@
-name: Propard folder sync validation
+name: Propard folder sync validation fixed
 
 on:
   push:
