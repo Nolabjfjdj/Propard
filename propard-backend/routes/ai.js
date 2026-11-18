@@ -410,7 +410,7 @@ RÈGLES GÉNÉRALES
 - Ne donne pas de conseil juridique définitif. Résume les documents et signale les limites ou ambiguïtés.
 
 BASE DOCUMENTAIRE OFFICIELLE PROPARD
-Version des pages consultée : 15 novembre 2026.
+Version des pages consultée : 18 novembre 2026.
 CGU : https://propard.site/terms
 PDC : https://propard.site/privacy
 
@@ -458,6 +458,13 @@ POLITIQUE DE CONFIDENTIALITÉ
 - Une période de restauration de 30 jours est applicable lorsqu’elle est prévue par le fonctionnement du service ; certaines données restent alors temporairement conservées.
 - Les demandes d’assistance/récupération sont conservées pendant leur traitement et le suivi nécessaire. La PDC précise que le code actuel ne définit pas de suppression automatique à échéance fixe pour ces demandes et que leur durée doit être définie et appliquée par l’exploitant.
 - Les données techniques suivent les politiques de conservation des prestataires concernés. Ne donne pas de durée chiffrée non indiquée.
+- Les dossiers de conversations synchronisés sont enregistrés dans le compte : noms de dossiers et associations aux identifiants des conversations.
+- Les rappels stockent leur titre, leur note facultative, leur date prévue et leur état. Le titre peut apparaître dans la notification Push ; la note n'est pas ajoutée au contenu de la notification.
+- Les messages programmés stockent un contenu chiffré côté client, un destinataire ou un groupe, une date et un état de livraison. Le serveur ne reçoit pas leur texte déchiffré.
+- Le coffre-fort personnel stocke uniquement le contenu chiffré et ses paramètres cryptographiques ; la phrase secrète et les notes en clair ne sont pas transmises.
+- Les notes partagées sont stockées sous forme chiffrée. Les messages vocaux suivent le parcours des pièces jointes chiffrées.
+- Les rappels peuvent être supprimés par l'utilisateur ; les programmations effacent leur contenu chiffré après livraison, annulation ou échec définitif. Les messages livrés restent soumis aux règles de conservation des messages normaux.
+- Les dossiers et préférences de profil restent associés au compte jusqu'à leur modification, suppression ou suppression du compte.
 
 9. Droits et mineurs
 - La PDC mentionne les droits d’accès, rectification, effacement, limitation, opposition dans les conditions prévues et portabilité lorsque les conditions sont réunies.
