@@ -273,6 +273,7 @@ app.use('/api/files',require('./routes/files'));
 app.use('/api/notes',require('./routes/notes'));
 app.use('/api/push',require('./routes/push'));
 app.use('/api/reminders',require('./routes/reminders'));
+app.use('/api/scheduled-messages',require('./routes/scheduledMessages'));
 app.use('/api/ai',require('./routes/ai'));
 
 app.get('/health',(req,res)=>res.status(200).send('OK'));
@@ -283,6 +284,7 @@ const Group=require('./models/Group');
 const GroupMessage=require('./models/GroupMessage');
 const FileAttachment=require('./models/FileAttachment');
 const Reminder=require('./models/Reminder');
+const ScheduledMessage=require('./models/ScheduledMessage');
 const {sendPushNotification}=require('./services/push');
 const {retryPendingFileCleanup}=require('./services/fileCleanup');
 
@@ -345,6 +347,144 @@ async function deliverDueReminders() {
 
 const reminderWorkerInterval = setInterval(deliverDueReminders, 15000);
 reminderWorkerInterval.unref?.();
+
+let scheduledMessageWorkerRunning = false;
+async function deliverScheduledMessages() {
+  if (scheduledMessageWorkerRunning || mongoose.connection.readyState !== 1) return;
+  scheduledMessageWorkerRunning = true;
+  try {
+    for (let index = 0; index < 20; index += 1) {
+      const now = new Date();
+      const scheduled = await ScheduledMessage.findOneAndUpdate(
+        {
+          dueAt: { $lte: now },
+          nextAttemptAt: { $lte: now },
+          attempts: { $lt: 10 },
+          $or: [
+            { status: 'pending' },
+            { status: 'processing', claimedAt: { $lte: new Date(now.getTime() - 5 * 60 * 1000) } }
+          ]
+        },
+        { $set: { status: 'processing', claimedAt: now } },
+        { new: true, sort: { dueAt: 1 } }
+      );
+      if (!scheduled) break;
+      try {
+        if (scheduled.recipient) {
+          const [senderAccount, recipientAccount] = await Promise.all([
+            User.findById(scheduled.sender).select('username ipAlias blockedUsers'),
+            User.findById(scheduled.recipient).select('friends blockedUsers')
+          ]);
+          const stillFriends = await areFriends(scheduled.sender, scheduled.recipient);
+          const recipientStillFriends = (recipientAccount?.friends || []).some(item => item.userId?.toString() === scheduled.sender.toString());
+          const blocked = (senderAccount?.blockedUsers || []).some(id => id.toString() === scheduled.recipient.toString()) ||
+            (recipientAccount?.blockedUsers || []).some(id => id.toString() === scheduled.sender.toString());
+          if (!senderAccount || !recipientAccount || !stillFriends || !recipientStillFriends || blocked) {
+            await ScheduledMessage.updateOne({ _id: scheduled._id }, { $set: { status: 'failed', content: '', claimedAt: null } });
+            continue;
+          }
+          let message = await Message.findOne({ scheduledMessageId: scheduled._id });
+          if (!message) {
+            message = await Message.create({
+              sender: scheduled.sender,
+              receiver: scheduled.recipient,
+              content: scheduled.content,
+              encrypted: true,
+              messageType: 'text',
+              scheduledMessageId: scheduled._id
+            });
+          }
+          const messageData = {
+            _id: message._id.toString(),
+            sender: scheduled.sender.toString(),
+            senderInfo: { username: senderAccount.username, ipAlias: senderAccount.ipAlias },
+            receiver: scheduled.recipient.toString(),
+            content: message.content,
+            attachments: [],
+            encrypted: true,
+            messageType: 'text',
+            expiresAt: null,
+            createdAt: message.createdAt
+          };
+          emitToUser(io, scheduled.recipient, 'newMessage', messageData);
+          emitToUser(io, scheduled.sender, 'messageSent', messageData);
+          if (!isConversationActive(scheduled.recipient.toString(), 'private', scheduled.sender.toString())) {
+            void sendPushNotification(scheduled.recipient, {
+              title: senderAccount.username ? '@' + senderAccount.username : 'Propard',
+              body: 'Message programmé reçu',
+              url: '/chat/' + scheduled.sender.toString(),
+              tag: 'private-' + scheduled.sender.toString(),
+              data: { type: 'private-message', senderId: scheduled.sender.toString() }
+            });
+          }
+        } else if (scheduled.group) {
+          const group = await Group.findOne({
+            _id: scheduled.group,
+            'members.userId': scheduled.sender
+          }).select('members keyVersion name');
+          if (!group || (group.keyVersion || 1) !== scheduled.keyVersion) {
+            await ScheduledMessage.updateOne({ _id: scheduled._id }, { $set: { status: 'failed', content: '', claimedAt: null } });
+            continue;
+          }
+          let message = await GroupMessage.findOne({ scheduledMessageId: scheduled._id });
+          if (!message) {
+            message = await GroupMessage.create({
+              group: scheduled.group,
+              sender: scheduled.sender,
+              content: scheduled.content,
+              encrypted: true,
+              keyVersion: scheduled.keyVersion,
+              messageType: 'text',
+              scheduledMessageId: scheduled._id
+            });
+          }
+          await Group.findByIdAndUpdate(scheduled.group, { lastMessageAt: message.createdAt });
+          const populated = await GroupMessage.findById(message._id).populate('sender', 'username displayName avatar ipAlias');
+          const payload = { ...populated.toObject(), groupId: scheduled.group.toString() };
+          for (const member of group.members || []) {
+            const memberId = (member.userId?._id || member.userId).toString();
+            emitToUser(io, memberId, 'newGroupMessage', payload);
+            if (memberId !== scheduled.sender.toString() && !isConversationActive(memberId, 'group', scheduled.group.toString())) {
+              void sendPushNotification(memberId, {
+                title: group.name || 'Propard',
+                body: 'Nouveau message programmé',
+                url: '/group/' + scheduled.group.toString(),
+                tag: 'group-' + scheduled.group.toString(),
+                data: { type: 'group-message', groupId: scheduled.group.toString() }
+              });
+            }
+          }
+        }
+        await ScheduledMessage.updateOne(
+          { _id: scheduled._id, status: 'processing' },
+          { $set: { status: 'sent', deliveredMessageId: scheduled.recipient ? (await Message.findOne({ scheduledMessageId: scheduled._id }).select('_id'))?._id : (await GroupMessage.findOne({ scheduledMessageId: scheduled._id }).select('_id'))?._id, claimedAt: null, content: '' } }
+        );
+      } catch (error) {
+        await ScheduledMessage.updateOne(
+          { _id: scheduled._id, status: 'processing' },
+          {
+            $set: {
+              status: scheduled.attempts >= 9 ? 'failed' : 'pending',
+              claimedAt: null,
+              nextAttemptAt: new Date(Date.now() + 5 * 60 * 1000),
+              ...(scheduled.attempts >= 9 ? { content: '' } : {})
+            },
+            $inc: { attempts: 1 }
+          }
+        );
+        console.error('Scheduled message delivery failed:', error?.message || error);
+      }
+    }
+  } catch (error) {
+    console.error('Scheduled message worker error:', error);
+  } finally {
+    scheduledMessageWorkerRunning = false;
+  }
+}
+
+const scheduledMessageWorkerInterval = setInterval(deliverScheduledMessages, 10000);
+scheduledMessageWorkerInterval.unref?.();
+
 
 
 async function areFriends(userId,friendId){
