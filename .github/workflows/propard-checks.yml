@@ -1,4 +1,4 @@
-name: Propard E2EE and scheduled delivery validation
+name: Propard folder sync validation
 
 on:
   push:
