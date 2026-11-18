@@ -1,4 +1,4 @@
-name: Propard scheduled messaging validation
+name: Propard vault and messaging validation
 
 on:
   push:
