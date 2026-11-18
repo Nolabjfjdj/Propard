@@ -1470,8 +1470,28 @@ async function finalizeExpiredDeletions() {
       user.realUsername = null;
       user.pendingDeletionAt = null;
       user.e2eeKeyBackup = null;
+      user.e2eeVault = null;
+      user.profileBadge = null;
+      user.statusMessage = null;
+      user.conversationFolders = null;
+      user.activeSessions = [];
 
       await user.save();
+
+      const privateConversationKeyPattern = new RegExp('(^|:)' + user._id.toString() + '(:|$)');
+      await Promise.all([
+        Reminder.deleteMany({ user: user._id }),
+        ScheduledMessage.deleteMany({
+          $or: [
+            { sender: user._id },
+            { recipient: user._id }
+          ]
+        }),
+        ConversationNote.deleteMany({
+          scope: 'private',
+          conversationKey: privateConversationKeyPattern
+        })
+      ]);
     }
 
     if (expired.length) {
