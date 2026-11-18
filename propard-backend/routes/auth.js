@@ -13,6 +13,7 @@ const GroupMessage = require('../models/GroupMessage');
 const Reminder = require('../models/Reminder');
 const ScheduledMessage = require('../models/ScheduledMessage');
 const ConversationNote = require('../models/ConversationNote');
+const AIConversation = require('../models/AIConversation');
 const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { getClientIp } = require('../utils/clientIp');
@@ -1246,6 +1247,7 @@ router.delete('/anonymize', authMiddleware, accountDeletionLimiter, async (req, 
 
     await Promise.all([
       Reminder.deleteMany({ user: userId }),
+      AIConversation.deleteMany({ userId }),
       ScheduledMessage.deleteMany({
         $or: [
           { sender: userId },
@@ -1382,6 +1384,7 @@ router.delete('/delete', authMiddleware, accountDeletionLimiter, async (req, res
     const privateConversationKeyPattern = new RegExp('(^|:)' + userId.toString() + '(:|$)');
     await Promise.all([
       Reminder.deleteMany({ user: userId }),
+      AIConversation.deleteMany({ userId }),
       ScheduledMessage.deleteMany({
         $or: [
           { sender: userId },
@@ -1493,6 +1496,7 @@ async function finalizeExpiredDeletions() {
       const privateConversationKeyPattern = new RegExp('(^|:)' + user._id.toString() + '(:|$)');
       await Promise.all([
         Reminder.deleteMany({ user: user._id }),
+        AIConversation.deleteMany({ userId: user._id }),
         ScheduledMessage.deleteMany({
           $or: [
             { sender: user._id },
