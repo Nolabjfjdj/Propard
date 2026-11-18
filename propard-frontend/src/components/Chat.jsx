@@ -814,7 +814,7 @@ export default function Chat({
     return true;
   };
 
-  const createPoll = async (question, options) => {
+  const createPoll = async (question, options, expiresIn = 0) => {
     if (!sharedKey || !friend?._id) {
       setLoadError('Chiffrement indisponible pour créer ce sondage.');
       return false;
@@ -828,7 +828,7 @@ export default function Chat({
       receiverId: friend._id,
       content: encryptedContent,
       messageType: 'poll',
-      expiresIn: 0
+      expiresIn
     });
     return true;
   };
