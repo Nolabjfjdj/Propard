@@ -1,4 +1,4 @@
-name: Propard profile badge validation
+name: Propard reminder and profile validation
 
 on:
   push:
