@@ -12,6 +12,7 @@ Propard est une plateforme web française de communication développée avec Rea
 - Système d'amis
 - Dossiers de conversations synchronisés entre les appareils du compte
 - Messagerie privée en temps réel
+- Messages vocaux enregistrés dans le navigateur et chiffrés avant téléversement
 - Messages privés et de groupe programmés avec stockage du seul contenu chiffré
 - Chiffrement de bout en bout des messages privés
 - Sauvegarde chiffrée de la clé privée E2EE
@@ -34,6 +35,10 @@ Propard est une plateforme web française de communication développée avec Rea
 - Gestion administrative des signalements
 - Pages d'aide, CGU et politique de confidentialité
 - Suppression de compte avec traitement côté serveur
+
+## Messages vocaux
+
+Les messages vocaux sont enregistrés dans le navigateur via MediaRecorder, limités à deux minutes et 25 Mo, puis envoyés par le même pipeline de pièces jointes chiffrées côté client que les autres fichiers. Le serveur ne reçoit pas le son en clair. Les messages vocaux ne sont pas disponibles lorsque l'expiration éphémère est activée.
 
 ## Dossiers de conversations
 
