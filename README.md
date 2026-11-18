@@ -8,7 +8,7 @@ Propard est une plateforme web française de communication développée avec Rea
 - Clés d’accès WebAuthn et codes de récupération
 - Consultation et révocation des sessions par appareil
 - Protection des mots de passe avec bcryptjs
-- Profils utilisateurs, avatars, surnoms et blocage
+- Profils utilisateurs, avatars, statuts, badges personnels décoratifs, surnoms et blocage
 - Système d'amis
 - Messagerie privée en temps réel
 - Chiffrement de bout en bout des messages privés
