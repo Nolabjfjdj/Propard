@@ -1,4 +1,4 @@
-name: Propard full upgrade validation
+name: Propard account deletion and privacy validation
 
 on:
   push:
