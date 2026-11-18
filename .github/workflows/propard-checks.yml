@@ -1,4 +1,4 @@
-name: Propard reminders final validation fixed
+name: Propard scheduled messaging validation
 
 on:
   push:
