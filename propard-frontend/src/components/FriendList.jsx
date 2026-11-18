@@ -33,15 +33,59 @@ export default function FriendList({
     }
   });
   const [activeFolder, setActiveFolder] = useState('all');
+  const folderEditedRef = useRef(false);
 
   const saveFolderData = next => {
+    setFolderEditedRef.current = true;
     setFolderData(next);
     try {
       localStorage.setItem('propard_conversation_folders_' + (userId || 'local'), JSON.stringify(next));
     } catch (error) {
       console.warn('Impossible de sauvegarder les dossiers de conversations:', error);
     }
+    if (token && userId) {
+      api.put('/api/conversation-folders', next, {
+        headers: { Authorization: 'Bearer ' + token }
+      }).catch(error => {
+        console.warn('Synchronisation des dossiers impossible:', error.response?.data?.error || error.message);
+      });
+    }
   };
+
+  useEffect(() => {
+    if (!token || !userId) return undefined;
+    let cancelled = false;
+    folderEditedRef.current = false;
+    api.get('/api/conversation-folders', {
+      headers: { Authorization: 'Bearer ' + token }
+    }).then(response => {
+      if (cancelled || folderEditedRef.current) return;
+      const remote = response.data?.folders;
+      if (remote && Array.isArray(remote.names) && remote.assignments && typeof remote.assignments === 'object') {
+        const synced = {
+          names: remote.names.filter(name => typeof name === 'string').slice(0, 30),
+          assignments: remote.assignments
+        };
+        setFolderData(synced);
+        try {
+          localStorage.setItem('propard_conversation_folders_' + userId, JSON.stringify(synced));
+        } catch (error) {
+          console.warn('Cache locale des dossiers indisponible:', error);
+        }
+      } else {
+        api.put('/api/conversation-folders', folderData, {
+          headers: { Authorization: 'Bearer ' + token }
+        }).catch(error => {
+          console.warn('Migration des dossiers locaux impossible:', error.response?.data?.error || error.message);
+        });
+      }
+    }).catch(error => {
+      console.warn('Chargement des dossiers synchronisés impossible:', error.response?.data?.error || error.message);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, userId]);
 
   const createFolder = () => {
     if (folderData.names.length >= 30) {
