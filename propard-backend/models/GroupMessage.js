@@ -27,6 +27,6 @@ groupMessageSchema.index({group:1,createdAt:-1});
 
 groupMessageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-groupMessageSchema.index({ scheduledMessageId: 1 }, { unique: true, sparse: true });
+groupMessageSchema.index({ scheduledMessageId: 1 }, { unique: true, partialFilterExpression: { scheduledMessageId: { $type: 'objectId' } } });
 
 module.exports = registerModel('GroupMessage', groupMessageSchema);
