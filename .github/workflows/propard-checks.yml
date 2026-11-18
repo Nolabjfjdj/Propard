@@ -1,4 +1,4 @@
-name: Propard voice and folder validation
+name: Propard full upgrade validation
 
 on:
   push:
