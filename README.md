@@ -11,6 +11,7 @@ Propard est une plateforme web française de communication développée avec Rea
 - Profils utilisateurs, avatars, statuts, badges personnels décoratifs, surnoms et blocage
 - Système d'amis
 - Messagerie privée en temps réel
+- Messages privés et de groupe programmés avec stockage du seul contenu chiffré
 - Chiffrement de bout en bout des messages privés
 - Sauvegarde chiffrée de la clé privée E2EE
 - Système de groupes
@@ -31,6 +32,12 @@ Propard est une plateforme web française de communication développée avec Rea
 - Gestion administrative des signalements
 - Pages d'aide, CGU et politique de confidentialité
 - Suppression de compte avec traitement côté serveur
+
+## Messages programmés
+
+Les messages programmés sont chiffrés dans le navigateur avant leur enregistrement. Le serveur ne stocke que le texte chiffré et les métadonnées de livraison. Les envois sont limités aux messages texte sans pièce jointe, dans une fenêtre maximale de 30 jours, avec 50 messages en attente par compte. La livraison est traitée par un worker avec verrouillage atomique, reprise après interruption et identifiant unique pour éviter la création de doublons. Pour les groupes, une rotation de clé avant l'envoi rend le message programmé invalide plutôt que de risquer un contenu indéchiffrable.
+
+API authentifiée : `GET /api/scheduled-messages`, `POST /api/scheduled-messages` et `DELETE /api/scheduled-messages/:messageId`.
 
 ## Rappels personnels
 
