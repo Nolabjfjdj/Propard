@@ -1247,7 +1247,6 @@ router.delete('/anonymize', authMiddleware, accountDeletionLimiter, async (req, 
 
     await Promise.all([
       Reminder.deleteMany({ user: userId }),
-      AIConversation.deleteMany({ userId }),
       ScheduledMessage.deleteMany({
         $or: [
           { sender: userId },
