@@ -312,7 +312,7 @@ async function deliverDueReminders() {
       try {
         await sendPushNotification(reminder.user, {
           title: 'Rappel Propard',
-          body: reminder.note ? reminder.title + ' · ' + reminder.note : reminder.title,
+          body: reminder.title,
           url: '/settings',
           tag: 'reminder-' + reminder._id.toString(),
           data: { type: 'reminder', reminderId: reminder._id.toString(), url: '/settings' }
