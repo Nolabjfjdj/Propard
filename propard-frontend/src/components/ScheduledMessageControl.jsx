@@ -103,6 +103,11 @@ export default function ScheduledMessageControl({ token, scope, conversationId, 
                   <button type="button" onClick={() => cancel(item)} disabled={loading || item.status !== 'pending'} style={{ border: '1px solid var(--danger)', borderRadius: 6, padding: '4px 7px', color: 'var(--danger)', background: 'transparent' }}>Annuler</button>
                 </div>
               ))}
+            {messages.filter(item => item.status === 'failed').map(item => (
+              <p key={item._id} style={{ margin: '8px 0 0', color: 'var(--danger)', fontSize: 12 }}>
+                Message non envoyé : {new Date(item.dueAt).toLocaleString()}. La conversation ou sa clé a peut-être changé.
+              </p>
+            ))}
           </div>
         </div>
       )}
