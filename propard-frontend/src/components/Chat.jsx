@@ -10,6 +10,7 @@ import E2EEVerification from './E2EEVerification';
 import PollMessage from './PollMessage';
 import PollComposer from './PollComposer';
 import ScheduledMessageControl from './ScheduledMessageControl';
+import VoiceMessageRecorder from './VoiceMessageRecorder';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
 import LinkText from './LinkText';
@@ -1879,6 +1880,7 @@ export default function Chat({
           uploading={uploadingFiles}
           progress={uploadProgress}
         />
+        <VoiceMessageRecorder disabled={!sharedKey || uploadingFiles || awaitingAttachmentAck || messageExpiry > 0} onRecorded={handleFilesSelected} />
         <input
           value={input}
           disabled={uploadingFiles || awaitingAttachmentAck}
