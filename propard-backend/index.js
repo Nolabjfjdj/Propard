@@ -314,13 +314,16 @@ async function deliverDueReminders() {
       );
       if (!reminder) break;
       try {
-        await sendPushNotification(reminder.user, {
+        const delivery = await sendPushNotification(reminder.user, {
           title: 'Rappel Propard',
           body: reminder.title,
           url: '/settings',
           tag: 'reminder-' + reminder._id.toString(),
           data: { type: 'reminder', reminderId: reminder._id.toString(), url: '/settings' }
         });
+        if (!delivery || delivery.delivered < 1) {
+          throw new Error('Aucune notification push remise à un appareil.');
+        }
         await Reminder.updateOne(
           { _id: reminder._id, status: 'processing' },
           { $set: { status: 'sent', sentAt: new Date(), claimedAt: null } }
