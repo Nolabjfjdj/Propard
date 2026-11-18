@@ -377,14 +377,14 @@ async function deliverScheduledMessages() {
       try {
         if (scheduled.recipient) {
           const [senderAccount, recipientAccount] = await Promise.all([
-            User.findById(scheduled.sender).select('username ipAlias blockedUsers'),
+            User.findById(scheduled.sender).select('username ipAlias blockedUsers pendingDeletionAt'),
             User.findById(scheduled.recipient).select('friends blockedUsers')
           ]);
           const stillFriends = await areFriends(scheduled.sender, scheduled.recipient);
           const recipientStillFriends = (recipientAccount?.friends || []).some(item => item.userId?.toString() === scheduled.sender.toString());
           const blocked = (senderAccount?.blockedUsers || []).some(id => id.toString() === scheduled.recipient.toString()) ||
             (recipientAccount?.blockedUsers || []).some(id => id.toString() === scheduled.sender.toString());
-          if (!senderAccount || !recipientAccount || !stillFriends || !recipientStillFriends || blocked) {
+          if (!senderAccount || senderAccount.pendingDeletionAt || !recipientAccount || !stillFriends || !recipientStillFriends || blocked) {
             await ScheduledMessage.updateOne({ _id: scheduled._id }, { $set: { status: 'failed', content: '', claimedAt: null } });
             continue;
           }
@@ -423,11 +423,14 @@ async function deliverScheduledMessages() {
             });
           }
         } else if (scheduled.group) {
-          const group = await Group.findOne({
-            _id: scheduled.group,
-            'members.userId': scheduled.sender
-          }).select('members keyVersion name');
-          if (!group || (group.keyVersion || 1) !== scheduled.keyVersion) {
+          const [group, senderAccount] = await Promise.all([
+            Group.findOne({
+              _id: scheduled.group,
+              'members.userId': scheduled.sender
+            }).select('members keyVersion name'),
+            User.findById(scheduled.sender).select('pendingDeletionAt')
+          ]);
+          if (!group || !senderAccount || senderAccount.pendingDeletionAt || (group.keyVersion || 1) !== scheduled.keyVersion) {
             await ScheduledMessage.updateOne({ _id: scheduled._id }, { $set: { status: 'failed', content: '', claimedAt: null } });
             continue;
           }
