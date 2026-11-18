@@ -22,6 +22,7 @@ Propard est une plateforme web française de communication développée avec Rea
 - Serveurs STUN/TURN et ICE restart
 - Support de plusieurs serveurs Metered
 - Notifications Web Push
+- Rappels personnels avec notifications push programmées
 - Service Worker
 - Fonctionnalités hors ligne
 - Mini-jeu hors ligne
@@ -30,6 +31,12 @@ Propard est une plateforme web française de communication développée avec Rea
 - Gestion administrative des signalements
 - Pages d'aide, CGU et politique de confidentialité
 - Suppression de compte avec traitement côté serveur
+
+## Rappels personnels
+
+Les rappels sont privés au compte connecté. Ils comportent un titre, une note facultative et une date future. La création exige au moins une destination de notification Web Push ou APNs déjà enregistrée. Le worker serveur traite les rappels échus, revendique chaque tâche de façon atomique, retente les échecs avec un délai et ne transmet que le titre dans la notification push. La note reste stockée côté serveur et n'est jamais incluse dans le payload de notification.
+
+API authentifiée : `GET /api/reminders`, `POST /api/reminders`, `PATCH /api/reminders/:reminderId/cancel` et `DELETE /api/reminders/:reminderId`.
 
 ## Architecture
 
