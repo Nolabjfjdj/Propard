@@ -462,6 +462,7 @@ router.post('/register', registerRateLimiter, async (req, res) => {
         username: user.username,
         displayName: user.displayName,
         statusMessage: user.statusMessage,
+        profileBadge: user.profileBadge,
         avatar: user.avatar,
         ipAlias: user.ipAlias,
         publicKey: user.publicKey,
@@ -742,7 +743,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 
 router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
   try {
-    const { displayName, statusMessage, avatar, username } = req.body;
+    const { displayName, statusMessage, profileBadge, avatar, username } = req.body;
 
     const user = await User.findById(req.user.id);
 
@@ -828,6 +829,17 @@ router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
       user.statusMessage = trimmedStatus || null;
     }
 
+    if (profileBadge !== undefined) {
+      if (typeof profileBadge !== 'string' && profileBadge !== null) {
+        return res.status(400).json({ error: 'Badge personnel invalide.' });
+      }
+      const trimmedBadge = typeof profileBadge === 'string' ? profileBadge.trim() : '';
+      if (trimmedBadge.length > 24 || /[\\u0000-\\u001F\\u007F]/.test(trimmedBadge)) {
+        return res.status(400).json({ error: 'Le badge doit contenir au maximum 24 caractères.' });
+      }
+      user.profileBadge = trimmedBadge || null;
+    }
+
     if (avatar !== undefined) {
       if (avatar !== null && typeof avatar !== 'string') {
         return res.status(400).json({
@@ -855,6 +867,8 @@ router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
         id: user._id,
         username: user.username,
         displayName: user.displayName,
+        statusMessage: user.statusMessage,
+        profileBadge: user.profileBadge,
         avatar: user.avatar,
         ipAlias: user.ipAlias,
         publicKey: user.publicKey
@@ -886,7 +900,7 @@ router.get('/user/:id', authMiddleware, async (req, res) => {
 
       User.findById(profileId)
         .select(
-          'username displayName statusMessage avatar ipAlias publicKey isOnline friends friendRequests'
+          'username displayName statusMessage profileBadge avatar ipAlias publicKey isOnline friends friendRequests'
         )
     ]);
 
@@ -964,6 +978,7 @@ router.get('/user/:id', authMiddleware, async (req, res) => {
       username: profile.username,
       displayName: profile.displayName,
       statusMessage: profile.statusMessage,
+      profileBadge: profile.profileBadge,
       avatar: profile.avatar,
       ipAlias: canViewPrivateDetails ? profile.ipAlias : null,
       publicKey: canViewPrivateDetails ? profile.publicKey : null,
