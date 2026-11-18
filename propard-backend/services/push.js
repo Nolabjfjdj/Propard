@@ -21,7 +21,9 @@ function getPublicKey() {
 }
 
 async function sendWebPush(user, payload) {
-  if (!pushConfigured || !user?.pushSubscriptions?.length) return;
+  if (!pushConfigured || !user?.pushSubscriptions?.length) return 0;
+
+  let delivered = 0;
 
   const body = JSON.stringify({
     title: payload.title || 'Propard',
@@ -52,6 +54,7 @@ async function sendWebPush(user, payload) {
           body,
           { TTL: 60 * 60 }
         );
+        delivered += 1;
       } catch (error) {
         if (error.statusCode === 404 || error.statusCode === 410) {
           staleEndpoints.push(subscription.endpoint);
@@ -75,10 +78,14 @@ async function sendWebPush(user, payload) {
       }
     );
   }
+
+  return delivered;
 }
 
 async function sendApnsPush(user, payload) {
-  if (!apnsConfigured || !user?.apnsTokens?.length) return;
+  if (!apnsConfigured || !user?.apnsTokens?.length) return 0;
+
+  let delivered = 0;
 
   const staleTokens = [];
 
@@ -87,7 +94,9 @@ async function sendApnsPush(user, payload) {
       try {
         const result = await sendApnsNotification(subscription.token, payload);
 
-        if (!result.ok) {
+        if (result.ok) {
+          delivered += 1;
+        } else {
           if (result.status === 400 || result.status === 410 || result.reason === 'BadDeviceToken' || result.reason === 'Unregistered') {
             staleTokens.push(subscription.token);
             return;
@@ -113,18 +122,21 @@ async function sendApnsPush(user, payload) {
       }
     );
   }
+
+  return delivered;
 }
 
 async function sendPushNotification(userId, payload) {
-  if (!userId) return;
+  if (!userId) return { delivered: 0 };
 
   const user = await User.findById(userId).select('pushSubscriptions apnsTokens');
-  if (!user) return;
+  if (!user) return { delivered: 0 };
 
-  await Promise.all([
+  const results = await Promise.all([
     sendWebPush(user, payload),
     sendApnsPush(user, payload)
   ]);
+  return { delivered: results.reduce((total, count) => total + count, 0) };
 }
 
 async function sendStaffHelpNotification({ kind, username, requestId }) {
