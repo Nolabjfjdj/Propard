@@ -326,7 +326,7 @@ async function deliverDueReminders() {
           { _id: reminder._id, status: 'processing' },
           {
             $set: {
-              status: 'pending',
+              status: reminder.attempts >= 19 ? 'failed' : 'pending',
               claimedAt: null,
               nextAttemptAt: new Date(Date.now() + 5 * 60 * 1000)
             },
