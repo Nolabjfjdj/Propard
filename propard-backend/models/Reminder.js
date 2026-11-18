@@ -6,8 +6,11 @@ const reminderSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true, maxlength: 80 },
   note: { type: String, default: null, trim: true, maxlength: 240 },
   dueAt: { type: Date, required: true, index: true },
-  status: { type: String, enum: ['pending', 'sent', 'cancelled'], default: 'pending', index: true },
+  status: { type: String, enum: ['pending', 'processing', 'sent', 'cancelled'], default: 'pending', index: true },
   sentAt: { type: Date, default: null },
+  claimedAt: { type: Date, default: null },
+  nextAttemptAt: { type: Date, default: Date.now },
+  attempts: { type: Number, default: 0, min: 0, max: 20 },
   createdAt: { type: Date, default: Date.now }
 });
 
