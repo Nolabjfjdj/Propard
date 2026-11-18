@@ -36,7 +36,7 @@ export default function FriendList({
   const folderEditedRef = useRef(false);
 
   const saveFolderData = next => {
-    setFolderEditedRef.current = true;
+    folderEditedRef.current = true;
     setFolderData(next);
     try {
       localStorage.setItem('propard_conversation_folders_' + (userId || 'local'), JSON.stringify(next));
