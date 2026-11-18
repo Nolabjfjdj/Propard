@@ -649,7 +649,7 @@ Les messages programmés privés et de groupe sont chiffrés côté client avant
 
 ### Coffre-fort personnel E2EE
 
-Le coffre-fort chiffre les notes dans le navigateur avec une clé dérivée d'une phrase secrète. Le serveur ne reçoit que le contenu chiffré et les paramètres nécessaires à son déchiffrement. La phrase secrète n'est jamais transmise ni récupérable par Propard. Sa perte rend le contenu du coffre-fort inaccessible.
+Le coffre-fort chiffre les notes dans le navigateur avec une clé dérivée d'une phrase secrète. Le serveur ne reçoit que le contenu chiffré et les paramètres nécessaires à son déchiffrement. La phrase secrète n'est jamais transmise ni récupérable par Propard. Sa perte rend le contenu du coffre-fort inaccessible. La suppression du compte efface également l'historique Propard AI associé, les rappels et les programmations personnels, ainsi que les notes privées. Après le délai de suppression de 30 jours, les données personnelles supplémentaires sont purgées lors de l'anonymisation définitive.
 
 ### Messages vocaux et profils
 
