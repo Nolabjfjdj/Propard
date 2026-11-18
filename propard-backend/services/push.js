@@ -129,8 +129,8 @@ async function sendApnsPush(user, payload) {
 async function sendPushNotification(userId, payload) {
   if (!userId) return { delivered: 0 };
 
-  const user = await User.findById(userId).select('pushSubscriptions apnsTokens');
-  if (!user) return { delivered: 0 };
+  const user = await User.findById(userId).select('pushSubscriptions apnsTokens pendingDeletionAt');
+  if (!user || user.pendingDeletionAt) return { delivered: 0 };
 
   const results = await Promise.all([
     sendWebPush(user, payload),
