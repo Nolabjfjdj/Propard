@@ -605,7 +605,7 @@ Les conversations privées et les groupes disposent d'un accès « Médias et fi
 
 ### Dossiers de conversations
 
-La liste des amis et des groupes permet de créer jusqu'à 30 dossiers locaux et d'y classer chaque conversation. Le filtre affiche toutes les conversations, celles sans dossier ou un dossier précis. Ces préférences restent dans le stockage local du navigateur et sont séparées par compte ; elles ne sont pas envoyées au serveur.
+La liste des amis et des groupes permet de créer jusqu'à 30 dossiers et d'y classer chaque conversation. Le filtre affiche toutes les conversations, celles sans dossier ou un dossier précis. Les dossiers sont synchronisés avec le compte sur le serveur et conservés en cache local pour accélérer l'affichage.
 
 
 ### Historique de sécurité du compte
@@ -641,3 +641,16 @@ Les conversations privées et les groupes permettent de choisir une expiration d
 ### Sondages chiffrés
 
 Les conversations privées et les groupes permettent de créer des sondages contenant une question et de 2 à 6 réponses. Le texte du sondage est chiffré côté client avant l'envoi. Les votes utilisent les réactions numérotées ; le serveur impose un seul choix actif par participant et ne connaît pas le texte des réponses. Les sondages ne prennent pas en charge les pièces jointes ni l'expiration éphémère.
+
+
+### Messages programmés et rappels
+
+Les messages programmés privés et de groupe sont chiffrés côté client avant leur stockage. Le serveur vérifie à nouveau les relations, l'appartenance au groupe et la version de clé avant la livraison. Les programmations peuvent être annulées tant qu'elles sont en attente. Les rappels personnels déclenchent une notification Push à l'heure prévue ; le titre est utilisé dans la notification, mais la note facultative n'est pas envoyée dans son contenu. La livraison dépend de la disponibilité des abonnements Push.
+
+### Coffre-fort personnel E2EE
+
+Le coffre-fort chiffre les notes dans le navigateur avec une clé dérivée d'une phrase secrète. Le serveur ne reçoit que le contenu chiffré et les paramètres nécessaires à son déchiffrement. La phrase secrète n'est jamais transmise ni récupérable par Propard. Sa perte rend le contenu du coffre-fort inaccessible.
+
+### Messages vocaux et profils
+
+Les messages vocaux sont enregistrés dans le navigateur puis transmis par le parcours existant de pièces jointes chiffrées. Les profils peuvent afficher un statut et un badge personnel. Les préférences d'apparence comprennent le thème sombre ou clair et cinq couleurs d'accent, enregistrés sur l'appareil.
