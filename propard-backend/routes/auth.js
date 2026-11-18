@@ -1242,6 +1242,16 @@ router.delete('/anonymize', authMiddleware, accountDeletionLimiter, async (req, 
       await user.save();
     }
 
+    await Promise.all([
+      Reminder.deleteMany({ user: userId }),
+      ScheduledMessage.deleteMany({
+        $or: [
+          { sender: userId },
+          { recipient: userId }
+        ]
+      })
+    ]);
+
     await User.updateMany(
       { 'friendRequests.from': userId },
       {
