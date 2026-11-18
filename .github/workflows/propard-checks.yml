@@ -1,4 +1,4 @@
-name: Propard vault and messaging validation
+name: Propard E2EE and scheduled delivery validation
 
 on:
   push:
