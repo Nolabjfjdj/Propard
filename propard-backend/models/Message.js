@@ -27,6 +27,6 @@ const messageSchema = new mongoose.Schema({
 
 messageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-messageSchema.index({ scheduledMessageId: 1 }, { unique: true, sparse: true });
+messageSchema.index({ scheduledMessageId: 1 }, { unique: true, partialFilterExpression: { scheduledMessageId: { $type: 'objectId' } } });
 
 module.exports = registerModel('Message', messageSchema);
