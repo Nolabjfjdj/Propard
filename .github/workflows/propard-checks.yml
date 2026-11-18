@@ -1,4 +1,4 @@
-name: Propard final validation 4
+name: Propard profile badge validation
 
 on:
   push:
