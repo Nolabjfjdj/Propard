@@ -10,6 +10,9 @@ const { sendStaffHelpNotification, sendPushNotification } = require('../services
 const Message = require('../models/Message');
 const Group = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
+const Reminder = require('../models/Reminder');
+const ScheduledMessage = require('../models/ScheduledMessage');
+const ConversationNote = require('../models/ConversationNote');
 const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { getClientIp } = require('../utils/clientIp');
@@ -1363,6 +1366,24 @@ router.delete('/delete', authMiddleware, accountDeletionLimiter, async (req, res
         }
       });
     }
+
+    const privateConversationKeyPattern = new RegExp('(^|:)' + userId.toString() + '(:|$)');
+    await Promise.all([
+      Reminder.deleteMany({ user: userId }),
+      ScheduledMessage.deleteMany({
+        $or: [
+          { sender: userId },
+          { recipient: userId },
+          ...(ownedGroupIds.length ? [{ group: { $in: ownedGroupIds } }] : [])
+        ]
+      }),
+      ConversationNote.deleteMany({
+        $or: [
+          { scope: 'private', conversationKey: privateConversationKeyPattern },
+          ...(ownedGroupIds.length ? [{ scope: 'group', conversationKey: { $in: ownedGroupIds.map(id => id.toString()) } }] : [])
+        ]
+      })
+    ]);
 
     await deleteFilesForUser(userId);
     await Promise.all(ownedGroupIds.map(groupId => deleteFilesForGroup(groupId)));
