@@ -95,7 +95,9 @@ export default function MessageTranslation({ text }) {
       try {
         await translator?.destroy?.();
         await detector?.destroy?.();
-      } catch {}
+      } catch (cleanupError) {
+        console.warn('Nettoyage du moteur de traduction impossible:', cleanupError?.message || cleanupError);
+      }
       setLoading(false);
     }
   };
