@@ -6,6 +6,11 @@ const { getPublicKey } = require('../services/push');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { isAllowedPushEndpoint } = require('../services/pushEndpoint');
 
+const pushPublicKeyReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: 'Trop de consultations de la configuration Push. Réessaie plus tard.'
+});
 const webPushSubscribeLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
@@ -25,7 +30,7 @@ const pushUnsubscribeLimiter = createRateLimiter({
   message: 'Trop de demandes de désactivation des notifications. Réessaie plus tard.'
 });
 
-router.get('/public-key', (req, res) => {
+router.get('/public-key', pushPublicKeyReadLimiter, (req, res) => {
   const publicKey = getPublicKey();
 
   if (!publicKey) {
