@@ -142,7 +142,7 @@ router.post(
       if (!allowedTypes.has(mimeType)) {
         return res.status(415).json({ error: 'Format audio non pris en charge.' });
       }
-      if (!Buffer.isBuffer(req.body) || req.body.length < 512 || req.body.length > 12 * 1024 * 1024) {
+      if (!Buffer.isBuffer(req.body) || req.body.length < 1 || req.body.length > 12 * 1024 * 1024) {
         return res.status(400).json({ error: 'Enregistrement audio vide ou trop volumineux.' });
       }
       const extension = ({
