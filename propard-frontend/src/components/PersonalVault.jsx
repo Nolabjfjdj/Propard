@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import api from '../utils/api';
 import { decryptVaultData, encryptVaultData } from '../utils/vaultCrypto';
 
@@ -13,7 +13,7 @@ export default function PersonalVault({ token }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const headers = { Authorization: 'Bearer ' + token };
+  const headers = useMemo(() => ({ Authorization: 'Bearer ' + token }), [token]);
 
   useEffect(() => {
     let cancelled = false;
