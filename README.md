@@ -44,6 +44,10 @@ Propard est une plateforme web française de communication développée avec Rea
 - Notifications Web Push et notifications natives APNs sur iOS
 - Suppression de compte avec traitement côté serveur
 
+## Protection des rappels et messages programmés
+
+Les listes personnelles de rappels et de messages programmés sont limitées à 60 consultations par minute et par compte. Les créations, annulations et suppressions conservent leurs limites de modification dédiées.
+
 ## Protection des sessions et de l'historique de sécurité
 
 Les consultations des sessions actives et de l'historique de sécurité sont limitées à 30 requêtes par minute et par compte. Les révocations individuelles sont limitées à 15 opérations par tranche de 15 minutes. Les déconnexions de session sont limitées à 10 requêtes par minute. La déconnexion globale conserve sa limite renforcée et sa vérification anti-bot.
