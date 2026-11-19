@@ -93,6 +93,18 @@ const accountRestoreLimiter = createRateLimiter({
   resetOnCaptcha: true
 });
 
+const profileReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyFn: req => `profile-read:${req.user.id}`,
+  message: 'Trop de consultations du profil. Réessaie plus tard.'
+});
+const publicProfileReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyFn: req => `public-profile-read:${req.user.id}`,
+  message: 'Trop de consultations de profils. Réessaie plus tard.'
+});
 const sessionReadLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   max: 30,
@@ -725,7 +737,7 @@ router.post('/logout-all', authMiddleware, logoutAllLimiter, async (req, res) =>
   }
 });
 
-router.get('/me', authMiddleware, async (req, res) => {
+router.get('/me', authMiddleware, profileReadLimiter, async (req, res) => {
   try {
     const user = await User.findById(req.user.id)
       .select('_id username displayName statusMessage profileBadge avatar ipAlias publicKey staffRole isOnline friends friendRequests pendingDeletionAt readReceiptsEnabled')
@@ -910,7 +922,7 @@ router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
   }
 });
 
-router.get('/user/:id', authMiddleware, async (req, res) => {
+router.get('/user/:id', authMiddleware, publicProfileReadLimiter, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(400).json({
