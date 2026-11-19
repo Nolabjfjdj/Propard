@@ -6,7 +6,7 @@ const { createRateLimiter } = require('../middleware/rateLimit');
 const AIConversation = require('../models/AIConversation');
 const User = require('../models/User');
 const Group = require('../models/Group');
-const { createGroqCompletion, getGroqConfiguration } = require('../services/groq');
+const { createGroqCompletion, getGroqConfiguration, transcribeGroqAudio } = require('../services/groq');
 
 router.use(authMiddleware);
 
@@ -105,6 +105,127 @@ const serializeConversation = conversation => ({
   })),
   createdAt: conversation.createdAt,
   updatedAt: conversation.updatedAt
+});
+
+
+const transcriptionLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 12,
+  keyFn: req => `propard-ai-transcription:${req.user.id}`,
+  message: 'Tu as effectué trop de transcriptions. Réessaie dans quelques minutes.'
+});
+
+const translationLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  keyFn: req => `propard-ai-translation:${req.user.id}`,
+  message: 'Tu as effectué trop de traductions. Réessaie dans quelques minutes.'
+});
+
+const supportedTranslationLanguages = new Set([
+  'ar', 'bg', 'bn', 'cs', 'da', 'de', 'el', 'en', 'es', 'fi', 'fr', 'he', 'hi',
+  'hr', 'hu', 'id', 'it', 'ja', 'kn', 'ko', 'lt', 'mr', 'nl', 'no', 'pl', 'pt',
+  'ro', 'ru', 'sk', 'sl', 'sv', 'ta', 'te', 'th', 'tr', 'uk', 'vi', 'zh', 'zh-Hant'
+]);
+
+router.post(
+  '/transcribe',
+  transcriptionLimiter,
+  express.raw({ type: 'audio/*', limit: '12mb' }),
+  async (req, res) => {
+    try {
+      const mimeType = (req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+      const allowedTypes = new Set([
+        'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg',
+        'audio/wav', 'audio/x-wav', 'audio/aac', 'audio/3gpp'
+      ]);
+      if (!allowedTypes.has(mimeType)) {
+        return res.status(415).json({ error: 'Format audio non pris en charge.' });
+      }
+      if (!Buffer.isBuffer(req.body) || req.body.length < 512 || req.body.length > 12 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Enregistrement audio vide ou trop volumineux.' });
+      }
+      const extension = ({
+        'audio/webm': 'webm',
+        'audio/ogg': 'ogg',
+        'audio/mp4': 'mp4',
+        'audio/mpeg': 'mp3',
+        'audio/wav': 'wav',
+        'audio/x-wav': 'wav',
+        'audio/aac': 'aac',
+        'audio/3gpp': '3gp'
+      })[mimeType];
+      const text = await transcribeGroqAudio({
+        audio: req.body,
+        mimeType,
+        filename: `propard-recording.${extension}`
+      });
+      res.json({ text });
+    } catch (error) {
+      console.error('Propard AI audio transcription failed:', error.message);
+      const status = error.code === 'GROQ_NOT_CONFIGURED' ? 503 : error.status === 429 ? 429 : 502;
+      res.status(status).json({
+        error: error.code === 'GROQ_NOT_CONFIGURED'
+          ? 'La transcription audio n’est pas configurée sur le serveur.'
+          : 'La transcription audio a échoué. Réessaie avec un enregistrement plus court.'
+      });
+    }
+  }
+);
+
+router.post('/translate', translationLimiter, async (req, res) => {
+  try {
+    const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+    const sourceLanguage = typeof req.body?.sourceLanguage === 'string' ? req.body.sourceLanguage : 'auto';
+    const targetLanguage = typeof req.body?.targetLanguage === 'string' ? req.body.targetLanguage : '';
+    if (!text || text.length > 12000) {
+      return res.status(400).json({ error: 'Le texte doit contenir entre 1 et 12000 caractères.' });
+    }
+    if (!['auto', ...supportedTranslationLanguages].includes(sourceLanguage) || !supportedTranslationLanguages.has(targetLanguage)) {
+      return res.status(400).json({ error: 'Langue source ou cible non prise en charge.' });
+    }
+    if (sourceLanguage !== 'auto' && sourceLanguage === targetLanguage) {
+      return res.status(400).json({ error: 'Le texte est déjà dans la langue sélectionnée.' });
+    }
+    if (!getGroqConfiguration().configured) {
+      return res.status(503).json({ error: 'La traduction Propard AI n’est pas configurée sur le serveur.' });
+    }
+    const languageNames = {
+      ar: 'arabe', bg: 'bulgare', bn: 'bengali', cs: 'tchèque', da: 'danois',
+      de: 'allemand', el: 'grec', en: 'anglais', es: 'espagnol', fi: 'finnois',
+      fr: 'français', he: 'hébreu', hi: 'hindi', hr: 'croate', hu: 'hongrois',
+      id: 'indonésien', it: 'italien', ja: 'japonais', kn: 'kannada', ko: 'coréen',
+      lt: 'lituanien', mr: 'marathi', nl: 'néerlandais', no: 'norvégien',
+      pl: 'polonais', pt: 'portugais', ro: 'roumain', ru: 'russe',
+      sk: 'slovaque', sl: 'slovène', sv: 'suédois', ta: 'tamoul',
+      te: 'télougou', th: 'thaï', tr: 'turc', uk: 'ukrainien',
+      vi: 'vietnamien', zh: 'chinois simplifié', 'zh-Hant': 'chinois traditionnel'
+    };
+    const sourceLabel = sourceLanguage === 'auto' ? 'la langue détectée automatiquement' : languageNames[sourceLanguage];
+    const targetLabel = languageNames[targetLanguage];
+    const completion = await createGroqCompletion({
+      messages: [
+        {
+          role: 'system',
+          content: `Tu es un moteur de traduction. Traduis fidèlement le texte de ${sourceLabel} vers ${targetLabel}. Préserve le sens, le ton, les noms propres et la mise en forme. Ne réponds pas au texte, ne le résume pas et n'ajoute aucune explication. Retourne uniquement la traduction.`
+        },
+        { role: 'user', content: text }
+      ],
+      temperature: 0.1,
+      max_completion_tokens: 3000
+    });
+    const translatedText = completion.choices?.[0]?.message?.content?.trim();
+    if (!translatedText) throw new Error('Groq n’a retourné aucune traduction.');
+    res.json({ translatedText });
+  } catch (error) {
+    console.error('Propard AI translation failed:', error.message);
+    const status = error.code === 'GROQ_NOT_CONFIGURED' ? 503 : error.status === 429 ? 429 : 502;
+    res.status(status).json({
+      error: error.code === 'GROQ_NOT_CONFIGURED'
+        ? 'La traduction Propard AI n’est pas configurée sur le serveur.'
+        : 'La traduction a échoué. Réessaie dans un instant.'
+    });
+  }
 });
 
 router.get('/status', conversationReadLimiter, (req, res) => {
