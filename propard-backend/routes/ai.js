@@ -107,7 +107,7 @@ const serializeConversation = conversation => ({
   updatedAt: conversation.updatedAt
 });
 
-router.get('/status', (req, res) => {
+router.get('/status', conversationReadLimiter, (req, res) => {
   const config = getGroqConfiguration();
   res.json({ available: config.configured, model: config.model, keyCount: config.keyCount });
 });
