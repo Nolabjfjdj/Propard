@@ -52,6 +52,10 @@ Les listes personnelles de rappels et de messages programmés sont limitées à 
 
 Les consultations des sessions actives et de l'historique de sécurité sont limitées à 30 requêtes par minute et par compte. Les révocations individuelles sont limitées à 15 opérations par tranche de 15 minutes. Les déconnexions de session sont limitées à 10 requêtes par minute. La déconnexion globale conserve sa limite renforcée et sa vérification anti-bot.
 
+## Protection des lectures de compte et de profil
+
+La consultation du compte connecté est limitée à 60 requêtes par minute et par compte. Les consultations de profils publics sont limitées à 120 requêtes par minute et par compte. La lecture de la configuration d'accès administrateur est limitée à 20 requêtes par minute et par compte, en plus du contrôle de propriétaire unique.
+
 ## Protection de la configuration Push
 
 La clé publique nécessaire à l'abonnement aux notifications Push est limitée à 30 consultations par minute et par adresse IP. Les créations et suppressions d'abonnements restent protégées par des limites dédiées par compte.
