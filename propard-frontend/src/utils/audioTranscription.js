@@ -16,8 +16,9 @@ export async function transcribeAudio(blob, token) {
     'audio/mpeg',
     'audio/wav',
     'audio/x-wav',
-    'audio/aac',
-    'audio/3gpp'
+    'audio/flac',
+    'audio/m4a',
+    'audio/mpga'
   ];
   if (!allowedTypes.includes(mimeType)) {
     throw new Error('Le format audio de cet appareil n’est pas pris en charge.');
