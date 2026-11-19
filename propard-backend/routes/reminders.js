@@ -15,7 +15,14 @@ const reminderLimiter = createRateLimiter({
   message: 'Trop de modifications de rappels. Réessaie plus tard.'
 });
 
-router.get('/', async (req, res) => {
+const reminderReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyFn: req => 'reminders-read:' + req.user.id,
+  message: 'Trop de consultations des rappels. Réessaie dans une minute.'
+});
+
+router.get('/', reminderReadLimiter, async (req, res) => {
   try {
     const reminders = await Reminder.find({
       user: req.user.id,
