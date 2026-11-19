@@ -76,6 +76,8 @@ La lecture des dossiers de conversations est limitée à 60 requêtes par minute
 
 La consultation des clés d’accès est limitée à 30 requêtes par minute et par compte. Le renommage et la suppression des clés sont limités à 10 opérations par tranche de 15 minutes et par compte. La création et la régénération des codes de récupération conservent leur limite de gestion dédiée, tandis que les tentatives de connexion par clé restent limitées par adresse IP.
 
+**Limitation technique actuelle :** les compteurs de limitation sont conservés en mémoire dans chaque processus Node. Ils ne sont donc pas partagés entre plusieurs instances et sont réinitialisés au redémarrage du processus. Ces limites constituent une protection applicative complémentaire, pas un quota distribué global. Une future mise à l'échelle multi-instance nécessitera un stockage partagé des compteurs.
+
 ## Limites d'utilisation de Propard AI
 
 Les conversations Propard AI sont protégées par des limites distinctes par compte : 10 créations par heure, 60 consultations par minute et 30 modifications ou suppressions toutes les 15 minutes. L'envoi de messages à l'IA conserve sa propre limite de 20 messages par tranche de 10 minutes. Ces limites réduisent les abus et les créations massives de conversations.
