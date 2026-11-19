@@ -11,6 +11,13 @@ const { deleteMessageAttachments } = require('../services/fileCleanup');
 
 router.use(authMiddleware);
 
+const messageReadReceiptLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyFn: req => `message-read-receipt:${req.user.id}`,
+  message: 'Trop de mises à jour de lecture. Réessaie plus tard.'
+});
+
 async function areFriends(userId, friendId) {
   const user = await User.findById(userId).select('friends');
 
@@ -420,7 +427,7 @@ router.get('/unread', createRateLimiter({
   }
 });
 
-router.patch('/messages/read/:friendId', async (req, res) => {
+router.patch('/messages/read/:friendId', messageReadReceiptLimiter, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.friendId)) {
       return res.status(400).json({ error: 'ID invalide' });
