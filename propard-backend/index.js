@@ -378,13 +378,13 @@ async function deliverScheduledMessages() {
         if (scheduled.recipient) {
           const [senderAccount, recipientAccount] = await Promise.all([
             User.findById(scheduled.sender).select('username ipAlias blockedUsers pendingDeletionAt'),
-            User.findById(scheduled.recipient).select('friends blockedUsers')
+            User.findById(scheduled.recipient).select('friends blockedUsers pendingDeletionAt')
           ]);
           const stillFriends = await areFriends(scheduled.sender, scheduled.recipient);
           const recipientStillFriends = (recipientAccount?.friends || []).some(item => item.userId?.toString() === scheduled.sender.toString());
           const blocked = (senderAccount?.blockedUsers || []).some(id => id.toString() === scheduled.recipient.toString()) ||
             (recipientAccount?.blockedUsers || []).some(id => id.toString() === scheduled.sender.toString());
-          if (!senderAccount || senderAccount.pendingDeletionAt || !recipientAccount || !stillFriends || !recipientStillFriends || blocked) {
+          if (!senderAccount || senderAccount.pendingDeletionAt || !recipientAccount || recipientAccount.pendingDeletionAt || !stillFriends || !recipientStillFriends || blocked) {
             await ScheduledMessage.updateOne({ _id: scheduled._id }, { $set: { status: 'failed', content: '', claimedAt: null } });
             continue;
           }
