@@ -13,9 +13,16 @@ const vaultLimiter = createRateLimiter({
   message: 'Trop de modifications du coffre-fort. Réessaie plus tard.'
 });
 
+const vaultReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyFn: req => 'e2ee-vault-read:' + req.user.id,
+  message: 'Trop de consultations du coffre-fort. Réessaie plus tard.'
+});
+
 const isBase64 = value => typeof value === 'string' && /^[A-Za-z0-9+/]+={0,2}$/.test(value);
 
-router.get('/', async (req, res) => {
+router.get('/', vaultReadLimiter, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('+e2eeVault');
     if (!user) return res.status(404).json({ error: 'Compte introuvable.' });
