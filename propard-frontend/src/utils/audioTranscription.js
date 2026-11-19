@@ -1,7 +1,7 @@
 import api from './api';
 
 export async function transcribeAudio(blob, token) {
-  if (!(blob instanceof Blob) || blob.size < 512) {
+  if (!(blob instanceof Blob) || blob.size < 1) {
     throw new Error('Aucun son exploitable n’a été enregistré.');
   }
   if (blob.size > 12 * 1024 * 1024) {
