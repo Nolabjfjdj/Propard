@@ -52,6 +52,10 @@ Les listes personnelles de rappels et de messages programmés sont limitées à 
 
 Les consultations des sessions actives et de l'historique de sécurité sont limitées à 30 requêtes par minute et par compte. Les révocations individuelles sont limitées à 15 opérations par tranche de 15 minutes. Les déconnexions de session sont limitées à 10 requêtes par minute. La déconnexion globale conserve sa limite renforcée et sa vérification anti-bot.
 
+## Protection des groupes et confirmations de lecture
+
+Les listes et fiches de groupes sont limitées à 60 consultations par minute et par compte. Les mises à jour des confirmations de lecture dans les conversations privées et les groupes sont limitées à 120 requêtes par minute et par compte. Les historiques de messages et galeries conservent leurs limites de lecture dédiées.
+
 ## Protection de l’espace Staff
 
 Les consultations des données de l’espace Staff sont limitées à 60 requêtes par minute et par compte. Les actions Staff conservent également la limite générale de 300 requêtes par tranche de 15 minutes, avec des limites plus strictes pour certaines opérations sensibles.
