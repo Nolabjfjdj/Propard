@@ -310,7 +310,7 @@ async function deliverDueReminders() {
         {
           $set: { status: 'processing', claimedAt: now }
         },
-        { new: true, sort: { dueAt: 1 } }
+        { returnDocument: 'after', sort: { dueAt: 1 } }
       );
       if (!reminder) break;
       try {
@@ -371,7 +371,7 @@ async function deliverScheduledMessages() {
           ]
         },
         { $set: { status: 'processing', claimedAt: now } },
-        { new: true, sort: { dueAt: 1 } }
+        { returnDocument: 'after', sort: { dueAt: 1 } }
       );
       if (!scheduled) break;
       try {
