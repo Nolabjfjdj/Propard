@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useAuth } from './context/AuthContext';
 import AuthPage from './pages/AuthPage';
-import AppPage from './pages/AppPage';
+const AppPage = lazy(() => import('./pages/AppPage'));
 import HelpPage from './pages/HelpPage';
 import ContactPage from './pages/ContactPage';
 import AdminPage from './pages/AdminPage';
@@ -14,8 +14,16 @@ import TermsPage from './pages/TermsPage';
 import CopyrightPage from './pages/CopyrightPage';
 import GlobalAnnouncement from './components/GlobalAnnouncement';
 import OfflineGame from './components/OfflineGame';
-import SettingsPage from './pages/SettingsPage';
-import PropardAIPage from './pages/PropardAIPage';
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const PropardAIPage = lazy(() => import('./pages/PropardAIPage'));
+
+function PageLoading() {
+  return (
+    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--bg-primary)', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+      Chargement de la page...
+    </div>
+  );
+}
 import api from './utils/api';
 
 async function checkPropardServer() {
@@ -231,7 +239,7 @@ export default function App() {
       window.history.replaceState({}, '', '/login');
       return null;
     }
-    return <PropardAIPage initialConversationId={aiRoute[1] || null} />;
+    return <Suspense fallback={<PageLoading />}><PropardAIPage initialConversationId={aiRoute[1] || null} /></Suspense>;
   }
 
   if (path === '/settings') {
@@ -240,7 +248,7 @@ export default function App() {
       return null;
     }
 
-    return <SettingsPage />;
+    return <Suspense fallback={<PageLoading />}><SettingsPage /></Suspense>;
   }
 
   if (path === '/help') {
@@ -270,10 +278,12 @@ export default function App() {
     const friendId = path.split('/chat/')[1];
 
     return (
-      <>
-        <AppPage initialFriendId={friendId} />
-        <GlobalAnnouncement />
-      </>
+      <Suspense fallback={<PageLoading />}>
+        <>
+          <AppPage initialFriendId={friendId} />
+          <GlobalAnnouncement />
+        </>
+      </Suspense>
     );
   }
 
@@ -287,10 +297,12 @@ export default function App() {
       path.split('/group/')[1];
 
     return (
-      <>
-        <AppPage initialGroupId={groupId} />
-        <GlobalAnnouncement />
-      </>
+      <Suspense fallback={<PageLoading />}>
+        <>
+          <AppPage initialGroupId={groupId} />
+          <GlobalAnnouncement />
+        </>
+      </Suspense>
     );
   }
 
@@ -303,10 +315,12 @@ export default function App() {
     const profileUserId = path.split('/profile/')[1];
 
     return (
-      <>
-        <AppPage initialProfileUserId={profileUserId} />
-        <GlobalAnnouncement />
-      </>
+      <Suspense fallback={<PageLoading />}>
+        <>
+          <AppPage initialProfileUserId={profileUserId} />
+          <GlobalAnnouncement />
+        </>
+      </Suspense>
     );
   }
 
@@ -354,10 +368,12 @@ export default function App() {
   if (path === '/') {
     if (user) {
       return (
-        <>
-          <AppPage />
-          <GlobalAnnouncement />
-        </>
+        <Suspense fallback={<PageLoading />}>
+          <>
+            <AppPage />
+            <GlobalAnnouncement />
+          </>
+        </Suspense>
       );
     }
 
