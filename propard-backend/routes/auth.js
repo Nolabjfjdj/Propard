@@ -700,7 +700,7 @@ router.post('/logout', authMiddleware, logoutLimiter, async (req, res) => {
       const user = await User.findByIdAndUpdate(
         req.user.id,
         { $inc: { sessionVersion: 1 }, $set: { activeSessions: [] } },
-        { new: true, select: '_id sessionVersion' }
+        { returnDocument: 'after', select: '_id sessionVersion' }
       );
 
       if (!user) {
@@ -725,7 +725,7 @@ router.post('/logout-all', authMiddleware, logoutAllLimiter, async (req, res) =>
     const user = await User.findByIdAndUpdate(
       req.user.id,
       { $inc: { sessionVersion: 1 }, $set: { activeSessions: [] } },
-      { new: true, select: '_id sessionVersion' }
+      { returnDocument: 'after', select: '_id sessionVersion' }
     );
 
     if (!user) {
