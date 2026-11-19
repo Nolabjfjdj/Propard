@@ -12,6 +12,7 @@ Propard est une plateforme web française de communication développée avec Rea
 - Système d'amis
 - Dossiers de conversations synchronisés entre les appareils du compte
 - Messagerie privée en temps réel
+- Traduction locale des messages privés et de groupe, sans transmettre le texte à un service tiers
 - Messages vocaux enregistrés dans le navigateur et chiffrés avant téléversement
 - Messages privés et de groupe programmés avec stockage du seul contenu chiffré
 - Chiffrement de bout en bout des messages privés
@@ -35,6 +36,10 @@ Propard est une plateforme web française de communication développée avec Rea
 - Gestion administrative des signalements
 - Pages d'aide, CGU et politique de confidentialité
 - Suppression de compte avec traitement côté serveur
+
+## Traduction des messages
+
+Les conversations privées et les groupes proposent une traduction à la demande des messages texte. La traduction est exécutée localement avec l'API Translator intégrée au navigateur lorsqu'elle est disponible. La langue source peut être détectée automatiquement ou sélectionnée manuellement, et la langue cible est configurable. Le message original n'est jamais modifié et le texte déchiffré n'est pas envoyé à un service de traduction externe. Les navigateurs qui ne prennent pas en charge cette API affichent une indication au lieu de transmettre le message à un tiers.
 
 ## Messages vocaux
 
