@@ -155,12 +155,17 @@ async function enableNativePushNotifications(token) {
     throw new Error('Permission de notification refusée.');
   }
 
+  let cancelRegistration;
+
   const registrationPromise = new Promise((resolve, reject) => {
     let settled = false;
     let registrationListener;
     let registrationErrorListener;
+    let timeoutId;
 
     const cleanup = async () => {
+      window.clearTimeout(timeoutId);
+
       try {
         await registrationListener?.remove();
       } catch (error) { console.warn('Opération ignorée:', error?.message || error); }
@@ -184,6 +189,11 @@ async function enableNativePushNotifications(token) {
       reject(error);
     };
 
+    cancelRegistration = fail;
+    timeoutId = window.setTimeout(() => {
+      fail(new Error('Délai dépassé lors de l’enregistrement des notifications.'));
+    }, 15000);
+
     Promise.all([
       PushNotifications.addListener('registration', tokenData => {
         finish(tokenData.value);
@@ -195,21 +205,24 @@ async function enableNativePushNotifications(token) {
       .then(([registrationHandle, registrationErrorHandle]) => {
         registrationListener = registrationHandle;
         registrationErrorListener = registrationErrorHandle;
+        if (settled) void cleanup();
       })
       .catch(fail);
   });
 
-  await withTimeout(
-    PushNotifications.register(),
-    15000,
-    'Délai dépassé lors du démarrage des notifications.'
-  );
+  try {
+    await withTimeout(
+      PushNotifications.register(),
+      15000,
+      'Délai dépassé lors du démarrage des notifications.'
+    );
+  } catch (error) {
+    await cancelRegistration?.(error);
+    await registrationPromise.catch(() => null);
+    throw error;
+  }
 
-  const nativeToken = await withTimeout(
-    registrationPromise,
-    15000,
-    'Délai dépassé lors de l’enregistrement des notifications.'
-  );
+  const nativeToken = await registrationPromise;
 
   await withTimeout(
     api.post(
