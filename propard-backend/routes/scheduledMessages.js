@@ -17,7 +17,14 @@ const scheduleLimiter = createRateLimiter({
   message: 'Trop de messages programmés. Réessaie plus tard.'
 });
 
-router.get('/', async (req, res) => {
+const scheduledReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyFn: req => 'scheduled-messages-read:' + req.user.id,
+  message: 'Trop de consultations des messages programmés. Réessaie dans une minute.'
+});
+
+router.get('/', scheduledReadLimiter, async (req, res) => {
   try {
     const messages = await ScheduledMessage.find({
       sender: req.user.id,
