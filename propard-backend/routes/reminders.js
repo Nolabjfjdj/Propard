@@ -74,7 +74,7 @@ router.patch('/:reminderId/cancel', reminderLimiter, async (req, res) => {
     const reminder = await Reminder.findOneAndUpdate(
       { _id: req.params.reminderId, user: req.user.id, status: 'pending' },
       { $set: { status: 'cancelled' } },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!reminder) return res.status(404).json({ error: 'Rappel introuvable ou déjà déclenché.' });
     res.json({ success: true, reminder });
