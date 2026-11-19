@@ -51,7 +51,11 @@ router.post('/subscribe', authMiddleware, webPushSubscribeLimiter, async (req, r
       !isAllowedPushEndpoint(subscription.endpoint) ||
       !subscription.keys ||
       typeof subscription.keys.p256dh !== 'string' ||
-      typeof subscription.keys.auth !== 'string'
+      !subscription.keys.p256dh ||
+      subscription.keys.p256dh.length > 256 ||
+      typeof subscription.keys.auth !== 'string' ||
+      !subscription.keys.auth ||
+      subscription.keys.auth.length > 256
     ) {
       return res.status(400).json({
         error: 'Abonnement Push invalide.'
