@@ -368,6 +368,7 @@ export default function VoiceMode({ onSend, sending }) {
           <div aria-live="polite" style={{ marginTop: 18, padding: 12, borderRadius: 10, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontSize: 13 }}>
             {fallbackRecording ? '🎙️ Enregistrement actif…' : listening ? '🎙️ Micro actif, je t’écoute…' : speaking ? '🔊 Propard AI parle…' : status}
           </div>
+          {fallbackRecording && <button type="button" onClick={() => { window.clearTimeout(recorderTimerRef.current); if (recorderRef.current?.state !== 'inactive') recorderRef.current?.stop(); }} style={{ width: '100%', marginTop: 12, border: '1px solid var(--border)', borderRadius: 9, padding: 11, background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontWeight: 650, cursor: 'pointer' }}>Terminer et transcrire</button>}
           {(listening || speaking || active) && <button type="button" onClick={stop} style={{ width: '100%', marginTop: 12, border: 0, borderRadius: 9, padding: 12, background: 'var(--danger)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Arrêter le mode vocal</button>}
           <p style={{ color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.5, margin: '14px 0 0' }}>La voix de lecture est fournie par le navigateur. Si la reconnaissance vocale native est indisponible, l’enregistrement de secours transmet temporairement l’audio à Groq pour transcription. L’audio n’est pas conservé par Propard.</p>
         </section>
