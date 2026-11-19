@@ -224,7 +224,7 @@ router.post('/register/verify', auth, registrationLimiter, async (req, res) => {
           passkeyRegistrationOrigin: null
         }
       },
-      { new: true },
+      { returnDocument: 'after' },
       '+passkeys +passkeyRecoveryCodes'
     );
     if (!user) return res.status(400).json({ error: 'Cette demande a déjà été utilisée. Recommence la création de la clé.' });
@@ -401,7 +401,7 @@ router.post('/login/verify', loginLimiter, async (req, res) => {
           passkeyLoginOrigin: null
         }
       },
-      { new: true },
+      { returnDocument: 'after' },
       '+passkeys'
     );
     if (!claimedUser) return res.status(401).json({ error: 'Cette vérification a déjà été utilisée. Recommence la connexion.' });
@@ -465,7 +465,7 @@ router.post('/login/recovery', loginLimiter, async (req, res) => {
           passkeyRecoveryCodes: hashed
         }
       },
-      { new: true },
+      { returnDocument: 'after' },
       '+passkeyRecoveryCodes'
     );
     if (!claimedUser) return res.status(401).json({ error: 'Code de récupération invalide ou déjà utilisé.' });
