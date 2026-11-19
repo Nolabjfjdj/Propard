@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import api from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 const languages = [
   ['ar', 'Arabe'],
@@ -81,6 +83,7 @@ async function ensureApiAvailable(api, options, label) {
 }
 
 export default function MessageTranslation({ text }) {
+  const { token } = useAuth();
   const [open, setOpen] = useState(false);
   const [sourceLanguage, setSourceLanguage] = useState('auto');
   const [targetLanguage, setTargetLanguage] = useState('fr');
@@ -88,19 +91,22 @@ export default function MessageTranslation({ text }) {
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(null);
+  const [fallbackAvailable, setFallbackAvailable] = useState(false);
 
   const translate = async () => {
     if (!text || loading) return;
 
     const TranslatorAPI = globalThis.Translator;
     if (!TranslatorAPI || typeof TranslatorAPI.create !== 'function') {
-      setStatus('La traduction locale n’est pas prise en charge par ce navigateur. Elle est notamment indisponible dans les navigateurs mobiles compatibles avec Chrome. Aucun message n’a été envoyé à un service externe.');
+      setFallbackAvailable(true);
+      setStatus('La traduction locale n’est pas disponible dans ce navigateur. Tu peux utiliser Propard AI en envoyant explicitement le texte à Groq.');
       return;
     }
 
     setLoading(true);
     setStatus('Vérification des modèles de traduction…');
     setTranslatedText('');
+    setFallbackAvailable(false);
     setDownloadProgress(null);
 
     let translator;
@@ -153,7 +159,8 @@ export default function MessageTranslation({ text }) {
       setTranslatedText(result);
       setStatus('Traduit localement sur cet appareil. Le message original reste inchangé.');
     } catch (error) {
-      setStatus(error?.message || 'La traduction a échoué sur cet appareil.');
+      setFallbackAvailable(true);
+      setStatus((error?.message || 'La traduction locale a échoué.') + ' Tu peux essayer la traduction via Propard AI.');
     } finally {
       try {
         await translator?.destroy?.();
@@ -162,6 +169,32 @@ export default function MessageTranslation({ text }) {
         console.warn('Nettoyage du moteur de traduction impossible:', cleanupError?.message || cleanupError);
       }
       setDownloadProgress(null);
+      setLoading(false);
+    }
+  };
+
+  const translateWithAI = async () => {
+    if (!text || loading) return;
+    setLoading(true);
+    setStatus('Traduction via Propard AI…');
+    setTranslatedText('');
+    try {
+      const response = await api.post('/api/ai/translate', {
+        text,
+        sourceLanguage,
+        targetLanguage
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (typeof response.data?.translatedText !== 'string' || !response.data.translatedText.trim()) {
+        throw new Error('Aucune traduction reçue.');
+      }
+      setTranslatedText(response.data.translatedText);
+      setStatus('Traduction effectuée via Propard AI.');
+      setFallbackAvailable(false);
+    } catch (error) {
+      setStatus(error.response?.data?.error || error.message || 'La traduction via Propard AI a échoué.');
+    } finally {
       setLoading(false);
     }
   };
@@ -201,6 +234,14 @@ export default function MessageTranslation({ text }) {
             <div role="status" style={{ width: '100%', color: 'var(--text-secondary)', fontSize: 10 }}>
               Téléchargement du modèle : {downloadProgress}%
               <progress value={downloadProgress} max="100" style={{ display: 'block', width: '100%', marginTop: 4 }} />
+            </div>
+          )}
+          {fallbackAvailable && (
+            <div style={{ width: '100%', padding: 9, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', fontSize: 11, lineHeight: 1.45 }}>
+              La traduction de secours envoie le texte du message à Propard AI via Groq. Le texte ne reste donc pas protégé par le chiffrement de bout en bout pendant cette opération.
+              <button type="button" onClick={translateWithAI} disabled={loading} style={{ ...controlStyle, display: 'block', marginTop: 8, cursor: loading ? 'wait' : 'pointer' }}>
+                {loading ? 'Traduction…' : 'Autoriser et traduire avec Propard AI'}
+              </button>
             </div>
           )}
           {status && <p role="status" style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 10, lineHeight: 1.4 }}>{status}</p>}
