@@ -1489,6 +1489,12 @@ async function finalizeExpiredDeletions() {
       user.statusMessage = null;
       user.conversationFolders = null;
       user.activeSessions = [];
+      user.revokedSessions = [];
+      user.securityEvents = [];
+      user.passkeyCredentials = [];
+      user.passkeyRecoveryCodes = [];
+      user.apnsTokens = [];
+      user.pushSubscriptions = [];
 
       await user.save();
 
