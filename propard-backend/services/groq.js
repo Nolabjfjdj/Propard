@@ -125,8 +125,72 @@ async function createGroqCompletion({
   throw error;
 }
 
+
+async function transcribeGroqAudio({ audio, mimeType, filename, fetchImpl = fetch, env = process.env }) {
+  if (!Buffer.isBuffer(audio) || !audio.length) {
+    throw new Error('Le fichier audio est vide.');
+  }
+
+  const keys = getGroqApiKeys(env);
+  if (!keys.length) {
+    const error = new Error('Aucune clé Groq configurée.');
+    error.code = 'GROQ_NOT_CONFIGURED';
+    throw error;
+  }
+
+  const startIndex = nextKeyIndex % keys.length;
+  const orderedKeys = keys.map((_, index) => keys[(startIndex + index) % keys.length]);
+  let lastError;
+
+  for (let index = 0; index < orderedKeys.length; index += 1) {
+    try {
+      const form = new FormData();
+      form.append('file', new Blob([audio], { type: mimeType }), filename);
+      form.append('model', 'whisper-large-v3-turbo');
+      form.append('language', 'fr');
+      form.append('prompt', 'Propard AI, Propard');
+      form.append('response_format', 'json');
+
+      const response = await fetchImpl('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${orderedKeys[index]}` },
+        body: form,
+        signal: AbortSignal.timeout(60000)
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (response.ok && typeof payload.text === 'string' && payload.text.trim()) {
+        nextKeyIndex = (startIndex + index + 1) % keys.length;
+        return payload.text.trim();
+      }
+
+      const error = new Error(
+        typeof payload.error?.message === 'string'
+          ? payload.error.message.slice(0, 400)
+          : `Groq transcription a répondu avec le statut HTTP ${response.status}.`
+      );
+      error.status = response.status;
+      error.code = 'GROQ_TRANSCRIPTION_ERROR';
+      lastError = error;
+
+      if (![401, 403, 408, 429].includes(response.status) && response.status < 500) throw error;
+    } catch (error) {
+      if (error.code === 'GROQ_TRANSCRIPTION_ERROR' && error.status && error.status < 500 && ![401, 403, 408, 429].includes(error.status)) {
+        throw error;
+      }
+      lastError = error;
+    }
+  }
+
+  const error = new Error(lastError?.message || 'La transcription audio a échoué.');
+  error.code = 'GROQ_TRANSCRIPTION_FAILED';
+  error.status = lastError?.status || 503;
+  throw error;
+}
+
 module.exports = {
   getGroqApiKeys,
   getGroqConfiguration,
-  createGroqCompletion
+  createGroqCompletion,
+  transcribeGroqAudio
 };
