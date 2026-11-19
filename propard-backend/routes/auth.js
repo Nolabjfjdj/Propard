@@ -880,7 +880,7 @@ router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
         return res.status(400).json({ error: 'Badge personnel invalide.' });
       }
       const trimmedBadge = typeof profileBadge === 'string' ? profileBadge.trim() : '';
-      if (trimmedBadge.length > 24 || /[\\u0000-\\u001F\\u007F]/.test(trimmedBadge)) {
+      if (trimmedBadge.length > 24 || /[\u0000-\u001F\u007F]/.test(trimmedBadge)) {
         return res.status(400).json({ error: 'Le badge doit contenir au maximum 24 caractères.' });
       }
       user.profileBadge = trimmedBadge || null;
