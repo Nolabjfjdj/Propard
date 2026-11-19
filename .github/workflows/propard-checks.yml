@@ -34,6 +34,8 @@ jobs:
         run: |
           npm audit --json > audit-report.json || true
           node -e 'const report = require("./audit-report.json"); for (const [name, item] of Object.entries(report.vulnerabilities || {})) console.log(name + ": " + item.severity + "; fix=" + JSON.stringify(item.fixAvailable));'
+      - name: Enforce dependency audit
+        run: npm audit --audit-level=moderate
       - name: Run tests
         run: npm test
 
@@ -58,6 +60,8 @@ jobs:
         run: |
           npm audit --json > audit-report.json || true
           node -e 'const report = require("./audit-report.json"); for (const [name, item] of Object.entries(report.vulnerabilities || {})) console.log(name + ": " + item.severity + "; fix=" + JSON.stringify(item.fixAvailable));'
+      - name: Enforce dependency audit
+        run: npm audit --audit-level=moderate
       - name: Lint
         run: npm run lint
 
@@ -82,5 +86,7 @@ jobs:
         run: |
           npm audit --json > audit-report.json || true
           node -e 'const report = require("./audit-report.json"); for (const [name, item] of Object.entries(report.vulnerabilities || {})) console.log(name + ": " + item.severity + "; fix=" + JSON.stringify(item.fixAvailable));'
+      - name: Enforce dependency audit
+        run: npm audit --audit-level=moderate
       - name: Build
         run: npm run build
