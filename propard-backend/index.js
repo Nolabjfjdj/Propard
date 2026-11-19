@@ -292,7 +292,7 @@ const {retryPendingFileCleanup}=require('./services/fileCleanup');
 
 let reminderWorkerRunning = false;
 async function deliverDueReminders() {
-  if (reminderWorkerRunning || mongoose.connection.readyState !== 1) return;
+  if (reminderWorkerRunning || !mongoose.connections.some(connection => connection.readyState === 1)) return;
   reminderWorkerRunning = true;
   try {
     for (let index = 0; index < 20; index += 1) {
@@ -355,7 +355,7 @@ reminderWorkerInterval.unref?.();
 
 let scheduledMessageWorkerRunning = false;
 async function deliverScheduledMessages() {
-  if (scheduledMessageWorkerRunning || mongoose.connection.readyState !== 1) return;
+  if (scheduledMessageWorkerRunning || !mongoose.connections.some(connection => connection.readyState === 1)) return;
   scheduledMessageWorkerRunning = true;
   try {
     for (let index = 0; index < 20; index += 1) {
