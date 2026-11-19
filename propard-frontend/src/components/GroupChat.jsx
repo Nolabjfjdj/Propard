@@ -1051,7 +1051,7 @@ export default function GroupChat({
   /*
    * Retourne le nom affiché d'un membre.
    */
-  const getMemberNickname = member => {
+  const getMemberNickname = useCallback(member => {
     const memberId =
       member?._id?.toString();
 
@@ -1070,7 +1070,7 @@ export default function GroupChat({
       member?.username ||
       'Membre'
     );
-  };
+  }, [friends]);
 
   /*
    * Liste des membres utilisable
@@ -1096,7 +1096,7 @@ export default function GroupChat({
         );
     }, [
       group?.members,
-      friends,
+      getMemberNickname,
       myId
     ]);
 
