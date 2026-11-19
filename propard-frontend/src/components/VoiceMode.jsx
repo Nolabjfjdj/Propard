@@ -51,6 +51,7 @@ export default function VoiceMode({ onSend, sending }) {
   const recorderStreamRef = useRef(null);
   const recorderChunksRef = useRef([]);
   const recorderTimerRef = useRef(null);
+  const recognitionStartTimeoutRef = useRef(null);
 
   useEffect(() => {
     modeRef.current = mode;
@@ -132,6 +133,7 @@ export default function VoiceMode({ onSend, sending }) {
     processingRef.current = false;
     window.clearTimeout(restartRef.current);
     window.clearTimeout(recorderTimerRef.current);
+    window.clearTimeout(recognitionStartTimeoutRef.current);
     recognitionRef.current?.stop?.();
     if (recorderRef.current?.state && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
     window.speechSynthesis?.cancel?.();
@@ -260,7 +262,10 @@ export default function VoiceMode({ onSend, sending }) {
     recognition.interimResults = false;
     recognition.maxAlternatives = 3;
     transcriptRef.current = '';
-    recognition.onstart = () => setListening(true);
+    recognition.onstart = () => {
+      window.clearTimeout(recognitionStartTimeoutRef.current);
+      setListening(true);
+    };
     recognition.onresult = event => {
       const alternatives = Array.from(event.results?.[0] || []);
       const preferred = alternatives.find(item => /\b(?:propard|pro\s*dromes?\s+ai|pro\s*part\s+ai|la\s*banane\s*415|banane\s*vr)\b/i.test(item.transcript))
@@ -273,6 +278,7 @@ export default function VoiceMode({ onSend, sending }) {
       }
     };
     recognition.onerror = event => {
+      window.clearTimeout(recognitionStartTimeoutRef.current);
       setListening(false);
       if (event.error !== 'aborted') {
         activeRef.current = false;
@@ -284,6 +290,7 @@ export default function VoiceMode({ onSend, sending }) {
       }
     };
     recognition.onend = () => {
+      window.clearTimeout(recognitionStartTimeoutRef.current);
       setListening(false);
       if (modeRef.current === 'classic') {
         activeRef.current = false;
@@ -296,8 +303,19 @@ export default function VoiceMode({ onSend, sending }) {
     recognitionRef.current = recognition;
     try {
       recognition.start();
+      recognitionStartTimeoutRef.current = window.setTimeout(() => {
+        if (recognitionRef.current !== recognition) return;
+        recognitionRef.current = null;
+        recognition.abort?.();
+        activeRef.current = false;
+        setActive(false);
+        setListening(false);
+        setFallbackAvailable(true);
+        setStatus('La reconnaissance native ne démarre pas. Tu peux autoriser l’enregistrement de secours via Groq.');
+      }, 8000);
       setStatus(modeRef.current === 'direct' ? 'Je t’écoute…' : 'Parle maintenant…');
     } catch {
+      window.clearTimeout(recognitionStartTimeoutRef.current);
       activeRef.current = false;
       setActive(false);
       setFallbackAvailable(true);
