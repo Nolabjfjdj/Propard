@@ -1004,7 +1004,6 @@ export default function GroupChat({
     messages,
     myId,
     token,
-    handleGroupMessageEdited,
     loadGroup,
     onDeleted
   ]);
