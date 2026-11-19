@@ -49,7 +49,8 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
     if (recorderRef.current?.state && recorderRef.current.state !== 'inactive') {
       recorderRef.current.stop();
     }
-    stopTracks();
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    streamRef.current = null;
   }, []);
 
   const startFallback = async () => {
