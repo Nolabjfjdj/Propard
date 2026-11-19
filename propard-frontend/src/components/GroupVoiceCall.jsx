@@ -797,12 +797,26 @@ export default function GroupVoiceCall({
     }
   }, [videoCall, status]);
 
+  const callLifecycleRef = useRef({});
+  callLifecycleRef.current = {
+    addPendingCandidates,
+    createPeer,
+    ensureLocalStream,
+    ensurePeersForParticipants,
+    groupId,
+    incomingCall,
+    myId,
+    onClose,
+    videoCall,
+    cleanup
+  };
+
   useEffect(() => {
     closedRef.current = false;
 
     const handleStarted = payload => {
       if (
-        normalizeId(payload?.groupId) !== groupId ||
+        normalizeId(payload?.groupId) !== callLifecycleRef.current.groupId ||
         closedRef.current
       ) {
         return;
@@ -820,7 +834,7 @@ export default function GroupVoiceCall({
 
         if (acceptedRef.current && localReadyRef.current && !joinedRef.current) {
           socket.emit('groupCallJoin', {
-            groupId,
+            groupId: callLifecycleRef.current.groupId,
             callId: payload.callId
           });
           joinedRef.current = true;
@@ -830,8 +844,8 @@ export default function GroupVoiceCall({
 
     const handleInvite = payload => {
       if (
-        normalizeId(payload?.groupId) !== groupId ||
-        normalizeId(payload?.callerId) === myId
+        normalizeId(payload?.groupId) !== callLifecycleRef.current.groupId ||
+        normalizeId(payload?.callerId) === callLifecycleRef.current.myId
       ) {
         return;
       }
@@ -846,7 +860,7 @@ export default function GroupVoiceCall({
 
     const handleParticipants = async payload => {
       if (
-        normalizeId(payload?.groupId) !== groupId ||
+        normalizeId(payload?.groupId) !== callLifecycleRef.current.groupId ||
         payload?.callId !== callIdRef.current ||
         closedRef.current
       ) {
@@ -863,14 +877,14 @@ export default function GroupVoiceCall({
         : [];
 
       setParticipants(ids);
-      await ensurePeersForParticipants(ids);
+      await callLifecycleRef.current.ensurePeersForParticipants(ids);
     };
 
     const handleOffer = async payload => {
       if (
-        normalizeId(payload?.groupId) !== groupId ||
+        normalizeId(payload?.groupId) !== callLifecycleRef.current.groupId ||
         payload?.callId !== callIdRef.current ||
-        normalizeId(payload?.senderId) === myId ||
+        normalizeId(payload?.senderId) === callLifecycleRef.current.myId ||
         !acceptedRef.current ||
         closedRef.current ||
         !payload?.offer
@@ -879,19 +893,19 @@ export default function GroupVoiceCall({
       }
 
       const senderId = normalizeId(payload.senderId);
-      const peer = await createPeer(senderId);
+      const peer = await callLifecycleRef.current.createPeer(senderId);
 
       try {
         await peer.setRemoteDescription(
           new RTCSessionDescription(payload.offer)
         );
-        await addPendingCandidates(senderId, peer);
+        await callLifecycleRef.current.addPendingCandidates(senderId, peer);
 
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
 
         socket.emit('groupCallAnswer', {
-          groupId,
+          groupId: callLifecycleRef.current.groupId,
           callId: callIdRef.current,
           callerId: senderId,
           answer
@@ -906,7 +920,7 @@ export default function GroupVoiceCall({
 
     const handleAnswer = async payload => {
       if (
-        normalizeId(payload?.groupId) !== groupId ||
+        normalizeId(payload?.groupId) !== callLifecycleRef.current.groupId ||
         payload?.callId !== callIdRef.current ||
         closedRef.current ||
         !payload?.answer
@@ -922,7 +936,7 @@ export default function GroupVoiceCall({
         await peer.setRemoteDescription(
           new RTCSessionDescription(payload.answer)
         );
-        await addPendingCandidates(senderId, peer);
+        await callLifecycleRef.current.addPendingCandidates(senderId, peer);
         setStatus('connected');
         startTimer(callStartedAtRef.current);
       } catch (err) {
@@ -932,7 +946,7 @@ export default function GroupVoiceCall({
 
     const handleIceCandidate = async payload => {
       if (
-        normalizeId(payload?.groupId) !== groupId ||
+        normalizeId(payload?.groupId) !== callLifecycleRef.current.groupId ||
         payload?.callId !== callIdRef.current ||
         closedRef.current ||
         !payload?.candidate
@@ -963,7 +977,7 @@ export default function GroupVoiceCall({
 
     const handleRestartOffer = async payload => {
       if (
-        normalizeId(payload?.groupId) !== groupId ||
+        normalizeId(payload?.groupId) !== callLifecycleRef.current.groupId ||
         payload?.callId !== callIdRef.current ||
         closedRef.current ||
         !payload?.offer
@@ -972,19 +986,19 @@ export default function GroupVoiceCall({
       }
 
       const senderId = normalizeId(payload.senderId);
-      const peer = await createPeer(senderId);
+      const peer = await callLifecycleRef.current.createPeer(senderId);
 
       try {
         await peer.setRemoteDescription(
           new RTCSessionDescription(payload.offer)
         );
-        await addPendingCandidates(senderId, peer);
+        await callLifecycleRef.current.addPendingCandidates(senderId, peer);
 
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
 
         socket.emit('groupCallIceRestartAnswer', {
-          groupId,
+          groupId: callLifecycleRef.current.groupId,
           callId: callIdRef.current,
           callerId: senderId,
           answer
@@ -996,7 +1010,7 @@ export default function GroupVoiceCall({
 
     const handleRestartAnswer = async payload => {
       if (
-        normalizeId(payload?.groupId) !== groupId ||
+        normalizeId(payload?.groupId) !== callLifecycleRef.current.groupId ||
         payload?.callId !== callIdRef.current ||
         closedRef.current ||
         !payload?.answer
@@ -1012,7 +1026,7 @@ export default function GroupVoiceCall({
         await peer.setRemoteDescription(
           new RTCSessionDescription(payload.answer)
         );
-        await addPendingCandidates(senderId, peer);
+        await callLifecycleRef.current.addPendingCandidates(senderId, peer);
       } catch (err) {
         console.error('groupCallIceRestartAnswer:', err);
       }
@@ -1020,7 +1034,7 @@ export default function GroupVoiceCall({
 
     const handleMemberLeft = payload => {
       if (
-        normalizeId(payload?.groupId) !== groupId ||
+        normalizeId(payload?.groupId) !== callLifecycleRef.current.groupId ||
         payload?.callId !== callIdRef.current
       ) {
         return;
@@ -1055,19 +1069,19 @@ export default function GroupVoiceCall({
 
     const handleEnded = payload => {
       if (
-        normalizeId(payload?.groupId) !== groupId ||
+        normalizeId(payload?.groupId) !== callLifecycleRef.current.groupId ||
         payload?.callId !== callIdRef.current
       ) {
         return;
       }
 
-      cleanup();
-      onClose();
+      callLifecycleRef.current.cleanup();
+      callLifecycleRef.current.onClose();
     };
 
     const handleError = payload => {
       if (
-        normalizeId(payload?.groupId) !== groupId ||
+        normalizeId(payload?.groupId) !== callLifecycleRef.current.groupId ||
         (payload?.callId && payload.callId !== callIdRef.current)
       ) {
         return;
@@ -1093,18 +1107,18 @@ export default function GroupVoiceCall({
      * L'appelant est déjà ajouté au call par le serveur.
      * Il doit récupérer la liste des participants après l'ouverture.
      */
-    if (!incomingCall) {
+    if (!callLifecycleRef.current.incomingCall) {
       acceptedRef.current = true;
 
-      ensureLocalStream()
+      callLifecycleRef.current.ensureLocalStream()
         .then(() => {
           localReadyRef.current = true;
 
           if (closedRef.current) return;
 
           socket.emit('groupCallStart', {
-            groupId,
-            videoCall
+            groupId: callLifecycleRef.current.groupId,
+            videoCall: callLifecycleRef.current.videoCall
           });
         })
         .catch(err => {
@@ -1130,7 +1144,7 @@ export default function GroupVoiceCall({
       socket.off('groupCallMemberLeft', handleMemberLeft);
       socket.off('groupCallEnded', handleEnded);
       socket.off('groupCallError', handleError);
-      cleanup();
+      callLifecycleRef.current.cleanup();
     };
   }, []);
 
