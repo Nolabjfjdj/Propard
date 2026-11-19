@@ -36,6 +36,12 @@ async function auditAdminAction(req, action, targetUser = null, details = null) 
   });
 }
 
+const adminAccessLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 20,
+  keyFn: req => `admin-access:${req.user.id}`,
+  message: 'Trop de consultations de la configuration administrateur. Réessaie plus tard.'
+});
 const adminSensitiveLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 5,
@@ -45,7 +51,7 @@ const adminSensitiveLimiter = createRateLimiter({
   resetOnCaptcha: true
 });
 
-router.get('/access', authMiddleware, requireSoleOwner, (req, res) => {
+router.get('/access', authMiddleware, requireSoleOwner, adminAccessLimiter, (req, res) => {
   return res.json({ success: true, owner: true });
 });
 
