@@ -35,6 +35,13 @@ Propard est une plateforme web française de communication développée avec Rea
 - Système de signalement
 - Gestion administrative des signalements
 - Pages d'aide, CGU et politique de confidentialité
+- Présence en ligne et confirmations de lecture configurables
+- Propard AI avec conversations sauvegardées sous forme chiffrée côté client
+- Mode vocal et dictée vocale pour Propard AI selon les capacités du navigateur
+- Demandes de support et suivi des demandes liées au compte
+- Espaces Staff et Admin avec rôles, permissions et journal d'audit
+- Stockage de fichiers réparti sur plusieurs buckets Filebase configurables
+- Notifications Web Push et notifications natives APNs sur iOS
 - Suppression de compte avec traitement côté serveur
 
 ## Traduction des messages
