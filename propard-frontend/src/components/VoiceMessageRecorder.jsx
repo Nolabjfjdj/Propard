@@ -37,6 +37,7 @@ export default function VoiceMessageRecorder({ disabled, onRecorded }) {
         if (event.data?.size) chunksRef.current.push(event.data);
       };
       recorder.onerror = () => {
+        cancelledRef.current = true;
         setError('Une erreur est survenue pendant l’enregistrement.');
         releaseStream();
         setRecording(false);
