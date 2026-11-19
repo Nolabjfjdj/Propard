@@ -85,20 +85,45 @@ export default function VoiceMode({ onSend, sending }) {
   const selectedVoice = () => voices.find(item => item.voiceURI === voiceURI) || voices.find(item => item.lang?.toLowerCase().startsWith('fr')) || voices[0] || null;
 
   const speak = text => new Promise(resolve => {
-    if (!text || !window.speechSynthesis) {
+    if (!text) {
       resolve();
       return;
     }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text.slice(0, 12000));
-    const voice = selectedVoice();
-    if (voice) utterance.voice = voice;
-    utterance.lang = voice?.lang || 'fr-FR';
-    utterance.rate = rate;
-    utterance.onstart = () => setSpeaking(true);
-    utterance.onend = () => { setSpeaking(false); resolve(); };
-    utterance.onerror = () => { setSpeaking(false); resolve(); };
-    window.speechSynthesis.speak(utterance);
+
+    const synthesis = window.speechSynthesis;
+    const Utterance = window.SpeechSynthesisUtterance || globalThis.SpeechSynthesisUtterance;
+    if (!synthesis || typeof Utterance !== 'function') {
+      setStatus('La synthèse vocale n’est pas disponible dans ce navigateur. La réponse reste affichée dans la conversation.');
+      resolve();
+      return;
+    }
+
+    synthesis.cancel();
+    let settled = false;
+    let timeout;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      setSpeaking(false);
+      resolve();
+    };
+
+    try {
+      const utterance = new Utterance(text.slice(0, 12000));
+      const voice = selectedVoice();
+      if (voice) utterance.voice = voice;
+      utterance.lang = voice?.lang || 'fr-FR';
+      utterance.rate = rate;
+      utterance.onstart = () => setSpeaking(true);
+      utterance.onend = finish;
+      utterance.onerror = finish;
+      timeout = window.setTimeout(finish, 60000);
+      synthesis.speak(utterance);
+    } catch {
+      finish();
+      setStatus('Impossible de lire la réponse à voix haute sur cet appareil.');
+    }
   });
 
   const stop = () => {
