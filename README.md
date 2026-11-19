@@ -693,6 +693,10 @@ Les conversations privées et les groupes permettent de choisir une expiration d
 Les conversations privées et les groupes permettent de créer des sondages contenant une question et de 2 à 6 réponses. Le texte du sondage est chiffré côté client avant l'envoi. Les votes utilisent les réactions numérotées ; le serveur impose un seul choix actif par participant et ne connaît pas le texte des réponses. Les sondages ne prennent pas en charge les pièces jointes ni l'expiration éphémère.
 
 
+### Limites du centre de support
+
+Les consultations d'une conversation de support sont limitées à 180 requêtes par adresse IP sur 30 minutes. La page actualise la conversation toutes les 15 secondes. L'envoi de messages possède un limiteur distinct de 20 messages par adresse IP sur 15 minutes, afin que les actualisations automatiques ne consomment pas le quota d'envoi.
+
 ### Messages programmés et rappels
 
 Les messages programmés privés et de groupe sont chiffrés côté client avant leur stockage. Le serveur vérifie à nouveau les relations, l'appartenance au groupe et la version de clé avant la livraison. Les programmations peuvent être annulées tant qu'elles sont en attente. Les rappels personnels déclenchent une notification Push à l'heure prévue ; le titre est utilisé dans la notification, mais la note facultative n'est pas envoyée dans son contenu. La livraison dépend de la disponibilité des abonnements Push.
