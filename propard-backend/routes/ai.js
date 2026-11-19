@@ -17,6 +17,20 @@ const messageLimiter = createRateLimiter({
   message: 'Tu envoies trop de messages à Propard AI. Réessaie dans quelques minutes.'
 });
 
+const conversationCreationLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  keyFn: req => `propard-ai-conversation-create:${req.user.id}`,
+  message: 'Tu as créé trop de conversations Propard AI. Réessaie dans une heure.'
+});
+
+const conversationManagementLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  keyFn: req => `propard-ai-conversation-manage:${req.user.id}`,
+  message: 'Trop de modifications de conversations Propard AI. Réessaie plus tard.'
+});
+
 const titleFromMessage = value => {
   const normalized = value.replace(/\s+/g, ' ').trim();
   return normalized.length > 48 ? `${normalized.slice(0, 45)}...` : normalized;
@@ -109,7 +123,7 @@ router.get('/conversations', async (req, res) => {
   }
 });
 
-router.post('/conversations', async (req, res) => {
+router.post('/conversations', conversationCreationLimiter, async (req, res) => {
   try {
     const conversation = await AIConversation.create({
       userId: req.user.id,
@@ -649,7 +663,7 @@ UTILISATION DES OUTILS ET CONFIDENTIALITÉ
   }
 });
 
-router.patch('/conversations/:id', async (req, res) => {
+router.patch('/conversations/:id', conversationManagementLimiter, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(400).json({ error: 'Conversation invalide.' });
@@ -671,7 +685,7 @@ router.patch('/conversations/:id', async (req, res) => {
   }
 });
 
-router.delete('/conversations/:id', async (req, res) => {
+router.delete('/conversations/:id', conversationManagementLimiter, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(400).json({ error: 'Conversation invalide.' });
