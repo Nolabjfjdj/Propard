@@ -31,6 +31,13 @@ const conversationManagementLimiter = createRateLimiter({
   message: 'Trop de modifications de conversations Propard AI. Réessaie plus tard.'
 });
 
+const conversationReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyFn: req => `propard-ai-conversation-read:${req.user.id}`,
+  message: 'Tu consultes trop souvent les conversations Propard AI. Réessaie dans une minute.'
+});
+
 const titleFromMessage = value => {
   const normalized = value.replace(/\s+/g, ' ').trim();
   return normalized.length > 48 ? `${normalized.slice(0, 45)}...` : normalized;
@@ -105,7 +112,7 @@ router.get('/status', (req, res) => {
   res.json({ available: config.configured, model: config.model, keyCount: config.keyCount });
 });
 
-router.get('/conversations', async (req, res) => {
+router.get('/conversations', conversationReadLimiter, async (req, res) => {
   try {
     const conversations = await AIConversation.find({ userId: req.user.id })
       .select('_id title createdAt updatedAt')
@@ -137,7 +144,7 @@ router.post('/conversations', conversationCreationLimiter, async (req, res) => {
   }
 });
 
-router.get('/conversations/:id', async (req, res) => {
+router.get('/conversations/:id', conversationReadLimiter, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(400).json({ error: 'Conversation invalide.' });
