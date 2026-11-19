@@ -13,6 +13,19 @@ const { deleteMessageAttachments, deleteFilesForGroup } = require('../services/f
 
 router.use(authMiddleware);
 
+const groupListReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyFn: req => `group-list-read:${req.user.id}`,
+  message: 'Trop de consultations des groupes. Réessaie plus tard.'
+});
+const groupReadReceiptLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyFn: req => `group-read-receipt:${req.user.id}`,
+  message: 'Trop de mises à jour de lecture. Réessaie plus tard.'
+});
+
 
 /* =========================
    HELPERS
@@ -203,6 +216,7 @@ const emitGroupEvent = (
 
 router.get(
   '/',
+  groupListReadLimiter,
   async (req, res) => {
     try {
       const groups =
@@ -534,6 +548,7 @@ router.post(
 
 router.get(
   '/:groupId',
+  groupListReadLimiter,
   async (req, res) => {
     try {
       if (
@@ -1086,6 +1101,7 @@ router.delete(
 
 router.patch(
   '/:groupId/read',
+  groupReadReceiptLimiter,
   async (req, res) => {
     try {
       if (
