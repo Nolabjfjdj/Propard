@@ -106,7 +106,9 @@ export default function VoiceMode({ onSend, sending }) {
     setActive(false);
     processingRef.current = false;
     window.clearTimeout(restartRef.current);
+    window.clearTimeout(recorderTimerRef.current);
     recognitionRef.current?.stop?.();
+    if (recorderRef.current?.state && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
     window.speechSynthesis?.cancel?.();
     setListening(false);
     setSpeaking(false);
@@ -180,6 +182,7 @@ export default function VoiceMode({ onSend, sending }) {
         setStatus('Transcription de ta voix…');
         try {
           const transcript = normalizeTranscript(await transcribeAudio(blob, token));
+          processingRef.current = false;
           if (modeRef.current === 'classic') {
             activeRef.current = false;
             setActive(false);
