@@ -44,6 +44,10 @@ Propard est une plateforme web française de communication développée avec Rea
 - Notifications Web Push et notifications natives APNs sur iOS
 - Suppression de compte avec traitement côté serveur
 
+## Protection des sessions et de l'historique de sécurité
+
+Les consultations des sessions actives et de l'historique de sécurité sont limitées à 30 requêtes par minute et par compte. Les révocations individuelles sont limitées à 15 opérations par tranche de 15 minutes. Les déconnexions de session sont limitées à 10 requêtes par minute. La déconnexion globale conserve sa limite renforcée et sa vérification anti-bot.
+
 ## Limites d'utilisation de Propard AI
 
 Les conversations Propard AI sont protégées par des limites distinctes par compte : 10 créations par heure, 60 consultations par minute et 30 modifications ou suppressions toutes les 15 minutes. L'envoi de messages à l'IA conserve sa propre limite de 20 messages par tranche de 10 minutes. Ces limites réduisent les abus et les créations massives de conversations.
