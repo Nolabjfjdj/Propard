@@ -16,6 +16,18 @@ const registrationLimiter = createRateLimiter({
   keyFn: req => `passkey-register:${req.user.id}`,
   message: 'Trop de tentatives de création de clé. Réessaie plus tard.'
 });
+const passkeyReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyFn: req => `passkey-read:${req.user.id}`,
+  message: 'Trop de consultations des clés d’accès. Réessaie plus tard.'
+});
+const passkeyManagementLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyFn: req => `passkey-manage:${req.user.id}`,
+  message: 'Trop de modifications des clés d’accès. Réessaie plus tard.'
+});
 const loginLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 30,
@@ -129,7 +141,7 @@ const publicUser = user => ({
     : null
 });
 
-router.get('/', auth, async (req, res) => {
+router.get('/', auth, passkeyReadLimiter, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('+passkeys +passkeyRecoveryCodes');
     if (!user) return res.status(404).json({ error: 'Compte introuvable.' });
@@ -261,7 +273,7 @@ router.post('/register/verify', auth, registrationLimiter, async (req, res) => {
   }
 });
 
-router.patch('/:credentialId', auth, async (req, res) => {
+router.patch('/:credentialId', auth, passkeyManagementLimiter, async (req, res) => {
   try {
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
     if (!name || name.length > 40) return res.status(400).json({ error: 'Nom invalide (1 à 40 caractères).' });
@@ -277,7 +289,7 @@ router.patch('/:credentialId', auth, async (req, res) => {
   }
 });
 
-router.delete('/:credentialId', auth, async (req, res) => {
+router.delete('/:credentialId', auth, passkeyManagementLimiter, async (req, res) => {
   try {
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
     if (!password || password.length > 128) return res.status(400).json({ error: 'Mot de passe requis.' });
