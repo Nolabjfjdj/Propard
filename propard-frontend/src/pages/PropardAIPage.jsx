@@ -250,6 +250,7 @@ export default function PropardAIPage({ initialConversationId = null }) {
     setSending(true);
     setDraft('');
     let conversationId = activeId;
+    let optimisticMessageAdded = false;
     try {
       if (!conversationId) {
         const created = await api.post('/api/ai/conversations', {}, auth(token));
@@ -259,6 +260,7 @@ export default function PropardAIPage({ initialConversationId = null }) {
         setConversations(current => [created.data, ...current]);
       }
       setMessages(current => [...current, { role: 'user', content }]);
+      optimisticMessageAdded = true;
       const response = await api.post(
         `/api/ai/conversations/${conversationId}/messages`,
         { content },
@@ -273,10 +275,12 @@ export default function PropardAIPage({ initialConversationId = null }) {
       setPendingRead(response.data.pendingRead || null);
       setLocalReadResult(null);
       setActionNotice('');
-      await loadConversations();
+      loadConversations().catch(refreshError => {
+        console.warn('Actualisation des conversations Propard AI impossible:', refreshError?.message || refreshError);
+      });
       return response.data.assistantMessage?.content || '';
     } catch (err) {
-      setMessages(current => current.slice(0, -1));
+      if (optimisticMessageAdded) setMessages(current => current.slice(0, -1));
       setDraft(content);
       setError(err.response?.data?.error || 'Une erreur est survenue pendant la génération.');
       return null;
