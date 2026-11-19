@@ -46,7 +46,7 @@ export default function SupportConversationPage({ reference }) {
   useEffect(() => {
     if (!accessToken) return;
     refresh();
-    const interval = window.setInterval(refresh, 5000);
+    const interval = window.setInterval(refresh, 15000);
     return () => window.clearInterval(interval);
   }, [accessToken, refresh]);
 
