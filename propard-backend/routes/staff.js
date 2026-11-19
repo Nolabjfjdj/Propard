@@ -28,6 +28,13 @@ const actionLimiter = createRateLimiter({
   message: 'Trop d’actions en peu de temps. Réessaie plus tard.'
 });
 
+const staffReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyFn: req => `staff-read:${req.user?.id || getClientIp(req) || 'unknown'}`,
+  message: 'Trop de consultations de l’espace Staff. Réessaie plus tard.'
+});
+
 const resetCompleteLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
@@ -165,6 +172,7 @@ router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) =
 
 router.use(authMiddleware);
 router.use(actionLimiter);
+router.use((req, res, next) => req.method === 'GET' ? staffReadLimiter(req, res, next) : next());
 
 router.post('/announcements/create', requireStaffRole('owner'), requireSoleOwner, announcementLimiter, async (req, res) => {
   try {
