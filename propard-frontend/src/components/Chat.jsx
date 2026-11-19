@@ -14,6 +14,7 @@ import VoiceMessageRecorder from './VoiceMessageRecorder';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
 import LinkText from './LinkText';
+import MessageTranslation from './MessageTranslation';
 import { uploadConversationFile, downloadConversationMedia } from '../utils/fileUpload';
 import {
   deriveSharedKey,
@@ -1685,6 +1686,9 @@ export default function Chat({
                             >
                               <LinkText text={content} />
                             </p>
+                          )}
+                          {msg.messageType !== 'poll' && content && !msg.decryptionError && (
+                            <MessageTranslation text={content} />
                           )}
                           <FileAttachments
                             attachments={msg.attachments}
