@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { markdownToHtml } from '../utils/markdown';
@@ -11,7 +11,7 @@ export default function GlobalAnnouncement() {
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState('');
 
-  const loadAnnouncement = async () => {
+  const loadAnnouncement = useCallback(async () => {
     if (!user || !token) {
       setAnnouncement(null);
       return;
@@ -42,7 +42,7 @@ export default function GlobalAnnouncement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, token]);
 
   useEffect(() => {
     if (!user || !token) {
@@ -65,7 +65,7 @@ export default function GlobalAnnouncement() {
     );
 
     return () => clearInterval(interval);
-  }, [user, token]);
+  }, [user, token, loadAnnouncement]);
 
   const acceptAnnouncement = async () => {
     if (
