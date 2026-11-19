@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { getSupportedRecordingMimeType, transcribeAudio } from '../utils/audioTranscription';
 
 const getRecognition = () => {
   if (typeof window === 'undefined') return null;
@@ -23,6 +25,7 @@ function MicrophoneIcon() {
 }
 
 export default function VoiceMode({ onSend, sending }) {
+  const { token } = useAuth();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState('classic');
   const [voices, setVoices] = useState([]);
@@ -36,12 +39,18 @@ export default function VoiceMode({ onSend, sending }) {
   const [speaking, setSpeaking] = useState(false);
   const [active, setActive] = useState(false);
   const [status, setStatus] = useState('');
+  const [fallbackAvailable, setFallbackAvailable] = useState(false);
+  const [fallbackRecording, setFallbackRecording] = useState(false);
   const recognitionRef = useRef(null);
   const activeRef = useRef(false);
   const processingRef = useRef(false);
   const transcriptRef = useRef('');
   const modeRef = useRef(mode);
   const restartRef = useRef(null);
+  const recorderRef = useRef(null);
+  const recorderStreamRef = useRef(null);
+  const recorderChunksRef = useRef([]);
+  const recorderTimerRef = useRef(null);
 
   useEffect(() => {
     modeRef.current = mode;
@@ -66,6 +75,10 @@ export default function VoiceMode({ onSend, sending }) {
     activeRef.current = false;
     window.clearTimeout(restartRef.current);
     recognitionRef.current?.stop?.();
+    if (recorderRef.current?.state && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
+    recorderStreamRef.current?.getTracks().forEach(track => track.stop());
+    recorderStreamRef.current = null;
+    window.clearTimeout(recorderTimerRef.current);
     window.speechSynthesis?.cancel?.();
   }, []);
 
@@ -122,10 +135,86 @@ export default function VoiceMode({ onSend, sending }) {
     }
   };
 
+  const stopFallbackTracks = () => {
+    recorderStreamRef.current?.getTracks().forEach(track => track.stop());
+    recorderStreamRef.current = null;
+  };
+
+  const startFallbackRecording = async () => {
+    if (!activeRef.current || processingRef.current || sending) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      activeRef.current = false;
+      setActive(false);
+      setStatus('Cet appareil ne permet pas l’enregistrement audio dans ce navigateur.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!activeRef.current) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      recorderStreamRef.current = stream;
+      recorderChunksRef.current = [];
+      const mimeType = getSupportedRecordingMimeType();
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recorderRef.current = recorder;
+      recorder.ondataavailable = event => {
+        if (event.data?.size) recorderChunksRef.current.push(event.data);
+      };
+      recorder.onerror = () => {
+        stopFallbackTracks();
+        setFallbackRecording(false);
+        activeRef.current = false;
+        setActive(false);
+        setStatus('Une erreur est survenue pendant l’enregistrement vocal.');
+      };
+      recorder.onstop = async () => {
+        stopFallbackTracks();
+        setFallbackRecording(false);
+        recorderRef.current = null;
+        if (!activeRef.current) return;
+        const blob = new Blob(recorderChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        processingRef.current = true;
+        setStatus('Transcription de ta voix…');
+        try {
+          const transcript = normalizeTranscript(await transcribeAudio(blob, token));
+          if (modeRef.current === 'classic') {
+            activeRef.current = false;
+            setActive(false);
+          }
+          await sendRecognizedText(transcript);
+        } catch (error) {
+          processingRef.current = false;
+          activeRef.current = false;
+          setActive(false);
+          setStatus(error.response?.data?.error || error.message || 'La transcription vocale a échoué.');
+        }
+      };
+      recorder.start(250);
+      setFallbackRecording(true);
+      setListening(true);
+      setStatus('Je t’écoute. Parle, je transcris automatiquement après quelques secondes.');
+      recorderTimerRef.current = window.setTimeout(() => {
+        if (recorder.state !== 'inactive') recorder.stop();
+      }, 12000);
+    } catch (error) {
+      stopFallbackTracks();
+      activeRef.current = false;
+      setActive(false);
+      setFallbackRecording(false);
+      setStatus(error?.name === 'NotAllowedError'
+        ? 'Autorise le microphone dans les réglages du navigateur.'
+        : error.message || 'Impossible d’accéder au microphone.');
+    }
+  };
+
   const startRecognition = () => {
     const Recognition = getRecognition();
     if (!Recognition) {
-      setStatus('La reconnaissance vocale n’est pas prise en charge par ce navigateur. Essaie Chrome ou un navigateur compatible.');
+      setFallbackAvailable(true);
+      void startFallbackRecording();
       return;
     }
     if (!activeRef.current || processingRef.current || sending) return;
@@ -152,7 +241,8 @@ export default function VoiceMode({ onSend, sending }) {
       if (event.error !== 'aborted' && event.error !== 'no-speech') {
         activeRef.current = false;
         setActive(false);
-        setStatus('Erreur du micro : ' + event.error);
+        setFallbackAvailable(true);
+        setStatus('La reconnaissance vocale du navigateur a échoué : ' + event.error + '. Tu peux utiliser l’enregistrement de secours.');
       }
     };
     recognition.onend = () => {
@@ -184,6 +274,7 @@ export default function VoiceMode({ onSend, sending }) {
     activeRef.current = true;
     setActive(true);
     processingRef.current = false;
+    setFallbackAvailable(false);
     startRecognition();
   };
 
@@ -237,11 +328,12 @@ export default function VoiceMode({ onSend, sending }) {
             </label>
             <input id="propard-voice-rate" type="range" min="0.75" max="1.25" step="0.05" value={rate} onChange={event => saveRate(Number(event.target.value))} style={{ width: '100%' }} />
           </div>
+          {fallbackAvailable && !active && <button type="button" onClick={() => { activeRef.current = true; setActive(true); processingRef.current = false; void startFallbackRecording(); }} disabled={sending} style={{ width: '100%', marginTop: 12, border: '1px solid var(--border)', borderRadius: 9, padding: 10, background: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: 'pointer' }}>Utiliser l’enregistrement vocal de secours</button>}
           <div aria-live="polite" style={{ marginTop: 18, padding: 12, borderRadius: 10, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontSize: 13 }}>
-            {listening ? '🎙️ Micro actif, je t’écoute…' : speaking ? '🔊 Propard AI parle…' : status}
+            {fallbackRecording ? '🎙️ Enregistrement actif…' : listening ? '🎙️ Micro actif, je t’écoute…' : speaking ? '🔊 Propard AI parle…' : status}
           </div>
           {(listening || speaking || active) && <button type="button" onClick={stop} style={{ width: '100%', marginTop: 12, border: 0, borderRadius: 9, padding: 12, background: 'var(--danger)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Arrêter le mode vocal</button>}
-          <p style={{ color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.5, margin: '14px 0 0' }}>La voix et la reconnaissance sont fournies par le navigateur et l’appareil. La disponibilité des voix et du micro dépend du navigateur. L’audio n’est pas enregistré par Propard.</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.5, margin: '14px 0 0' }}>La voix de lecture est fournie par le navigateur. Si la reconnaissance vocale native est indisponible, l’enregistrement de secours transmet temporairement l’audio à Groq pour transcription. L’audio n’est pas conservé par Propard.</p>
         </section>
       </div>}
     </>
