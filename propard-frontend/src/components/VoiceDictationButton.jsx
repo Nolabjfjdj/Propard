@@ -36,6 +36,7 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
   const finalTextRef = useRef('');
   const cancelledRef = useRef(false);
   const timerRef = useRef(null);
+  const recognitionStartTimeoutRef = useRef(null);
 
   const stopTracks = () => {
     streamRef.current?.getTracks().forEach(track => track.stop());
@@ -45,6 +46,7 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
   useEffect(() => () => {
     cancelledRef.current = true;
     window.clearTimeout(timerRef.current);
+    window.clearTimeout(recognitionStartTimeoutRef.current);
     recognitionRef.current?.abort?.();
     if (recorderRef.current?.state && recorderRef.current.state !== 'inactive') {
       recorderRef.current.stop();
@@ -150,6 +152,7 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
     }
 
     recognition.onstart = () => {
+      window.clearTimeout(recognitionStartTimeoutRef.current);
       setUseServerFallback(false);
       setRecording(true);
     };
@@ -166,6 +169,7 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
       onChange([base, spoken].filter(Boolean).join(base && spoken ? ' ' : ''));
     };
     recognition.onerror = event => {
+      window.clearTimeout(recognitionStartTimeoutRef.current);
       if (event.error !== 'aborted') {
         setError(event.error === 'not-allowed'
           ? 'Accès au micro refusé. Vérifie les autorisations du navigateur.'
@@ -177,6 +181,7 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
       setRecording(false);
     };
     recognition.onend = () => {
+      window.clearTimeout(recognitionStartTimeoutRef.current);
       setRecording(false);
       if (cancelledRef.current) return;
       const spoken = normalizeTranscript(finalTextRef.current).trim();
@@ -197,6 +202,7 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
 
   const stop = () => {
     window.clearTimeout(timerRef.current);
+    window.clearTimeout(recognitionStartTimeoutRef.current);
     if (recorderRef.current?.state && recorderRef.current.state !== 'inactive') {
       recorderRef.current.stop();
       return;
@@ -207,6 +213,7 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
   const cancel = () => {
     cancelledRef.current = true;
     window.clearTimeout(timerRef.current);
+    window.clearTimeout(recognitionStartTimeoutRef.current);
     recognitionRef.current?.abort?.();
     recognitionRef.current = null;
     if (recorderRef.current?.state && recorderRef.current.state !== 'inactive') {
