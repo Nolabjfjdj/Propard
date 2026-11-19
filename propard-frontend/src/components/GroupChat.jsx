@@ -21,6 +21,7 @@ import VoiceMessageRecorder from './VoiceMessageRecorder';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
 import LinkText from './LinkText';
+import MessageTranslation from './MessageTranslation';
 import { uploadConversationFile, downloadConversationMedia } from '../utils/fileUpload';
 import GroupVoiceCall from './GroupVoiceCall';
 
@@ -2874,6 +2875,9 @@ export default function GroupChat({
                               >
                                 <LinkText text={content} />
                               </p>
+                            )}
+                            {message.messageType !== 'poll' && content && !message.decryptionError && (
+                              <MessageTranslation text={content} />
                             )}
                             {!message.deleted && (
                               <FileAttachments
