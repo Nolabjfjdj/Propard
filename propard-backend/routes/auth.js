@@ -93,6 +93,27 @@ const accountRestoreLimiter = createRateLimiter({
   resetOnCaptcha: true
 });
 
+const sessionReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyFn: req => `session-read:${req.user.id}`,
+  message: 'Trop de consultations des sessions. Réessaie dans une minute.'
+});
+
+const sessionMutationLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  keyFn: req => `session-mutation:${req.user.id}`,
+  message: 'Trop de modifications des sessions. Réessaie plus tard.'
+});
+
+const logoutLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 10,
+  keyFn: req => `logout:${req.user.id}`,
+  message: 'Trop de demandes de déconnexion. Réessaie dans une minute.'
+});
+
 const PSEUDOS_INTERDITS = ['owner','admin','administrator','superadmin','sysadmin','moderator','mod','comod','staff','team','crew','support','helpdesk','official','propard','propardbot','propardteam','propardstaff','propardadmin','propardsupport','propardofficial','everyone','nigger','nigga','faggot','retard','whore','bitch','salope','pute','connard','connasse','batard','batarde','enculé','encule','fdp','ntm','tg','pd','discord','telegram','whatsapp','snapchat','instagram','kkk','facebook','twitter','tiktok','youtube','google','microsoft','apple','amazon','netflix','spotify','twitch','reddit','github','anthropic','openai','chatgpt','claude','malware','virus','phishing','scam','billing','privacy','terms','rules','guidelines','policy'];
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -558,7 +579,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
 });
 
 
-router.get('/sessions', authMiddleware, async (req, res) => {
+router.get('/sessions', authMiddleware, sessionReadLimiter, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('+activeSessions');
     if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
@@ -580,7 +601,7 @@ router.get('/sessions', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/security-events', authMiddleware, async (req, res) => {
+router.get('/security-events', authMiddleware, sessionReadLimiter, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('+securityEvents');
     if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
@@ -597,7 +618,7 @@ router.get('/security-events', authMiddleware, async (req, res) => {
   }
 });
 
-router.delete('/sessions/:jti', authMiddleware, async (req, res) => {
+router.delete('/sessions/:jti', authMiddleware, sessionMutationLimiter, async (req, res) => {
   try {
     const jti = req.params.jti;
     if (typeof jti !== 'string' || !/^[a-f0-9-]{36}$/i.test(jti)) {
@@ -625,7 +646,7 @@ router.delete('/sessions/:jti', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/logout', authMiddleware, async (req, res) => {
+router.post('/logout', authMiddleware, logoutLimiter, async (req, res) => {
   try {
     if (typeof req.user.jti === 'string' && req.user.jti.length >= 16) {
       const expiresAt = new Date((req.user.exp || Math.floor(Date.now() / 1000) + 1) * 1000);
