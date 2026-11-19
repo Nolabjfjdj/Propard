@@ -80,7 +80,7 @@ La consultation des clés d’accès est limitée à 30 requêtes par minute et 
 
 ## Limites d'utilisation de Propard AI
 
-Les conversations Propard AI sont protégées par des limites distinctes par compte : 10 créations par heure, 60 consultations par minute et 30 modifications ou suppressions toutes les 15 minutes. L'envoi de messages à l'IA conserve sa propre limite de 20 messages par tranche de 10 minutes. Ces limites réduisent les abus et les créations massives de conversations.
+Les conversations Propard AI sont protégées par des limites distinctes par compte : 10 créations par heure, 60 consultations par minute et 30 modifications ou suppressions toutes les 15 minutes. L'envoi de messages à l'IA conserve sa propre limite de 20 messages par tranche de 10 minutes. Les traductions via Propard AI sont limitées à 20 par tranche de 15 minutes et les transcriptions audio à 12 par tranche de 15 minutes. Ces limites réduisent les abus et les appels excessifs aux services IA.
 
 ## Traduction des messages
 
