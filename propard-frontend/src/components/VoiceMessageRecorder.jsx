@@ -27,6 +27,10 @@ export default function VoiceMessageRecorder({ disabled, onRecorded }) {
         throw new Error('L’enregistrement vocal n’est pas pris en charge par ce navigateur.');
       }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (cancelledRef.current) {
+        for (const track of stream.getTracks()) track.stop();
+        return;
+      }
       streamRef.current = stream;
       const supportedTypes = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
       const mimeType = supportedTypes.find(type => MediaRecorder.isTypeSupported?.(type));
@@ -74,8 +78,10 @@ export default function VoiceMessageRecorder({ disabled, onRecorded }) {
       }, 120000);
     } catch (err) {
       releaseStream();
-      setRecording(false);
-      setError(err.message || 'Impossible d’accéder au microphone.');
+      if (!cancelledRef.current) {
+        setRecording(false);
+        setError(err.message || 'Impossible d’accéder au microphone.');
+      }
     }
   };
 
