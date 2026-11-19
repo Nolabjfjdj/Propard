@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../utils/api';
 import socket from '../socket';
 import { decryptMessage, encryptMessage } from '../utils/crypto';
@@ -13,7 +13,7 @@ export default function ConversationSharedNote({ scope, conversationId, userId, 
   const [updatedAt, setUpdatedAt] = useState(null);
   const [noteLoaded, setNoteLoaded] = useState(false);
 
-  const headers = { Authorization: 'Bearer ' + token };
+  const headers = useMemo(() => ({ Authorization: 'Bearer ' + token }), [token]);
   const endpoint = scope === 'private'
     ? '/api/notes/private/' + conversationId
     : '/api/notes/group/' + conversationId;
@@ -22,7 +22,7 @@ export default function ConversationSharedNote({ scope, conversationId, userId, 
     ? [String(userId), String(conversationId)].sort().join(':')
     : String(conversationId);
 
-  const loadNote = async () => {
+  const loadNote = useCallback(async () => {
     if (!encryptionKey || !conversationId) return;
     setLoading(true);
     setError('');
@@ -58,7 +58,7 @@ export default function ConversationSharedNote({ scope, conversationId, userId, 
     } finally {
       setLoading(false);
     }
-  };
+  }, [encryptionKey, conversationId, endpoint, headers, scope, keyVersion]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -74,7 +74,7 @@ export default function ConversationSharedNote({ scope, conversationId, userId, 
     };
     socket.on('conversationNoteUpdated', handleUpdate);
     return () => socket.off('conversationNoteUpdated', handleUpdate);
-  }, [open, scope, conversationKey, encryptionKey, keyVersion, token]);
+  }, [open, scope, conversationKey, encryptionKey, keyVersion, token, loadNote, userId]);
 
   const saveNote = async () => {
     if (!encryptionKey || !conversationId || saving) return;
