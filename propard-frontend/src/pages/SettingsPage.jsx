@@ -45,7 +45,7 @@ export default function SettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [section, token]);
+  }, [section, token, headers]);
 
   useEffect(() => {
     if (!token) return;
