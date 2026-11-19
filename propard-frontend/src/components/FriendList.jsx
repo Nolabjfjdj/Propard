@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
 import socket from '../socket';
 
@@ -34,6 +34,11 @@ export default function FriendList({
   });
   const [activeFolder, setActiveFolder] = useState('all');
   const folderEditedRef = useRef(false);
+  const folderDataRef = useRef(folderData);
+
+  useEffect(() => {
+    folderDataRef.current = folderData;
+  }, [folderData]);
 
   const saveFolderData = next => {
     folderEditedRef.current = true;
@@ -73,7 +78,7 @@ export default function FriendList({
           console.warn('Cache locale des dossiers indisponible:', error);
         }
       } else {
-        api.put('/api/conversation-folders', folderData, {
+        api.put('/api/conversation-folders', folderDataRef.current, {
           headers: { Authorization: 'Bearer ' + token }
         }).catch(error => {
           console.warn('Migration des dossiers locaux impossible:', error.response?.data?.error || error.message);
@@ -148,7 +153,7 @@ export default function FriendList({
     };
   }, []);
 
-  const playNotificationSound = () => {
+  const playNotificationSound = useCallback(() => {
     const audio = notificationAudioRef.current;
 
     if (!audio) return;
@@ -165,9 +170,9 @@ export default function FriendList({
         );
       });
     }
-  };
+  }, []);
 
-  const fetchGroups = async () => {
+  const fetchGroups = useCallback(async () => {
     try {
       const res = await api.get(
         '/api/groups',
@@ -185,9 +190,9 @@ export default function FriendList({
         err
       );
     }
-  };
+  }, [token]);
 
-  const fetchUnread = async () => {
+  const fetchUnread = useCallback(async () => {
     try {
       const res = await api.get(
         '/api/friends/unread',
@@ -205,9 +210,9 @@ export default function FriendList({
         err
       );
     }
-  };
+  }, [token]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const res = await api.get(
         '/api/auth/me',
@@ -252,7 +257,7 @@ export default function FriendList({
         err
       );
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     if (!captchaRequired) return;
@@ -314,7 +319,7 @@ export default function FriendList({
       window.clearTimeout(initialLoad);
       clearInterval(interval);
     };
-  }, [token, refreshKey]);
+  }, [fetchData, fetchUnread, fetchGroups, refreshKey]);
 
   useEffect(() => {
     const handleFriendRequest = () => {
@@ -327,7 +332,7 @@ export default function FriendList({
     return () => {
       socket.off('friendRequestReceived', handleFriendRequest);
     };
-  }, [token]);
+  }, [fetchData, playNotificationSound]);
 
   useEffect(() => {
     const handleNew = async (msg) => {
@@ -380,7 +385,7 @@ export default function FriendList({
     return () => {
       socket.off('newMessage', handleNew);
     };
-  }, [selectedFriend, token, userId]);
+  }, [selectedFriend, token, userId, playNotificationSound]);
 
   useEffect(() => {
     const refreshGroups = () => {
@@ -398,7 +403,7 @@ export default function FriendList({
       socket.off('groupDeleted', refreshGroups);
       socket.off('groupCreated', refreshGroups);
     };
-  }, [token]);
+  }, [fetchGroups]);
 
   const acceptRequest = async (fromUserId) => {
     if (captchaRequired && !captchaToken) {
