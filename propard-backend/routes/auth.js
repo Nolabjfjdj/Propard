@@ -28,9 +28,16 @@ const accountHelpLimiter = createRateLimiter({
   message: 'Trop de demandes envoyées. Réessaie plus tard.'
 });
 
+const accountHelpMessageLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  keyFn: req => `account-help-message:${getClientIp(req) || 'unknown'}`,
+  message: 'Trop de messages envoyés. Réessaie plus tard.'
+});
+
 const accountHelpStatusLimiter = createRateLimiter({
   windowMs: 30 * 60 * 1000,
-  max: 20,
+  max: 180,
   keyFn: req => `account-help-status:${getClientIp(req) || 'unknown'}`,
   message: 'Trop de consultations. Réessaie plus tard.'
 });
@@ -337,7 +344,7 @@ router.post('/account-help', accountHelpLimiter, async (req, res) => {
   }
 });
 
-router.post('/account-help/message', accountHelpStatusLimiter, async (req, res) => {
+router.post('/account-help/message', accountHelpMessageLimiter, async (req, res) => {
   try {
     const reference = typeof req.body?.reference === 'string' ? req.body.reference.trim().toUpperCase() : '';
     const accessToken = typeof req.body?.accessToken === 'string' ? req.body.accessToken.trim() : '';
