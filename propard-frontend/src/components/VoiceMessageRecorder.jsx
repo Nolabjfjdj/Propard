@@ -127,7 +127,6 @@ const styles = {
   button: {
     border: '1px solid var(--border)',
     borderRadius: 8,
-    padding: '7px 9px',
     background: 'var(--bg-tertiary)',
     color: 'var(--text-primary)',
     fontSize: 11,
