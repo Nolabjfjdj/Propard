@@ -84,8 +84,11 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
       };
       recorder.onstop = async () => {
         stopTracks();
+        if (cancelledRef.current) {
+          recorderRef.current = null;
+          return;
+        }
         setRecording(false);
-        if (cancelledRef.current) return;
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
         setTranscribing(true);
         setError('Transcription en cours…');
@@ -99,7 +102,7 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
         } catch (transcriptionError) {
           if (!cancelledRef.current) setError(transcriptionError.response?.data?.error || transcriptionError.message || 'La transcription audio a échoué.');
         } finally {
-          setTranscribing(false);
+          if (!cancelledRef.current) setTranscribing(false);
           recorderRef.current = null;
         }
       };
@@ -175,10 +178,7 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
     };
     recognition.onend = () => {
       setRecording(false);
-      if (cancelledRef.current) {
-        onChange(baseTextRef.current);
-        return;
-      }
+      if (cancelledRef.current) return;
       const spoken = normalizeTranscript(finalTextRef.current).trim();
       const base = baseTextRef.current.trim();
       onChange([base, spoken].filter(Boolean).join(base && spoken ? ' ' : ''));
