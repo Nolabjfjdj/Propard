@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import MicrophoneIcon from './MicrophoneIcon';
 
 export default function VoiceMessageRecorder({ disabled, onRecorded }) {
   const [recording, setRecording] = useState(false);
@@ -108,7 +109,7 @@ export default function VoiceMessageRecorder({ disabled, onRecorded }) {
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
       {!recording ? (
         <button type="button" onClick={startRecording} disabled={disabled || busy} title="Enregistrer un message vocal" aria-label="Enregistrer un message vocal" style={styles.button}>
-          {busy ? 'Envoi…' : 'Vocal'}
+          {busy ? '…' : <MicrophoneIcon />}
         </button>
       ) : (
         <>
@@ -130,6 +131,11 @@ const styles = {
     background: 'var(--bg-tertiary)',
     color: 'var(--text-primary)',
     fontSize: 11,
+    width: 40,
+    height: 40,
+    display: 'grid',
+    placeItems: 'center',
+    padding: 0,
     cursor: 'pointer'
   },
   cancel: {
