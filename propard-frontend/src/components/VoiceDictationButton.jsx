@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getSupportedRecordingMimeType, transcribeAudio } from '../utils/audioTranscription';
+import MicrophoneIcon from './MicrophoneIcon';
 
 const getRecognition = () => {
   if (typeof window === 'undefined') return null;
@@ -12,15 +13,6 @@ const normalizeTranscript = text => String(text || '')
   .replace(/\bpro\s*pard\s+ai\b/gi, 'Propard AI')
   .replace(/\bpropard\s+a[iï]\b/gi, 'Propard AI')
   .replace(/\bpropard\b/gi, 'Propard');
-
-function MicrophoneIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" aria-hidden="true" style={{ display: 'block' }}>
-      <rect x="9" y="2.5" width="6" height="12" rx="3" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M8.5 21.5h7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 export default function VoiceDictationButton({ value, onChange, disabled = false }) {
   const { token } = useAuth();
