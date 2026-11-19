@@ -217,7 +217,9 @@ export default function VoiceMode({ onSend, sending }) {
     const Recognition = getRecognition();
     if (!Recognition) {
       setFallbackAvailable(true);
-      void startFallbackRecording();
+      activeRef.current = false;
+      setActive(false);
+      setStatus('La reconnaissance native est indisponible. Autorise l’enregistrement de secours si tu acceptes que l’audio soit transcrit par Groq.');
       return;
     }
     if (!activeRef.current || processingRef.current || sending) return;
