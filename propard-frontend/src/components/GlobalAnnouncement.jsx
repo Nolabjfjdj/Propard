@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
-import { markdownToHtml } from '../utils/markdown';
+import MarkdownRenderer from './MarkdownRenderer';
 
 export default function GlobalAnnouncement() {
   const { user, token } = useAuth();
@@ -130,12 +130,9 @@ export default function GlobalAnnouncement() {
         </h2>
 
         <div style={styles.message}>
-          <div
-            style={styles.markdown}
-            dangerouslySetInnerHTML={{
-              __html: markdownToHtml(announcement.message)
-            }}
-          />
+          <div style={styles.markdown}>
+            <MarkdownRenderer content={announcement.message} />
+          </div>
         </div>
 
         {error && (
