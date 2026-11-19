@@ -1597,6 +1597,15 @@ export default function VoiceCall({
     setMuted(prev => !prev);
   };
 
+  const callLifecycleRef = useRef({});
+  callLifecycleRef.current = {
+    cleanup,
+    friendId: friend?._id,
+    incomingOffer,
+    onClose,
+    startCall
+  };
+
   useEffect(() => {
     closedRef.current = false;
 
@@ -1713,7 +1722,7 @@ export default function VoiceCall({
           socket.emit(
             'iceRestartAnswer',
             {
-              callerId: friend._id,
+              callerId: callLifecycleRef.current.friendId,
               answer
             }
           );
@@ -1762,8 +1771,8 @@ export default function VoiceCall({
       };
 
     const handleCallEnded = () => {
-      cleanup();
-      onClose();
+      callLifecycleRef.current.cleanup();
+      callLifecycleRef.current.onClose();
     };
 
     const handleCallFailed = () => {
@@ -1803,14 +1812,14 @@ export default function VoiceCall({
     );
 
     if (
-      !incomingOffer &&
+      !callLifecycleRef.current.incomingOffer &&
       !hasInitiatedRef.current
     ) {
       hasInitiatedRef.current = true;
 
       isCallerRef.current = true;
 
-      startCall();
+      callLifecycleRef.current.startCall();
     }
 
     return () => {
@@ -1844,7 +1853,7 @@ export default function VoiceCall({
         handleCallFailed
       );
 
-      cleanup();
+      callLifecycleRef.current.cleanup();
     };
   }, []);
 
