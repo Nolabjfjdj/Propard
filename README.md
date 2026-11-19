@@ -12,7 +12,7 @@ Propard est une plateforme web française de communication développée avec Rea
 - Système d'amis
 - Dossiers de conversations synchronisés entre les appareils du compte
 - Messagerie privée en temps réel
-- Traduction locale des messages privés et de groupe, sans transmettre le texte à un service tiers
+- Traduction locale des messages privés et de groupe lorsque le navigateur la prend en charge, avec une solution de secours Propard AI soumise à confirmation
 - Messages vocaux enregistrés dans le navigateur et chiffrés avant téléversement
 - Messages privés et de groupe programmés avec stockage du seul contenu chiffré
 - Chiffrement de bout en bout des messages privés
@@ -37,7 +37,7 @@ Propard est une plateforme web française de communication développée avec Rea
 - Pages d'aide, CGU et politique de confidentialité
 - Présence en ligne et confirmations de lecture configurables
 - Propard AI avec conversations sauvegardées sous forme chiffrée côté client
-- Mode vocal et dictée vocale pour Propard AI selon les capacités du navigateur
+- Mode vocal et dictée vocale pour Propard AI avec reconnaissance native du navigateur et transcription de secours via Groq
 - Demandes de support et suivi des demandes liées au compte
 - Espaces Staff et Admin avec rôles, permissions et journal d'audit
 - Stockage de fichiers réparti sur plusieurs buckets Filebase configurables
@@ -84,7 +84,7 @@ Les conversations Propard AI sont protégées par des limites distinctes par com
 
 ## Traduction des messages
 
-Les conversations privées et les groupes proposent une traduction à la demande des messages texte. La traduction est exécutée localement avec l'API Translator intégrée au navigateur lorsqu'elle est disponible. La langue source peut être détectée automatiquement ou sélectionnée manuellement, et la langue cible est configurable. Le message original n'est jamais modifié et le texte déchiffré n'est pas envoyé à un service de traduction externe. La disponibilité dépend du navigateur, de l’appareil et des modèles linguistiques installés. Dans Chrome, les API Translator et Language Detector sont actuellement réservées à l’ordinateur et ne fonctionnent pas sur mobile. Les navigateurs ou appareils qui ne prennent pas en charge ces API affichent une indication au lieu de transmettre le message à un tiers.
+Les conversations privées et les groupes proposent une traduction à la demande des messages texte. La traduction locale utilise l'API Translator intégrée au navigateur lorsqu'elle est disponible. La langue source peut être détectée automatiquement ou sélectionnée manuellement, et la langue cible est configurable. Si l'API locale est absente ou indisponible, l'utilisateur peut explicitement choisir la solution de secours Propard AI. Dans ce cas, le texte déchiffré est envoyé à Groq pour traduction et n'est donc plus couvert par le chiffrement de bout en bout pendant cette opération. Le message original n'est jamais modifié.
 
 ## Messages vocaux
 
@@ -708,3 +708,8 @@ Le coffre-fort chiffre les notes dans le navigateur avec une clé dérivée d'un
 ### Messages vocaux et profils
 
 Les messages vocaux sont enregistrés dans le navigateur puis transmis par le parcours existant de pièces jointes chiffrées. Les profils peuvent afficher un statut et un badge personnel. Les préférences d'apparence comprennent le thème sombre ou clair et cinq couleurs d'accent, enregistrés sur l'appareil.
+
+
+## Dictée et mode vocal Propard AI
+
+La dictée et le mode vocal utilisent d'abord la reconnaissance vocale native du navigateur lorsqu'elle est disponible. Si elle est absente ou échoue, un enregistrement audio temporaire peut être transcrit via Groq Whisper après autorisation du microphone. L'audio est transmis à Groq pour transcription et n'est pas stocké par Propard. La lecture des réponses utilise les voix de synthèse disponibles sur l'appareil. Les enregistrements de secours sont limités à 12 secondes en mode vocal et à 90 secondes pour la dictée manuelle.
