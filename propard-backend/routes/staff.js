@@ -534,7 +534,7 @@ router.patch('/account-help/settings', requireStaffRole('support'), async (req, 
         'staffNotificationPreferences.passwordReset': passwordResetNotifications,
         'staffNotificationPreferences.support': supportNotifications
       }},
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).select('staffNotificationPreferences');
     if (!staffUser) return res.status(404).json({ error: 'Compte du personnel introuvable.' });
     await audit(req, 'account_help.notifications_updated', {
@@ -984,7 +984,7 @@ router.patch('/users/:userId/role', requireStaffRole('admin'), async (req, res) 
           staffRoleUpdatedBy: roleUpdatedBy
         }
       },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).select('_id username staffRole');
 
     if (!updatedTarget) {
@@ -1084,7 +1084,7 @@ router.post('/audit/:logId/undo', requireStaffRole('owner'), async (req, res) =>
           $set: { bannedAt: null, banExpiresAt: null, banReason: null, isOnline: false },
           $inc: { sessionVersion: 1 }
         },
-        { new: true }
+        { returnDocument: 'after' }
       ).select('_id username');
       if (!target) {
         return res.status(409).json({ error: 'Le bannissement a changé depuis cette action. Annulation refusée pour ne pas modifier une sanction plus récente.' });
@@ -1115,7 +1115,7 @@ router.post('/audit/:logId/undo', requireStaffRole('owner'), async (req, res) =>
             staffRoleUpdatedBy: roleUpdatedBy
           }
         },
-        { new: true, runValidators: true }
+        { returnDocument: 'after', runValidators: true }
       ).select('_id');
 
       if (!restoredTarget) {
