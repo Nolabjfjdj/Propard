@@ -196,6 +196,7 @@ export default function VoiceMode({ onSend, sending }) {
       recorder.onerror = () => {
         stopFallbackTracks();
         setFallbackRecording(false);
+        setListening(false);
         activeRef.current = false;
         setActive(false);
         setStatus('Une erreur est survenue pendant l’enregistrement vocal.');
@@ -203,6 +204,7 @@ export default function VoiceMode({ onSend, sending }) {
       recorder.onstop = async () => {
         stopFallbackTracks();
         setFallbackRecording(false);
+        setListening(false);
         recorderRef.current = null;
         if (!activeRef.current) return;
         const blob = new Blob(recorderChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
@@ -235,6 +237,7 @@ export default function VoiceMode({ onSend, sending }) {
       activeRef.current = false;
       setActive(false);
       setFallbackRecording(false);
+      setListening(false);
       setStatus(error?.name === 'NotAllowedError'
         ? 'Autorise le microphone dans les réglages du navigateur.'
         : error.message || 'Impossible d’accéder au microphone.');
