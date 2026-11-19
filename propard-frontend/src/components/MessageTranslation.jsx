@@ -63,10 +63,13 @@ export default function MessageTranslation({ text }) {
 
         detector = await DetectorAPI.create();
         const detections = await detector.detect(text);
-        detectedSource = detections?.[0]?.detectedLanguage;
+        const detectedLanguage = detections?.[0]?.detectedLanguage;
+        detectedSource = typeof detectedLanguage === 'string'
+          ? detectedLanguage.toLowerCase().split('-')[0]
+          : '';
 
         if (!detectedSource || !languages.some(([code]) => code === detectedSource)) {
-          throw new Error('La langue du message n’a pas pu être détectée. Choisis-la manuellement.');
+          throw new Error('La langue du message n’a pas pu être détectée parmi les langues prises en charge. Choisis-la manuellement.');
         }
       }
 
@@ -108,12 +111,12 @@ export default function MessageTranslation({ text }) {
       ) : (
         <>
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, maxWidth: '100%' }}>
-            <select aria-label="Langue source" value={sourceLanguage} onChange={event => setSourceLanguage(event.target.value)} disabled={loading} style={controlStyle}>
+            <select aria-label="Langue source" value={sourceLanguage} onChange={event => { setSourceLanguage(event.target.value); setTranslatedText(''); setStatus(''); }} disabled={loading} style={controlStyle}>
               <option value="auto">Détection automatique</option>
               {languages.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
             </select>
             <span aria-hidden="true" style={{ color: 'var(--text-secondary)', fontSize: 11 }}>vers</span>
-            <select aria-label="Langue cible" value={targetLanguage} onChange={event => setTargetLanguage(event.target.value)} disabled={loading} style={controlStyle}>
+            <select aria-label="Langue cible" value={targetLanguage} onChange={event => { setTargetLanguage(event.target.value); setTranslatedText(''); setStatus(''); }} disabled={loading} style={controlStyle}>
               {languages.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
             </select>
             <button type="button" onClick={translate} disabled={loading} style={{ ...controlStyle, cursor: loading ? 'wait' : 'pointer' }}>
