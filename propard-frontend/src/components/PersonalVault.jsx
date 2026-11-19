@@ -27,7 +27,7 @@ export default function PersonalVault({ token }) {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, headers]);
 
   const unlockVault = async () => {
     if (passphrase.length < 12) {
