@@ -137,7 +137,7 @@ router.post(
       const mimeType = (req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
       const allowedTypes = new Set([
         'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg',
-        'audio/wav', 'audio/x-wav', 'audio/aac', 'audio/3gpp'
+        'audio/wav', 'audio/x-wav', 'audio/flac', 'audio/m4a', 'audio/mpga'
       ]);
       if (!allowedTypes.has(mimeType)) {
         return res.status(415).json({ error: 'Format audio non pris en charge.' });
@@ -152,8 +152,9 @@ router.post(
         'audio/mpeg': 'mp3',
         'audio/wav': 'wav',
         'audio/x-wav': 'wav',
-        'audio/aac': 'aac',
-        'audio/3gpp': '3gp'
+        'audio/flac': 'flac',
+        'audio/m4a': 'm4a',
+        'audio/mpga': 'mpga'
       })[mimeType];
       const text = await transcribeGroqAudio({
         audio: req.body,
