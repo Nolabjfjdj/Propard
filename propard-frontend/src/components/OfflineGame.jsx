@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const HIGH_SCORE_KEY = 'propard_offline_highscore_v1';
 
@@ -147,7 +147,7 @@ export default function OfflineGame({
     }
   };
 
-  const createStars = (width, height) => {
+  const createStars = useCallback((width, height) => {
     const count = Math.max(
       45,
       Math.floor((width * height) / 11000)
@@ -164,9 +164,9 @@ export default function OfflineGame({
         phase: random(0, Math.PI * 2)
       })
     );
-  };
+  }, []);
 
-  const resizeCanvas = () => {
+  const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const wrapper = wrapperRef.current;
 
@@ -243,7 +243,7 @@ export default function OfflineGame({
         height
       );
     }
-  };
+  }, [createStars]);
 
   useEffect(() => {
     resizeCanvas();
@@ -272,7 +272,7 @@ export default function OfflineGame({
 
       observer.disconnect();
     };
-  }, []);
+  }, [resizeCanvas]);
 
   const resetGame = () => {
     const game = gameRef.current;
@@ -1366,9 +1366,14 @@ export default function OfflineGame({
     drawFloatingTexts(ctx);
   };
 
+  const updateRef = useRef(update);
+  const drawRef = useRef(draw);
+  updateRef.current = update;
+  drawRef.current = draw;
+
   useEffect(() => {
     let mounted = true;
-
+    const game = gameRef.current;
     const loop =
       timestamp => {
         if (!mounted)
@@ -1394,8 +1399,8 @@ export default function OfflineGame({
         game.lastTime =
           timestamp;
 
-        update(dt);
-        draw();
+        updateRef.current(dt);
+        drawRef.current();
 
         game.animationFrame =
           requestAnimationFrame(
@@ -1411,10 +1416,7 @@ export default function OfflineGame({
     return () => {
       mounted = false;
 
-      cancelAnimationFrame(
-        gameRef.current
-          .animationFrame
-      );
+      cancelAnimationFrame(game.animationFrame);
     };
   }, []);
 
