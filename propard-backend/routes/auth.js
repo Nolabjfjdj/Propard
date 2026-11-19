@@ -1491,7 +1491,7 @@ async function finalizeExpiredDeletions() {
       user.activeSessions = [];
       user.revokedSessions = [];
       user.securityEvents = [];
-      user.passkeyCredentials = [];
+      user.passkeys = [];
       user.passkeyRecoveryCodes = [];
       user.apnsTokens = [];
       user.pushSubscriptions = [];
