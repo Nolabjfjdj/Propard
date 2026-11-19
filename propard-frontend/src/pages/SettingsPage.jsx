@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
@@ -26,7 +26,7 @@ export default function SettingsPage() {
   const [reminderDueAt, setReminderDueAt] = useState('');
   const [remindersLoading, setRemindersLoading] = useState(false);
 
-  const headers = { Authorization: `Bearer ${token}` };
+  const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   useEffect(() => {
     if (section !== 'reminders' || !token) return;
@@ -67,7 +67,7 @@ export default function SettingsPage() {
     }
   };
 
-  const loadPasskeys = async () => {
+  const loadPasskeys = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -79,9 +79,9 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [headers]);
 
-  const loadSessions = async () => {
+  const loadSessions = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -92,9 +92,9 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [headers]);
 
-  const loadSecurityEvents = async () => {
+  const loadSecurityEvents = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -105,7 +105,7 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [headers]);
 
   const revokeAllSessions = async () => {
     if (!window.confirm('Déconnecter tous les appareils, y compris celui-ci ? Tu devras te reconnecter.')) return;
@@ -149,7 +149,7 @@ export default function SettingsPage() {
     if (section === 'a2f') loadPasskeys();
     if (section === 'sessions') loadSessions();
     if (section === 'security-history') loadSecurityEvents();
-  }, [section]);
+  }, [section, loadPasskeys, loadSessions, loadSecurityEvents]);
 
   const goBack = () => {
     if (section === 'e2ee') {
