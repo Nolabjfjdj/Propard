@@ -1495,6 +1495,15 @@ async function finalizeExpiredDeletions() {
       user.passkeyRecoveryCodes = [];
       user.apnsTokens = [];
       user.pushSubscriptions = [];
+      user.sessionVersion = (user.sessionVersion || 0) + 1;
+      user.passkeyRegistrationChallenge = null;
+      user.passkeyRegistrationChallengeExpiresAt = null;
+      user.passkeyRegistrationRpId = null;
+      user.passkeyRegistrationOrigin = null;
+      user.passkeyLoginChallenge = null;
+      user.passkeyLoginChallengeExpiresAt = null;
+      user.passkeyLoginRpId = null;
+      user.passkeyLoginOrigin = null;
 
       await user.save();
 
