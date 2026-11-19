@@ -124,7 +124,8 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
     cancelledRef.current = false;
 
     if (!Recognition) {
-      void startFallback();
+      setUseServerFallback(true);
+      setError('La dictée native est indisponible. Tu peux autoriser la transcription via Groq.');
       return;
     }
 
@@ -246,7 +247,7 @@ export default function VoiceDictationButton({ value, onChange, disabled = false
       {transcribing && <span role="status" style={{ position: 'absolute', bottom: 'calc(100% + 8px)', right: 0, zIndex: 5, width: 250, maxWidth: '70vw', padding: 9, borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: 11 }}>Transcription audio en cours…</span>}
       {error && <span role="status" style={{ position: 'absolute', bottom: 'calc(100% + 8px)', right: 0, zIndex: 5, width: 270, maxWidth: '75vw', padding: 9, borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--danger)', fontSize: 11 }}>
         {error}
-        {useServerFallback && !recording && !transcribing && <button type="button" onClick={startFallback} disabled={disabled} style={{ display: 'block', marginTop: 7, border: '1px solid var(--border)', borderRadius: 6, padding: '5px 7px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: 'pointer' }}>Utiliser l’enregistrement de secours</button>}
+        {useServerFallback && !recording && !transcribing && <button type="button" onClick={startFallback} disabled={disabled} style={{ display: 'block', marginTop: 7, border: '1px solid var(--border)', borderRadius: 6, padding: '5px 7px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: 'pointer' }} >Autoriser l’enregistrement et la transcription via Groq</button>}
       </span>}
     </div>
   );
