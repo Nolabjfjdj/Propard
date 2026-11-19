@@ -126,7 +126,10 @@ export default function VoiceMode({ onSend, sending }) {
       if (modeRef.current === 'direct' && activeRef.current) {
         setStatus('Je t’écoute…');
         processingRef.current = false;
-        restartRef.current = window.setTimeout(() => startRecognition(), 350);
+        restartRef.current = window.setTimeout(() => {
+          if (fallbackAvailable) void startFallbackRecording();
+          else startRecognition();
+        }, 350);
       } else {
         processingRef.current = false;
         setStatus(answer ? 'Réponse terminée.' : 'Aucune réponse reçue.');
