@@ -84,7 +84,7 @@ Les conversations Propard AI sont protégées par des limites distinctes par com
 
 ## Traduction des messages
 
-Les conversations privées et les groupes proposent une traduction à la demande des messages texte. La traduction est exécutée localement avec l'API Translator intégrée au navigateur lorsqu'elle est disponible. La langue source peut être détectée automatiquement ou sélectionnée manuellement, et la langue cible est configurable. Le message original n'est jamais modifié et le texte déchiffré n'est pas envoyé à un service de traduction externe. Les navigateurs qui ne prennent pas en charge cette API affichent une indication au lieu de transmettre le message à un tiers.
+Les conversations privées et les groupes proposent une traduction à la demande des messages texte. La traduction est exécutée localement avec l'API Translator intégrée au navigateur lorsqu'elle est disponible. La langue source peut être détectée automatiquement ou sélectionnée manuellement, et la langue cible est configurable. Le message original n'est jamais modifié et le texte déchiffré n'est pas envoyé à un service de traduction externe. La disponibilité dépend du navigateur, de l’appareil et des modèles linguistiques installés. Dans Chrome, les API Translator et Language Detector sont actuellement réservées à l’ordinateur et ne fonctionnent pas sur mobile. Les navigateurs ou appareils qui ne prennent pas en charge ces API affichent une indication au lieu de transmettre le message à un tiers.
 
 ## Messages vocaux
 
