@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { enablePushNotifications, disablePushNotifications, isPushEnabled } from '../utils/pushNotifications';
@@ -45,7 +45,7 @@ export default function ProfilePage({
 
   const fileInputRef = useRef(null);
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     setLoading(true);
     setError('');
 
@@ -71,7 +71,7 @@ export default function ProfilePage({
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, token]);
 
   useEffect(() => {
     if (!userId || !token) return;
@@ -82,7 +82,7 @@ export default function ProfilePage({
     setMenuOpen(false);
     setConfirmAction(null);
     setEditingNickname(false);
-  }, [userId, token]);
+  }, [userId, token, fetchProfile]);
 
   useEffect(() => {
     let cancelled = false;
