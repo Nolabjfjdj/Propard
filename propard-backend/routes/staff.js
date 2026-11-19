@@ -915,7 +915,7 @@ router.post('/users/:userId/ban', requireStaffRole('moderator'), async (req, res
 
     await audit(req, 'user.banned', {
       targetUser: target._id,
-      details: { duration, reason: reason.trim(), banExpiresAt: target.banExpiresAt }
+      details: { duration, reason: reason.trim(), bannedAt: target.bannedAt, banExpiresAt: target.banExpiresAt }
     });
 
     return res.json({
@@ -1066,14 +1066,29 @@ router.post('/audit/:logId/undo', requireStaffRole('owner'), async (req, res) =>
     let undoDescription;
 
     if (original.action === 'user.banned' && original.targetUser) {
-      const target = await User.findById(original.targetUser);
-      if (!target) return res.status(404).json({ error: 'Le compte concerné n’existe plus.' });
-      if (!target.bannedAt) return res.status(409).json({ error: 'Ce compte n’est actuellement plus banni. Rien n’a été modifié.', code: 'BAN_ALREADY_INACTIVE', targetUsername: target.username });
-      target.bannedAt = null;
-      target.banExpiresAt = null;
-      target.banReason = null;
-      target.sessionVersion = (target.sessionVersion || 0) + 1;
-      await target.save();
+      if (typeof details.reason !== 'string' || !Object.prototype.hasOwnProperty.call(details, 'banExpiresAt')) {
+        return res.status(409).json({ error: 'Cette ancienne action ne contient pas assez d’informations pour être annulée en sécurité.' });
+      }
+      const banFilter = {
+        _id: original.targetUser,
+        bannedAt: { $ne: null },
+        banReason: details.reason,
+        banExpiresAt: details.banExpiresAt
+      };
+      if (details.bannedAt && Number.isFinite(new Date(details.bannedAt).getTime())) {
+        banFilter.bannedAt = new Date(details.bannedAt);
+      }
+      const target = await User.findOneAndUpdate(
+        banFilter,
+        {
+          $set: { bannedAt: null, banExpiresAt: null, banReason: null, isOnline: false },
+          $inc: { sessionVersion: 1 }
+        },
+        { new: true }
+      ).select('_id username');
+      if (!target) {
+        return res.status(409).json({ error: 'Le bannissement a changé depuis cette action. Annulation refusée pour ne pas modifier une sanction plus récente.' });
+      }
       const io = req.app.get('io');
       if (io) {
         for (const socket of io.sockets.sockets.values()) {
@@ -1110,15 +1125,21 @@ router.post('/audit/:logId/undo', requireStaffRole('owner'), async (req, res) =>
     } else if (original.action === 'report.status.updated' && original.targetReport &&
       ['new', 'processed', 'rejected'].includes(details.previousStatus) &&
       ['new', 'processed', 'rejected'].includes(details.status)) {
-      const report = await Report.findById(original.targetReport);
-      if (!report) return res.status(404).json({ error: 'Le signalement concerné n’existe plus.' });
-      if (report.status !== details.status) {
+      const reportUpdate = await Report.updateOne(
+        { _id: original.targetReport, status: details.status },
+        {
+          $set: {
+            status: details.previousStatus,
+            processedAt: details.previousStatus === 'new' ? null : new Date()
+          }
+        }
+      );
+      if (!reportUpdate.matchedCount) {
+        const reportExists = await Report.exists({ _id: original.targetReport });
+        if (!reportExists) return res.status(404).json({ error: 'Le signalement concerné n’existe plus.' });
         return res.status(409).json({ error: 'Le statut du signalement a changé depuis cette action. Annulation refusée.' });
       }
-      report.status = details.previousStatus;
-      report.processedAt = details.previousStatus === 'new' ? null : new Date();
-      await report.save();
-      undoDescription = { type: 'report_status_restore', targetReportId: report._id.toString(), restoredStatus: details.previousStatus };
+      undoDescription = { type: 'report_status_restore', targetReportId: original.targetReport.toString(), restoredStatus: details.previousStatus };
     } else {
       return res.status(409).json({
         error: 'Cette action n’est pas encore annulable automatiquement. Les suppressions définitives, réinitialisations de mot de passe et actions sans état précédent sauvegardé ne peuvent pas être restaurées en sécurité.'
