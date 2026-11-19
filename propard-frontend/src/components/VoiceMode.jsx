@@ -243,11 +243,13 @@ export default function VoiceMode({ onSend, sending }) {
     };
     recognition.onerror = event => {
       setListening(false);
-      if (event.error !== 'aborted' && event.error !== 'no-speech') {
+      if (event.error !== 'aborted') {
         activeRef.current = false;
         setActive(false);
         setFallbackAvailable(true);
-        setStatus('La reconnaissance vocale du navigateur a échoué : ' + event.error + '. Tu peux utiliser l’enregistrement de secours.');
+        setStatus(event.error === 'no-speech'
+          ? 'Aucune voix détectée. Tu peux utiliser l’enregistrement de secours.'
+          : 'La reconnaissance vocale du navigateur a échoué : ' + event.error + '. Tu peux utiliser l’enregistrement de secours.');
       }
     };
     recognition.onend = () => {
@@ -267,7 +269,8 @@ export default function VoiceMode({ onSend, sending }) {
     } catch {
       activeRef.current = false;
       setActive(false);
-      setStatus('Impossible de démarrer le micro. Vérifie son autorisation.');
+      setFallbackAvailable(true);
+      setStatus('Impossible de démarrer la reconnaissance native. Tu peux utiliser l’enregistrement de secours.');
     }
   };
 
