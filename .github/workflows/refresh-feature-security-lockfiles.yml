@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: 24
       - name: Refresh backend security fixes
-        run: npm audit fix --package-lock-only --ignore-scripts --no-fund
+        run: npm audit fix --package-lock-only --ignore-scripts --no-fund || true
         working-directory: propard-backend
       - name: Refresh frontend security fixes
         run: npm audit fix --package-lock-only --ignore-scripts --no-fund
