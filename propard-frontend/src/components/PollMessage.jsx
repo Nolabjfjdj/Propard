@@ -24,9 +24,10 @@ export default function PollMessage({ content, reactions = [], userId, onVote, d
     return <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Format de sondage invalide.</p>;
   }
 
-  const totalVotes = reactions.filter(reaction => voteEmojis.includes(reaction.emoji)).length;
+  const validVoteEmojis = voteEmojis.slice(0, poll.options.length);
+  const totalVotes = reactions.filter(reaction => validVoteEmojis.includes(reaction.emoji)).length;
   const myVote = reactions.find(reaction =>
-    reaction.userId?.toString() === userId?.toString() && voteEmojis.includes(reaction.emoji)
+    reaction.userId?.toString() === userId?.toString() && validVoteEmojis.includes(reaction.emoji)
   )?.emoji;
 
   return (
