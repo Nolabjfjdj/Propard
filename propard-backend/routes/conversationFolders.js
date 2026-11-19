@@ -13,6 +13,13 @@ const foldersLimiter = createRateLimiter({
   message: 'Trop de modifications de dossiers. Réessaie plus tard.'
 });
 
+const foldersReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyFn: req => 'conversation-folders-read:' + req.user.id,
+  message: 'Trop de consultations des dossiers. Réessaie plus tard.'
+});
+
 function validateFolders(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || !Array.isArray(value.names) || !value.assignments || typeof value.assignments !== 'object' || Array.isArray(value.assignments)) {
     return false;
@@ -28,7 +35,7 @@ function validateFolders(value) {
   return true;
 }
 
-router.get('/', async (req, res) => {
+router.get('/', foldersReadLimiter, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('+conversationFolders');
     if (!user) return res.status(404).json({ error: 'Compte introuvable.' });
