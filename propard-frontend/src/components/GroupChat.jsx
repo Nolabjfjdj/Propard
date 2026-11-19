@@ -1,4 +1,5 @@
 import React, {
+  useCallback,
   useEffect,
   useState,
   useRef,
@@ -346,7 +347,7 @@ export default function GroupChat({
   /*
    * Recharge le groupe et synchronise sa clé active.
    */
-  const loadGroup = async () => {
+  const loadGroup = useCallback(async () => {
     if (!initialGroup?._id || !token || !myId) {
       return null;
     }
@@ -448,7 +449,7 @@ export default function GroupChat({
     } finally {
       setLoading(false);
     }
-  };
+  }, [initialGroup?._id, token, myId]);
 
   /*
    * Charge le groupe et récupère sa clé.
@@ -1002,7 +1003,10 @@ export default function GroupChat({
     key,
     messages,
     myId,
-    token
+    token,
+    handleGroupMessageEdited,
+    loadGroup,
+    onDeleted
   ]);
 
   /*
@@ -1796,7 +1800,7 @@ export default function GroupChat({
    * Message de groupe modifié
    * en temps réel.
    */
-  const handleGroupMessageEdited =
+  const handleGroupMessageEdited = useCallback(
     async data => {
       if (
         data?.groupId?.toString() !==
@@ -1842,7 +1846,9 @@ export default function GroupChat({
             : message
         )
       );
-    };
+    },
+    [initialGroup?._id, key]
+  );
 
   /*
    * Envoi du message.
