@@ -122,13 +122,31 @@ export default function AppPage({
   }, [token, user?.staffRole]);
 
   useEffect(() => {
-    const check = () =>
-      setIsMobile(window.innerWidth < 768);
-
+    const check = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
-    return () =>
-      window.removeEventListener('resize', check);
+  useEffect(() => {
+    const root = document.documentElement;
+    const viewport = window.visualViewport;
+    const updateViewport = () => {
+      const height = viewport?.height || window.innerHeight;
+      const offsetTop = viewport?.offsetTop || 0;
+      root.style.setProperty('--propard-app-viewport-height', `${height}px`);
+      root.style.setProperty('--propard-app-viewport-offset-top', `${offsetTop}px`);
+    };
+    updateViewport();
+    viewport?.addEventListener('resize', updateViewport);
+    viewport?.addEventListener('scroll', updateViewport);
+    window.addEventListener('resize', updateViewport);
+    return () => {
+      root.style.removeProperty('--propard-app-viewport-height');
+      root.style.removeProperty('--propard-app-viewport-offset-top');
+      viewport?.removeEventListener('resize', updateViewport);
+      viewport?.removeEventListener('scroll', updateViewport);
+      window.removeEventListener('resize', updateViewport);
+    };
   }, []);
 
   useEffect(() => {
@@ -1906,11 +1924,17 @@ export default function AppPage({
 
 const styles = {
   layout: {
+    position: 'fixed',
+    top: 'var(--propard-app-viewport-offset-top, 0px)',
+    left: 0,
+    right: 0,
+    width: '100%',
     display: 'flex',
-    height: '100dvh',
-    minHeight: '100vh',
+    height: 'var(--propard-app-viewport-height, 100dvh)',
+    minHeight: 0,
     background: 'var(--bg-primary)',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    overscrollBehavior: 'none'
   },
 
   overlay: {
@@ -2169,6 +2193,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     minWidth: 0,
+    minHeight: 0,
     overflow: 'hidden'
   },
 
