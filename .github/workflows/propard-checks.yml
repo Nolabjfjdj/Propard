@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/propard-full-upgrade
+      - fix/mobile-chat-scheduling-ai-media
   pull_request:
     branches:
       - main
