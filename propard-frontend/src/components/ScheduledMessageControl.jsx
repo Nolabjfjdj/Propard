@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
 
-export default function ScheduledMessageControl({ token, scope, conversationId, disabled, onSchedule }) {
+export default function ScheduledMessageControl({ token, scope, conversationId, disabled, hasMessage, onSchedule }) {
   const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
   const [dueAt, setDueAt] = useState('');
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -29,7 +30,27 @@ export default function ScheduledMessageControl({ token, scope, conversationId, 
     };
   }, [open, token, scope, conversationId]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOnOutsidePointer = event => {
+      if (!containerRef.current?.contains(event.target)) setOpen(false);
+    };
+    const closeOnEscape = event => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [open]);
+
   const submit = async () => {
+    if (!hasMessage) {
+      setError('Écris un message avant de le programmer.');
+      return;
+    }
     if (!dueAt) {
       setError('Choisis une date et une heure.');
       return;
@@ -72,7 +93,7 @@ export default function ScheduledMessageControl({ token, scope, conversationId, 
   };
 
   return (
-    <div style={{ position: 'relative', display: 'inline-flex' }}>
+    <div ref={containerRef} style={{ position: 'relative', display: 'inline-flex' }}>
       <button
         type="button"
         disabled={disabled}
@@ -91,7 +112,7 @@ export default function ScheduledMessageControl({ token, scope, conversationId, 
             onChange={event => setDueAt(event.target.value)}
             style={{ width: '100%', boxSizing: 'border-box', padding: 9, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
           />
-          <button type="button" onClick={submit} disabled={loading || disabled} style={{ width: '100%', marginTop: 8, padding: 9, border: 0, borderRadius: 8, background: 'var(--accent)', color: '#fff', fontWeight: 700 }} >{loading ? 'Patiente…' : 'Confirmer'}</button>
+          <button type="button" onClick={submit} disabled={loading || disabled || !hasMessage || !dueAt} style={{ width: '100%', marginTop: 8, padding: 9, border: 0, borderRadius: 8, background: 'var(--accent)', color: '#fff', fontWeight: 700, opacity: loading || disabled || !hasMessage || !dueAt ? 0.55 : 1 }} >{loading ? 'Patiente…' : 'Confirmer'}</button>
           {error && <p role="alert" style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</p>}
           <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
             <strong style={{ fontSize: 12 }}>En attente</strong>
