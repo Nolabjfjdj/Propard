@@ -1,4 +1,5 @@
 import React, {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -217,7 +218,7 @@ export default function GroupProfile({
    * Charge les informations complètes
    * du groupe.
    */
-  const loadGroup = async () => {
+  const loadGroup = useCallback(async () => {
     if (!initialGroup?._id) {
       return;
     }
@@ -259,14 +260,11 @@ export default function GroupProfile({
     } finally {
       setLoading(false);
     }
-  };
+  }, [initialGroup?._id, token]);
 
   useEffect(() => {
     loadGroup();
-  }, [
-    initialGroup?._id,
-    token
-  ]);
+  }, [loadGroup]);
 
   /*
    * Récupère les relations d'amis afin

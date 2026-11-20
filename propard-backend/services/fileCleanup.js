@@ -81,7 +81,7 @@ async function deleteMessageAttachments(fileIds, senderId) {
           cleanupPending: true
         }
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!marked) continue;
@@ -118,7 +118,7 @@ async function deleteFilesMatching(filter) {
           cleanupPending: true
         }
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!marked) continue;
@@ -208,7 +208,7 @@ async function retryPendingFileCleanup(limit = 100) {
           cleanupPending: true
         }
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (marked && await cleanupFileObjects(marked)) {

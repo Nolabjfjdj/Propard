@@ -102,7 +102,6 @@ export default function StaffPage() {
   const [reportsPage, setReportsPage] = useState(1);
   const [reportsPageSize, setReportsPageSize] = useState(5);
   const [selectedReport, setSelectedReport] = useState(null);
-  const [reportStatus, setReportStatus] = useState('new');
   const [targetUserId, setTargetUserId] = useState('');
   const [banReason, setBanReason] = useState('');
   const [banDuration, setBanDuration] = useState('24h');
@@ -216,7 +215,9 @@ export default function StaffPage() {
       try {
         const response = await request('get', '/api/staff/notifications/preferences');
         setStaffEventPreferences(response.data.preferences || { reports: true, bans: true, staffActions: true });
-      } catch {}
+      } catch (refreshError) {
+        console.warn('Impossible de recharger les préférences du personnel:', refreshError.message);
+      }
     } finally {
       setStaffEventPreferencesSaving(false);
     }
@@ -494,7 +495,6 @@ export default function StaffPage() {
       const found = response.data.user;
       setLookupResult(found);
       setTargetUserId(found._id);
-      setResetUserId(found._id);
       setRoleUserId(found._id);
       setNotice(`Compte trouvé : ${found.username}`);
     } catch (err) {
@@ -520,9 +520,7 @@ export default function StaffPage() {
       setLookupResult(null);
       setLookupUsername('');
       setTargetUserId('');
-      setResetUserId('');
       setRoleUserId('');
-      setResetToken('');
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible d’anonymiser définitivement ce compte.');
     }
@@ -548,9 +546,7 @@ export default function StaffPage() {
       setLookupResult(null);
       setLookupUsername('');
       setTargetUserId('');
-      setResetUserId('');
       setRoleUserId('');
-      setResetToken('');
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de supprimer complètement ce compte.');
     }
@@ -573,7 +569,6 @@ export default function StaffPage() {
     try {
       const response = await request('get', `/api/staff/reports/${reportId}`);
       setSelectedReport(response.data.report);
-      setReportStatus(response.data.report.status || 'new');
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible d’ouvrir ce signalement.');
     }

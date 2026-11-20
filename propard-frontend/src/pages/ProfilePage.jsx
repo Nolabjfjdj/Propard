@@ -1,17 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { enablePushNotifications, disablePushNotifications, isPushEnabled } from '../utils/pushNotifications';
 
 export default function ProfilePage({
   userId,
-  isMobile,
-  onBack,
   onOpenChat,
   onRelationshipChanged
 }) {
   const {
-    user: currentUser,
     token,
     updateUser
   } = useAuth();
@@ -22,6 +19,8 @@ export default function ProfilePage({
 
   const [isEditing, setIsEditing] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState('');
+  const [editStatusMessage, setEditStatusMessage] = useState('');
+  const [editProfileBadge, setEditProfileBadge] = useState('');
   const [editUsername, setEditUsername] = useState('');
   const [editAvatarPreview, setEditAvatarPreview] = useState(null);
   const [editAvatarData, setEditAvatarData] = useState(undefined);
@@ -46,7 +45,7 @@ export default function ProfilePage({
 
   const fileInputRef = useRef(null);
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     setLoading(true);
     setError('');
 
@@ -72,7 +71,7 @@ export default function ProfilePage({
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, token]);
 
   useEffect(() => {
     if (!userId || !token) return;
@@ -83,7 +82,7 @@ export default function ProfilePage({
     setMenuOpen(false);
     setConfirmAction(null);
     setEditingNickname(false);
-  }, [userId, token]);
+  }, [userId, token, fetchProfile]);
 
   useEffect(() => {
     let cancelled = false;
@@ -208,6 +207,8 @@ export default function ProfilePage({
       profile.displayName || ''
     );
     setEditUsername(profile.username || '');
+    setEditStatusMessage(profile.statusMessage || '');
+    setEditProfileBadge(profile.profileBadge || '');
 
     setEditAvatarPreview(
       profile.avatar || null
@@ -336,6 +337,8 @@ export default function ProfilePage({
     try {
       const body = {
         displayName: editDisplayName,
+        statusMessage: editStatusMessage,
+        profileBadge: editProfileBadge,
         username: editUsername
       };
 
@@ -363,6 +366,8 @@ export default function ProfilePage({
       updateUser({
         username: res.data.user.username,
         displayName: res.data.user.displayName,
+        statusMessage: res.data.user.statusMessage,
+        profileBadge: res.data.user.profileBadge,
         avatar: res.data.user.avatar
       });
 
@@ -757,12 +762,25 @@ export default function ProfilePage({
             value={editDisplayName}
             maxLength={32}
             placeholder={profile.username}
-            onChange={e =>
-              setEditDisplayName(
-                e.target.value
-              )
-            }
+            onChange={e => setEditDisplayName(e.target.value)}
           />
+          <input
+            style={styles.editNameInput}
+            value={editStatusMessage}
+            maxLength={80}
+            placeholder="Ton statut (80 caractères maximum)"
+            aria-label="Statut du profil"
+            onChange={e => setEditStatusMessage(e.target.value)}
+          />
+          <input
+            style={styles.editNameInput}
+            value={editProfileBadge}
+            maxLength={24}
+            placeholder="Badge personnel (24 caractères maximum)"
+            aria-label="Badge personnel du profil"
+            onChange={e => setEditProfileBadge(e.target.value)}
+          />
+          <p style={{ ...styles.infoText, fontSize: 11, textAlign: 'left' }}>Ce badge est un texte décoratif choisi par toi. Il ne donne aucun rôle ni privilège sur Propard.</p>
           </>
         ) : (
           <>
@@ -776,6 +794,16 @@ export default function ProfilePage({
             <p style={styles.username}>
               @{profile.username}
             </p>
+            {profile.profileBadge && (
+              <span style={{ display: 'inline-flex', alignSelf: 'center', marginTop: 8, padding: '4px 10px', borderRadius: 999, border: '1px solid var(--accent)', color: 'var(--accent)', fontSize: 12, fontWeight: 600, maxWidth: '100%', overflowWrap: 'anywhere' }}>
+                {profile.profileBadge}
+              </span>
+            )}
+            {profile.statusMessage && (
+              <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 8, textAlign: 'center', overflowWrap: 'anywhere' }}>
+                {profile.statusMessage}
+              </p>
+            )}
           </>
         )}
 

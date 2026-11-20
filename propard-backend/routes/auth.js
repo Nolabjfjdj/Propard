@@ -6,14 +6,18 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const SupportRequest = require('../models/SupportRequest');
-const { sendStaffHelpNotification } = require('../services/push');
+const { sendStaffHelpNotification, sendPushNotification } = require('../services/push');
 const Message = require('../models/Message');
 const Group = require('../models/Group');
 const GroupMessage = require('../models/GroupMessage');
+const Reminder = require('../models/Reminder');
+const ScheduledMessage = require('../models/ScheduledMessage');
+const ConversationNote = require('../models/ConversationNote');
+const AIConversation = require('../models/AIConversation');
 const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { getClientIp } = require('../utils/clientIp');
-const { MAX_AVATAR_LENGTH } = require('../utils/inputValidation');
+const { isValidAvatar } = require('../utils/inputValidation');
 const { effectiveStaffRole } = require('../utils/staffAllowlist');
 const { deleteFilesForUser, deleteFilesForGroup } = require('../services/fileCleanup');
 
@@ -24,9 +28,16 @@ const accountHelpLimiter = createRateLimiter({
   message: 'Trop de demandes envoyées. Réessaie plus tard.'
 });
 
+const accountHelpMessageLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  keyFn: req => `account-help-message:${getClientIp(req) || 'unknown'}`,
+  message: 'Trop de messages envoyés. Réessaie plus tard.'
+});
+
 const accountHelpStatusLimiter = createRateLimiter({
   windowMs: 30 * 60 * 1000,
-  max: 20,
+  max: 180,
   keyFn: req => `account-help-status:${getClientIp(req) || 'unknown'}`,
   message: 'Trop de consultations. Réessaie plus tard.'
 });
@@ -87,6 +98,39 @@ const accountRestoreLimiter = createRateLimiter({
   message: 'Trop de tentatives de restauration. Réessaie plus tard.',
   captcha: true,
   resetOnCaptcha: true
+});
+
+const profileReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyFn: req => `profile-read:${req.user.id}`,
+  message: 'Trop de consultations du profil. Réessaie plus tard.'
+});
+const publicProfileReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyFn: req => `public-profile-read:${req.user.id}`,
+  message: 'Trop de consultations de profils. Réessaie plus tard.'
+});
+const sessionReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyFn: req => `session-read:${req.user.id}`,
+  message: 'Trop de consultations des sessions. Réessaie dans une minute.'
+});
+
+const sessionMutationLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  keyFn: req => `session-mutation:${req.user.id}`,
+  message: 'Trop de modifications des sessions. Réessaie plus tard.'
+});
+
+const logoutLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 10,
+  keyFn: req => `logout:${req.user.id}`,
+  message: 'Trop de demandes de déconnexion. Réessaie dans une minute.'
 });
 
 const PSEUDOS_INTERDITS = ['owner','admin','administrator','superadmin','sysadmin','moderator','mod','comod','staff','team','crew','support','helpdesk','official','propard','propardbot','propardteam','propardstaff','propardadmin','propardsupport','propardofficial','everyone','nigger','nigga','faggot','retard','whore','bitch','salope','pute','connard','connasse','batard','batarde','enculé','encule','fdp','ntm','tg','pd','discord','telegram','whatsapp','snapchat','instagram','kkk','facebook','twitter','tiktok','youtube','google','microsoft','apple','amazon','netflix','spotify','twitch','reddit','github','anthropic','openai','chatgpt','claude','malware','virus','phishing','scam','billing','privacy','terms','rules','guidelines','policy'];
@@ -172,6 +216,47 @@ function signToken(user) {
   );
 }
 
+async function recordIssuedSession(userId, token, req, eventType = 'password_login') {
+  const decoded = jwt.decode(token);
+  if (!decoded?.jti || !decoded?.exp) return;
+  const user = await User.findById(userId).select('+activeSessions +revokedSessions +securityEvents');
+  if (!user) throw new Error('Utilisateur introuvable lors de la création de session.');
+  const now = new Date();
+  const hadExistingSession = (user.activeSessions || []).some(session => session.expiresAt > now);
+  user.activeSessions = (user.activeSessions || []).filter(session => session.expiresAt > now);
+  user.revokedSessions = (user.revokedSessions || []).filter(session => session.expiresAt > now);
+  user.activeSessions.push({
+    jti: decoded.jti,
+    createdAt: now,
+    expiresAt: new Date(decoded.exp * 1000),
+    userAgent: String(req.get('user-agent') || '').slice(0, 300) || null
+  });
+  while (user.activeSessions.length > 10) {
+    const oldest = user.activeSessions.shift();
+    if (oldest.expiresAt > now) {
+      user.revokedSessions.push({ jti: oldest.jti, expiresAt: oldest.expiresAt });
+      const disconnect = req.app.get('disconnectUserSessionSockets');
+      if (typeof disconnect === 'function') disconnect(userId, oldest.jti);
+    }
+  }
+  user.revokedSessions = user.revokedSessions.slice(-100);
+  user.securityEvents = [...(user.securityEvents || []), {
+    eventType,
+    createdAt: now,
+    userAgent: String(req.get('user-agent') || '').slice(0, 300) || null
+  }].slice(-50);
+  await user.save();
+  if (hadExistingSession && eventType !== 'registration') {
+    void sendPushNotification(userId, {
+      title: 'Alerte de sécurité Propard',
+      body: 'Une nouvelle connexion à ton compte a été détectée.',
+      url: '/settings',
+      tag: 'propard-security-login',
+      data: { type: 'security-login' }
+    }).catch(error => console.error('Security login alert failed:', error.message));
+  }
+}
+
 const escapeRegExp = value =>
   value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -192,7 +277,7 @@ const registerRateLimiter = createRateLimiter({
 });
 
 function generateIpAlias() {
-  const part = () => Math.floor(Math.random() * 254) + 1;
+  const part = () => crypto.randomInt(1, 255);
   return `${part()}.${part()}.${part()}.${part()}`;
 }
 
@@ -259,7 +344,7 @@ router.post('/account-help', accountHelpLimiter, async (req, res) => {
   }
 });
 
-router.post('/account-help/message', accountHelpStatusLimiter, async (req, res) => {
+router.post('/account-help/message', accountHelpMessageLimiter, async (req, res) => {
   try {
     const reference = typeof req.body?.reference === 'string' ? req.body.reference.trim().toUpperCase() : '';
     const accessToken = typeof req.body?.accessToken === 'string' ? req.body.accessToken.trim() : '';
@@ -411,6 +496,7 @@ router.post('/register', registerRateLimiter, async (req, res) => {
     await user.save();
 
     const token = signToken(user);
+    await recordIssuedSession(user._id, token, req, 'registration');
 
     res.status(201).json({
       message: 'Compte créé avec succès',
@@ -419,6 +505,8 @@ router.post('/register', registerRateLimiter, async (req, res) => {
         id: user._id,
         username: user.username,
         displayName: user.displayName,
+        statusMessage: user.statusMessage,
+        profileBadge: user.profileBadge,
         avatar: user.avatar,
         ipAlias: user.ipAlias,
         publicKey: user.publicKey,
@@ -482,6 +570,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     }
 
     const token = signToken(user);
+    await recordIssuedSession(user._id, token, req, 'password_login');
 
     const deletionExpiresAt = user.pendingDeletionAt
       ? new Date(user.pendingDeletionAt.getTime() + THIRTY_DAYS_MS)
@@ -494,6 +583,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
         id: user._id,
         username: user.username,
         displayName: user.displayName,
+        statusMessage: user.statusMessage,
         avatar: user.avatar,
         ipAlias: user.ipAlias,
         publicKey: user.publicKey,
@@ -508,14 +598,81 @@ router.post('/login', loginRateLimiter, async (req, res) => {
 });
 
 
-router.post('/logout', authMiddleware, async (req, res) => {
+router.get('/sessions', authMiddleware, sessionReadLimiter, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('+activeSessions');
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+    const now = new Date();
+    user.activeSessions = (user.activeSessions || []).filter(session => session.expiresAt > now);
+    await user.save();
+    res.json({
+      sessions: user.activeSessions.map(session => ({
+        jti: session.jti,
+        createdAt: session.createdAt,
+        expiresAt: session.expiresAt,
+        userAgent: session.userAgent,
+        current: session.jti === req.user.jti
+      }))
+    });
+  } catch (error) {
+    console.error('Session listing failed:', error);
+    res.status(500).json({ error: 'Impossible de charger les sessions.' });
+  }
+});
+
+router.get('/security-events', authMiddleware, sessionReadLimiter, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('+securityEvents');
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+    res.json({
+      events: (user.securityEvents || []).slice(-50).reverse().map(event => ({
+        eventType: event.eventType,
+        createdAt: event.createdAt,
+        userAgent: event.userAgent
+      }))
+    });
+  } catch (error) {
+    console.error('Security event history failed:', error);
+    res.status(500).json({ error: 'Impossible de charger l’historique de sécurité.' });
+  }
+});
+
+router.delete('/sessions/:jti', authMiddleware, sessionMutationLimiter, async (req, res) => {
+  try {
+    const jti = req.params.jti;
+    if (typeof jti !== 'string' || !/^[a-f0-9-]{36}$/i.test(jti)) {
+      return res.status(400).json({ error: 'Identifiant de session invalide.' });
+    }
+    const user = await User.findById(req.user.id).select('+activeSessions +revokedSessions');
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+    const session = (user.activeSessions || []).find(item => item.jti === jti);
+    if (!session) return res.status(404).json({ error: 'Session introuvable ou déjà révoquée.' });
+    user.activeSessions = user.activeSessions.filter(item => item.jti !== jti);
+    if (session.expiresAt > new Date()) {
+      user.revokedSessions = [...(user.revokedSessions || []), { jti, expiresAt: session.expiresAt }]
+        .filter(item => item.expiresAt > new Date())
+        .slice(-100);
+    }
+    await user.save();
+    const disconnectUserSessionSockets = req.app.get('disconnectUserSessionSockets');
+    if (typeof disconnectUserSessionSockets === 'function') {
+      disconnectUserSessionSockets(req.user.id, jti);
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Session revocation failed:', error);
+    res.status(500).json({ error: 'Impossible de révoquer cette session.' });
+  }
+});
+
+router.post('/logout', authMiddleware, logoutLimiter, async (req, res) => {
   try {
     if (typeof req.user.jti === 'string' && req.user.jti.length >= 16) {
       const expiresAt = new Date((req.user.exp || Math.floor(Date.now() / 1000) + 1) * 1000);
 
       await User.updateOne(
         { _id: req.user.id },
-        { $pull: { revokedSessions: { expiresAt: { $lte: new Date() } } } }
+        { $pull: { revokedSessions: { expiresAt: { $lte: new Date() } }, activeSessions: { expiresAt: { $lte: new Date() } } } }
       );
 
       await User.updateOne(
@@ -523,11 +680,16 @@ router.post('/logout', authMiddleware, async (req, res) => {
         {
           $push: {
             revokedSessions: {
-              jti: req.user.jti,
-              expiresAt
+              $each: [{ jti: req.user.jti, expiresAt }],
+              $slice: -100
             }
           }
         }
+      );
+
+      await User.updateOne(
+        { _id: req.user.id },
+        { $pull: { activeSessions: { jti: req.user.jti } } }
       );
 
       const disconnectUserSessionSockets = req.app.get('disconnectUserSessionSockets');
@@ -537,8 +699,8 @@ router.post('/logout', authMiddleware, async (req, res) => {
     } else {
       const user = await User.findByIdAndUpdate(
         req.user.id,
-        { $inc: { sessionVersion: 1 } },
-        { new: true, select: '_id sessionVersion' }
+        { $inc: { sessionVersion: 1 }, $set: { activeSessions: [] } },
+        { returnDocument: 'after', select: '_id sessionVersion' }
       );
 
       if (!user) {
@@ -562,8 +724,8 @@ router.post('/logout-all', authMiddleware, logoutAllLimiter, async (req, res) =>
   try {
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { $inc: { sessionVersion: 1 } },
-      { new: true, select: '_id sessionVersion' }
+      { $inc: { sessionVersion: 1 }, $set: { activeSessions: [] } },
+      { returnDocument: 'after', select: '_id sessionVersion' }
     );
 
     if (!user) {
@@ -582,10 +744,10 @@ router.post('/logout-all', authMiddleware, logoutAllLimiter, async (req, res) =>
   }
 });
 
-router.get('/me', authMiddleware, async (req, res) => {
+router.get('/me', authMiddleware, profileReadLimiter, async (req, res) => {
   try {
     const user = await User.findById(req.user.id)
-      .select('_id username displayName avatar ipAlias publicKey staffRole isOnline friends friendRequests pendingDeletionAt')
+      .select('_id username displayName statusMessage profileBadge avatar ipAlias publicKey staffRole isOnline friends friendRequests pendingDeletionAt readReceiptsEnabled')
       .populate(
         'friends.userId',
         'username displayName avatar ipAlias isOnline publicKey'
@@ -606,11 +768,14 @@ router.get('/me', authMiddleware, async (req, res) => {
       _id: user._id,
       username: user.username,
       displayName: user.displayName,
+      statusMessage: user.statusMessage,
+      profileBadge: user.profileBadge,
       avatar: user.avatar,
       ipAlias: user.ipAlias,
       publicKey: user.publicKey,
       staffRole: effectiveStaffRole(user._id, user.staffRole),
       isOnline: user.isOnline,
+      readReceiptsEnabled: user.readReceiptsEnabled !== false,
       friends: user.friends,
       friendRequests: user.friendRequests,
       pendingDeletion,
@@ -624,7 +789,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 
 router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
   try {
-    const { displayName, avatar, username } = req.body;
+    const { displayName, statusMessage, profileBadge, avatar, username } = req.body;
 
     const user = await User.findById(req.user.id);
 
@@ -632,6 +797,13 @@ router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
       return res.status(404).json({
         error: 'Utilisateur introuvable'
       });
+    }
+
+    if (req.body?.readReceiptsEnabled !== undefined) {
+      if (typeof req.body.readReceiptsEnabled !== 'boolean') {
+        return res.status(400).json({ error: 'Préférence de confirmation de lecture invalide.' });
+      }
+      user.readReceiptsEnabled = req.body.readReceiptsEnabled;
     }
 
     if (username !== undefined) {
@@ -692,20 +864,31 @@ router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
       user.displayName = trimmed || null;
     }
 
-    if (avatar !== undefined) {
-      if (avatar !== null && typeof avatar !== 'string') {
-        return res.status(400).json({
-          error: 'Avatar invalide'
-        });
+    if (statusMessage !== undefined) {
+      if (typeof statusMessage !== 'string' && statusMessage !== null) {
+        return res.status(400).json({ error: 'Statut invalide.' });
       }
+      const trimmedStatus = typeof statusMessage === 'string' ? statusMessage.trim() : '';
+      if (trimmedStatus.length > 80) {
+        return res.status(400).json({ error: 'Le statut ne peut pas dépasser 80 caractères.' });
+      }
+      user.statusMessage = trimmedStatus || null;
+    }
 
-      if (
-        typeof avatar === 'string' &&
-        avatar.length > MAX_AVATAR_LENGTH
-      ) {
-        return res.status(400).json({
-          error: 'Avatar trop volumineux'
-        });
+    if (profileBadge !== undefined) {
+      if (typeof profileBadge !== 'string' && profileBadge !== null) {
+        return res.status(400).json({ error: 'Badge personnel invalide.' });
+      }
+      const trimmedBadge = typeof profileBadge === 'string' ? profileBadge.trim() : '';
+      if (trimmedBadge.length > 24 || /[\u0000-\u001F\u007F]/.test(trimmedBadge)) {
+        return res.status(400).json({ error: 'Le badge doit contenir au maximum 24 caractères.' });
+      }
+      user.profileBadge = trimmedBadge || null;
+    }
+
+    if (avatar !== undefined) {
+      if (!isValidAvatar(avatar)) {
+        return res.status(400).json({ error: 'Avatar invalide ou format non pris en charge.' });
       }
 
       user.avatar = avatar || null;
@@ -719,6 +902,8 @@ router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
         id: user._id,
         username: user.username,
         displayName: user.displayName,
+        statusMessage: user.statusMessage,
+        profileBadge: user.profileBadge,
         avatar: user.avatar,
         ipAlias: user.ipAlias,
         publicKey: user.publicKey
@@ -733,7 +918,7 @@ router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
   }
 });
 
-router.get('/user/:id', authMiddleware, async (req, res) => {
+router.get('/user/:id', authMiddleware, publicProfileReadLimiter, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(400).json({
@@ -750,7 +935,7 @@ router.get('/user/:id', authMiddleware, async (req, res) => {
 
       User.findById(profileId)
         .select(
-          'username displayName avatar ipAlias publicKey isOnline friends friendRequests'
+          'username displayName statusMessage profileBadge avatar ipAlias publicKey isOnline friends friendRequests'
         )
     ]);
 
@@ -827,6 +1012,8 @@ router.get('/user/:id', authMiddleware, async (req, res) => {
       _id: profile._id,
       username: profile.username,
       displayName: profile.displayName,
+      statusMessage: profile.statusMessage,
+      profileBadge: profile.profileBadge,
       avatar: profile.avatar,
       ipAlias: canViewPrivateDetails ? profile.ipAlias : null,
       publicKey: canViewPrivateDetails ? profile.publicKey : null,
@@ -852,7 +1039,10 @@ router.get('/user/:id', authMiddleware, async (req, res) => {
 
 router.patch('/publickey', authMiddleware, keyChangeLimiter, async (req, res) => {
   try {
-    const { publicKey } = req.body;
+    const { publicKey, password } = req.body;
+    if (typeof password !== 'string' || !password || password.length > 128) {
+      return res.status(400).json({ error: 'Mot de passe requis.' });
+    }
 
     if (!publicKey || typeof publicKey !== 'string') {
       return res.status(400).json({
@@ -898,11 +1088,21 @@ router.patch('/publickey', authMiddleware, keyChangeLimiter, async (req, res) =>
       key_ops: []
     };
 
-    await User.findByIdAndUpdate(
-      req.user.id,
-      { publicKey: JSON.stringify(sanitizedPublicKey) }
-    );
-
+    const user = await User.findById(req.user.id).select('+password friends publicKey');
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ error: 'Mot de passe incorrect.' });
+    }
+    const newPublicKey = JSON.stringify(sanitizedPublicKey);
+    const changed = user.publicKey !== newPublicKey;
+    user.publicKey = newPublicKey;
+    await user.save();
+    if (changed) {
+      const io = req.app.get('io');
+      const emitToUser = req.app.get('emitToUser');
+      for (const friend of user.friends || []) {
+        if (friend.userId) emitToUser?.(io, friend.userId.toString(), 'friendKeyChanged', { userId: req.user.id.toString() });
+      }
+    }
     res.json({ success: true });
   } catch (e) {
     console.error(e);
@@ -1087,6 +1287,16 @@ router.delete('/anonymize', authMiddleware, accountDeletionLimiter, async (req, 
       await user.save();
     }
 
+    await Promise.all([
+      Reminder.deleteMany({ user: userId }),
+      ScheduledMessage.deleteMany({
+        $or: [
+          { sender: userId },
+          { recipient: userId }
+        ]
+      })
+    ]);
+
     await User.updateMany(
       { 'friendRequests.from': userId },
       {
@@ -1212,6 +1422,25 @@ router.delete('/delete', authMiddleware, accountDeletionLimiter, async (req, res
       });
     }
 
+    const privateConversationKeyPattern = new RegExp('(^|:)' + userId.toString() + '(:|$)');
+    await Promise.all([
+      Reminder.deleteMany({ user: userId }),
+      AIConversation.deleteMany({ userId }),
+      ScheduledMessage.deleteMany({
+        $or: [
+          { sender: userId },
+          { recipient: userId },
+          ...(ownedGroupIds.length ? [{ group: { $in: ownedGroupIds } }] : [])
+        ]
+      }),
+      ConversationNote.deleteMany({
+        $or: [
+          { scope: 'private', conversationKey: privateConversationKeyPattern },
+          ...(ownedGroupIds.length ? [{ scope: 'group', conversationKey: { $in: ownedGroupIds.map(id => id.toString()) } }] : [])
+        ]
+      })
+    ]);
+
     await deleteFilesForUser(userId);
     await Promise.all(ownedGroupIds.map(groupId => deleteFilesForGroup(groupId)));
 
@@ -1288,17 +1517,50 @@ async function finalizeExpiredDeletions() {
     });
 
     for (const user of expired) {
-      user.password = await bcrypt.hash(
-        Math.random().toString(36) + Date.now(),
-        10
-      );
+      user.password = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
 
       user.ipAlias = await generateUniqueIpAlias();
       user.realUsername = null;
       user.pendingDeletionAt = null;
       user.e2eeKeyBackup = null;
+      user.e2eeVault = null;
+      user.profileBadge = null;
+      user.statusMessage = null;
+      user.conversationFolders = null;
+      user.activeSessions = [];
+      user.revokedSessions = [];
+      user.securityEvents = [];
+      user.passkeys = [];
+      user.passkeyRecoveryCodes = [];
+      user.apnsTokens = [];
+      user.pushSubscriptions = [];
+      user.sessionVersion = (user.sessionVersion || 0) + 1;
+      user.passkeyRegistrationChallenge = null;
+      user.passkeyRegistrationChallengeExpiresAt = null;
+      user.passkeyRegistrationRpId = null;
+      user.passkeyRegistrationOrigin = null;
+      user.passkeyLoginChallenge = null;
+      user.passkeyLoginChallengeExpiresAt = null;
+      user.passkeyLoginRpId = null;
+      user.passkeyLoginOrigin = null;
 
       await user.save();
+
+      const privateConversationKeyPattern = new RegExp('(^|:)' + user._id.toString() + '(:|$)');
+      await Promise.all([
+        Reminder.deleteMany({ user: user._id }),
+        AIConversation.deleteMany({ userId: user._id }),
+        ScheduledMessage.deleteMany({
+          $or: [
+            { sender: user._id },
+            { recipient: user._id }
+          ]
+        }),
+        ConversationNote.deleteMany({
+          scope: 'private',
+          conversationKey: privateConversationKeyPattern
+        })
+      ]);
     }
 
     if (expired.length) {

@@ -228,50 +228,58 @@ export async function uploadConversationFile({
 
     let nextIndex = 0;
     let completedBytes = 0;
+    let uploadFailure = null;
     const worker = async () => {
-      while (true) {
+      while (!uploadFailure) {
         const index = nextIndex;
         nextIndex += 1;
         if (index >= chunkCount) return;
 
-        const start = index * FILE_CHUNK_SIZE;
-        const end = Math.min(file.size, start + FILE_CHUNK_SIZE);
-        const encrypted = await encryptFileChunk(
-          fileKey,
-          fileId,
-          index,
-          file.slice(start, end)
-        );
+        try {
+          const start = index * FILE_CHUNK_SIZE;
+          const end = Math.min(file.size, start + FILE_CHUNK_SIZE);
+          const encrypted = await encryptFileChunk(
+            fileKey,
+            fileId,
+            index,
+            file.slice(start, end)
+          );
 
-        const signed = await api.post(
-          `/api/files/uploads/${fileId}/chunks/${index}/url`,
-          {
-            iv: encrypted.iv,
-            sha256: encrypted.sha256,
-            encryptedSize: encrypted.encryptedSize
-          },
-          authConfig(token)
-        );
+          const signed = await api.post(
+            `/api/files/uploads/${fileId}/chunks/${index}/url`,
+            {
+              iv: encrypted.iv,
+              sha256: encrypted.sha256,
+              encryptedSize: encrypted.encryptedSize
+            },
+            authConfig(token)
+          );
 
-        const response = await fetch(signed.data.uploadUrl, {
-          method: 'PUT',
-          headers: signed.data.headers,
-          body: encrypted.data
-        });
+          const response = await fetch(signed.data.uploadUrl, {
+            method: 'PUT',
+            headers: signed.data.headers,
+            body: encrypted.data
+          });
 
-        if (!response.ok) {
-          throw new Error(`Échec du transfert du morceau ${index + 1}.`);
+          if (!response.ok) {
+            throw new Error(`Échec du transfert du morceau ${index + 1}.`);
+          }
+
+          completedBytes += end - start;
+          onProgress?.(Math.min(99, Math.round(completedBytes / file.size * 100)));
+        } catch (error) {
+          uploadFailure ||= error;
+          throw error;
         }
-
-        completedBytes += end - start;
-        onProgress?.(Math.min(99, Math.round(completedBytes / file.size * 100)));
       }
     };
 
-    await Promise.all([
+    const workerResults = await Promise.allSettled([
       worker(),
       worker()
     ]);
+    const failedWorker = workerResults.find(result => result.status === 'rejected');
+    if (failedWorker) throw failedWorker.reason;
 
     await api.post(
       `/api/files/uploads/${fileId}/finalize`,

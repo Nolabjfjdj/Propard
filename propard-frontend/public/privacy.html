@@ -47,7 +47,7 @@ try {
         <a href="/help" class="legal-back">← Retour</a>
 
         <h1 class="legal-title">Politique de Confidentialité</h1>
-        <p class="legal-date">En vigueur depuis le 15 novembre 2026</p>
+        <p class="legal-date">En vigueur depuis le 18 novembre 2026</p>
 
         <div class="legal-section">
           <h2 class="legal-section-title">1. Responsable du traitement</h2>
@@ -170,6 +170,27 @@ try {
             </li>
             <li>
               Les conversations Propard AI : titres, messages saisis, réponses générées et dates associées, ainsi que les informations de profil, d'amis ou de groupes utilisées pour répondre aux demandes lorsque les outils correspondants sont sollicités
+            </li>
+            <li>
+              Les informations de profil facultatives, notamment le message de statut et le badge personnel affichés sur le profil
+            </li>
+            <li>
+              Les dossiers de conversations synchronisés entre appareils : noms des dossiers et associations entre dossiers et identifiants de conversations
+            </li>
+            <li>
+              Les rappels personnels : titre, note facultative, date prévue, état et dates de traitement. Le titre peut être transmis au prestataire de notification Push pour afficher la notification ; la note n'est pas incluse dans son contenu
+            </li>
+            <li>
+              Les messages programmés : contenu chiffré côté client, destinataire ou groupe, date prévue, état de livraison et métadonnées techniques. Le serveur ne reçoit pas le texte déchiffré du message
+            </li>
+            <li>
+              Le coffre-fort personnel E2EE : paramètres cryptographiques et contenu chiffré des notes. La phrase secrète et le contenu en clair restent sur l'appareil et ne sont pas transmis au serveur
+            </li>
+            <li>
+              Les notes partagées de conversation : contenu chiffré côté client et métadonnées de mise à jour
+            </li>
+            <li>
+              Les messages vocaux : fichiers audio traités comme des pièces jointes et chiffrés côté client avant leur transfert, ainsi que leurs métadonnées techniques
             </li>
             <li>
               Les jetons de notification natifs Apple Push Notification service (APNs)
@@ -625,6 +646,18 @@ try {
               durée nécessaire à la sécurité et au fonctionnement du service,
               selon les politiques de conservation applicables aux prestataires
               concernés.
+            </li>
+            <li>
+              <strong>Rappels :</strong> jusqu'à leur suppression par l'utilisateur ou la suppression du compte. Un rappel peut être annulé avant son déclenchement ; aucun délai automatique de suppression des rappels terminés n'est défini dans le code actuel.
+            </li>
+            <li>
+              <strong>Messages programmés :</strong> le contenu chiffré est effacé de l'enregistrement de programmation après livraison, annulation ou échec définitif. Le message livré est conservé comme un message normal. Les métadonnées de programmation ne disposent pas actuellement d'une durée automatique de suppression.
+            </li>
+            <li>
+              <strong>Coffre-fort personnel :</strong> jusqu'à sa suppression par l'utilisateur ou à la suppression du compte. Le serveur conserve uniquement la structure chiffrée et ses paramètres cryptographiques.
+            </li>
+            <li>
+              <strong>Dossiers de conversations et informations de profil facultatives :</strong> jusqu'à leur modification ou suppression par l'utilisateur, ou à la suppression du compte.
             </li>
           </ul>
 

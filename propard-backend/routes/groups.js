@@ -7,11 +7,24 @@ const GroupMessage = require('../models/GroupMessage');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
-const { MAX_AVATAR_LENGTH, MAX_GROUP_NAME_LENGTH, isEncryptedMessagePayload } = require('../utils/inputValidation');
+const { MAX_GROUP_NAME_LENGTH, isValidAvatar, isEncryptedMessagePayload } = require('../utils/inputValidation');
 const { parseMessagePagination } = require('../utils/messagePagination');
 const { deleteMessageAttachments, deleteFilesForGroup } = require('../services/fileCleanup');
 
 router.use(authMiddleware);
+
+const groupListReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyFn: req => `group-list-read:${req.user.id}`,
+  message: 'Trop de consultations des groupes. Réessaie plus tard.'
+});
+const groupReadReceiptLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyFn: req => `group-read-receipt:${req.user.id}`,
+  message: 'Trop de mises à jour de lecture. Réessaie plus tard.'
+});
 
 
 /* =========================
@@ -203,6 +216,7 @@ const emitGroupEvent = (
 
 router.get(
   '/',
+  groupListReadLimiter,
   async (req, res) => {
     try {
       const groups =
@@ -244,7 +258,11 @@ router.get(
               },
               deleted: {
                 $ne: true
-              }
+              },
+              $or: [
+                { expiresAt: null },
+                { expiresAt: { $gt: new Date() } }
+              ]
             };
 
             if (me?.lastReadAt) {
@@ -318,11 +336,7 @@ router.post(
         });
       }
 
-      if (
-        avatar !== null &&
-        avatar !== undefined &&
-        (typeof avatar !== 'string' || avatar.length > MAX_AVATAR_LENGTH)
-      ) {
+      if (!isValidAvatar(avatar ?? null)) {
         return res.status(400).json({
           error:
             'Avatar invalide ou trop volumineux'
@@ -530,6 +544,7 @@ router.post(
 
 router.get(
   '/:groupId',
+  groupListReadLimiter,
   async (req, res) => {
     try {
       if (
@@ -609,6 +624,33 @@ router.get(
    MESSAGES D'UN GROUPE
 ========================= */
 
+router.get('/:groupId/attachments', createRateLimiter({ windowMs: 60 * 1000, max: 60, keyFn: req => 'group-gallery:' + req.user.id, message: 'Trop de chargements de galerie. Réessaie dans un instant.' }), async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.groupId)) {
+      return res.status(400).json({ error: 'Groupe invalide.' });
+    }
+    const group = await Group.findOne({
+      _id: req.params.groupId,
+      'members.userId': req.user.id
+    }).select('_id');
+    if (!group) return res.status(403).json({ error: 'Groupe inaccessible.' });
+    const messages = await GroupMessage.find({
+      group: group._id,
+      deleted: { $ne: true },
+      attachments: { $exists: true, $ne: [] },
+      $or: [
+        { expiresAt: null },
+        { expiresAt: { $gt: new Date() } }
+      ]
+    }).select('attachments');
+    const attachments = [...new Set(messages.flatMap(message => (message.attachments || []).map(id => id.toString())))];
+    res.json({ attachments });
+  } catch (error) {
+    console.error('Group conversation gallery failed:', error);
+    res.status(500).json({ error: 'Impossible de charger la galerie.' });
+  }
+});
+
 router.get(
   '/:groupId/messages',
   createRateLimiter({
@@ -659,8 +701,11 @@ router.get(
       }
 
       const filter = {
-        group:
-          group._id
+        group: group._id,
+        $or: [
+          { expiresAt: null },
+          { expiresAt: { $gt: new Date() } }
+        ]
       };
 
       if (pagination.before) {
@@ -1052,6 +1097,7 @@ router.delete(
 
 router.patch(
   '/:groupId/read',
+  groupReadReceiptLimiter,
   async (req, res) => {
     try {
       if (
@@ -1201,27 +1247,8 @@ router.patch(
         req.body.avatar !==
         undefined
       ) {
-        if (
-          req.body.avatar !== null &&
-          typeof req.body.avatar !==
-            'string'
-        ) {
-          return res.status(400).json({
-            error:
-              'Avatar invalide'
-          });
-        }
-
-        if (
-          typeof req.body.avatar ===
-            'string' &&
-          req.body.avatar.length >
-            MAX_AVATAR_LENGTH
-        ) {
-          return res.status(400).json({
-            error:
-              'Avatar trop volumineux'
-          });
+        if (!isValidAvatar(req.body.avatar)) {
+          return res.status(400).json({ error: 'Avatar invalide ou format non pris en charge.' });
         }
 
         group.avatar =
@@ -1926,6 +1953,49 @@ router.post(
 
 
 
+router.patch('/:groupId/messages/:messageId/pin', createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 60,
+  keyFn: req => `group-message-pin:${req.user.id}`,
+  message: 'Trop de modifications des messages épinglés. Réessaie plus tard.'
+}), async (req, res) => {
+  try {
+    const { groupId, messageId } = req.params;
+    const { pinned } = req.body || {};
+    if (!mongoose.isValidObjectId(groupId) || !mongoose.isValidObjectId(messageId) || typeof pinned !== 'boolean') {
+      return res.status(400).json({ error: 'Demande invalide.' });
+    }
+
+    const group = await Group.findById(groupId);
+    if (!group || !memberOf(group, req.user.id)) {
+      return res.status(403).json({ error: 'Accès refusé.' });
+    }
+
+    const message = await GroupMessage.findOne({ _id: messageId, group: groupId });
+    if (!message || message.deleted) {
+      return res.status(404).json({ error: 'Message introuvable.' });
+    }
+
+    message.pinned = pinned;
+    message.pinnedAt = pinned ? new Date() : null;
+    message.pinnedBy = pinned ? req.user.id : null;
+    await message.save();
+
+    const payload = {
+      groupId,
+      messageId,
+      pinned,
+      pinnedAt: message.pinnedAt,
+      pinnedBy: message.pinnedBy?.toString() || null
+    };
+    emitGroupEvent(req, group, 'groupMessagePinUpdated', payload);
+    res.json({ success: true, ...payload });
+  } catch (error) {
+    console.error('Group message pin error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 router.post('/:groupId/messages/:messageId/reactions', createRateLimiter({
   windowMs: 10 * 60 * 1000,
   max: 120,
@@ -1965,9 +2035,29 @@ router.post('/:groupId/messages/:messageId/reactions', createRateLimiter({
     const existingIndex = message.reactions.findIndex(reaction =>
       reaction.userId.toString() === userId && reaction.emoji === emoji
     );
-    const isAddingReaction = existingIndex < 0;
+    let isAddingReaction = existingIndex < 0;
 
-    if (existingIndex >= 0) {
+    if (message.messageType === 'poll') {
+      const pollEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣'];
+      if (!pollEmojis.includes(emoji)) {
+        return res.status(400).json({ error: 'Choix de vote invalide.' });
+      }
+      const ownVoteIndex = message.reactions.findIndex(reaction =>
+        reaction.userId.toString() === userId
+      );
+      if (ownVoteIndex >= 0 && message.reactions[ownVoteIndex].emoji === emoji) {
+        message.reactions.splice(ownVoteIndex, 1);
+        isAddingReaction = false;
+      } else if (ownVoteIndex >= 0) {
+        message.reactions[ownVoteIndex].emoji = emoji;
+        isAddingReaction = true;
+      } else {
+        if (message.reactions.length >= 500) {
+          return res.status(409).json({ error: 'Trop de réactions sur ce message.' });
+        }
+        message.reactions.push({ userId, emoji });
+      }
+    } else if (existingIndex >= 0) {
       message.reactions.splice(existingIndex, 1);
     } else {
       if (message.reactions.length >= 500) {

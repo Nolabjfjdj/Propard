@@ -14,7 +14,7 @@ export default function AddFriend({ token, onClose }) {
     if (!captchaRequired) return;
     const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
     if (!siteKey) {
-      setError('La protection anti-bot n’est pas configurée.');
+      window.setTimeout(() => setError('La protection anti-bot n’est pas configurée.'), 0);
       return;
     }
     const renderCaptcha = () => {

@@ -1,4 +1,5 @@
 import React, {
+  useCallback,
   useEffect,
   useState,
   useRef,
@@ -11,9 +12,17 @@ import socket from '../socket';
 import GroupProfile from './GroupProfile';
 import MessageReactions from './MessageReactions';
 import FileAttachments from './FileAttachments';
+import ConversationGallery from './ConversationGallery';
+import ConversationSharedNote from './ConversationSharedNote';
+import E2EEVerification from './E2EEVerification';
+import PollMessage from './PollMessage';
+import PollComposer from './PollComposer';
+import ScheduledMessageControl from './ScheduledMessageControl';
+import VoiceMessageRecorder from './VoiceMessageRecorder';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
 import LinkText from './LinkText';
+import MessageTranslation from './MessageTranslation';
 import { uploadConversationFile, downloadConversationMedia } from '../utils/fileUpload';
 import GroupVoiceCall from './GroupVoiceCall';
 
@@ -35,7 +44,6 @@ export default function GroupChat({
   group: initialGroup,
   token,
   userId,
-  onBack,
   onDeleted,
   onGrabStart,
   grabbedMessageId
@@ -45,6 +53,7 @@ export default function GroupChat({
 
   const [messages, setMessages] =
     useState([]);
+
 
   const reactionNotificationAudioRef = useRef(null);
 
@@ -65,6 +74,8 @@ export default function GroupChat({
 
   const [input, setInput] =
     useState('');
+  const [messageExpiry, setMessageExpiry] = useState(0);
+  const [pollOpen, setPollOpen] = useState(false);
 
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [awaitingAttachmentAck, setAwaitingAttachmentAck] = useState(false);
@@ -138,9 +149,6 @@ export default function GroupChat({
 
   const bottomRef =
     useRef(null);
-
-  const lastMessageTime =
-    useRef(0);
 
   const longPressTimer =
     useRef(null);
@@ -339,7 +347,7 @@ export default function GroupChat({
   /*
    * Recharge le groupe et synchronise sa clé active.
    */
-  const loadGroup = async () => {
+  const loadGroup = useCallback(async () => {
     if (!initialGroup?._id || !token || !myId) {
       return null;
     }
@@ -441,7 +449,7 @@ export default function GroupChat({
     } finally {
       setLoading(false);
     }
-  };
+  }, [initialGroup?._id, token, myId]);
 
   /*
    * Charge le groupe et récupère sa clé.
@@ -910,6 +918,17 @@ export default function GroupChat({
       ));
     };
 
+    const handleGroupMessagePinUpdated = data => {
+      if (data.groupId?.toString() !== initialGroup?._id?.toString()) return;
+      setMessages(prev => prev.map(message =>
+        message._id?.toString() === data.messageId?.toString()
+          ? { ...message, pinned: data.pinned, pinnedAt: data.pinnedAt, pinnedBy: data.pinnedBy }
+          : message
+      ));
+    };
+
+    socket.on('groupMessagePinUpdated', handleGroupMessagePinUpdated);
+
     socket.on(
       'groupMessageReactionsUpdated',
       handleGroupReactionsUpdated
@@ -960,6 +979,8 @@ export default function GroupChat({
         handleGroupDeleted
       );
 
+      socket.off('groupMessagePinUpdated', handleGroupMessagePinUpdated);
+
       socket.off(
         'groupMessageReactionsUpdated',
         handleGroupReactionsUpdated
@@ -982,7 +1003,9 @@ export default function GroupChat({
     key,
     messages,
     myId,
-    token
+    token,
+    loadGroup,
+    onDeleted
   ]);
 
   /*
@@ -993,6 +1016,19 @@ export default function GroupChat({
       behavior: 'smooth'
     });
   }, [messages]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setMessages(previous => {
+        const now = Date.now();
+        const visible = previous.filter(message =>
+          !message.expiresAt || new Date(message.expiresAt).getTime() > now
+        );
+        return visible.length === previous.length ? previous : visible;
+      });
+    }, 5000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   /*
    * Fermer les menus / suggestions.
@@ -1018,7 +1054,7 @@ export default function GroupChat({
   /*
    * Retourne le nom affiché d'un membre.
    */
-  const getMemberNickname = member => {
+  const getMemberNickname = useCallback(member => {
     const memberId =
       member?._id?.toString();
 
@@ -1037,7 +1073,7 @@ export default function GroupChat({
       member?.username ||
       'Membre'
     );
-  };
+  }, [friends]);
 
   /*
    * Liste des membres utilisable
@@ -1063,7 +1099,7 @@ export default function GroupChat({
         );
     }, [
       group?.members,
-      friends,
+      getMemberNickname,
       myId
     ]);
 
@@ -1391,6 +1427,25 @@ export default function GroupChat({
       ));
     } catch (err) {
       console.error('Erreur réaction message de groupe:', err);
+    }
+  };
+
+  const toggleGroupMessagePin = async (message, pinned) => {
+    try {
+      const res = await api.patch(
+        `/api/groups/${group._id}/messages/${message._id}/pin`,
+        { pinned },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setMessages(prev => prev.map(item =>
+        item._id?.toString() === message._id?.toString()
+          ? { ...item, pinned: res.data.pinned, pinnedAt: res.data.pinnedAt, pinnedBy: res.data.pinnedBy }
+          : item
+      ));
+      setContextMenu(null);
+    } catch (error) {
+      console.error('Erreur épinglage du message de groupe:', error);
+      setLoadError(error.response?.data?.error || 'Impossible de modifier l’épinglage.');
     }
   };
 
@@ -1744,7 +1799,7 @@ export default function GroupChat({
    * Message de groupe modifié
    * en temps réel.
    */
-  const handleGroupMessageEdited =
+  const handleGroupMessageEdited = useCallback(
     async data => {
       if (
         data?.groupId?.toString() !==
@@ -1790,7 +1845,9 @@ export default function GroupChat({
             : message
         )
       );
-    };
+    },
+    [initialGroup?._id, key]
+  );
 
   /*
    * Envoi du message.
@@ -1826,7 +1883,8 @@ export default function GroupChat({
         socket.emit('sendGroupMessage', {
           groupId: group._id,
           content: encryptedContent,
-          keyVersion: group.keyVersion || 1
+          keyVersion: group.keyVersion || 1,
+          expiresIn: messageExpiry
         });
 
         setInput('');
@@ -1842,7 +1900,51 @@ export default function GroupChat({
     };
 
 
+  const scheduleMessage = async dueAt => {
+    const plaintext = input.trim();
+    if (!plaintext || !key || !group?._id) {
+      setLoadError(!key ? 'Chiffrement indisponible pour programmer ce message.' : 'Écris un message avant de le programmer.');
+      return false;
+    }
+    const encryptedContent = await encryptMessage(key, plaintext);
+    await api.post('/api/scheduled-messages', {
+      groupId: group._id,
+      content: encryptedContent,
+      keyVersion: group.keyVersion || 1,
+      dueAt
+    }, { headers: { Authorization: 'Bearer ' + token } });
+    setInput('');
+    setMentionQuery(null);
+    setMentionStart(-1);
+    setLoadError(null);
+    return true;
+  };
+
+  const createPoll = async (question, options, expiresIn = 0) => {
+    if (!key || !group?._id) {
+      setLoadError('Chiffrement indisponible pour créer ce sondage.');
+      return false;
+    }
+    const encryptedContent = await encryptMessage(key, JSON.stringify({
+      type: 'propard-poll',
+      question,
+      options
+    }));
+    socket.emit('sendGroupMessage', {
+      groupId: group._id,
+      content: encryptedContent,
+      keyVersion: group.keyVersion || 1,
+      messageType: 'poll',
+      expiresIn
+    });
+    return true;
+  };
+
   const handleFilesSelected = async files => {
+    if (messageExpiry > 0) {
+      setLoadError('Les messages éphémères sont actuellement limités au texte, sans pièce jointe.');
+      return;
+    }
     if (!key || !myId || !group?._id) {
       setLoadError('Chiffrement indisponible pour ce groupe.');
       return;
@@ -2336,55 +2438,70 @@ export default function GroupChat({
     <div style={styles.container}>
 
       <div
-        style={{
-          ...styles.header,
-          cursor: 'pointer'
-        }}
-        onClick={() =>
-          setShowProfile(true)
-        }
+        style={styles.header}
       >
 
         <div
-          style={
-            styles.headerAvatar
-          }
+          role="button"
+          tabIndex={0}
+          aria-label={`Ouvrir le profil du groupe ${group.name || ''}`}
+          onClick={() => setShowProfile(true)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setShowProfile(true);
+            }
+          }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            cursor: 'pointer',
+            flex: '1 1 auto',
+            minWidth: 0
+          }}
         >
-          {group.avatar ? (
-            <img
-              src={group.avatar}
-              alt=""
+          <div
+            style={
+              styles.headerAvatar
+            }
+          >
+            {group.avatar ? (
+              <img
+                src={group.avatar}
+                alt=""
+                style={
+                  styles.headerAvatarImage
+                }
+              />
+            ) : (
+              (
+                group.name ||
+                '?'
+              )[0].toUpperCase()
+            )}
+          </div>
+
+          <div>
+            <p
               style={
-                styles.headerAvatarImage
+                styles.headerName
               }
-            />
-          ) : (
-            (
-              group.name ||
-              '?'
-            )[0].toUpperCase()
-          )}
-        </div>
+            >
+              {group.name}
+            </p>
 
-        <div>
-          <p
-            style={
-              styles.headerName
-            }
-          >
-            {group.name}
-          </p>
-
-          <p
-            style={
-              styles.headerIp
-            }
-          >
-            {group.memberCount ||
-              group.members?.length ||
-              0}{' '}
-            membre(s)
-          </p>
+            <p
+              style={
+                styles.headerIp
+              }
+            >
+              {group.memberCount ||
+                group.members?.length ||
+                0}{' '}
+              membre(s)
+            </p>
+          </div>
         </div>
 
         <div
@@ -2392,22 +2509,30 @@ export default function GroupChat({
             marginLeft: 'auto',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            justifyContent: 'flex-end',
+            gap: '6px',
+            flex: '0 1 auto',
+            flexWrap: 'wrap',
+            minWidth: 0,
+            maxWidth: '100%'
           }}
         >
+          <ConversationGallery messages={messages} token={token} userId={myId} scope="group" conversationId={group._id} />
+          <ConversationSharedNote scope="group" conversationId={group._id} userId={myId} token={token} encryptionKey={key} keyVersion={group.keyVersion || 1} />
+          <E2EEVerification scope="group" token={token} encryptionKey={key} keyVersion={group.keyVersion || 1} />
           <button
             type="button"
             onClick={e => {
               e.stopPropagation();
               reportConversation();
             }}
-            style={{ ...styles.callBtn, width: 'auto', padding: '0 10px', borderRadius: '8px', color: 'var(--danger)', fontSize: '12px', whiteSpace: 'nowrap' }}
+            style={{ ...styles.callBtn, width: 'auto', padding: '0 7px', borderRadius: '8px', color: 'var(--danger)', fontSize: '11px', whiteSpace: 'nowrap' }}
             title="Signaler toute la conversation"
             aria-label="Signaler toute la conversation"
           >
             Signaler
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
             <button
               style={styles.callBtn}
               title="Appel vocal du groupe"
@@ -2756,7 +2881,17 @@ export default function GroupChat({
                           </div>
                         ) : (
                           <>
-                            {content && (
+                            {message.expiresAt && <p style={{ fontSize: '10px', color: isMe ? 'rgba(255,255,255,0.75)' : 'var(--text-secondary)', margin: '0 0 5px' }}>Message éphémère</p>}
+                            {message.pinned && <p style={{ fontSize: '11px', color: isMe ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)', margin: '0 0 5px' }}>Épinglé</p>}
+                            {message.messageType === 'poll' ? (
+                              <PollMessage
+                                content={content}
+                                reactions={message.reactions}
+                                userId={myId}
+                                onVote={emoji => toggleGroupMessageReaction(message._id, emoji)}
+                                disabled={message.decryptionError}
+                              />
+                            ) : content && (
                               <p
                                 style={{
                                   ...styles.text,
@@ -2765,6 +2900,9 @@ export default function GroupChat({
                               >
                                 <LinkText text={content} />
                               </p>
+                            )}
+                            {message.messageType !== 'poll' && content && !message.decryptionError && (
+                              <MessageTranslation text={content} />
                             )}
                             {!message.deleted && (
                               <FileAttachments
@@ -2820,10 +2958,12 @@ export default function GroupChat({
                           </p>
 
                         </div>
-                        <MessageReactions
-                          reactions={message.reactions}
-                          userId={myId}
-                        />
+                        {message.messageType !== 'poll' && (
+                          <MessageReactions
+                            reactions={message.reactions}
+                            userId={myId}
+                          />
+                        )}
 
                       </div>
 
@@ -2857,24 +2997,35 @@ export default function GroupChat({
             e.stopPropagation()
           }
         >
+          {contextMenu.message.messageType !== 'poll' && (
+            <>
+              <button
+                type="button"
+                style={styles.contextItem}
+                onClick={() => setContextMenu(current => ({ ...current, showReactions: !current.showReactions }))}
+              >
+                Réagir
+              </button>
+              {contextMenu.showReactions && (
+                <MessageReactions
+                  reactions={contextMenu.message.reactions}
+                  userId={myId}
+                  showPicker
+                  onReact={emoji => {
+                    toggleGroupMessageReaction(contextMenu.message._id, emoji);
+                    setContextMenu(null);
+                  }}
+                />
+              )}
+            </>
+          )}
           <button
             type="button"
             style={styles.contextItem}
-            onClick={() => setContextMenu(current => ({ ...current, showReactions: !current.showReactions }))}
+            onClick={() => toggleGroupMessagePin(contextMenu.message, !contextMenu.message.pinned)}
           >
-            Réagir
+            {contextMenu.message.pinned ? 'Désépingler' : 'Épingler'}
           </button>
-          {contextMenu.showReactions && (
-            <MessageReactions
-              reactions={contextMenu.message.reactions}
-              userId={myId}
-              showPicker
-              onReact={emoji => {
-                toggleGroupMessageReaction(contextMenu.message._id, emoji);
-                setContextMenu(null);
-              }}
-            />
-          )}
           <button
             type="button"
             style={styles.contextItem}
@@ -2899,19 +3050,21 @@ export default function GroupChat({
             contextMenu.message
           ) ? (
             <>
-              <button
-                type="button"
-                style={
-                  styles.contextItem
-                }
-                onClick={() =>
-                  startEditGroupMessage(
-                    contextMenu.message
-                  )
-                }
-              >
-                Modifier
-              </button>
+              {contextMenu.message.messageType !== 'poll' && (
+                <button
+                  type="button"
+                  style={
+                    styles.contextItem
+                  }
+                  onClick={() =>
+                    startEditGroupMessage(
+                      contextMenu.message
+                    )
+                  }
+                >
+                  Modifier
+                </button>
+              )}
 
               <button
                 type="button"
@@ -3028,12 +3181,25 @@ export default function GroupChat({
           styles.inputBar
         }
       >
+        <select
+          aria-label="Durée avant disparition du message"
+          value={messageExpiry}
+          onChange={event => setMessageExpiry(Number(event.target.value))}
+          disabled={!key || uploadingFiles || awaitingAttachmentAck}
+          style={{ maxWidth: 92, minWidth: 82, minHeight: 36, flexShrink: 0, whiteSpace: 'nowrap', padding: '8px 4px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontSize: 10 }}
+        >
+          <option value={0}>Normal</option>
+          <option value={3600}>1 heure</option>
+          <option value={86400}>24 heures</option>
+          <option value={604800}>7 jours</option>
+        </select>
         <FileUploadButton
           onFilesSelected={handleFilesSelected}
-          disabled={!key || awaitingAttachmentAck}
+          disabled={!key || awaitingAttachmentAck || messageExpiry > 0}
           uploading={uploadingFiles}
           progress={uploadProgress}
         />
+        <VoiceMessageRecorder disabled={!key || uploadingFiles || awaitingAttachmentAck || messageExpiry > 0} onRecorded={handleFilesSelected} />
 
         <div
           style={
@@ -3203,6 +3369,8 @@ export default function GroupChat({
 
         </div>
 
+        <button type="button" onClick={() => setPollOpen(true)} disabled={!key || uploadingFiles || awaitingAttachmentAck} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 9px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: 11 }}>Sondage</button>
+        <ScheduledMessageControl token={token} scope="group" conversationId={group?._id} disabled={!key || uploadingFiles || awaitingAttachmentAck} hasMessage={Boolean(input.trim())} onSchedule={scheduleMessage} />
         <EmojiPicker onSelect={emoji => setInput(value => value + emoji)} />
         <button
           onClick={sendMessage}
@@ -3220,6 +3388,8 @@ export default function GroupChat({
         </button>
 
       </div>
+
+      {pollOpen && <PollComposer onClose={() => setPollOpen(false)} onCreate={createPoll} />}
 
       {groupCall && (
         <GroupVoiceCall
@@ -3243,15 +3413,18 @@ const styles = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    height: '100vh',
+    height: '100%',
+    minHeight: 0,
+    minWidth: 0,
     position: 'relative'
   },
 
   header: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    padding: '16px 20px',
+    gap: '8px',
+    padding: '10px 12px',
+    flexWrap: 'wrap',
     background:
       'var(--bg-secondary)',
     borderBottom:
@@ -3309,9 +3482,12 @@ const styles = {
     border:
       '1px solid var(--border)',
     borderRadius: '8px',
-    padding: '6px 10px',
-    fontSize: '16px',
-    cursor: 'pointer'
+    padding: '5px 7px',
+    minWidth: '34px',
+    minHeight: '34px',
+    fontSize: '15px',
+    cursor: 'pointer',
+    flexShrink: 0
   },
 
   leaveBtn: {
@@ -3320,14 +3496,20 @@ const styles = {
     border:
       '1px solid var(--border)',
     borderRadius: '8px',
-    padding: '6px 10px',
-    fontSize: '16px',
-    cursor: 'pointer'
+    padding: '5px 7px',
+    minWidth: '34px',
+    minHeight: '34px',
+    fontSize: '15px',
+    cursor: 'pointer',
+    flexShrink: 0
   },
 
   messages: {
     flex: 1,
+    minHeight: 0,
     overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    overscrollBehaviorY: 'contain',
     padding: '20px',
     display: 'flex',
     flexDirection: 'column',
@@ -3622,6 +3804,7 @@ const styles = {
 
   inputBar: {
     display: 'flex',
+    flexWrap: 'wrap',
     padding: '16px',
     gap: '8px',
     borderTop:

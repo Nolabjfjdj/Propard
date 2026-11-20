@@ -20,6 +20,11 @@ const {
 }=require('./utils/inputValidation');
 require('dotenv').config();
 
+if (Buffer.byteLength(process.env.JWT_SECRET || '', 'utf8') < 32) {
+  console.error('JWT_SECRET doit contenir au moins 32 octets.');
+  process.exit(1);
+}
+
 const app=express();
 const server=http.createServer(app);
 
@@ -77,6 +82,8 @@ app.use((req,res,next)=>{
   res.setHeader('X-Content-Type-Options','nosniff');
   res.setHeader('X-Frame-Options','DENY');
   res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
+  res.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains');
+  res.setHeader('Permissions-Policy','camera=(self), microphone=(self), geolocation=()');
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; " +
@@ -270,7 +277,12 @@ app.use('/api',require('./routes/turn'));
 app.use('/api/reports',require('./routes/reports'));
 app.use('/api/groups',require('./routes/groups'));
 app.use('/api/files',require('./routes/files'));
+app.use('/api/notes',require('./routes/notes'));
 app.use('/api/push',require('./routes/push'));
+app.use('/api/reminders',require('./routes/reminders'));
+app.use('/api/scheduled-messages',require('./routes/scheduledMessages'));
+app.use('/api/vault',require('./routes/vault'));
+app.use('/api/conversation-folders',require('./routes/conversationFolders'));
 app.use('/api/ai',require('./routes/ai'));
 
 app.get('/health',(req,res)=>res.status(200).send('OK'));
@@ -280,8 +292,215 @@ const User=require('./models/User');
 const Group=require('./models/Group');
 const GroupMessage=require('./models/GroupMessage');
 const FileAttachment=require('./models/FileAttachment');
+const Reminder=require('./models/Reminder');
+const ScheduledMessage=require('./models/ScheduledMessage');
 const {sendPushNotification}=require('./services/push');
 const {retryPendingFileCleanup}=require('./services/fileCleanup');
+
+let reminderWorkerRunning = false;
+async function deliverDueReminders() {
+  if (reminderWorkerRunning || !mongoose.connections.some(connection => connection.readyState === 1)) return;
+  reminderWorkerRunning = true;
+  try {
+    for (let index = 0; index < 20; index += 1) {
+      const now = new Date();
+      const reminder = await Reminder.findOneAndUpdate(
+        {
+          dueAt: { $lte: now },
+          nextAttemptAt: { $lte: now },
+          attempts: { $lt: 20 },
+          $or: [
+            { status: 'pending' },
+            { status: 'processing', claimedAt: { $lte: new Date(now.getTime() - 5 * 60 * 1000) } }
+          ]
+        },
+        {
+          $set: { status: 'processing', claimedAt: now }
+        },
+        { returnDocument: 'after', sort: { dueAt: 1 } }
+      );
+      if (!reminder) break;
+      try {
+        const delivery = await sendPushNotification(reminder.user, {
+          title: 'Rappel Propard',
+          body: reminder.title,
+          url: '/settings',
+          tag: 'reminder-' + reminder._id.toString(),
+          data: { type: 'reminder', reminderId: reminder._id.toString(), url: '/settings' }
+        });
+        if (!delivery || delivery.delivered < 1) {
+          throw new Error('Aucune notification push remise à un appareil.');
+        }
+        await Reminder.updateOne(
+          { _id: reminder._id, status: 'processing' },
+          { $set: { status: 'sent', sentAt: new Date(), claimedAt: null } }
+        );
+      } catch (error) {
+        await Reminder.updateOne(
+          { _id: reminder._id, status: 'processing' },
+          {
+            $set: {
+              status: reminder.attempts >= 19 ? 'failed' : 'pending',
+              claimedAt: null,
+              nextAttemptAt: new Date(Date.now() + 5 * 60 * 1000)
+            },
+            $inc: { attempts: 1 }
+          }
+        );
+        console.error('Reminder delivery failed:', error?.message || error);
+      }
+    }
+  } catch (error) {
+    console.error('Reminder worker error:', error);
+  } finally {
+    reminderWorkerRunning = false;
+  }
+}
+
+const reminderWorkerInterval = setInterval(deliverDueReminders, 15000);
+reminderWorkerInterval.unref?.();
+
+let scheduledMessageWorkerRunning = false;
+async function deliverScheduledMessages() {
+  if (scheduledMessageWorkerRunning || !mongoose.connections.some(connection => connection.readyState === 1)) return;
+  scheduledMessageWorkerRunning = true;
+  try {
+    for (let index = 0; index < 20; index += 1) {
+      const now = new Date();
+      const scheduled = await ScheduledMessage.findOneAndUpdate(
+        {
+          dueAt: { $lte: now },
+          nextAttemptAt: { $lte: now },
+          attempts: { $lt: 10 },
+          $or: [
+            { status: 'pending' },
+            { status: 'processing', claimedAt: { $lte: new Date(now.getTime() - 5 * 60 * 1000) } }
+          ]
+        },
+        { $set: { status: 'processing', claimedAt: now } },
+        { returnDocument: 'after', sort: { dueAt: 1 } }
+      );
+      if (!scheduled) break;
+      try {
+        if (scheduled.recipient) {
+          const [senderAccount, recipientAccount] = await Promise.all([
+            User.findById(scheduled.sender).select('username ipAlias blockedUsers pendingDeletionAt'),
+            User.findById(scheduled.recipient).select('friends blockedUsers pendingDeletionAt')
+          ]);
+          const stillFriends = await areFriends(scheduled.sender, scheduled.recipient);
+          const recipientStillFriends = (recipientAccount?.friends || []).some(item => item.userId?.toString() === scheduled.sender.toString());
+          const blocked = (senderAccount?.blockedUsers || []).some(id => id.toString() === scheduled.recipient.toString()) ||
+            (recipientAccount?.blockedUsers || []).some(id => id.toString() === scheduled.sender.toString());
+          if (!senderAccount || senderAccount.pendingDeletionAt || !recipientAccount || recipientAccount.pendingDeletionAt || !stillFriends || !recipientStillFriends || blocked) {
+            await ScheduledMessage.updateOne({ _id: scheduled._id }, { $set: { status: 'failed', content: '', claimedAt: null } });
+            continue;
+          }
+          let message = await Message.findOne({ scheduledMessageId: scheduled._id });
+          if (!message) {
+            message = await Message.create({
+              sender: scheduled.sender,
+              receiver: scheduled.recipient,
+              content: scheduled.content,
+              encrypted: true,
+              messageType: 'text',
+              scheduledMessageId: scheduled._id
+            });
+          }
+          const messageData = {
+            _id: message._id.toString(),
+            sender: scheduled.sender.toString(),
+            senderInfo: { username: senderAccount.username, ipAlias: senderAccount.ipAlias },
+            receiver: scheduled.recipient.toString(),
+            content: message.content,
+            attachments: [],
+            encrypted: true,
+            messageType: 'text',
+            expiresAt: null,
+            createdAt: message.createdAt
+          };
+          emitToUser(io, scheduled.recipient, 'newMessage', messageData);
+          emitToUser(io, scheduled.sender, 'messageSent', messageData);
+          if (!isConversationActive(scheduled.recipient.toString(), 'private', scheduled.sender.toString())) {
+            void sendPushNotification(scheduled.recipient, {
+              title: senderAccount.username ? '@' + senderAccount.username : 'Propard',
+              body: 'Message programmé reçu',
+              url: '/chat/' + scheduled.sender.toString(),
+              tag: 'private-' + scheduled.sender.toString(),
+              data: { type: 'private-message', senderId: scheduled.sender.toString() }
+            });
+          }
+        } else if (scheduled.group) {
+          const [group, senderAccount] = await Promise.all([
+            Group.findOne({
+              _id: scheduled.group,
+              'members.userId': scheduled.sender
+            }).select('members keyVersion name'),
+            User.findById(scheduled.sender).select('pendingDeletionAt')
+          ]);
+          if (!group || !senderAccount || senderAccount.pendingDeletionAt || (group.keyVersion || 1) !== scheduled.keyVersion) {
+            await ScheduledMessage.updateOne({ _id: scheduled._id }, { $set: { status: 'failed', content: '', claimedAt: null } });
+            continue;
+          }
+          let message = await GroupMessage.findOne({ scheduledMessageId: scheduled._id });
+          if (!message) {
+            message = await GroupMessage.create({
+              group: scheduled.group,
+              sender: scheduled.sender,
+              content: scheduled.content,
+              encrypted: true,
+              keyVersion: scheduled.keyVersion,
+              messageType: 'text',
+              scheduledMessageId: scheduled._id
+            });
+          }
+          await Group.findByIdAndUpdate(scheduled.group, { lastMessageAt: message.createdAt });
+          const populated = await GroupMessage.findById(message._id).populate('sender', 'username displayName avatar ipAlias');
+          const payload = { ...populated.toObject(), groupId: scheduled.group.toString() };
+          for (const member of group.members || []) {
+            const memberId = (member.userId?._id || member.userId).toString();
+            emitToUser(io, memberId, 'newGroupMessage', payload);
+            if (memberId !== scheduled.sender.toString() && !isConversationActive(memberId, 'group', scheduled.group.toString())) {
+              void sendPushNotification(memberId, {
+                title: group.name || 'Propard',
+                body: 'Nouveau message programmé',
+                url: '/group/' + scheduled.group.toString(),
+                tag: 'group-' + scheduled.group.toString(),
+                data: { type: 'group-message', groupId: scheduled.group.toString() }
+              });
+            }
+          }
+        }
+        await ScheduledMessage.updateOne(
+          { _id: scheduled._id, status: 'processing' },
+          { $set: { status: 'sent', deliveredMessageId: scheduled.recipient ? (await Message.findOne({ scheduledMessageId: scheduled._id }).select('_id'))?._id : (await GroupMessage.findOne({ scheduledMessageId: scheduled._id }).select('_id'))?._id, claimedAt: null, content: '' } }
+        );
+      } catch (error) {
+        await ScheduledMessage.updateOne(
+          { _id: scheduled._id, status: 'processing' },
+          {
+            $set: {
+              status: scheduled.attempts >= 9 ? 'failed' : 'pending',
+              claimedAt: null,
+              nextAttemptAt: new Date(Date.now() + 5 * 60 * 1000),
+              ...(scheduled.attempts >= 9 ? { content: '' } : {})
+            },
+            $inc: { attempts: 1 }
+          }
+        );
+        console.error('Scheduled message delivery failed:', error?.message || error);
+      }
+    }
+  } catch (error) {
+    console.error('Scheduled message worker error:', error);
+  } finally {
+    scheduledMessageWorkerRunning = false;
+  }
+}
+
+const scheduledMessageWorkerInterval = setInterval(deliverScheduledMessages, 10000);
+scheduledMessageWorkerInterval.unref?.();
+
+
 
 async function areFriends(userId,friendId){
   const user=await User.findById(userId).select('friends');
@@ -525,7 +744,7 @@ io.on('connection',async socket=>{
     );
   });
 
-  registerSocketHandler('sendMessage',async({receiverId,content,attachmentIds=[]}={})=>{
+  registerSocketHandler('sendMessage',async({receiverId,content,attachmentIds=[],expiresIn=0,messageType='text'}={})=>{
     try{
       if(!socket.userId) return;
       if(!allowSocketEvent(socket,'sendMessage',20,10000)){
@@ -566,6 +785,20 @@ io.on('connection',async socket=>{
         return socket.emit('messageError',{message:'Pièces jointes invalides.'});
       }
 
+      if(!['text','poll'].includes(messageType)){
+        return socket.emit('messageError',{message:'Type de message invalide.'});
+      }
+      if(messageType === 'poll' && attachmentIds.length){
+        return socket.emit('messageError',{message:'Les sondages ne peuvent pas contenir de pièces jointes.'});
+      }
+      if(![0,3600,86400,604800].includes(expiresIn)){
+        return socket.emit('messageError',{message:'Durée éphémère invalide.'});
+      }
+      if(expiresIn > 0 && attachmentIds.length){
+        return socket.emit('messageError',{message:'Les messages éphémères ne peuvent pas contenir de pièces jointes.'});
+      }
+      const expiresAt = expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000) : null;
+
       if(attachmentIds.length){
         const [readyAttachments, recipientAccount, senderAccount]=await Promise.all([
           FileAttachment.find({
@@ -605,7 +838,9 @@ io.on('connection',async socket=>{
         content:content.trim(),
         attachments:attachmentIds,
         originalContent:null,
-        encrypted:true
+        encrypted:true,
+        messageType,
+        expiresAt
       });
 
       if(attachmentIds.length){
@@ -627,6 +862,8 @@ io.on('connection',async socket=>{
         content:message.content,
         attachments:message.attachments.map(id=>id.toString()),
         encrypted:true,
+        messageType:message.messageType,
+        expiresAt:message.expiresAt,
         createdAt:message.createdAt
       };
 
@@ -680,7 +917,7 @@ io.on('connection',async socket=>{
   // MESSAGES DE GROUPE
   // ─────────────────────────────────────
 
-  registerSocketHandler('sendGroupMessage',async({groupId,content,keyVersion,attachmentIds=[]}={})=>{
+  registerSocketHandler('sendGroupMessage',async({groupId,content,keyVersion,attachmentIds=[],expiresIn=0,messageType='text'}={})=>{
     try{
       if(!socket.userId) return;
       if(!allowSocketEvent(socket,'sendGroupMessage',20,10000)){
@@ -735,6 +972,20 @@ io.on('connection',async socket=>{
         return socket.emit('groupMessageError',{message:'Pièces jointes invalides.'});
       }
 
+      if(!['text','poll'].includes(messageType)){
+        return socket.emit('groupMessageError',{message:'Type de message invalide.'});
+      }
+      if(messageType === 'poll' && attachmentIds.length){
+        return socket.emit('groupMessageError',{message:'Les sondages ne peuvent pas contenir de pièces jointes.'});
+      }
+      if(![0,3600,86400,604800].includes(expiresIn)){
+        return socket.emit('groupMessageError',{message:'Durée éphémère invalide.'});
+      }
+      if(expiresIn > 0 && attachmentIds.length){
+        return socket.emit('groupMessageError',{message:'Les messages éphémères ne peuvent pas contenir de pièces jointes.'});
+      }
+      const expiresAt = expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000) : null;
+
       if(attachmentIds.length){
         const readyAttachments=await FileAttachment.find({
           _id:{$in:attachmentIds},
@@ -756,7 +1007,9 @@ io.on('connection',async socket=>{
         content:content.trim(),
         attachments:attachmentIds,
         encrypted:true,
-        keyVersion:currentKeyVersion
+        messageType,
+        keyVersion:currentKeyVersion,
+        expiresAt
       });
 
       if(attachmentIds.length){
@@ -780,7 +1033,9 @@ io.on('connection',async socket=>{
         content:message.content,
         attachments:message.attachments.map(id=>id.toString()),
         encrypted:true,
+        messageType:message.messageType,
         keyVersion:message.keyVersion,
+        expiresAt:message.expiresAt,
         createdAt:message.createdAt
       };
 

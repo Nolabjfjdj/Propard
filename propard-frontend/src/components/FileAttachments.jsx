@@ -254,7 +254,7 @@ export default function FileAttachments({ attachments, token, userId }) {
       objectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
       objectUrlsRef.current = [];
     };
-  }, [attachments, token, loadPreview]);
+  }, [attachments, token, userId, loadPreview]);
 
   const download = async fileId => {
     setFiles(previous => ({

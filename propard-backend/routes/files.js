@@ -585,7 +585,7 @@ router.post('/uploads/:fileId/finalize', signedUrlRateLimit, async (req, res) =>
           completedAt: new Date()
         }
       },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!updated) {

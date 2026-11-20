@@ -17,6 +17,7 @@ const { ROLE_LEVELS, roleLevel, requireStaffRole, canManageRole } = require('../
 const { effectiveStaffRole } = require('../utils/staffAllowlist');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { getClientIp } = require('../utils/clientIp');
+const { isSoleOwner } = require('../utils/staffAllowlist');
 const { deleteFilesForUser, deleteFilesForGroup } = require('../services/fileCleanup');
 
 const router = express.Router();
@@ -26,6 +27,13 @@ const actionLimiter = createRateLimiter({
   max: 300,
   keyFn: req => req.user && req.user.id ? req.user.id : getClientIp(req) || 'unknown',
   message: 'Trop d’actions en peu de temps. Réessaie plus tard.'
+});
+
+const staffReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyFn: req => `staff-read:${req.user?.id || getClientIp(req) || 'unknown'}`,
+  message: 'Trop de consultations de l’espace Staff. Réessaie plus tard.'
 });
 
 const resetCompleteLimiter = createRateLimiter({
@@ -44,7 +52,7 @@ function checkAnnouncementKey(providedKey) {
 }
 
 function requireSoleOwner(req, res, next) {
-  if (req.user?.staffRole !== 'owner') {
+  if (req.user?.staffRole !== 'owner' || !isSoleOwner(req.user.id)) {
     return res.status(403).json({ error: 'Seul le propriétaire unique peut gérer les annonces globales.' });
   }
   return next();
@@ -139,6 +147,7 @@ router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) =
     user.passwordResetExpiresAt = null;
     user.passwordResetIssuedBy = null;
     user.sessionVersion = (user.sessionVersion || 0) + 1;
+    user.activeSessions = [];
     await user.save();
 
     const disconnectUserSockets = req.app.get('disconnectUserSockets');
@@ -164,6 +173,7 @@ router.post('/password-reset/complete', resetCompleteLimiter, async (req, res) =
 
 router.use(authMiddleware);
 router.use(actionLimiter);
+router.use((req, res, next) => req.method === 'GET' ? staffReadLimiter(req, res, next) : next());
 
 router.post('/announcements/create', requireStaffRole('owner'), requireSoleOwner, announcementLimiter, async (req, res) => {
   try {
@@ -525,7 +535,7 @@ router.patch('/account-help/settings', requireStaffRole('support'), async (req, 
         'staffNotificationPreferences.passwordReset': passwordResetNotifications,
         'staffNotificationPreferences.support': supportNotifications
       }},
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).select('staffNotificationPreferences');
     if (!staffUser) return res.status(404).json({ error: 'Compte du personnel introuvable.' });
     await audit(req, 'account_help.notifications_updated', {
@@ -906,7 +916,7 @@ router.post('/users/:userId/ban', requireStaffRole('moderator'), async (req, res
 
     await audit(req, 'user.banned', {
       targetUser: target._id,
-      details: { duration, reason: reason.trim(), banExpiresAt: target.banExpiresAt }
+      details: { duration, reason: reason.trim(), bannedAt: target.bannedAt, banExpiresAt: target.banExpiresAt }
     });
 
     return res.json({
@@ -975,7 +985,7 @@ router.patch('/users/:userId/role', requireStaffRole('admin'), async (req, res) 
           staffRoleUpdatedBy: roleUpdatedBy
         }
       },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).select('_id username staffRole');
 
     if (!updatedTarget) {
@@ -1057,14 +1067,29 @@ router.post('/audit/:logId/undo', requireStaffRole('owner'), async (req, res) =>
     let undoDescription;
 
     if (original.action === 'user.banned' && original.targetUser) {
-      const target = await User.findById(original.targetUser);
-      if (!target) return res.status(404).json({ error: 'Le compte concerné n’existe plus.' });
-      if (!target.bannedAt) return res.status(409).json({ error: 'Ce compte n’est actuellement plus banni. Rien n’a été modifié.', code: 'BAN_ALREADY_INACTIVE', targetUsername: target.username });
-      target.bannedAt = null;
-      target.banExpiresAt = null;
-      target.banReason = null;
-      target.sessionVersion = (target.sessionVersion || 0) + 1;
-      await target.save();
+      if (typeof details.reason !== 'string' || !Object.prototype.hasOwnProperty.call(details, 'banExpiresAt')) {
+        return res.status(409).json({ error: 'Cette ancienne action ne contient pas assez d’informations pour être annulée en sécurité.' });
+      }
+      const banFilter = {
+        _id: original.targetUser,
+        bannedAt: { $ne: null },
+        banReason: details.reason,
+        banExpiresAt: details.banExpiresAt
+      };
+      if (details.bannedAt && Number.isFinite(new Date(details.bannedAt).getTime())) {
+        banFilter.bannedAt = new Date(details.bannedAt);
+      }
+      const target = await User.findOneAndUpdate(
+        banFilter,
+        {
+          $set: { bannedAt: null, banExpiresAt: null, banReason: null, isOnline: false },
+          $inc: { sessionVersion: 1 }
+        },
+        { returnDocument: 'after' }
+      ).select('_id username');
+      if (!target) {
+        return res.status(409).json({ error: 'Le bannissement a changé depuis cette action. Annulation refusée pour ne pas modifier une sanction plus récente.' });
+      }
       const io = req.app.get('io');
       if (io) {
         for (const socket of io.sockets.sockets.values()) {
@@ -1091,7 +1116,7 @@ router.post('/audit/:logId/undo', requireStaffRole('owner'), async (req, res) =>
             staffRoleUpdatedBy: roleUpdatedBy
           }
         },
-        { new: true, runValidators: true }
+        { returnDocument: 'after', runValidators: true }
       ).select('_id');
 
       if (!restoredTarget) {
@@ -1101,15 +1126,21 @@ router.post('/audit/:logId/undo', requireStaffRole('owner'), async (req, res) =>
     } else if (original.action === 'report.status.updated' && original.targetReport &&
       ['new', 'processed', 'rejected'].includes(details.previousStatus) &&
       ['new', 'processed', 'rejected'].includes(details.status)) {
-      const report = await Report.findById(original.targetReport);
-      if (!report) return res.status(404).json({ error: 'Le signalement concerné n’existe plus.' });
-      if (report.status !== details.status) {
+      const reportUpdate = await Report.updateOne(
+        { _id: original.targetReport, status: details.status },
+        {
+          $set: {
+            status: details.previousStatus,
+            processedAt: details.previousStatus === 'new' ? null : new Date()
+          }
+        }
+      );
+      if (!reportUpdate.matchedCount) {
+        const reportExists = await Report.exists({ _id: original.targetReport });
+        if (!reportExists) return res.status(404).json({ error: 'Le signalement concerné n’existe plus.' });
         return res.status(409).json({ error: 'Le statut du signalement a changé depuis cette action. Annulation refusée.' });
       }
-      report.status = details.previousStatus;
-      report.processedAt = details.previousStatus === 'new' ? null : new Date();
-      await report.save();
-      undoDescription = { type: 'report_status_restore', targetReportId: report._id.toString(), restoredStatus: details.previousStatus };
+      undoDescription = { type: 'report_status_restore', targetReportId: original.targetReport.toString(), restoredStatus: details.previousStatus };
     } else {
       return res.status(409).json({
         error: 'Cette action n’est pas encore annulable automatiquement. Les suppressions définitives, réinitialisations de mot de passe et actions sans état précédent sauvegardé ne peuvent pas être restaurées en sécurité.'

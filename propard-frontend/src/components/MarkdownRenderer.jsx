@@ -209,7 +209,7 @@ export default function MarkdownRenderer({ content = '' }) {
 
     const paragraph = [line];
     index += 1;
-    while (index < lines.length && lines[index].trim() && !/^\s*(#{1,6}\s|\`\`\`|~~~|>|[-*+]\s+|\d+[.)]\s+)/.test(lines[index]) && !(index + 1 < lines.length && isTableRow(lines[index]) && isSeparator(lines[index + 1]))) {
+    while (index < lines.length && lines[index].trim() && !/^\s*(#{1,6}\s|```|~~~|>|[-*+]\s+|\d+[.)]\s+)/.test(lines[index]) && !(index + 1 < lines.length && isTableRow(lines[index]) && isSeparator(lines[index + 1]))) {
       paragraph.push(lines[index]);
       index += 1;
     }

@@ -1,0 +1,48 @@
+name: Refresh feature branch security lockfiles
+
+on:
+  push:
+    branches:
+      - feature/propard-full-upgrade
+    paths:
+      - .github/workflows/refresh-feature-security-lockfiles.yml
+      - propard-backend/package.json
+      - propard-frontend/package.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-feature-security-lockfiles
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/propard-full-upgrade
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Refresh backend security fixes
+        run: npm audit fix --package-lock-only --ignore-scripts --no-fund || true
+        working-directory: propard-backend
+      - name: Refresh frontend security fixes
+        run: npm audit fix --package-lock-only --ignore-scripts --no-fund
+        working-directory: propard-frontend
+      - name: Commit updated lockfiles
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add propard-backend/package-lock.json propard-frontend/package-lock.json
+          if git diff --cached --quiet; then
+            echo "No security lockfile updates were needed."
+            exit 0
+          fi
+          git commit -m "security: update vulnerable dependency lockfiles"
+          git push origin feature/propard-full-upgrade

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
 import socket from '../socket';
 
@@ -21,6 +21,117 @@ export default function FriendList({
   const [requestUsers, setRequestUsers] = useState({});
   const [unread, setUnread] = useState({});
   const [groups, setGroups] = useState([]);
+  const [folderData, setFolderData] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('propard_conversation_folders_' + (userId || 'local')) || '{}');
+      return {
+        names: Array.isArray(saved.names) ? saved.names.filter(name => typeof name === 'string').slice(0, 30) : [],
+        assignments: saved.assignments && typeof saved.assignments === 'object' ? saved.assignments : {}
+      };
+    } catch {
+      return { names: [], assignments: {} };
+    }
+  });
+  const [activeFolder, setActiveFolder] = useState('all');
+  const folderEditedRef = useRef(false);
+  const folderDataRef = useRef(folderData);
+
+  useEffect(() => {
+    folderDataRef.current = folderData;
+  }, [folderData]);
+
+  const saveFolderData = next => {
+    folderEditedRef.current = true;
+    setFolderData(next);
+    try {
+      localStorage.setItem('propard_conversation_folders_' + (userId || 'local'), JSON.stringify(next));
+    } catch (error) {
+      console.warn('Impossible de sauvegarder les dossiers de conversations:', error);
+    }
+    if (token && userId) {
+      api.put('/api/conversation-folders', next, {
+        headers: { Authorization: 'Bearer ' + token }
+      }).catch(error => {
+        console.warn('Synchronisation des dossiers impossible:', error.response?.data?.error || error.message);
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!token || !userId) return undefined;
+    let cancelled = false;
+    folderEditedRef.current = false;
+    api.get('/api/conversation-folders', {
+      headers: { Authorization: 'Bearer ' + token }
+    }).then(response => {
+      if (cancelled || folderEditedRef.current) return;
+      const remote = response.data?.folders;
+      if (remote && Array.isArray(remote.names) && remote.assignments && typeof remote.assignments === 'object') {
+        const synced = {
+          names: remote.names.filter(name => typeof name === 'string').slice(0, 30),
+          assignments: remote.assignments
+        };
+        setFolderData(synced);
+        try {
+          localStorage.setItem('propard_conversation_folders_' + userId, JSON.stringify(synced));
+        } catch (error) {
+          console.warn('Cache locale des dossiers indisponible:', error);
+        }
+      } else {
+        api.put('/api/conversation-folders', folderDataRef.current, {
+          headers: { Authorization: 'Bearer ' + token }
+        }).catch(error => {
+          console.warn('Migration des dossiers locaux impossible:', error.response?.data?.error || error.message);
+        });
+      }
+    }).catch(error => {
+      console.warn('Chargement des dossiers synchronisés impossible:', error.response?.data?.error || error.message);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, userId]);
+
+  const createFolder = () => {
+    if (folderData.names.length >= 30) {
+      window.alert('La limite de 30 dossiers est atteinte.');
+      return;
+    }
+    const name = window.prompt('Nom du dossier (24 caractères maximum) :');
+    const cleanName = typeof name === 'string' ? name.trim().slice(0, 24) : '';
+    if (!cleanName) return;
+    const existing = folderData.names.find(item => item.toLowerCase() === cleanName.toLowerCase());
+    if (existing) {
+      setActiveFolder(existing);
+      return;
+    }
+    const next = { ...folderData, names: [...folderData.names, cleanName].slice(0, 30) };
+    saveFolderData(next);
+    setActiveFolder(cleanName);
+  };
+
+  const assignFolder = (key, folder) => {
+    const assignments = { ...folderData.assignments };
+    if (folder) assignments[key] = folder;
+    else delete assignments[key];
+    saveFolderData({ ...folderData, assignments });
+  };
+
+  const deleteActiveFolder = () => {
+    if (!activeFolder || activeFolder === 'all') return;
+    if (!window.confirm('Supprimer le dossier « ' + activeFolder + ' » ? Les conversations seront replacées sans dossier.')) return;
+    const assignments = { ...folderData.assignments };
+    for (const key of Object.keys(assignments)) {
+      if (assignments[key] === activeFolder) delete assignments[key];
+    }
+    saveFolderData({
+      names: folderData.names.filter(name => name !== activeFolder),
+      assignments
+    });
+    setActiveFolder('all');
+  };
+
+  const isInActiveFolder = key => activeFolder === 'all' || (folderData.assignments[key] || '') === activeFolder;
   const [captchaRequired, setCaptchaRequired] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
   const [requestActionError, setRequestActionError] = useState('');
@@ -42,7 +153,7 @@ export default function FriendList({
     };
   }, []);
 
-  const playNotificationSound = () => {
+  const playNotificationSound = useCallback(() => {
     const audio = notificationAudioRef.current;
 
     if (!audio) return;
@@ -59,9 +170,9 @@ export default function FriendList({
         );
       });
     }
-  };
+  }, []);
 
-  const fetchGroups = async () => {
+  const fetchGroups = useCallback(async () => {
     try {
       const res = await api.get(
         '/api/groups',
@@ -79,9 +190,9 @@ export default function FriendList({
         err
       );
     }
-  };
+  }, [token]);
 
-  const fetchUnread = async () => {
+  const fetchUnread = useCallback(async () => {
     try {
       const res = await api.get(
         '/api/friends/unread',
@@ -99,9 +210,9 @@ export default function FriendList({
         err
       );
     }
-  };
+  }, [token]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const res = await api.get(
         '/api/auth/me',
@@ -133,7 +244,8 @@ export default function FriendList({
 
           usersMap[req.from] = userRes.data;
           validRequests.push(req);
-        } catch {
+        } catch (error) {
+          console.warn('Demande d’ami ignorée car son profil est indisponible:', error.message);
         }
       }
 
@@ -145,13 +257,13 @@ export default function FriendList({
         err
       );
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     if (!captchaRequired) return;
     const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
     if (!siteKey) {
-      setRequestActionError('La protection anti-bot n’est pas configurée.');
+      window.setTimeout(() => setRequestActionError('La protection anti-bot n’est pas configurée.'), 0);
       return;
     }
     const renderCaptcha = () => {
@@ -191,9 +303,11 @@ export default function FriendList({
   }, [captchaRequired]);
 
   useEffect(() => {
-    fetchData();
-    fetchUnread();
-    fetchGroups();
+    const initialLoad = window.setTimeout(() => {
+      fetchData();
+      fetchUnread();
+      fetchGroups();
+    }, 0);
 
     const interval = setInterval(() => {
       fetchData();
@@ -201,8 +315,11 @@ export default function FriendList({
       fetchGroups();
     }, 5000);
 
-    return () => clearInterval(interval);
-  }, [token, refreshKey]);
+    return () => {
+      window.clearTimeout(initialLoad);
+      clearInterval(interval);
+    };
+  }, [fetchData, fetchUnread, fetchGroups, refreshKey]);
 
   useEffect(() => {
     const handleFriendRequest = () => {
@@ -215,7 +332,7 @@ export default function FriendList({
     return () => {
       socket.off('friendRequestReceived', handleFriendRequest);
     };
-  }, [token]);
+  }, [fetchData, playNotificationSound]);
 
   useEffect(() => {
     const handleNew = async (msg) => {
@@ -268,7 +385,7 @@ export default function FriendList({
     return () => {
       socket.off('newMessage', handleNew);
     };
-  }, [selectedFriend, token, userId]);
+  }, [selectedFriend, token, userId, playNotificationSound]);
 
   useEffect(() => {
     const refreshGroups = () => {
@@ -286,7 +403,7 @@ export default function FriendList({
       socket.off('groupDeleted', refreshGroups);
       socket.off('groupCreated', refreshGroups);
     };
-  }, [token]);
+  }, [fetchGroups]);
 
   const acceptRequest = async (fromUserId) => {
     if (captchaRequired && !captchaToken) {
@@ -481,6 +598,23 @@ export default function FriendList({
         </p>
       )}
 
+      <div style={{ display: 'flex', gap: 6, padding: '6px 4px', alignItems: 'center' }}>
+        <select
+          aria-label="Filtrer les conversations par dossier"
+          value={activeFolder}
+          onChange={event => setActiveFolder(event.target.value)}
+          style={{ flex: 1, minWidth: 0, padding: '7px 8px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: 12 }}
+        >
+          <option value="all">Toutes les conversations</option>
+          <option value="">Sans dossier</option>
+          {folderData.names.map(name => <option key={name} value={name}>{name}</option>)}
+        </select>
+        {activeFolder !== 'all' && activeFolder !== '' && (
+          <button type="button" onClick={deleteActiveFolder} style={{ ...styles.hideIpBtn, whiteSpace: 'nowrap', color: 'var(--danger)' }} title="Supprimer ce dossier">Supprimer</button>
+        )}
+        <button type="button" onClick={createFolder} style={{ ...styles.hideIpBtn, whiteSpace: 'nowrap', color: 'var(--accent)' }} title="Créer un dossier">+ Dossier</button>
+      </div>
+
       <div style={styles.sectionHeader}>
         <p style={styles.sectionTitle}>
           Groupes — {groups.length}
@@ -501,7 +635,7 @@ export default function FriendList({
           Crée ton premier groupe !
         </p>
       ) : (
-        groups.map(group => {
+        groups.filter(group => isInActiveFolder('group:' + group?._id?.toString())).map(group => {
           const groupId = group?._id?.toString();
           const unreadCount = group?.unreadCount || 0;
 
@@ -555,6 +689,17 @@ export default function FriendList({
                 </p>
               </div>
 
+              <select
+                aria-label={'Dossier du groupe ' + (group?.name || '')}
+                value={folderData.assignments['group:' + groupId] || ''}
+                onClick={event => event.stopPropagation()}
+                onChange={event => assignFolder('group:' + groupId, event.target.value)}
+                style={styles.folderSelect}
+              >
+                <option value="">Sans dossier</option>
+                {folderData.names.map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
+
               {unreadCount > 0 && (
                 <div style={styles.badge}>
                   <span style={styles.badgeIcon}>
@@ -592,7 +737,7 @@ export default function FriendList({
       )}
 
       {friends
-        .filter(friend => friend.userId)
+        .filter(friend => friend.userId && isInActiveFolder('friend:' + friend.userId?._id?.toString()))
         .map(friend => {
           const friendUser = friend.userId;
           const friendId = friendUser?._id?.toString();
@@ -671,6 +816,17 @@ export default function FriendList({
                 </p>
               </div>
 
+              <select
+                aria-label={'Dossier de ' + (friend.nickname || friendUser?.username || 'cet ami')}
+                value={folderData.assignments['friend:' + friendId] || ''}
+                onClick={event => event.stopPropagation()}
+                onChange={event => assignFolder('friend:' + friendId, event.target.value)}
+                style={styles.folderSelect}
+              >
+                <option value="">Sans dossier</option>
+                {folderData.names.map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
+
               {isDropTarget ? (
                 <div style={styles.dropHint}>
                   📥
@@ -715,6 +871,18 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between'
+  },
+
+  folderSelect: {
+    maxWidth: 92,
+    minWidth: 0,
+    padding: '5px 4px',
+    border: '1px solid var(--border)',
+    borderRadius: 6,
+    background: 'var(--bg-tertiary)',
+    color: 'var(--text-secondary)',
+    fontSize: 10,
+    cursor: 'pointer'
   },
 
   sectionTitle: {

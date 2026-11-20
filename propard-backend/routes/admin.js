@@ -9,9 +9,10 @@ const authMiddleware = require('../middleware/auth');
 const { roleLevel } = require('../middleware/staffRoles');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { getClientIp } = require('../utils/clientIp');
+const { isSoleOwner } = require('../utils/staffAllowlist');
 
 function requireSoleOwner(req, res, next) {
-  if (req.user?.staffRole !== 'owner') {
+  if (req.user?.staffRole !== 'owner' || !isSoleOwner(req.user.id)) {
     return res.status(403).json({ error: 'Accès réservé au propriétaire unique de Propard.' });
   }
   return next();
@@ -36,6 +37,12 @@ async function auditAdminAction(req, action, targetUser = null, details = null) 
   });
 }
 
+const adminAccessLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 20,
+  keyFn: req => `admin-access:${req.user.id}`,
+  message: 'Trop de consultations de la configuration administrateur. Réessaie plus tard.'
+});
 const adminSensitiveLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 5,
@@ -45,7 +52,7 @@ const adminSensitiveLimiter = createRateLimiter({
   resetOnCaptcha: true
 });
 
-router.get('/access', authMiddleware, requireSoleOwner, (req, res) => {
+router.get('/access', authMiddleware, requireSoleOwner, adminAccessLimiter, (req, res) => {
   return res.json({ success: true, owner: true });
 });
 
@@ -90,6 +97,7 @@ router.post('/reset-password', authMiddleware, requireSoleOwner, adminSensitiveL
     user.password = await bcrypt.hash(newPassword, 10);
     if (e2eeBackupCleared) user.e2eeKeyBackup = null;
     user.sessionVersion = (user.sessionVersion || 0) + 1;
+    user.activeSessions = [];
     await user.save();
 
     const disconnectUserSockets = req.app.get('disconnectUserSockets');

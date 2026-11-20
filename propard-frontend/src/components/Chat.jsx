@@ -4,9 +4,17 @@ import socket from '../socket';
 import VoiceCall from './VoiceCall';
 import MessageReactions from './MessageReactions';
 import FileAttachments from './FileAttachments';
+import ConversationGallery from './ConversationGallery';
+import ConversationSharedNote from './ConversationSharedNote';
+import E2EEVerification from './E2EEVerification';
+import PollMessage from './PollMessage';
+import PollComposer from './PollComposer';
+import ScheduledMessageControl from './ScheduledMessageControl';
+import VoiceMessageRecorder from './VoiceMessageRecorder';
 import FileUploadButton from './FileUploadButton';
 import EmojiPicker from './EmojiPicker';
 import LinkText from './LinkText';
+import MessageTranslation from './MessageTranslation';
 import { uploadConversationFile, downloadConversationMedia } from '../utils/fileUpload';
 import {
   deriveSharedKey,
@@ -20,7 +28,6 @@ export default function Chat({
   token,
   userId,
   hideFriendIps,
-  isMobile,
   onGrabStart,
   grabbedMessageId
 }) {
@@ -29,6 +36,8 @@ export default function Chat({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [input, setInput] = useState('');
+  const [messageExpiry, setMessageExpiry] = useState(0);
+  const [pollOpen, setPollOpen] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [awaitingAttachmentAck, setAwaitingAttachmentAck] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -93,10 +102,29 @@ export default function Chat({
     }
   };
 
+  const toggleMessagePin = async (message, pinned) => {
+    try {
+      const res = await api.patch(
+        `/api/friends/messages/${message._id}/pin`,
+        { pinned },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setMessages(prev => prev.map(item =>
+        item._id?.toString() === message._id?.toString()
+          ? { ...item, pinned: res.data.pinned, pinnedAt: res.data.pinnedAt, pinnedBy: res.data.pinnedBy }
+          : item
+      ));
+      setContextMenu(null);
+    } catch (error) {
+      console.error('Erreur épinglage du message:', error);
+      setLoadError(error.response?.data?.error || 'Impossible de modifier l’épinglage.');
+    }
+  };
+
   const friendName =
-    friend.nickname?.trim() ||
-    friend.displayName?.trim() ||
-    friend.username ||
+    friend?.nickname?.trim() ||
+    friend?.displayName?.trim() ||
+    friend?.username ||
     'Ami';
 
   useEffect(() => {
@@ -146,11 +174,8 @@ export default function Chat({
     };
   }, [captchaRequired]);
 
-  if (!friend || !friend._id) {
-    return <div style={styles.container} />;
-  }
-
   useEffect(() => {
+    if (!friend?._id) return undefined;
     let cancelled = false;
 
     const loadFriendKey = async () => {
@@ -215,7 +240,7 @@ export default function Chat({
     return () => {
       cancelled = true;
     };
-  }, [friend._id, friend.publicKey, token]);
+  }, [friend?._id, friend?.publicKey, token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -313,6 +338,7 @@ export default function Chat({
   };
 
   useEffect(() => {
+    if (!friend?._id) return undefined;
     let cancelled = false;
 
     const fetchMessages = async () => {
@@ -383,7 +409,7 @@ export default function Chat({
     return () => {
       cancelled = true;
     };
-  }, [friend._id, token, sharedKey, friendKeyLoading, keyError]);
+  }, [friend?._id, token, sharedKey, friendKeyLoading, keyError]);
 
   useEffect(() => {
     const conversationId = friend?._id?.toString();
@@ -417,6 +443,7 @@ export default function Chat({
   }, [friend?._id]);
 
   useEffect(() => {
+    if (!friend?._id) return undefined;
     const handleNewMessage = async msg => {
       const senderId = (
         msg.sender?._id ||
@@ -606,6 +633,16 @@ export default function Chat({
       ));
     };
 
+    const handleMessagePinUpdated = data => {
+      setMessages(prev => prev.map(message =>
+        message._id?.toString() === data.messageId?.toString()
+          ? { ...message, pinned: data.pinned, pinnedAt: data.pinnedAt, pinnedBy: data.pinnedBy }
+          : message
+      ));
+    };
+
+    socket.on('messagePinUpdated', handleMessagePinUpdated);
+
     socket.on(
       'messageReactionsUpdated',
       handleReactionsUpdated
@@ -646,6 +683,8 @@ export default function Chat({
         handleNewMessage
       );
 
+      socket.off('messagePinUpdated', handleMessagePinUpdated);
+
       socket.off(
         'messageReactionsUpdated',
         handleReactionsUpdated
@@ -664,7 +703,7 @@ export default function Chat({
       socket.off('messageError', handleMessageError);
     };
   }, [
-    friend._id,
+    friend?._id,
     messages,
     myId,
     sharedKey,
@@ -676,6 +715,19 @@ export default function Chat({
       behavior: 'smooth'
     });
   }, [messages]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setMessages(previous => {
+        const now = Date.now();
+        const visible = previous.filter(message =>
+          !message.expiresAt || new Date(message.expiresAt).getTime() > now
+        );
+        return visible.length === previous.length ? previous : visible;
+      });
+    }, 5000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const close = () => {
@@ -731,7 +783,8 @@ export default function Chat({
 
       socket.emit('sendMessage', {
         receiverId: friend._id,
-        content: encryptedContent
+        content: encryptedContent,
+        expiresIn: messageExpiry
       });
 
       setInput('');
@@ -745,7 +798,47 @@ export default function Chat({
   };
 
 
+  const scheduleMessage = async dueAt => {
+    const plaintext = input.trim();
+    if (!plaintext || !sharedKey || !friend?._id) {
+      setLoadError(!sharedKey ? 'Chiffrement indisponible pour programmer ce message.' : 'Écris un message avant de le programmer.');
+      return false;
+    }
+    const encryptedContent = await encryptMessage(sharedKey, plaintext);
+    await api.post('/api/scheduled-messages', {
+      recipientId: friend._id,
+      content: encryptedContent,
+      dueAt
+    }, { headers: { Authorization: 'Bearer ' + token } });
+    setInput('');
+    setLoadError(null);
+    return true;
+  };
+
+  const createPoll = async (question, options, expiresIn = 0) => {
+    if (!sharedKey || !friend?._id) {
+      setLoadError('Chiffrement indisponible pour créer ce sondage.');
+      return false;
+    }
+    const encryptedContent = await encryptMessage(sharedKey, JSON.stringify({
+      type: 'propard-poll',
+      question,
+      options
+    }));
+    socket.emit('sendMessage', {
+      receiverId: friend._id,
+      content: encryptedContent,
+      messageType: 'poll',
+      expiresIn
+    });
+    return true;
+  };
+
   const handleFilesSelected = async files => {
+    if (messageExpiry > 0) {
+      setLoadError('Les messages éphémères sont actuellement limités au texte, sans pièce jointe.');
+      return;
+    }
     if (!sharedKey || !friendPublicKey) {
       setLoadError('Chiffrement indisponible pour cette conversation.');
       return;
@@ -1267,6 +1360,8 @@ export default function Chat({
     );
   };
 
+  if (!friend || !friend._id) return <div style={styles.container} />;
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -1301,19 +1396,27 @@ export default function Chat({
             marginLeft: 'auto',
             display: 'flex',
             alignItems: 'center',
-            gap: '10px'
+            justifyContent: 'flex-end',
+            gap: '6px',
+            flex: '0 1 auto',
+            flexWrap: 'wrap',
+            minWidth: 0,
+            maxWidth: '100%'
           }}
         >
+          <ConversationGallery messages={messages} token={token} userId={userId} scope="private" conversationId={friend._id} />
+          <ConversationSharedNote scope="private" conversationId={friend._id} userId={myId} token={token} encryptionKey={sharedKey} />
+          <E2EEVerification scope="private" token={token} encryptionKey={sharedKey} friendPublicKey={friendPublicKey} />
           <button
             type="button"
             onClick={reportConversation}
-            style={{ ...styles.callBtn, width: 'auto', padding: '0 10px', borderRadius: '8px', color: 'var(--danger)', fontSize: '12px', whiteSpace: 'nowrap' }}
+            style={{ ...styles.callBtn, width: 'auto', padding: '0 7px', borderRadius: '8px', color: 'var(--danger)', fontSize: '11px', whiteSpace: 'nowrap' }}
             title="Signaler toute la conversation"
             aria-label="Signaler toute la conversation"
           >
             Signaler
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
             <button
               style={styles.callBtn}
               title="Appel vocal"
@@ -1569,7 +1672,17 @@ export default function Chat({
                         </div>
                       ) : (
                         <>
-                          {content && (
+                          {msg.expiresAt && <p style={{ fontSize: '10px', color: isMe ? 'rgba(255,255,255,0.75)' : 'var(--text-secondary)', margin: '0 0 5px' }}>Message éphémère</p>}
+                          {msg.pinned && <p style={{ fontSize: '11px', color: isMe ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)', margin: '0 0 5px' }}>Épinglé</p>}
+                          {msg.messageType === 'poll' ? (
+                            <PollMessage
+                              content={content}
+                              reactions={msg.reactions}
+                              userId={myId}
+                              onVote={emoji => toggleMessageReaction(msg._id, emoji)}
+                              disabled={msg.decryptionError}
+                            />
+                          ) : content && (
                             <p
                               style={{
                                 ...styles.text,
@@ -1578,6 +1691,9 @@ export default function Chat({
                             >
                               <LinkText text={content} />
                             </p>
+                          )}
+                          {msg.messageType !== 'poll' && content && !msg.decryptionError && (
+                            <MessageTranslation text={content} />
                           )}
                           <FileAttachments
                             attachments={msg.attachments}
@@ -1626,10 +1742,12 @@ export default function Chat({
                                 : ''}
                             </p>
                           </div>
-                          <MessageReactions
-                            reactions={msg.reactions}
-                            userId={myId}
-                          />
+                          {msg.messageType !== 'poll' && (
+                            <MessageReactions
+                              reactions={msg.reactions}
+                              userId={myId}
+                            />
+                          )}
                         </>
                       )}
                     </div>
@@ -1659,23 +1777,33 @@ export default function Chat({
             onClick={e => e.stopPropagation()}
             onTouchStart={e => e.stopPropagation()}
           >
+            {contextMenu.msg.messageType !== 'poll' && (
+              <>
+                <button
+                  style={styles.contextItem}
+                  onClick={() => setContextMenu(current => ({ ...current, showReactions: !current.showReactions }))}
+                >
+                  Réagir
+                </button>
+                {contextMenu.showReactions && (
+                  <MessageReactions
+                    reactions={contextMenu.msg.reactions}
+                    userId={myId}
+                    showPicker
+                    onReact={emoji => {
+                      toggleMessageReaction(contextMenu.msg._id, emoji);
+                      setContextMenu(null);
+                    }}
+                  />
+                )}
+              </>
+            )}
             <button
               style={styles.contextItem}
-              onClick={() => setContextMenu(current => ({ ...current, showReactions: !current.showReactions }))}
+              onClick={() => toggleMessagePin(contextMenu.msg, !contextMenu.msg.pinned)}
             >
-              Réagir
+              {contextMenu.msg.pinned ? 'Désépingler' : 'Épingler'}
             </button>
-            {contextMenu.showReactions && (
-              <MessageReactions
-                reactions={contextMenu.msg.reactions}
-                userId={myId}
-                showPicker
-                onReact={emoji => {
-                  toggleMessageReaction(contextMenu.msg._id, emoji);
-                  setContextMenu(null);
-                }}
-              />
-            )}
             <button
               style={styles.contextItem}
               onClick={() =>
@@ -1696,16 +1824,18 @@ export default function Chat({
 
             {isMe ? (
               <>
-                <button
-                  style={styles.contextItem}
-                  onClick={() =>
-                    startEdit(
-                      contextMenu.msg
-                    )
-                  }
-                >
-                  Modifier
-                </button>
+                {contextMenu.msg.messageType !== 'poll' && (
+                  <button
+                    style={styles.contextItem}
+                    onClick={() =>
+                      startEdit(
+                        contextMenu.msg
+                      )
+                    }
+                  >
+                    Modifier
+                  </button>
+                )}
 
                 <button
                   style={{
@@ -1741,12 +1871,25 @@ export default function Chat({
       })()}
 
        <div style={styles.inputBar}>
+        <select
+          aria-label="Durée avant disparition du message"
+          value={messageExpiry}
+          onChange={event => setMessageExpiry(Number(event.target.value))}
+          disabled={!sharedKey || uploadingFiles || awaitingAttachmentAck}
+          style={{ maxWidth: 92, minWidth: 82, minHeight: 36, flexShrink: 0, whiteSpace: 'nowrap', padding: '8px 4px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontSize: 10 }}
+        >
+          <option value={0}>Normal</option>
+          <option value={3600}>1 heure</option>
+          <option value={86400}>24 heures</option>
+          <option value={604800}>7 jours</option>
+        </select>
         <FileUploadButton
           onFilesSelected={handleFilesSelected}
-          disabled={!sharedKey || awaitingAttachmentAck}
+          disabled={!sharedKey || awaitingAttachmentAck || messageExpiry > 0}
           uploading={uploadingFiles}
           progress={uploadProgress}
         />
+        <VoiceMessageRecorder disabled={!sharedKey || uploadingFiles || awaitingAttachmentAck || messageExpiry > 0} onRecorded={handleFilesSelected} />
         <input
           value={input}
           disabled={uploadingFiles || awaitingAttachmentAck}
@@ -1763,6 +1906,8 @@ export default function Chat({
           style={styles.input}
         />
 
+        <button type="button" onClick={() => setPollOpen(true)} disabled={!sharedKey || uploadingFiles || awaitingAttachmentAck} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 9px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: 11 }}>Sondage</button>
+        <ScheduledMessageControl token={token} scope="private" conversationId={friend?._id} disabled={!sharedKey || uploadingFiles || awaitingAttachmentAck} hasMessage={Boolean(input.trim())} onSchedule={scheduleMessage} />
         <EmojiPicker onSelect={emoji => setInput(value => value + emoji)} />
         <button
           onClick={sendMessage}
@@ -1772,6 +1917,8 @@ export default function Chat({
           ➤
         </button>
       </div>
+
+      {pollOpen && <PollComposer onClose={() => setPollOpen(false)} onCreate={createPoll} />}
 
       {reportTarget && (
         <div
@@ -1895,15 +2042,18 @@ const styles = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    height: '100vh',
+    height: '100%',
+    minHeight: 0,
+    minWidth: 0,
     position: 'relative'
   },
 
   header: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    padding: '16px 20px',
+    gap: '8px',
+    padding: '10px 12px',
+    flexWrap: 'wrap',
     background: 'var(--bg-secondary)',
     borderBottom:
       '1px solid var(--border)',
@@ -1957,14 +2107,20 @@ const styles = {
     background: 'var(--bg-tertiary)',
     border: '1px solid var(--border)',
     borderRadius: '8px',
-    padding: '6px 10px',
-    fontSize: '16px',
-    cursor: 'pointer'
+    padding: '5px 7px',
+    minWidth: '34px',
+    minHeight: '34px',
+    fontSize: '15px',
+    cursor: 'pointer',
+    flexShrink: 0
   },
 
   messages: {
     flex: 1,
+    minHeight: 0,
     overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    overscrollBehaviorY: 'contain',
     padding: '20px',
     display: 'flex',
     flexDirection: 'column',
@@ -2095,6 +2251,7 @@ const styles = {
 
   inputBar: {
     display: 'flex',
+    flexWrap: 'wrap',
     padding: '16px',
     gap: '8px',
     borderTop:
@@ -2105,6 +2262,7 @@ const styles = {
 
   input: {
     flex: 1,
+    minWidth: 0,
     padding: '12px',
     borderRadius: '8px',
     border:

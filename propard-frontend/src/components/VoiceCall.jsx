@@ -77,7 +77,6 @@ const getIceServers = async (token) => {
 
 export default function VoiceCall({
   friend,
-  userId,
   token,
   onClose,
   incomingOffer,
@@ -97,7 +96,6 @@ export default function VoiceCall({
   const [screenShareSettingsOpen, setScreenShareSettingsOpen] = useState(false);
   const [screenShareError, setScreenShareError] = useState('');
   const [screenShareSettings, setScreenShareSettings] = useState({ width: 2560, height: 1440, fps: 60, automatic: true, audio: true });
-  const screenShareSupported = typeof navigator !== 'undefined' && (Boolean(navigator.mediaDevices?.getDisplayMedia) || Boolean(window.Capacitor?.isNativePlatform?.()));
   const [remoteVideoAvailable, setRemoteVideoAvailable] = useState(false);
   const [isWatchingRemoteStream, setIsWatchingRemoteStream] = useState(false);
   const remoteViewerRef = useRef(null);
@@ -1599,6 +1597,15 @@ export default function VoiceCall({
     setMuted(prev => !prev);
   };
 
+  const callLifecycleRef = useRef({});
+  callLifecycleRef.current = {
+    cleanup,
+    friendId: friend?._id,
+    incomingOffer,
+    onClose,
+    startCall
+  };
+
   useEffect(() => {
     closedRef.current = false;
 
@@ -1715,7 +1722,7 @@ export default function VoiceCall({
           socket.emit(
             'iceRestartAnswer',
             {
-              callerId: friend._id,
+              callerId: callLifecycleRef.current.friendId,
               answer
             }
           );
@@ -1764,8 +1771,8 @@ export default function VoiceCall({
       };
 
     const handleCallEnded = () => {
-      cleanup();
-      onClose();
+      callLifecycleRef.current.cleanup();
+      callLifecycleRef.current.onClose();
     };
 
     const handleCallFailed = () => {
@@ -1805,14 +1812,14 @@ export default function VoiceCall({
     );
 
     if (
-      !incomingOffer &&
+      !callLifecycleRef.current.incomingOffer &&
       !hasInitiatedRef.current
     ) {
       hasInitiatedRef.current = true;
 
       isCallerRef.current = true;
 
-      startCall();
+      callLifecycleRef.current.startCall();
     }
 
     return () => {
@@ -1846,7 +1853,7 @@ export default function VoiceCall({
         handleCallFailed
       );
 
-      cleanup();
+      callLifecycleRef.current.cleanup();
     };
   }, []);
 
@@ -1982,7 +1989,7 @@ export default function VoiceCall({
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', paddingBottom: '10px' }}>
               <button
                 type="button"
-                onClick={() => { try { remoteViewerRef.current?.requestFullscreen?.()?.catch?.(() => {}); } catch {} }}
+                onClick={() => { try { remoteViewerRef.current?.requestFullscreen?.()?.catch?.(() => {}); } catch (error) { console.warn('Opération ignorée:', error?.message || error); } }}
                 aria-label="Mettre le stream en plein écran"
                 title="Mettre en plein écran"
                 style={{ width: '42px', height: '42px', border: '1px solid #555', borderRadius: '10px', background: '#222', color: '#fff', fontSize: '22px', cursor: 'pointer' }}

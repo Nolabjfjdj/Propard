@@ -11,12 +11,27 @@ const { deleteMessageAttachments } = require('../services/fileCleanup');
 
 router.use(authMiddleware);
 
+const messageReadReceiptLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyFn: req => `message-read-receipt:${req.user.id}`,
+  message: 'Trop de mises à jour de lecture. Réessaie plus tard.'
+});
+
 async function areFriends(userId, friendId) {
   const user = await User.findById(userId).select('friends');
+  return !!user && (user.friends || []).some(f => f.userId.toString() === friendId.toString());
+}
 
-  return !!user && user.friends.some(
-    f => f.userId.toString() === friendId.toString()
-  );
+async function canInteract(userId, otherId) {
+  const [me, other] = await Promise.all([
+    User.findById(userId).select('friends blockedUsers'),
+    User.findById(otherId).select('friends blockedUsers')
+  ]);
+  if (!me || !other) return false;
+  const hasFriend = (user, id) => (user.friends || []).some(friend => friend.userId?.toString() === id.toString());
+  const blocked = (user, id) => (user.blockedUsers || []).some(blockedId => blockedId.toString() === id.toString());
+  return hasFriend(me, otherId) && hasFriend(other, userId) && !blocked(me, otherId) && !blocked(other, userId);
 }
 
 router.post('/add', createRateLimiter({
@@ -119,6 +134,9 @@ router.post('/add', createRateLimiter({
       });
     }
 
+    if ((targetUser.friendRequests || []).length >= 200) {
+      return res.status(400).json({ error: "Impossible d'envoyer une demande à cet utilisateur" });
+    }
     targetUser.friendRequests.push({
       from: req.user.id
     });
@@ -399,7 +417,11 @@ router.get('/unread', createRateLimiter({
         sender: friendId,
         receiver: req.user.id,
         read: false,
-        deleted: { $ne: true }
+        deleted: { $ne: true },
+        $or: [
+          { expiresAt: null },
+          { expiresAt: { $gt: new Date() } }
+        ]
       });
 
       if (count > 0) {
@@ -416,7 +438,7 @@ router.get('/unread', createRateLimiter({
   }
 });
 
-router.patch('/messages/read/:friendId', async (req, res) => {
+router.patch('/messages/read/:friendId', messageReadReceiptLimiter, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.friendId)) {
       return res.status(400).json({ error: 'ID invalide' });
@@ -427,6 +449,9 @@ router.patch('/messages/read/:friendId', async (req, res) => {
       });
     }
 
+    const currentUser = await User.findById(req.user.id).select('readReceiptsEnabled');
+    const sendReceipt = currentUser?.readReceiptsEnabled !== false;
+
     await Message.updateMany(
       {
         sender: req.params.friendId,
@@ -434,18 +459,54 @@ router.patch('/messages/read/:friendId', async (req, res) => {
         read: false
       },
       {
-        read: true
+        $set: {
+          read: true,
+          readReceiptSent: sendReceipt
+        }
       }
     );
 
     res.json({
-      success: true
+      success: true,
+      readReceiptsEnabled: sendReceipt
     });
   } catch (e) {
     console.error(e);
     res.status(500).json({
       error: 'Erreur serveur'
     });
+  }
+});
+
+router.get('/messages/:friendId/attachments', createRateLimiter({ windowMs: 60 * 1000, max: 60, keyFn: req => 'private-gallery:' + req.user.id, message: 'Trop de chargements de galerie. Réessaie dans un instant.' }), async (req, res) => {
+  try {
+    const friendId = req.params.friendId;
+    if (!mongoose.isValidObjectId(friendId) || !await areFriends(req.user.id, friendId)) {
+      return res.status(403).json({ error: 'Conversation inaccessible.' });
+    }
+    const participants = await User.find({ _id: { $in: [req.user.id, friendId] } }).select('blockedUsers');
+    if (participants.some(user => (user.blockedUsers || []).some(id => id.toString() === (user._id.toString() === req.user.id.toString() ? friendId : req.user.id.toString())))) {
+      return res.status(403).json({ error: 'Cette conversation n’est pas accessible.' });
+    }
+    const messages = await Message.find({
+      $or: [
+        { sender: req.user.id, receiver: friendId },
+        { sender: friendId, receiver: req.user.id }
+      ],
+      deleted: { $ne: true },
+      attachments: { $exists: true, $ne: [] },
+      $and: [{
+        $or: [
+          { expiresAt: null },
+          { expiresAt: { $gt: new Date() } }
+        ]
+      }]
+    }).select('attachments');
+    const attachments = [...new Set(messages.flatMap(message => (message.attachments || []).map(id => id.toString())))];
+    res.json({ attachments });
+  } catch (error) {
+    console.error('Private conversation gallery failed:', error);
+    res.status(500).json({ error: 'Impossible de charger la galerie.' });
   }
 });
 
@@ -486,7 +547,13 @@ router.get('/messages/:friendId', createRateLimiter({
           receiver: req.user.id
         }
       ],
-      deleted: { $ne: true }
+      deleted: { $ne: true },
+      $and: [{
+        $or: [
+          { expiresAt: null },
+          { expiresAt: { $gt: new Date() } }
+        ]
+      }]
     };
 
     if (req.query.direction === 'sent') {
@@ -542,12 +609,85 @@ router.get('/messages/:friendId', createRateLimiter({
       }
     }
 
+    messages = messages.map(message => {
+      const item = message.toObject();
+      const senderId = item.sender?._id || item.sender;
+      if (
+        senderId?.toString() === req.user.id.toString() &&
+        item.readReceiptSent === false
+      ) {
+        item.read = false;
+      }
+      return item;
+    });
+
     res.json(messages);
   } catch (e) {
     console.error(e);
     res.status(500).json({
       error: 'Erreur serveur'
     });
+  }
+});
+
+router.patch('/messages/:messageId/pin', createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 60,
+  keyFn: req => `message-pin:${req.user.id}`,
+  message: 'Trop de modifications des messages épinglés. Réessaie plus tard.'
+}), async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { pinned } = req.body || {};
+    if (!mongoose.isValidObjectId(messageId) || typeof pinned !== 'boolean') {
+      return res.status(400).json({ error: 'Demande invalide.' });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message || message.deleted) {
+      return res.status(404).json({ error: 'Message introuvable.' });
+    }
+
+    const userId = req.user.id.toString();
+    const senderId = message.sender.toString();
+    const receiverId = message.receiver.toString();
+    if (userId !== senderId && userId !== receiverId) {
+      return res.status(403).json({ error: 'Accès refusé.' });
+    }
+
+    const otherId = userId === senderId ? receiverId : senderId;
+    if (!await areFriends(userId, otherId)) {
+      return res.status(403).json({ error: 'Cette conversation n’est plus accessible.' });
+    }
+
+    const participants = await User.find({ _id: { $in: [userId, otherId] } }).select('blockedUsers');
+    if (participants.some(user => (user.blockedUsers || []).some(id => id.toString() === (user._id.toString() === userId ? otherId : userId)))) {
+      return res.status(403).json({ error: 'Cette interaction n’est pas autorisée.' });
+    }
+
+    message.pinned = pinned;
+    message.pinnedAt = pinned ? new Date() : null;
+    message.pinnedBy = pinned ? userId : null;
+    await message.save();
+
+    const payload = {
+      messageId,
+      pinned,
+      pinnedAt: message.pinnedAt,
+      pinnedBy: message.pinnedBy?.toString() || null
+    };
+    const io = req.app.get('io');
+    const emitToUser = req.app.get('emitToUser');
+    if (io && emitToUser) {
+      for (const participantId of new Set([senderId, receiverId])) {
+        emitToUser(io, participantId, 'messagePinUpdated', payload);
+      }
+    }
+
+    res.json({ success: true, ...payload });
+  } catch (error) {
+    console.error('Message pin error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -655,6 +795,12 @@ router.patch('/messages/:messageId', createRateLimiter({
       });
     }
 
+    if (message.deleted || message.messageType === 'poll') {
+      return res.status(400).json({ error: 'Ce message ne peut pas être modifié.' });
+    }
+    if (!(await canInteract(req.user.id, message.receiver))) {
+      return res.status(403).json({ error: 'Cette conversation n’est plus accessible.' });
+    }
     message.content = content.trim();
     message.encrypted = true;
     message.originalContent = null;
@@ -997,9 +1143,29 @@ router.post('/messages/:messageId/reactions', createRateLimiter({
     const existingIndex = message.reactions.findIndex(reaction =>
       reaction.userId.toString() === userId && reaction.emoji === emoji
     );
-    const isAddingReaction = existingIndex < 0;
+    let isAddingReaction = existingIndex < 0;
 
-    if (existingIndex >= 0) {
+    if (message.messageType === 'poll') {
+      const pollEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣'];
+      if (!pollEmojis.includes(emoji)) {
+        return res.status(400).json({ error: 'Choix de vote invalide.' });
+      }
+      const ownVoteIndex = message.reactions.findIndex(reaction =>
+        reaction.userId.toString() === userId
+      );
+      if (ownVoteIndex >= 0 && message.reactions[ownVoteIndex].emoji === emoji) {
+        message.reactions.splice(ownVoteIndex, 1);
+        isAddingReaction = false;
+      } else if (ownVoteIndex >= 0) {
+        message.reactions[ownVoteIndex].emoji = emoji;
+        isAddingReaction = true;
+      } else {
+        if (message.reactions.length >= 500) {
+          return res.status(409).json({ error: 'Trop de réactions sur ce message.' });
+        }
+        message.reactions.push({ userId, emoji });
+      }
+    } else if (existingIndex >= 0) {
       message.reactions.splice(existingIndex, 1);
     } else {
       if (message.reactions.length >= 500) {

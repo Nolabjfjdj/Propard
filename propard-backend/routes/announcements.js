@@ -8,13 +8,28 @@ const authMiddleware = require('../middleware/auth');
 const mongoose = require('mongoose');
 
 
+const { createRateLimiter } = require('../middleware/rateLimit');
+
+const announcementReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyFn: req => 'announcement-read:' + req.user.id,
+  message: 'Trop de consultations des annonces. Réessaie plus tard.'
+});
+const announcementAcceptLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyFn: req => 'announcement-accept:' + req.user.id,
+  message: 'Trop de confirmations d’annonces. Réessaie plus tard.'
+});
+
 /*
  * ============================================================
  * ANNONCE ACTIVE POUR L'UTILISATEUR CONNECTÉ
  * ============================================================
  */
 
-router.get('/active', authMiddleware, async (req, res) => {
+router.get('/active', authMiddleware, announcementReadLimiter, async (req, res) => {
   try {
     const candidates = await Announcement.find({ active: true })
       .sort({ createdAt: -1 })
@@ -75,7 +90,7 @@ router.get('/active', authMiddleware, async (req, res) => {
  * ============================================================
  */
 
-router.post('/:announcementId/accept', authMiddleware, async (req, res) => {
+router.post('/:announcementId/accept', authMiddleware, announcementAcceptLimiter, async (req, res) => {
   try {
     const {
       announcementId

@@ -67,6 +67,9 @@ export default function AppPage({
   );
 
   const [friendNotFound, setFriendNotFound] = useState(false);
+  const [staffAccess, setStaffAccess] = useState(() =>
+    ['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(user?.staffRole)
+  );
 
   const [incomingCall, setIncomingCall] = useState(null);
   const [incomingGroupCall, setIncomingGroupCall] = useState(null);
@@ -97,13 +100,53 @@ export default function AppPage({
   const [grabVisual, setGrabVisual] = useState(null);
 
   useEffect(() => {
-    const check = () =>
-      setIsMobile(window.innerWidth < 768);
+    if (!token) {
+      setStaffAccess(false);
+      return undefined;
+    }
+    let cancelled = false;
+    api.get('/api/staff/me', {
+      headers: { Authorization: `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+    }).then(response => {
+      if (!cancelled) setStaffAccess(Boolean(response.data?.staffRole));
+    }).catch(error => {
+      if (!cancelled) {
+        setStaffAccess(error.response?.status === 403
+          ? false
+          : ['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(user?.staffRole));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user?.staffRole]);
 
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
-    return () =>
-      window.removeEventListener('resize', check);
+  useEffect(() => {
+    const root = document.documentElement;
+    const viewport = window.visualViewport;
+    const updateViewport = () => {
+      const height = viewport?.height || window.innerHeight;
+      const offsetTop = viewport?.offsetTop || 0;
+      root.style.setProperty('--propard-app-viewport-height', `${height}px`);
+      root.style.setProperty('--propard-app-viewport-offset-top', `${offsetTop}px`);
+    };
+    updateViewport();
+    viewport?.addEventListener('resize', updateViewport);
+    viewport?.addEventListener('scroll', updateViewport);
+    window.addEventListener('resize', updateViewport);
+    return () => {
+      root.style.removeProperty('--propard-app-viewport-height');
+      root.style.removeProperty('--propard-app-viewport-offset-top');
+      viewport?.removeEventListener('resize', updateViewport);
+      viewport?.removeEventListener('scroll', updateViewport);
+      window.removeEventListener('resize', updateViewport);
+    };
   }, []);
 
   useEffect(() => {
@@ -1132,7 +1175,7 @@ export default function AppPage({
               help
             </a>
 
-            {['support', 'junior_moderator', 'moderator', 'senior_moderator', 'admin', 'owner'].includes(user?.staffRole) && (
+            {staffAccess && (
               <a
                 href="/staff"
                 style={styles.staffLink}
@@ -1183,7 +1226,7 @@ export default function AppPage({
                 onClick={() =>
                   setShowSidebar(false)
                 }
-                style={styles.iconBtn}
+                style={{ ...styles.iconBtn, color: 'var(--accent)' }}
               >
                 ✕
               </button>
@@ -1881,11 +1924,17 @@ export default function AppPage({
 
 const styles = {
   layout: {
+    position: 'fixed',
+    top: 'var(--propard-app-viewport-offset-top, 0px)',
+    left: 0,
+    right: 0,
+    width: '100%',
     display: 'flex',
-    height: '100dvh',
-    minHeight: '100vh',
+    height: 'var(--propard-app-viewport-height, 100dvh)',
+    minHeight: 0,
     background: 'var(--bg-primary)',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    overscrollBehavior: 'none'
   },
 
   overlay: {
@@ -2144,6 +2193,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     minWidth: 0,
+    minHeight: 0,
     overflow: 'hidden'
   },
 
@@ -2176,6 +2226,7 @@ const styles = {
 
   hamburger: {
     background: 'var(--bg-tertiary)',
+    color: 'var(--accent)',
     border: '1px solid var(--border)',
     borderRadius: '8px',
     padding: '6px 10px',

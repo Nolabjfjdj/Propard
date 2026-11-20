@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 const emojiGroups = [
   {
@@ -114,6 +114,8 @@ export default function MessageReactions({ reactions = [], userId, onReact, show
   const [emoji, setEmoji] = useState('');
   const [activeGroup, setActiveGroup] = useState('smileys');
   const [search, setSearch] = useState('');
+  const pickerRef = useRef(null);
+  const [pickerPosition, setPickerPosition] = useState(null);
   const safeReactions = Array.isArray(reactions) ? reactions : [];
   const grouped = safeReactions.reduce((items, reaction) => {
     const current = items.find(item => item.emoji === reaction.emoji);
@@ -131,6 +133,41 @@ export default function MessageReactions({ reactions = [], userId, onReact, show
     }
     return emojiGroups.find(group => group.id === activeGroup)?.emojis || emojiGroups[0].emojis;
   }, [activeGroup, search]);
+
+  useLayoutEffect(() => {
+    if (!showPicker) return undefined;
+
+    const updatePickerPosition = () => {
+      const picker = pickerRef.current;
+      const trigger = picker?.parentElement?.previousElementSibling;
+      if (!picker || !trigger) return;
+
+      const pickerRect = picker.getBoundingClientRect();
+      const viewportWidth = window.visualViewport?.width || window.innerWidth;
+
+      if (pickerRect.right > viewportWidth - 8) {
+        const triggerRect = trigger.getBoundingClientRect();
+        setPickerPosition({
+          position: 'fixed',
+          left: Math.max(8, triggerRect.left - pickerRect.width - 8),
+          top: triggerRect.top,
+          marginTop: 0,
+          zIndex: 1101
+        });
+      } else {
+        setPickerPosition(null);
+      }
+    };
+
+    updatePickerPosition();
+    window.addEventListener('resize', updatePickerPosition);
+    window.visualViewport?.addEventListener('resize', updatePickerPosition);
+
+    return () => {
+      window.removeEventListener('resize', updatePickerPosition);
+      window.visualViewport?.removeEventListener('resize', updatePickerPosition);
+    };
+  }, [showPicker, activeGroup, search]);
 
   const react = value => {
     const normalized = value.trim();
@@ -170,7 +207,9 @@ export default function MessageReactions({ reactions = [], userId, onReact, show
       })}
       {showPicker && (
         <div
+          ref={pickerRef}
           style={{
+            ...(pickerPosition || {}),
             display: 'flex',
             flexDirection: 'column',
             gap: 10,

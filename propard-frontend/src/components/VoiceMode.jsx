@@ -1,11 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { getSupportedRecordingMimeType, transcribeAudio } from '../utils/audioTranscription';
 
 const getRecognition = () => {
   if (typeof window === 'undefined') return null;
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 };
 
+const normalizeTranscript = value => String(value || '')
+  .replace(/\bpro\s*dromes?\s+ai\b/gi, 'Propard AI')
+  .replace(/\bpro\s*part\s+ai\b/gi, 'Propard AI')
+  .replace(/\bpropard\s+ia\b/gi, 'Propard AI')
+  .replace(/\bpropard\s+ai\b/gi, 'Propard AI')
+  .replace(/\bla\s*banane\s*415\b/gi, 'LaBanane415')
+  .replace(/\bbanane\s*vr\b/gi, 'BananeVR');
+
+function MicrophoneIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+      <rect x="9" y="2.5" width="6" height="12" rx="3" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M8.5 21.5h7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function VoiceMode({ onSend, sending }) {
+  const { token } = useAuth();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState('classic');
   const [voices, setVoices] = useState([]);
@@ -17,13 +37,21 @@ export default function VoiceMode({ onSend, sending }) {
   });
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [active, setActive] = useState(false);
   const [status, setStatus] = useState('');
+  const [fallbackAvailable, setFallbackAvailable] = useState(false);
+  const [fallbackRecording, setFallbackRecording] = useState(false);
   const recognitionRef = useRef(null);
   const activeRef = useRef(false);
   const processingRef = useRef(false);
   const transcriptRef = useRef('');
   const modeRef = useRef(mode);
   const restartRef = useRef(null);
+  const recorderRef = useRef(null);
+  const recorderStreamRef = useRef(null);
+  const recorderChunksRef = useRef([]);
+  const recorderTimerRef = useRef(null);
+  const recognitionStartTimeoutRef = useRef(null);
 
   useEffect(() => {
     modeRef.current = mode;
@@ -48,33 +76,66 @@ export default function VoiceMode({ onSend, sending }) {
     activeRef.current = false;
     window.clearTimeout(restartRef.current);
     recognitionRef.current?.stop?.();
+    if (recorderRef.current?.state && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
+    recorderStreamRef.current?.getTracks().forEach(track => track.stop());
+    recorderStreamRef.current = null;
+    window.clearTimeout(recorderTimerRef.current);
     window.speechSynthesis?.cancel?.();
   }, []);
 
   const selectedVoice = () => voices.find(item => item.voiceURI === voiceURI) || voices.find(item => item.lang?.toLowerCase().startsWith('fr')) || voices[0] || null;
 
   const speak = text => new Promise(resolve => {
-    if (!text || !window.speechSynthesis) {
+    if (!text) {
       resolve();
       return;
     }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text.slice(0, 12000));
-    const voice = selectedVoice();
-    if (voice) utterance.voice = voice;
-    utterance.lang = voice?.lang || 'fr-FR';
-    utterance.rate = rate;
-    utterance.onstart = () => setSpeaking(true);
-    utterance.onend = () => { setSpeaking(false); resolve(); };
-    utterance.onerror = () => { setSpeaking(false); resolve(); };
-    window.speechSynthesis.speak(utterance);
+
+    const synthesis = window.speechSynthesis;
+    const Utterance = window.SpeechSynthesisUtterance || globalThis.SpeechSynthesisUtterance;
+    if (!synthesis || typeof Utterance !== 'function') {
+      setStatus('La synthèse vocale n’est pas disponible dans ce navigateur. La réponse reste affichée dans la conversation.');
+      resolve();
+      return;
+    }
+
+    synthesis.cancel();
+    let settled = false;
+    let timeout;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      setSpeaking(false);
+      resolve();
+    };
+
+    try {
+      const utterance = new Utterance(text.slice(0, 12000));
+      const voice = selectedVoice();
+      if (voice) utterance.voice = voice;
+      utterance.lang = voice?.lang || 'fr-FR';
+      utterance.rate = rate;
+      utterance.onstart = () => setSpeaking(true);
+      utterance.onend = finish;
+      utterance.onerror = finish;
+      timeout = window.setTimeout(finish, 60000);
+      synthesis.speak(utterance);
+    } catch {
+      finish();
+      setStatus('Impossible de lire la réponse à voix haute sur cet appareil.');
+    }
   });
 
   const stop = () => {
     activeRef.current = false;
+    setActive(false);
     processingRef.current = false;
     window.clearTimeout(restartRef.current);
+    window.clearTimeout(recorderTimerRef.current);
+    window.clearTimeout(recognitionStartTimeoutRef.current);
     recognitionRef.current?.stop?.();
+    if (recorderRef.current?.state && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
     window.speechSynthesis?.cancel?.();
     setListening(false);
     setSpeaking(false);
@@ -92,7 +153,10 @@ export default function VoiceMode({ onSend, sending }) {
       if (modeRef.current === 'direct' && activeRef.current) {
         setStatus('Je t’écoute…');
         processingRef.current = false;
-        restartRef.current = window.setTimeout(() => startRecognition(), 350);
+        restartRef.current = window.setTimeout(() => {
+          if (fallbackAvailable) void startFallbackRecording();
+          else startRecognition();
+        }, 350);
       } else {
         processingRef.current = false;
         setStatus(answer ? 'Réponse terminée.' : 'Aucune réponse reçue.');
@@ -103,10 +167,92 @@ export default function VoiceMode({ onSend, sending }) {
     }
   };
 
+  const stopFallbackTracks = () => {
+    recorderStreamRef.current?.getTracks().forEach(track => track.stop());
+    recorderStreamRef.current = null;
+  };
+
+  const startFallbackRecording = async () => {
+    if (!activeRef.current || processingRef.current || sending) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      activeRef.current = false;
+      setActive(false);
+      setStatus('Cet appareil ne permet pas l’enregistrement audio dans ce navigateur.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!activeRef.current) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      recorderStreamRef.current = stream;
+      recorderChunksRef.current = [];
+      const mimeType = getSupportedRecordingMimeType();
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recorderRef.current = recorder;
+      recorder.ondataavailable = event => {
+        if (event.data?.size) recorderChunksRef.current.push(event.data);
+      };
+      recorder.onerror = () => {
+        stopFallbackTracks();
+        setFallbackRecording(false);
+        setListening(false);
+        activeRef.current = false;
+        setActive(false);
+        setStatus('Une erreur est survenue pendant l’enregistrement vocal.');
+      };
+      recorder.onstop = async () => {
+        stopFallbackTracks();
+        setFallbackRecording(false);
+        setListening(false);
+        recorderRef.current = null;
+        if (!activeRef.current) return;
+        const blob = new Blob(recorderChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        processingRef.current = true;
+        setStatus('Transcription de ta voix…');
+        try {
+          const transcript = normalizeTranscript(await transcribeAudio(blob, token));
+          processingRef.current = false;
+          if (modeRef.current === 'classic') {
+            activeRef.current = false;
+            setActive(false);
+          }
+          await sendRecognizedText(transcript);
+        } catch (error) {
+          processingRef.current = false;
+          activeRef.current = false;
+          setActive(false);
+          setStatus(error.response?.data?.error || error.message || 'La transcription vocale a échoué.');
+        }
+      };
+      recorder.start(250);
+      setFallbackRecording(true);
+      setListening(true);
+      setStatus('Je t’écoute. Parle, je transcris automatiquement après quelques secondes.');
+      recorderTimerRef.current = window.setTimeout(() => {
+        if (recorder.state !== 'inactive') recorder.stop();
+      }, 12000);
+    } catch (error) {
+      stopFallbackTracks();
+      activeRef.current = false;
+      setActive(false);
+      setFallbackRecording(false);
+      setListening(false);
+      setStatus(error?.name === 'NotAllowedError'
+        ? 'Autorise le microphone dans les réglages du navigateur.'
+        : error.message || 'Impossible d’accéder au microphone.');
+    }
+  };
+
   const startRecognition = () => {
     const Recognition = getRecognition();
     if (!Recognition) {
-      setStatus('La reconnaissance vocale n’est pas prise en charge par ce navigateur. Essaie Chrome ou un navigateur compatible.');
+      setFallbackAvailable(true);
+      activeRef.current = false;
+      setActive(false);
+      setStatus('La reconnaissance native est indisponible. Autorise l’enregistrement de secours si tu acceptes que l’audio soit transcrit par Groq.');
       return;
     }
     if (!activeRef.current || processingRef.current || sending) return;
@@ -114,11 +260,17 @@ export default function VoiceMode({ onSend, sending }) {
     recognition.lang = 'fr-FR';
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    recognition.maxAlternatives = 3;
     transcriptRef.current = '';
-    recognition.onstart = () => setListening(true);
+    recognition.onstart = () => {
+      window.clearTimeout(recognitionStartTimeoutRef.current);
+      setListening(true);
+    };
     recognition.onresult = event => {
-      transcriptRef.current = event.results?.[0]?.[0]?.transcript || '';
+      const alternatives = Array.from(event.results?.[0] || []);
+      const preferred = alternatives.find(item => /\b(?:propard|pro\s*dromes?\s+ai|pro\s*part\s+ai|la\s*banane\s*415|banane\s*vr)\b/i.test(item.transcript))
+        || alternatives[0];
+      transcriptRef.current = normalizeTranscript(preferred?.transcript || '');
       setListening(false);
       if (modeRef.current === 'direct') {
         recognition.stop();
@@ -126,15 +278,24 @@ export default function VoiceMode({ onSend, sending }) {
       }
     };
     recognition.onerror = event => {
+      window.clearTimeout(recognitionStartTimeoutRef.current);
       setListening(false);
-      if (event.error !== 'aborted' && event.error !== 'no-speech') {
-        setStatus('Erreur du micro : ' + event.error);
+      if (event.error !== 'aborted') {
+        activeRef.current = false;
+        setActive(false);
+        setFallbackAvailable(true);
+        setStatus(event.error === 'no-speech'
+          ? 'Aucune voix détectée. Tu peux utiliser l’enregistrement de secours.'
+          : 'La reconnaissance vocale du navigateur a échoué : ' + event.error + '. Tu peux utiliser l’enregistrement de secours.');
       }
     };
     recognition.onend = () => {
+      window.clearTimeout(recognitionStartTimeoutRef.current);
       setListening(false);
-      if (modeRef.current === 'classic' && transcriptRef.current) {
-        sendRecognizedText(transcriptRef.current);
+      if (modeRef.current === 'classic') {
+        activeRef.current = false;
+        setActive(false);
+        if (transcriptRef.current) sendRecognizedText(transcriptRef.current);
       } else if (modeRef.current === 'direct' && activeRef.current && !processingRef.current) {
         restartRef.current = window.setTimeout(() => startRecognition(), 450);
       }
@@ -142,9 +303,23 @@ export default function VoiceMode({ onSend, sending }) {
     recognitionRef.current = recognition;
     try {
       recognition.start();
+      recognitionStartTimeoutRef.current = window.setTimeout(() => {
+        if (recognitionRef.current !== recognition) return;
+        recognitionRef.current = null;
+        recognition.abort?.();
+        activeRef.current = false;
+        setActive(false);
+        setListening(false);
+        setFallbackAvailable(true);
+        setStatus('La reconnaissance native ne démarre pas. Tu peux autoriser l’enregistrement de secours via Groq.');
+      }, 8000);
       setStatus(modeRef.current === 'direct' ? 'Je t’écoute…' : 'Parle maintenant…');
     } catch {
-      setStatus('Impossible de démarrer le micro. Vérifie son autorisation.');
+      window.clearTimeout(recognitionStartTimeoutRef.current);
+      activeRef.current = false;
+      setActive(false);
+      setFallbackAvailable(true);
+      setStatus('Impossible de démarrer la reconnaissance native. Tu peux utiliser l’enregistrement de secours.');
     }
   };
 
@@ -154,18 +329,20 @@ export default function VoiceMode({ onSend, sending }) {
     modeRef.current = selectedMode;
     setMode(selectedMode);
     activeRef.current = true;
+    setActive(true);
     processingRef.current = false;
+    setFallbackAvailable(false);
     startRecognition();
   };
 
   const saveVoice = value => {
     setVoiceURI(value);
-    try { localStorage.setItem('propard_ai_voice', value); } catch {}
+    try { localStorage.setItem('propard_ai_voice', value); } catch (error) { console.warn('Impossible de sauvegarder la voix choisie:', error.message); }
   };
 
   const saveRate = value => {
     setRate(value);
-    try { localStorage.setItem('propard_ai_voice_rate', String(value)); } catch {}
+    try { localStorage.setItem('propard_ai_voice_rate', String(value)); } catch (error) { console.warn('Impossible de sauvegarder la vitesse vocale:', error.message); }
   };
 
   const preview = () => speak('Bonjour, je suis Propard AI. Comment puis-je t’aider aujourd’hui ?');
@@ -173,7 +350,7 @@ export default function VoiceMode({ onSend, sending }) {
   return (
     <>
       <button type="button" onClick={() => { setOpen(true); setStatus('Choisis un mode vocal pour commencer.'); }} style={{ border: '1px solid var(--border)', borderRadius: 9, padding: '7px 10px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 650 }}>
-        ♫ Mode vocal
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><MicrophoneIcon /> Mode vocal</span>
       </button>
       {open && <div role="dialog" aria-modal="true" aria-label="Mode vocal Propard AI" style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.62)', display: 'grid', placeItems: 'center', padding: 16 }}>
         <section style={{ width: '100%', maxWidth: 440, maxHeight: '90dvh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 18, padding: 20, boxShadow: '0 20px 70px rgba(0,0,0,.35)' }}>
@@ -208,11 +385,13 @@ export default function VoiceMode({ onSend, sending }) {
             </label>
             <input id="propard-voice-rate" type="range" min="0.75" max="1.25" step="0.05" value={rate} onChange={event => saveRate(Number(event.target.value))} style={{ width: '100%' }} />
           </div>
+          {fallbackAvailable && !active && <button type="button" onClick={() => { activeRef.current = true; setActive(true); processingRef.current = false; void startFallbackRecording(); }} disabled={sending} style={{ width: '100%', marginTop: 12, border: '1px solid var(--border)', borderRadius: 9, padding: 10, background: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: 'pointer' }}>Utiliser l’enregistrement vocal de secours</button>}
           <div aria-live="polite" style={{ marginTop: 18, padding: 12, borderRadius: 10, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontSize: 13 }}>
-            {listening ? '🎙️ Micro actif, je t’écoute…' : speaking ? '🔊 Propard AI parle…' : status}
+            {fallbackRecording ? '🎙️ Enregistrement actif…' : listening ? '🎙️ Micro actif, je t’écoute…' : speaking ? '🔊 Propard AI parle…' : status}
           </div>
-          {(listening || speaking || activeRef.current) && <button type="button" onClick={stop} style={{ width: '100%', marginTop: 12, border: 0, borderRadius: 9, padding: 12, background: 'var(--danger)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Arrêter le mode vocal</button>}
-          <p style={{ color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.5, margin: '14px 0 0' }}>La voix et la reconnaissance sont fournies par le navigateur et l’appareil. La disponibilité des voix et du micro dépend du navigateur. L’audio n’est pas enregistré par Propard.</p>
+          {fallbackRecording && <button type="button" onClick={() => { window.clearTimeout(recorderTimerRef.current); if (recorderRef.current?.state !== 'inactive') recorderRef.current?.stop(); }} style={{ width: '100%', marginTop: 12, border: '1px solid var(--border)', borderRadius: 9, padding: 11, background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontWeight: 650, cursor: 'pointer' }}>Terminer et transcrire</button>}
+          {(listening || speaking || active) && <button type="button" onClick={stop} style={{ width: '100%', marginTop: 12, border: 0, borderRadius: 9, padding: 12, background: 'var(--danger)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Arrêter le mode vocal</button>}
+          <p style={{ color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.5, margin: '14px 0 0' }}>La voix de lecture est fournie par le navigateur. Si la reconnaissance vocale native est indisponible, l’enregistrement de secours transmet temporairement l’audio à Groq pour transcription. L’audio n’est pas conservé par Propard.</p>
         </section>
       </div>}
     </>

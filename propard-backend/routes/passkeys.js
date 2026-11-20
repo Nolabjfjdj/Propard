@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const { sendPushNotification } = require('../services/push');
 const User = require('../models/User');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { getClientIp } = require('../utils/clientIp');
@@ -14,6 +15,18 @@ const registrationLimiter = createRateLimiter({
   max: 12,
   keyFn: req => `passkey-register:${req.user.id}`,
   message: 'Trop de tentatives de création de clé. Réessaie plus tard.'
+});
+const passkeyReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyFn: req => `passkey-read:${req.user.id}`,
+  message: 'Trop de consultations des clés d’accès. Réessaie plus tard.'
+});
+const passkeyManagementLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyFn: req => `passkey-manage:${req.user.id}`,
+  message: 'Trop de modifications des clés d’accès. Réessaie plus tard.'
 });
 const loginLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
@@ -75,6 +88,46 @@ const issueToken = user => jwt.sign(
   process.env.JWT_SECRET,
   { algorithm: 'HS256', expiresIn: '7d' }
 );
+async function recordIssuedSession(userId, token, req, eventType = 'passkey_login') {
+  const decoded = jwt.decode(token);
+  if (!decoded?.jti || !decoded?.exp) return;
+  const user = await User.findById(userId).select('+activeSessions +revokedSessions +securityEvents');
+  if (!user) throw new Error('Utilisateur introuvable lors de la création de session.');
+  const now = new Date();
+  const hadExistingSession = (user.activeSessions || []).some(session => session.expiresAt > now);
+  user.activeSessions = (user.activeSessions || []).filter(session => session.expiresAt > now);
+  user.revokedSessions = (user.revokedSessions || []).filter(session => session.expiresAt > now);
+  user.activeSessions.push({
+    jti: decoded.jti,
+    createdAt: now,
+    expiresAt: new Date(decoded.exp * 1000),
+    userAgent: String(req.get('user-agent') || '').slice(0, 300) || null
+  });
+  while (user.activeSessions.length > 10) {
+    const oldest = user.activeSessions.shift();
+    if (oldest.expiresAt > now) {
+      user.revokedSessions.push({ jti: oldest.jti, expiresAt: oldest.expiresAt });
+      const disconnect = req.app.get('disconnectUserSessionSockets');
+      if (typeof disconnect === 'function') disconnect(userId, oldest.jti);
+    }
+  }
+  user.revokedSessions = user.revokedSessions.slice(-100);
+  user.securityEvents = [...(user.securityEvents || []), {
+    eventType,
+    createdAt: now,
+    userAgent: String(req.get('user-agent') || '').slice(0, 300) || null
+  }].slice(-50);
+  await user.save();
+  if (hadExistingSession && eventType !== 'registration') {
+    void sendPushNotification(userId, {
+      title: 'Alerte de sécurité Propard',
+      body: 'Une nouvelle connexion à ton compte a été détectée.',
+      url: '/settings',
+      tag: 'propard-security-login',
+      data: { type: 'security-login' }
+    }).catch(error => console.error('Security login alert failed:', error.message));
+  }
+}
 const publicUser = user => ({
   id: user._id,
   username: user.username,
@@ -88,7 +141,7 @@ const publicUser = user => ({
     : null
 });
 
-router.get('/', auth, async (req, res) => {
+router.get('/', auth, passkeyReadLimiter, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('+passkeys +passkeyRecoveryCodes');
     if (!user) return res.status(404).json({ error: 'Compte introuvable.' });
@@ -171,7 +224,7 @@ router.post('/register/verify', auth, registrationLimiter, async (req, res) => {
           passkeyRegistrationOrigin: null
         }
       },
-      { new: true },
+      { returnDocument: 'after' },
       '+passkeys +passkeyRecoveryCodes'
     );
     if (!user) return res.status(400).json({ error: 'Cette demande a déjà été utilisée. Recommence la création de la clé.' });
@@ -220,7 +273,7 @@ router.post('/register/verify', auth, registrationLimiter, async (req, res) => {
   }
 });
 
-router.patch('/:credentialId', auth, async (req, res) => {
+router.patch('/:credentialId', auth, passkeyManagementLimiter, async (req, res) => {
   try {
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
     if (!name || name.length > 40) return res.status(400).json({ error: 'Nom invalide (1 à 40 caractères).' });
@@ -236,7 +289,7 @@ router.patch('/:credentialId', auth, async (req, res) => {
   }
 });
 
-router.delete('/:credentialId', auth, async (req, res) => {
+router.delete('/:credentialId', auth, passkeyManagementLimiter, async (req, res) => {
   try {
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
     if (!password || password.length > 128) return res.status(400).json({ error: 'Mot de passe requis.' });
@@ -348,7 +401,7 @@ router.post('/login/verify', loginLimiter, async (req, res) => {
           passkeyLoginOrigin: null
         }
       },
-      { new: true },
+      { returnDocument: 'after' },
       '+passkeys'
     );
     if (!claimedUser) return res.status(401).json({ error: 'Cette vérification a déjà été utilisée. Recommence la connexion.' });
@@ -376,7 +429,9 @@ router.post('/login/verify', loginLimiter, async (req, res) => {
     stored.counter = verification.authenticationInfo.newCounter;
     stored.lastUsedAt = new Date();
     await claimedUser.save();
-    return res.json({ token: issueToken(claimedUser), user: publicUser(claimedUser) });
+    const token = issueToken(claimedUser);
+    await recordIssuedSession(claimedUser._id, token, req);
+    return res.json({ token, user: publicUser(claimedUser) });
   } catch (error) {
     console.error('Passkey login verification failed:', error);
     return res.status(401).json({ error: 'La vérification de la clé d’accès a échoué.' });
@@ -410,12 +465,14 @@ router.post('/login/recovery', loginLimiter, async (req, res) => {
           passkeyRecoveryCodes: hashed
         }
       },
-      { new: true },
+      { returnDocument: 'after' },
       '+passkeyRecoveryCodes'
     );
     if (!claimedUser) return res.status(401).json({ error: 'Code de récupération invalide ou déjà utilisé.' });
+    const token = issueToken(claimedUser);
+    await recordIssuedSession(claimedUser._id, token, req, 'recovery_code_login');
     return res.json({
-      token: issueToken(claimedUser),
+      token,
       user: publicUser(claimedUser),
       remainingRecoveryCodes: claimedUser.passkeyRecoveryCodes.length
     });

@@ -44,11 +44,11 @@ export default function SupportConversationPage({ reference }) {
   }, [accessToken, reference]);
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken || ticket?.status === 'resolved') return;
     refresh();
-    const interval = window.setInterval(refresh, 5000);
+    const interval = window.setInterval(refresh, 15000);
     return () => window.clearInterval(interval);
-  }, [accessToken, refresh]);
+  }, [accessToken, refresh, ticket?.status]);
 
   const send = async event => {
     event.preventDefault();
