@@ -2457,7 +2457,7 @@ export default function GroupChat({
             alignItems: 'center',
             gap: '12px',
             cursor: 'pointer',
-            flexShrink: 0,
+            flex: '1 1 auto',
             minWidth: 0
           }}
         >
@@ -2509,7 +2509,12 @@ export default function GroupChat({
             marginLeft: 'auto',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            justifyContent: 'flex-end',
+            gap: '6px',
+            flex: '0 1 auto',
+            flexWrap: 'wrap',
+            minWidth: 0,
+            maxWidth: '100%'
           }}
         >
           <ConversationGallery messages={messages} token={token} userId={myId} scope="group" conversationId={group._id} />
@@ -2521,13 +2526,13 @@ export default function GroupChat({
               e.stopPropagation();
               reportConversation();
             }}
-            style={{ ...styles.callBtn, width: 'auto', padding: '0 10px', borderRadius: '8px', color: 'var(--danger)', fontSize: '12px', whiteSpace: 'nowrap' }}
+            style={{ ...styles.callBtn, width: 'auto', padding: '0 7px', borderRadius: '8px', color: 'var(--danger)', fontSize: '11px', whiteSpace: 'nowrap' }}
             title="Signaler toute la conversation"
             aria-label="Signaler toute la conversation"
           >
             Signaler
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
             <button
               style={styles.callBtn}
               title="Appel vocal du groupe"
@@ -3417,8 +3422,9 @@ const styles = {
   header: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    padding: '16px 20px',
+    gap: '8px',
+    padding: '10px 12px',
+    flexWrap: 'wrap',
     background:
       'var(--bg-secondary)',
     borderBottom:
@@ -3476,9 +3482,12 @@ const styles = {
     border:
       '1px solid var(--border)',
     borderRadius: '8px',
-    padding: '6px 10px',
-    fontSize: '16px',
-    cursor: 'pointer'
+    padding: '5px 7px',
+    minWidth: '34px',
+    minHeight: '34px',
+    fontSize: '15px',
+    cursor: 'pointer',
+    flexShrink: 0
   },
 
   leaveBtn: {
@@ -3487,9 +3496,12 @@ const styles = {
     border:
       '1px solid var(--border)',
     borderRadius: '8px',
-    padding: '6px 10px',
-    fontSize: '16px',
-    cursor: 'pointer'
+    padding: '5px 7px',
+    minWidth: '34px',
+    minHeight: '34px',
+    fontSize: '15px',
+    cursor: 'pointer',
+    flexShrink: 0
   },
 
   messages: {
