@@ -1226,7 +1226,7 @@ export default function AppPage({
                 onClick={() =>
                   setShowSidebar(false)
                 }
-                style={styles.iconBtn}
+                style={{ ...styles.iconBtn, color: 'var(--accent)' }}
               >
                 ✕
               </button>
@@ -2226,6 +2226,7 @@ const styles = {
 
   hamburger: {
     background: 'var(--bg-tertiary)',
+    color: 'var(--accent)',
     border: '1px solid var(--border)',
     borderRadius: '8px',
     padding: '6px 10px',
