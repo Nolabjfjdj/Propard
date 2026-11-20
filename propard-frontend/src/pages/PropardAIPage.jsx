@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../utils/api';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import FileAttachments from '../components/FileAttachments';
 import VoiceMode from '../components/VoiceMode';
 import VoiceDictationButton from '../components/VoiceDictationButton';
 import { useAuth } from '../context/AuthContext';
@@ -122,6 +123,7 @@ export default function PropardAIPage({ initialConversationId = null }) {
         if (!privateKey) throw new Error('Clé privée E2EE locale introuvable.');
 
         let response;
+        let latestMessage = null;
         let plaintext = null;
         if (pendingRead.type === 'private_message') {
           const profileResponse = await api.get(
@@ -138,6 +140,7 @@ export default function PropardAIPage({ initialConversationId = null }) {
           );
           const latest = Array.isArray(response.data) ? response.data[0] : null;
           if (!latest) throw new Error('Aucun message dans cette conversation.');
+          latestMessage = latest;
           if (latest.encrypted === false) plaintext = latest.content || '';
           else plaintext = await decryptMessage(sharedKey, latest.content);
         } else if (pendingRead.type === 'group_message') {
@@ -167,6 +170,7 @@ export default function PropardAIPage({ initialConversationId = null }) {
           );
           const latest = Array.isArray(response.data) ? response.data[0] : null;
           if (!latest) throw new Error('Aucun message dans ce groupe.');
+          latestMessage = latest;
           if (latest.encrypted === false) plaintext = latest.content || '';
           else {
             const messageVersion = latest.keyVersion || currentVersion;
@@ -175,11 +179,13 @@ export default function PropardAIPage({ initialConversationId = null }) {
             plaintext = await decryptMessage(messageKey, latest.content);
           }
         }
-        if (plaintext === null) throw new Error('Impossible de déchiffrer ce message avec la clé locale.');
+        const attachments = Array.isArray(latestMessage?.attachments) ? latestMessage.attachments : [];
+        if (plaintext === null && attachments.length === 0) throw new Error('Impossible de déchiffrer ce message avec la clé locale.');
         if (!cancelled) setLocalReadResult({
           name: pendingRead.conversationName,
           label: pendingRead.type === 'private_message' ? (pendingRead.direction === 'sent' ? 'Dernier message envoyé à' : 'Dernier message reçu de') : 'Dernier message du groupe',
-          content: plaintext
+          content: plaintext || '',
+          attachments
         });
       } catch (err) {
         if (!cancelled) setLocalReadResult({ name: pendingRead.conversationName, error: err.response?.data?.error || err.message || 'Lecture locale impossible.' });
@@ -500,7 +506,10 @@ export default function PropardAIPage({ initialConversationId = null }) {
             {readingLocal && <div style={{ ...styles.bubble, ...styles.assistantBubble, color: 'var(--text-muted)' }}>Déchiffrement du dernier message directement sur cet appareil…</div>}
             {localReadResult && <div style={{ ...styles.bubble, ...styles.assistantBubble, border: '1px solid var(--border)' }}>
               <strong>{localReadResult.label} {localReadResult.name}</strong>
-              {localReadResult.error ? <div style={{ color: 'var(--danger)', marginTop: 8 }}>{localReadResult.error}</div> : <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginTop: 8 }}>{localReadResult.content}</div>}
+              {localReadResult.error ? <div style={{ color: 'var(--danger)', marginTop: 8 }}>{localReadResult.error}</div> : <>
+                {localReadResult.content ? <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginTop: 8 }}>{localReadResult.content}</div> : localReadResult.attachments?.length ? <div style={{ color: 'var(--text-secondary)', marginTop: 8 }}>Message sans texte, avec pièce(s) jointe(s) :</div> : null}
+                <FileAttachments attachments={localReadResult.attachments || []} token={token} userId={user?.id || user?._id} />
+              </>}
               <div style={styles.muted}>Déchiffré localement. Ce contenu n’a pas été envoyé à Groq ni enregistré dans l’historique IA.</div>
               <button type="button" onClick={() => setLocalReadResult(null)} style={{ ...styles.back, marginTop: 8, cursor: 'pointer', background: 'transparent' }}>Fermer</button>
             </div>}
