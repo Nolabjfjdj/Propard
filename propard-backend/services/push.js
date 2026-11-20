@@ -126,11 +126,21 @@ async function sendApnsPush(user, payload) {
   return delivered;
 }
 
+function canReceivePush(user) {
+  return Boolean(user && !user.pendingDeletionAt);
+}
+
+function getAuthorizedStaffUsers(staffUsers, getEffectiveStaffRole = effectiveStaffRole) {
+  return (Array.isArray(staffUsers) ? staffUsers : []).filter(
+    user => canReceivePush(user) && getEffectiveStaffRole(user._id, user.staffRole) !== 'user'
+  );
+}
+
 async function sendPushNotification(userId, payload) {
   if (!userId) return { delivered: 0 };
 
   const user = await User.findById(userId).select('pushSubscriptions apnsTokens pendingDeletionAt');
-  if (!user || user.pendingDeletionAt) return { delivered: 0 };
+  if (!canReceivePush(user)) return { delivered: 0 };
 
   const results = await Promise.all([
     sendWebPush(user, payload),
@@ -147,10 +157,8 @@ async function sendStaffHelpNotification({ kind, username, requestId }) {
   const staffUsers = await User.find({
     staffRole: { $in: staffRoles },
     [`staffNotificationPreferences.${preferenceKey}`]: { $ne: false }
-  }).select('_id staffRole staffNotificationPreferences pushSubscriptions apnsTokens');
-  const authorizedStaffUsers = staffUsers.filter(
-    user => effectiveStaffRole(user._id, user.staffRole) !== 'user'
-  );
+  }).select('_id staffRole staffNotificationPreferences pendingDeletionAt');
+  const authorizedStaffUsers = getAuthorizedStaffUsers(staffUsers, effectiveStaffRole);
 
   const requestLabel = kind === 'password_reset' ? 'Mot de passe oublié' : 'Support';
   const payload = {
@@ -168,10 +176,7 @@ async function sendStaffHelpNotification({ kind, username, requestId }) {
 
   await Promise.all(authorizedStaffUsers.map(async user => {
     try {
-      await Promise.all([
-        sendWebPush(user, payload),
-        sendApnsPush(user, payload)
-      ]);
+      await sendPushNotification(user._id, payload);
     } catch (error) {
       console.error('🔔 Account-help push error:', error.statusCode || error.message);
     }
@@ -181,5 +186,7 @@ async function sendStaffHelpNotification({ kind, username, requestId }) {
 module.exports = {
   getPublicKey,
   sendPushNotification,
-  sendStaffHelpNotification
+  sendStaffHelpNotification,
+  canReceivePush,
+  getAuthorizedStaffUsers
 };

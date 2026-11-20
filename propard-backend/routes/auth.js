@@ -20,6 +20,7 @@ const { getClientIp } = require('../utils/clientIp');
 const { isValidAvatar } = require('../utils/inputValidation');
 const { effectiveStaffRole } = require('../utils/staffAllowlist');
 const { deleteFilesForUser, deleteFilesForGroup } = require('../services/fileCleanup');
+const { revokeAllSessions } = require('../services/sessionRevocation');
 
 const accountHelpLimiter = createRateLimiter({
   windowMs: 30 * 60 * 1000,
@@ -1284,7 +1285,13 @@ router.delete('/anonymize', authMiddleware, accountDeletionLimiter, async (req, 
       user.username = `supprimé_${userId.toString().slice(-6)}`;
       user.pendingDeletionAt = new Date();
       user.isOnline = false;
+      revokeAllSessions(user);
       await user.save();
+
+      const disconnectUserSockets = req.app.get('disconnectUserSockets');
+      if (typeof disconnectUserSockets === 'function') {
+        disconnectUserSockets(userId);
+      }
     }
 
     await Promise.all([
