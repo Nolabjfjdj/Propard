@@ -3166,7 +3166,7 @@ export default function GroupChat({
           value={messageExpiry}
           onChange={event => setMessageExpiry(Number(event.target.value))}
           disabled={!key || uploadingFiles || awaitingAttachmentAck}
-          style={{ maxWidth: 96, minWidth: 78, padding: '7px 4px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontSize: 11 }}
+          style={{ maxWidth: 92, minWidth: 82, minHeight: 36, flexShrink: 0, whiteSpace: 'nowrap', padding: '8px 4px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontSize: 10 }}
         >
           <option value={0}>Normal</option>
           <option value={3600}>1 heure</option>
@@ -3350,7 +3350,7 @@ export default function GroupChat({
         </div>
 
         <button type="button" onClick={() => setPollOpen(true)} disabled={!key || uploadingFiles || awaitingAttachmentAck} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 9px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: 11 }}>Sondage</button>
-        <ScheduledMessageControl token={token} scope="group" conversationId={group?._id} disabled={!key || !input.trim() || uploadingFiles || awaitingAttachmentAck} onSchedule={scheduleMessage} />
+        <ScheduledMessageControl token={token} scope="group" conversationId={group?._id} disabled={!key || uploadingFiles || awaitingAttachmentAck} hasMessage={Boolean(input.trim())} onSchedule={scheduleMessage} />
         <EmojiPicker onSelect={emoji => setInput(value => value + emoji)} />
         <button
           onClick={sendMessage}
@@ -3393,7 +3393,9 @@ const styles = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    height: '100vh',
+    height: '100%',
+    minHeight: 0,
+    minWidth: 0,
     position: 'relative'
   },
 
@@ -3477,7 +3479,10 @@ const styles = {
 
   messages: {
     flex: 1,
+    minHeight: 0,
     overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    overscrollBehaviorY: 'contain',
     padding: '20px',
     display: 'flex',
     flexDirection: 'column',
