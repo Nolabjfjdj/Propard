@@ -4,7 +4,10 @@ const assert = require('node:assert/strict');
 const staffId = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 process.env.STAFF_SUPPORT_IDS = staffId;
 
+const allowlistPath = require.resolve('../utils/staffAllowlist');
+delete require.cache[allowlistPath];
 const User = require('../models/User');
+delete require.cache[allowlistPath];
 const { canReceivePush, sendStaffHelpNotification } = require('./push');
 
 test('push eligibility excludes accounts pending deletion', () => {
