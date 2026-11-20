@@ -7,7 +7,7 @@ const GroupMessage = require('../models/GroupMessage');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
-const { MAX_AVATAR_LENGTH, MAX_GROUP_NAME_LENGTH, isEncryptedMessagePayload } = require('../utils/inputValidation');
+const { MAX_GROUP_NAME_LENGTH, isValidAvatar, isEncryptedMessagePayload } = require('../utils/inputValidation');
 const { parseMessagePagination } = require('../utils/messagePagination');
 const { deleteMessageAttachments, deleteFilesForGroup } = require('../services/fileCleanup');
 
@@ -336,11 +336,7 @@ router.post(
         });
       }
 
-      if (
-        avatar !== null &&
-        avatar !== undefined &&
-        (typeof avatar !== 'string' || avatar.length > MAX_AVATAR_LENGTH)
-      ) {
+      if (!isValidAvatar(avatar ?? null)) {
         return res.status(400).json({
           error:
             'Avatar invalide ou trop volumineux'
@@ -1251,27 +1247,8 @@ router.patch(
         req.body.avatar !==
         undefined
       ) {
-        if (
-          req.body.avatar !== null &&
-          typeof req.body.avatar !==
-            'string'
-        ) {
-          return res.status(400).json({
-            error:
-              'Avatar invalide'
-          });
-        }
-
-        if (
-          typeof req.body.avatar ===
-            'string' &&
-          req.body.avatar.length >
-            MAX_AVATAR_LENGTH
-        ) {
-          return res.status(400).json({
-            error:
-              'Avatar trop volumineux'
-          });
+        if (!isValidAvatar(req.body.avatar)) {
+          return res.status(400).json({ error: 'Avatar invalide ou format non pris en charge.' });
         }
 
         group.avatar =

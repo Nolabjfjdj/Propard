@@ -4,6 +4,11 @@ const MAX_ICE_CANDIDATE_LENGTH = 20000;
 const MAX_AVATAR_LENGTH = 1000000;
 const MAX_DISPLAY_NAME_LENGTH = 32;
 const MAX_GROUP_NAME_LENGTH = 50;
+const AVATAR_RE = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/;
+
+function isValidAvatar(value) {
+  return value === null || (typeof value === 'string' && value.length <= MAX_AVATAR_LENGTH && AVATAR_RE.test(value));
+}
 
 function isEncryptedMessagePayload(content) {
   if (
@@ -71,6 +76,7 @@ module.exports = {
   MAX_AVATAR_LENGTH,
   MAX_DISPLAY_NAME_LENGTH,
   MAX_GROUP_NAME_LENGTH,
+  isValidAvatar,
   isEncryptedMessagePayload,
   isSessionDescription,
   isIceCandidate

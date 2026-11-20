@@ -17,7 +17,7 @@ const AIConversation = require('../models/AIConversation');
 const authMiddleware = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { getClientIp } = require('../utils/clientIp');
-const { MAX_AVATAR_LENGTH } = require('../utils/inputValidation');
+const { isValidAvatar } = require('../utils/inputValidation');
 const { effectiveStaffRole } = require('../utils/staffAllowlist');
 const { deleteFilesForUser, deleteFilesForGroup } = require('../services/fileCleanup');
 
@@ -277,7 +277,7 @@ const registerRateLimiter = createRateLimiter({
 });
 
 function generateIpAlias() {
-  const part = () => Math.floor(Math.random() * 254) + 1;
+  const part = () => crypto.randomInt(1, 255);
   return `${part()}.${part()}.${part()}.${part()}`;
 }
 
@@ -887,19 +887,8 @@ router.patch('/me', authMiddleware, profileUpdateLimiter, async (req, res) => {
     }
 
     if (avatar !== undefined) {
-      if (avatar !== null && typeof avatar !== 'string') {
-        return res.status(400).json({
-          error: 'Avatar invalide'
-        });
-      }
-
-      if (
-        typeof avatar === 'string' &&
-        avatar.length > MAX_AVATAR_LENGTH
-      ) {
-        return res.status(400).json({
-          error: 'Avatar trop volumineux'
-        });
+      if (!isValidAvatar(avatar)) {
+        return res.status(400).json({ error: 'Avatar invalide ou format non pris en charge.' });
       }
 
       user.avatar = avatar || null;
@@ -1050,7 +1039,10 @@ router.get('/user/:id', authMiddleware, publicProfileReadLimiter, async (req, re
 
 router.patch('/publickey', authMiddleware, keyChangeLimiter, async (req, res) => {
   try {
-    const { publicKey } = req.body;
+    const { publicKey, password } = req.body;
+    if (typeof password !== 'string' || !password || password.length > 128) {
+      return res.status(400).json({ error: 'Mot de passe requis.' });
+    }
 
     if (!publicKey || typeof publicKey !== 'string') {
       return res.status(400).json({
@@ -1096,11 +1088,21 @@ router.patch('/publickey', authMiddleware, keyChangeLimiter, async (req, res) =>
       key_ops: []
     };
 
-    await User.findByIdAndUpdate(
-      req.user.id,
-      { publicKey: JSON.stringify(sanitizedPublicKey) }
-    );
-
+    const user = await User.findById(req.user.id).select('+password friends publicKey');
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ error: 'Mot de passe incorrect.' });
+    }
+    const newPublicKey = JSON.stringify(sanitizedPublicKey);
+    const changed = user.publicKey !== newPublicKey;
+    user.publicKey = newPublicKey;
+    await user.save();
+    if (changed) {
+      const io = req.app.get('io');
+      const emitToUser = req.app.get('emitToUser');
+      for (const friend of user.friends || []) {
+        if (friend.userId) emitToUser?.(io, friend.userId.toString(), 'friendKeyChanged', { userId: req.user.id.toString() });
+      }
+    }
     res.json({ success: true });
   } catch (e) {
     console.error(e);
@@ -1515,10 +1517,7 @@ async function finalizeExpiredDeletions() {
     });
 
     for (const user of expired) {
-      user.password = await bcrypt.hash(
-        Math.random().toString(36) + Date.now(),
-        10
-      );
+      user.password = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
 
       user.ipAlias = await generateUniqueIpAlias();
       user.realUsername = null;

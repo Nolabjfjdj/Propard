@@ -9,9 +9,10 @@ const authMiddleware = require('../middleware/auth');
 const { roleLevel } = require('../middleware/staffRoles');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { getClientIp } = require('../utils/clientIp');
+const { isSoleOwner } = require('../utils/staffAllowlist');
 
 function requireSoleOwner(req, res, next) {
-  if (req.user?.staffRole !== 'owner') {
+  if (req.user?.staffRole !== 'owner' || !isSoleOwner(req.user.id)) {
     return res.status(403).json({ error: 'Accès réservé au propriétaire unique de Propard.' });
   }
   return next();

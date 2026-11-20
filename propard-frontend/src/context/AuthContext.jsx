@@ -188,6 +188,7 @@ const ensureEncryptionKeys = async (
             '/api/auth/publickey',
             {
               publicKey: JSON.stringify(derivedPublicKeyJwk),
+              password,
               ...(captchaToken ? { captchaToken } : {})
             },
             {

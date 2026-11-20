@@ -20,6 +20,11 @@ const {
 }=require('./utils/inputValidation');
 require('dotenv').config();
 
+if (Buffer.byteLength(process.env.JWT_SECRET || '', 'utf8') < 32) {
+  console.error('JWT_SECRET doit contenir au moins 32 octets.');
+  process.exit(1);
+}
+
 const app=express();
 const server=http.createServer(app);
 
@@ -77,6 +82,8 @@ app.use((req,res,next)=>{
   res.setHeader('X-Content-Type-Options','nosniff');
   res.setHeader('X-Frame-Options','DENY');
   res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
+  res.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains');
+  res.setHeader('Permissions-Policy','camera=(self), microphone=(self), geolocation=()');
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; " +

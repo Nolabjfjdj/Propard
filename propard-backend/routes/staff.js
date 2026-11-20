@@ -17,6 +17,7 @@ const { ROLE_LEVELS, roleLevel, requireStaffRole, canManageRole } = require('../
 const { effectiveStaffRole } = require('../utils/staffAllowlist');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { getClientIp } = require('../utils/clientIp');
+const { isSoleOwner } = require('../utils/staffAllowlist');
 const { deleteFilesForUser, deleteFilesForGroup } = require('../services/fileCleanup');
 
 const router = express.Router();
@@ -51,7 +52,7 @@ function checkAnnouncementKey(providedKey) {
 }
 
 function requireSoleOwner(req, res, next) {
-  if (req.user?.staffRole !== 'owner') {
+  if (req.user?.staffRole !== 'owner' || !isSoleOwner(req.user.id)) {
     return res.status(403).json({ error: 'Seul le propriétaire unique peut gérer les annonces globales.' });
   }
   return next();

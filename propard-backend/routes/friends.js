@@ -20,10 +20,18 @@ const messageReadReceiptLimiter = createRateLimiter({
 
 async function areFriends(userId, friendId) {
   const user = await User.findById(userId).select('friends');
+  return !!user && (user.friends || []).some(f => f.userId.toString() === friendId.toString());
+}
 
-  return !!user && user.friends.some(
-    f => f.userId.toString() === friendId.toString()
-  );
+async function canInteract(userId, otherId) {
+  const [me, other] = await Promise.all([
+    User.findById(userId).select('friends blockedUsers'),
+    User.findById(otherId).select('friends blockedUsers')
+  ]);
+  if (!me || !other) return false;
+  const hasFriend = (user, id) => (user.friends || []).some(friend => friend.userId?.toString() === id.toString());
+  const blocked = (user, id) => (user.blockedUsers || []).some(blockedId => blockedId.toString() === id.toString());
+  return hasFriend(me, otherId) && hasFriend(other, userId) && !blocked(me, otherId) && !blocked(other, userId);
 }
 
 router.post('/add', createRateLimiter({
@@ -126,6 +134,9 @@ router.post('/add', createRateLimiter({
       });
     }
 
+    if ((targetUser.friendRequests || []).length >= 200) {
+      return res.status(400).json({ error: "Impossible d'envoyer une demande à cet utilisateur" });
+    }
     targetUser.friendRequests.push({
       from: req.user.id
     });
@@ -784,6 +795,12 @@ router.patch('/messages/:messageId', createRateLimiter({
       });
     }
 
+    if (message.deleted || message.messageType === 'poll') {
+      return res.status(400).json({ error: 'Ce message ne peut pas être modifié.' });
+    }
+    if (!(await canInteract(req.user.id, message.receiver))) {
+      return res.status(403).json({ error: 'Cette conversation n’est plus accessible.' });
+    }
     message.content = content.trim();
     message.encrypted = true;
     message.originalContent = null;
