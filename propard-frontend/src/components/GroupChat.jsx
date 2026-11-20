@@ -2438,55 +2438,70 @@ export default function GroupChat({
     <div style={styles.container}>
 
       <div
-        style={{
-          ...styles.header,
-          cursor: 'pointer'
-        }}
-        onClick={() =>
-          setShowProfile(true)
-        }
+        style={styles.header}
       >
 
         <div
-          style={
-            styles.headerAvatar
-          }
+          role="button"
+          tabIndex={0}
+          aria-label={`Ouvrir le profil du groupe ${group.name || ''}`}
+          onClick={() => setShowProfile(true)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setShowProfile(true);
+            }
+          }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            cursor: 'pointer',
+            flexShrink: 0,
+            minWidth: 0
+          }}
         >
-          {group.avatar ? (
-            <img
-              src={group.avatar}
-              alt=""
+          <div
+            style={
+              styles.headerAvatar
+            }
+          >
+            {group.avatar ? (
+              <img
+                src={group.avatar}
+                alt=""
+                style={
+                  styles.headerAvatarImage
+                }
+              />
+            ) : (
+              (
+                group.name ||
+                '?'
+              )[0].toUpperCase()
+            )}
+          </div>
+
+          <div>
+            <p
               style={
-                styles.headerAvatarImage
+                styles.headerName
               }
-            />
-          ) : (
-            (
-              group.name ||
-              '?'
-            )[0].toUpperCase()
-          )}
-        </div>
+            >
+              {group.name}
+            </p>
 
-        <div>
-          <p
-            style={
-              styles.headerName
-            }
-          >
-            {group.name}
-          </p>
-
-          <p
-            style={
-              styles.headerIp
-            }
-          >
-            {group.memberCount ||
-              group.members?.length ||
-              0}{' '}
-            membre(s)
-          </p>
+            <p
+              style={
+                styles.headerIp
+              }
+            >
+              {group.memberCount ||
+                group.members?.length ||
+                0}{' '}
+              membre(s)
+            </p>
+          </div>
         </div>
 
         <div
