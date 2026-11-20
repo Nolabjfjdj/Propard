@@ -8,6 +8,8 @@ const allowlistPath = require.resolve('../utils/staffAllowlist');
 delete require.cache[allowlistPath];
 const User = require('../models/User');
 delete require.cache[allowlistPath];
+const pushPath = require.resolve('./push');
+delete require.cache[pushPath];
 const { canReceivePush, sendStaffHelpNotification } = require('./push');
 
 test('push eligibility excludes accounts pending deletion', () => {
