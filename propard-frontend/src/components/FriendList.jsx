@@ -612,7 +612,7 @@ export default function FriendList({
         {activeFolder !== 'all' && activeFolder !== '' && (
           <button type="button" onClick={deleteActiveFolder} style={{ ...styles.hideIpBtn, whiteSpace: 'nowrap', color: 'var(--danger)' }} title="Supprimer ce dossier">Supprimer</button>
         )}
-        <button type="button" onClick={createFolder} style={{ ...styles.hideIpBtn, whiteSpace: 'nowrap' }} title="Créer un dossier">+ Dossier</button>
+        <button type="button" onClick={createFolder} style={{ ...styles.hideIpBtn, whiteSpace: 'nowrap', color: 'var(--accent)' }} title="Créer un dossier">+ Dossier</button>
       </div>
 
       <div style={styles.sectionHeader}>
