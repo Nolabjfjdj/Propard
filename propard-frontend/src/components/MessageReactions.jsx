@@ -135,10 +135,7 @@ export default function MessageReactions({ reactions = [], userId, onReact, show
   }, [activeGroup, search]);
 
   useLayoutEffect(() => {
-    if (!showPicker) {
-      setPickerPosition(null);
-      return undefined;
-    }
+    if (!showPicker) return undefined;
 
     const updatePickerPosition = () => {
       const picker = pickerRef.current;
