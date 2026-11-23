@@ -683,6 +683,9 @@ export default function FriendList({
               <div style={styles.friendInfo}>
                 <p style={styles.friendName}>
                   {group?.name || 'Groupe'}
+                  {folderData.assignments['group:' + groupId] && (
+                    <span style={styles.folderLabel}>{folderData.assignments['group:' + groupId]}</span>
+                  )}
                 </p>
 
                 <p style={styles.friendIp}>
@@ -708,9 +711,6 @@ export default function FriendList({
                   </select>
                 ) : (
                   <>
-                    {folderData.assignments['group:' + groupId] && (
-                      <span style={styles.folderLabel}>{folderData.assignments['group:' + groupId]}</span>
-                    )}
                     <button
                       type="button"
                       style={styles.editFolderBtn}
@@ -831,6 +831,9 @@ export default function FriendList({
                   {friend.nickname ||
                     friendUser?.displayName ||
                     friendUser?.username}
+                  {folderData.assignments['friend:' + friendId] && (
+                    <span style={styles.folderLabel}>{folderData.assignments['friend:' + friendId]}</span>
+                  )}
                 </p>
 
                 <p style={styles.friendIp}>
@@ -858,9 +861,6 @@ export default function FriendList({
                   </select>
                 ) : (
                   <>
-                    {folderData.assignments['friend:' + friendId] && (
-                      <span style={styles.folderLabel}>{folderData.assignments['friend:' + friendId]}</span>
-                    )}
                     <button
                       type="button"
                       style={styles.editFolderBtn}
@@ -928,6 +928,9 @@ const styles = {
   },
 
   folderLabel: {
+    display: 'inline-block',
+    marginLeft: '6px',
+    verticalAlign: 'middle',
     maxWidth: '88px',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
