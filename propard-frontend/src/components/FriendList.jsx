@@ -33,6 +33,7 @@ export default function FriendList({
     }
   });
   const [activeFolder, setActiveFolder] = useState('all');
+  const [editingFolderKey, setEditingFolderKey] = useState(null);
   const folderEditedRef = useRef(false);
   const folderDataRef = useRef(folderData);
 
@@ -689,16 +690,39 @@ export default function FriendList({
                 </p>
               </div>
 
-              <select
-                aria-label={'Dossier du groupe ' + (group?.name || '')}
-                value={folderData.assignments['group:' + groupId] || ''}
-                onClick={event => event.stopPropagation()}
-                onChange={event => assignFolder('group:' + groupId, event.target.value)}
-                style={styles.folderSelect}
-              >
-                <option value="">Sans dossier</option>
-                {folderData.names.map(name => <option key={name} value={name}>{name}</option>)}
-              </select>
+              <div style={styles.folderControl} onClick={event => event.stopPropagation()}>
+                {editingFolderKey === 'group:' + groupId ? (
+                  <select
+                    aria-label={'Dossier du groupe ' + (group?.name || '')}
+                    autoFocus
+                    value={folderData.assignments['group:' + groupId] || ''}
+                    onChange={event => {
+                      assignFolder('group:' + groupId, event.target.value);
+                      setEditingFolderKey(null);
+                    }}
+                    onBlur={() => setEditingFolderKey(null)}
+                    style={styles.folderSelect}
+                  >
+                    <option value="">Sans dossier</option>
+                    {folderData.names.map(name => <option key={name} value={name}>{name}</option>)}
+                  </select>
+                ) : (
+                  <>
+                    {folderData.assignments['group:' + groupId] && (
+                      <span style={styles.folderLabel}>{folderData.assignments['group:' + groupId]}</span>
+                    )}
+                    <button
+                      type="button"
+                      style={styles.editFolderBtn}
+                      onClick={() => setEditingFolderKey('group:' + groupId)}
+                      title="Modifier le dossier"
+                      aria-label={'Modifier le dossier du groupe ' + (group?.name || '')}
+                    >
+                      ✏️
+                    </button>
+                  </>
+                )}
+              </div>
 
               {unreadCount > 0 && (
                 <div style={styles.badge}>
@@ -816,16 +840,39 @@ export default function FriendList({
                 </p>
               </div>
 
-              <select
-                aria-label={'Dossier de ' + (friend.nickname || friendUser?.username || 'cet ami')}
-                value={folderData.assignments['friend:' + friendId] || ''}
-                onClick={event => event.stopPropagation()}
-                onChange={event => assignFolder('friend:' + friendId, event.target.value)}
-                style={styles.folderSelect}
-              >
-                <option value="">Sans dossier</option>
-                {folderData.names.map(name => <option key={name} value={name}>{name}</option>)}
-              </select>
+              <div style={styles.folderControl} onClick={event => event.stopPropagation()}>
+                {editingFolderKey === 'friend:' + friendId ? (
+                  <select
+                    aria-label={'Dossier de ' + (friend.nickname || friendUser?.username || 'cet ami')}
+                    autoFocus
+                    value={folderData.assignments['friend:' + friendId] || ''}
+                    onChange={event => {
+                      assignFolder('friend:' + friendId, event.target.value);
+                      setEditingFolderKey(null);
+                    }}
+                    onBlur={() => setEditingFolderKey(null)}
+                    style={styles.folderSelect}
+                  >
+                    <option value="">Sans dossier</option>
+                    {folderData.names.map(name => <option key={name} value={name}>{name}</option>)}
+                  </select>
+                ) : (
+                  <>
+                    {folderData.assignments['friend:' + friendId] && (
+                      <span style={styles.folderLabel}>{folderData.assignments['friend:' + friendId]}</span>
+                    )}
+                    <button
+                      type="button"
+                      style={styles.editFolderBtn}
+                      onClick={() => setEditingFolderKey('friend:' + friendId)}
+                      title="Modifier le dossier"
+                      aria-label={'Modifier le dossier de ' + (friend.nickname || friendUser?.username || 'cet ami')}
+                    >
+                      ✏️
+                    </button>
+                  </>
+                )}
+              </div>
 
               {isDropTarget ? (
                 <div style={styles.dropHint}>
@@ -871,6 +918,34 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between'
+  },
+
+  folderControl: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    flexShrink: 0
+  },
+
+  folderLabel: {
+    maxWidth: '88px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    fontSize: '10px',
+    color: 'var(--text-muted)'
+  },
+
+  editFolderBtn: {
+    background: 'transparent',
+    border: '1px solid var(--border)',
+    borderRadius: '6px',
+    color: 'var(--text-secondary)',
+    cursor: 'pointer',
+    fontSize: '13px',
+    lineHeight: 1,
+    padding: '5px',
+    flexShrink: 0
   },
 
   folderSelect: {
