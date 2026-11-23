@@ -681,12 +681,12 @@ export default function FriendList({
               </div>
 
               <div style={styles.friendInfo}>
-                <p style={styles.friendName}>
-                  {group?.name || 'Groupe'}
+                <div style={styles.friendName}>
+                  <span style={styles.conversationName}>{group?.name || 'Groupe'}</span>
                   {folderData.assignments['group:' + groupId] && (
                     <span style={styles.folderLabel}>{folderData.assignments['group:' + groupId]}</span>
                   )}
-                </p>
+                </div>
 
                 <p style={styles.friendIp}>
                   {group?.members?.length || 0} membre(s)
@@ -827,14 +827,16 @@ export default function FriendList({
                 }
                 title="Voir le profil"
               >
-                <p style={styles.friendName}>
-                  {friend.nickname ||
-                    friendUser?.displayName ||
-                    friendUser?.username}
+                <div style={styles.friendName}>
+                  <span style={styles.conversationName}>
+                    {friend.nickname ||
+                      friendUser?.displayName ||
+                      friendUser?.username}
+                  </span>
                   {folderData.assignments['friend:' + friendId] && (
                     <span style={styles.folderLabel}>{folderData.assignments['friend:' + friendId]}</span>
                   )}
-                </p>
+                </div>
 
                 <p style={styles.friendIp}>
                   {hideFriendIps
@@ -929,8 +931,7 @@ const styles = {
 
   folderLabel: {
     display: 'inline-block',
-    marginLeft: '6px',
-    verticalAlign: 'middle',
+    flex: '0 0 auto',
     maxWidth: '88px',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -1080,12 +1081,21 @@ const styles = {
   },
 
   friendName: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    minWidth: 0,
     fontSize: '14px',
     fontWeight: '500',
-    color: 'var(--text-primary)',
-    whiteSpace: 'nowrap',
+    color: 'var(--text-primary)'
+  },
+
+  conversationName: {
+    minWidth: 0,
     overflow: 'hidden',
-    textOverflow: 'ellipsis'
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    flex: '0 1 auto'
   },
 
   friendIp: {
