@@ -7,6 +7,7 @@ const AIConversation = require('../models/AIConversation');
 const User = require('../models/User');
 const Group = require('../models/Group');
 const { createGroqCompletion, getGroqConfiguration, transcribeGroqAudio } = require('../services/groq');
+const { validateToolCall } = require('../services/aiToolAuthorization');
 
 const cleanToolText = (value, maxLength = 64) => typeof value === 'string'
   ? value.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, maxLength)
@@ -686,20 +687,11 @@ UTILISATION DES OUTILS ET CONFIDENTIALITÉ
         const toolName = toolCall.function?.name;
         let result;
         try {
-          const args = JSON.parse(toolCall.function?.arguments || '{}');
-          const allowedKeys = {
-            get_my_profile: [],
-            list_my_friends: [],
-            list_my_groups: [],
-            prepare_private_message: ['recipient', 'content'],
-            prepare_group_message: ['groupId', 'content'],
-            request_last_private_message: ['recipient', 'direction'],
-            request_last_group_message: ['groupId']
-          }[toolName];
-          if (!args || typeof args !== 'object' || Array.isArray(args) || !allowedKeys || Object.keys(args).some(key => !allowedKeys.includes(key)) || allowedKeys.some(key => !Object.prototype.hasOwnProperty.call(args, key))) {
-            result = { error: 'Arguments invalides.' };
+          const validation = validateToolCall(toolCall, selectedTools);
+          if (!validation.ok) {
+            result = { error: validation.error };
           } else {
-            result = await executeTool(toolName, args);
+            result = await executeTool(validation.name, validation.args);
           }
         } catch {
           result = { error: 'Impossible d’exécuter cet outil.' };
