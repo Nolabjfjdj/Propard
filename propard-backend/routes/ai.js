@@ -684,7 +684,6 @@ UTILISATION DES OUTILS ET CONFIDENTIALITÉ
       });
 
       for (const toolCall of toolCalls) {
-        const toolName = toolCall.function?.name;
         let result;
         try {
           const validation = validateToolCall(toolCall, selectedTools);
